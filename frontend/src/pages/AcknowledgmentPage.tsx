@@ -17,6 +17,7 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import api from '../services/api';
+import { authService } from '../services/authService';
 
 interface Document {
   id: string;
@@ -37,6 +38,7 @@ interface Document {
   sharePointItemId?: string;
   confluenceSpaceKey?: string;
   confluencePageId?: string;
+  documentUrl?: string | null; // Cached URL for the document
 }
 
 export function AcknowledgmentPage() {
@@ -51,10 +53,17 @@ export function AcknowledgmentPage() {
   }, []);
 
   useEffect(() => {
-    // Generate URLs for all documents
+    // Use stored URLs first, generate only if missing
     const generateUrls = async () => {
       const urlMap: Record<string, string> = {};
       for (const doc of documents) {
+        // Use stored documentUrl if available
+        if (doc.documentUrl) {
+          urlMap[doc.id] = doc.documentUrl;
+          continue;
+        }
+        
+        // Only generate URL if not stored
         const url = await getDocumentUrl(doc);
         if (url) {
           urlMap[doc.id] = url;
@@ -64,6 +73,8 @@ export function AcknowledgmentPage() {
     };
     if (documents.length > 0) {
       generateUrls();
+    } else {
+      setDocumentUrls({});
     }
   }, [documents]);
 
@@ -118,14 +129,51 @@ export function AcknowledgmentPage() {
   const getDocumentUrl = async (doc: Document): Promise<string | null> => {
     try {
       if (doc.storageLocation === 'SHAREPOINT' && doc.sharePointSiteId && doc.sharePointDriveId && doc.sharePointItemId) {
-        const response = await api.get('/api/sharepoint/url', {
-          params: {
-            siteId: doc.sharePointSiteId,
-            driveId: doc.sharePointDriveId,
-            itemId: doc.sharePointItemId,
-          },
-        });
-        return response.data.url;
+        // Get Graph token and pass it to the URL endpoint
+        const graphToken = await authService.getGraphAccessToken();
+        
+        if (graphToken) {
+          // First, try to get webUrl directly from the item endpoint (fastest)
+          try {
+            const response = await api.get(`/api/sharepoint/items/${doc.sharePointItemId}`, {
+              params: {
+                siteId: doc.sharePointSiteId,
+                driveId: doc.sharePointDriveId,
+              },
+              headers: {
+                'x-graph-token': graphToken,
+              },
+            });
+            if (response.data?.webUrl) {
+              return response.data.webUrl;
+            }
+          } catch (error) {
+            console.error('Error fetching SharePoint item:', error);
+          }
+
+          // Fallback: use the URL endpoint with the token
+          try {
+            const response = await api.get('/api/sharepoint/url', {
+              params: {
+                siteId: doc.sharePointSiteId,
+                driveId: doc.sharePointDriveId,
+                itemId: doc.sharePointItemId,
+              },
+              headers: {
+                'x-graph-token': graphToken,
+              },
+            });
+            if (response.data?.url) {
+              return response.data.url;
+            }
+          } catch (error) {
+            console.error('Error generating SharePoint URL:', error);
+          }
+        } else {
+          // No token available - cannot generate URL
+          console.warn('No Graph access token available for SharePoint document URL');
+        }
+        return null;
       }
       if (doc.storageLocation === 'CONFLUENCE' && doc.confluenceSpaceKey && doc.confluencePageId) {
         const response = await api.get('/api/confluence/url', {

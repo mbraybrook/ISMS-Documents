@@ -49,6 +49,9 @@ export function Layout({ children }: LayoutProps) {
                       <MenuItem as={RouterLink} to="/risks/controls">
                         Controls
                       </MenuItem>
+                      <MenuItem as={RouterLink} to="/risks/interested-parties">
+                        Interested Parties
+                      </MenuItem>
                     </MenuList>
                   </Menu>
                   <Menu>

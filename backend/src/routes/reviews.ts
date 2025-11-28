@@ -125,7 +125,7 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
         },
         status: { in: ['APPROVED', 'IN_REVIEW'] },
         // Exclude documents that already have active ReviewTasks
-        reviewTasks: {
+        ReviewTask: {
           none: {
             status: { in: ['PENDING', 'OVERDUE'] },
           },
@@ -153,7 +153,7 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
         },
         status: { in: ['APPROVED', 'IN_REVIEW'] },
         // Exclude documents that already have active ReviewTasks
-        reviewTasks: {
+        ReviewTask: {
           none: {
             status: { in: ['PENDING', 'OVERDUE'] },
           },
@@ -180,7 +180,7 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
         nextReviewDate: null,
         status: { in: ['APPROVED', 'IN_REVIEW'] },
         // Exclude documents that already have active ReviewTasks
-        reviewTasks: {
+        ReviewTask: {
           none: {
             status: { in: ['PENDING', 'OVERDUE'] },
           },

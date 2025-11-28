@@ -2,24 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Heading,
-  Table,
-  Thead,
-  Tbody,
   Tr,
-  Th,
   Td,
   Button,
   HStack,
   VStack,
   Badge,
   useDisclosure,
-  Select,
-  Input,
-  InputGroup,
-  InputLeftElement,
   Text,
-  IconButton,
-  Tooltip,
   useToast,
   Modal,
   ModalOverlay,
@@ -38,11 +28,15 @@ import {
   AlertDialogContent,
   AlertDialogOverlay,
   useDisclosure as useAlertDisclosure,
-  Spinner,
+  Checkbox,
+  Input,
+  Select,
 } from '@chakra-ui/react';
 import { SearchIcon, EditIcon, DeleteIcon, AddIcon, DownloadIcon, ChevronUpIcon, ChevronDownIcon, InfoIcon } from '@chakra-ui/icons';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
+import { formatBoolean } from '../utils/tableUtils';
 
 interface Asset {
   id: string;
@@ -110,6 +104,7 @@ export function AssetsPage() {
   const [owners, setOwners] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const initialFormDataRef = useRef<string>('');
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -526,6 +521,161 @@ export function AssetsPage() {
     return 'purple';
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedAssets(new Set(assets.map((a) => a.id)));
+    } else {
+      setSelectedAssets(new Set());
+    }
+  };
+
+  const handleSelectAsset = (assetId: string, checked: boolean) => {
+    const newSelected = new Set(selectedAssets);
+    if (checked) {
+      newSelected.add(assetId);
+    } else {
+      newSelected.delete(assetId);
+    }
+    setSelectedAssets(newSelected);
+  };
+
+  // DataTable configuration
+  const columns: Column<Asset>[] = [
+    {
+      key: 'date',
+      header: 'Date',
+      sortable: true,
+      render: (asset) => new Date(asset.date).toLocaleDateString(),
+    },
+    {
+      key: 'category',
+      header: 'Category',
+      sortable: true,
+      render: (asset) => asset.category.name,
+    },
+    {
+      key: 'assetSubCategory',
+      header: 'Sub-category',
+      render: (asset) => asset.assetSubCategory || <Text color="gray.400" fontSize="xs">—</Text>,
+    },
+    {
+      key: 'owner',
+      header: 'Owner',
+      sortable: true,
+      render: (asset) => asset.owner,
+    },
+    {
+      key: 'primaryUser',
+      header: 'Primary User',
+      render: (asset) => asset.primaryUser || <Text color="gray.400" fontSize="xs">Not assigned</Text>,
+    },
+    {
+      key: 'model',
+      header: 'Model',
+      render: (asset) => asset.model || <Text color="gray.400">—</Text>,
+    },
+    {
+      key: 'nameSerialNo',
+      header: 'Serial No',
+      render: (asset) => asset.nameSerialNo || <Text color="gray.400">—</Text>,
+    },
+    {
+      key: 'classification',
+      header: 'Classification',
+      render: (asset) => (
+        <Badge colorScheme={getClassificationColor(asset.classification.name)}>
+          {asset.classification.name}
+        </Badge>
+      ),
+    },
+    {
+      key: 'cdeImpacting',
+      header: 'CDE',
+      render: (asset) =>
+        asset.cdeImpacting ? (
+          <Badge colorScheme="red" display="flex" alignItems="center" justifyContent="center" w="50px">
+            ✓
+          </Badge>
+        ) : (
+          <Badge colorScheme="gray" display="flex" alignItems="center" justifyContent="center" w="50px">
+            ✗
+          </Badge>
+        ),
+    },
+    {
+      key: 'risks',
+      header: 'Risks',
+      render: (asset) =>
+        (asset._count?.risks || 0) > 0 ? (
+          <Badge colorScheme="purple">{asset._count?.risks || 0}</Badge>
+        ) : (
+          <Text fontSize="xs" color="gray.400">—</Text>
+        ),
+    },
+  ];
+
+  const filterConfigs: FilterConfig[] = [
+    {
+      key: 'search',
+      type: 'search',
+      placeholder: 'Search assets...',
+    },
+    {
+      key: 'categoryId',
+      type: 'select',
+      placeholder: 'All Categories',
+      options: categories.map((cat) => ({ value: cat.id, label: cat.name })),
+    },
+    {
+      key: 'classificationId',
+      type: 'select',
+      placeholder: 'All Classifications',
+      options: classifications.map((cls) => ({ value: cls.id, label: cls.name })),
+    },
+  ];
+
+  const actions: ActionButton<Asset>[] = canEdit
+    ? [
+        {
+          icon: <EditIcon />,
+          label: 'Edit',
+          onClick: handleEdit,
+          colorScheme: 'blue',
+        },
+        {
+          icon: <DeleteIcon />,
+          label: 'Delete',
+          onClick: handleDelete,
+          colorScheme: 'red',
+        },
+      ]
+    : [];
+
+  const paginationConfig: PaginationConfig = {
+    mode: 'server',
+    page: filters.page,
+    pageSize: filters.limit,
+    total: pagination.total,
+    totalPages: pagination.totalPages,
+    onPageChange: (page) => setFilters({ ...filters, page }),
+    onPageSizeChange: (newSize) => setFilters({ ...filters, limit: newSize, page: 1 }),
+  };
+
+  const sortConfig: SortConfig = {
+    field: filters.sortBy,
+    direction: filters.sortOrder,
+    onSort: handleSort,
+  };
+
+  // CSV export is handled separately since we need to fetch all data for server-side pagination
+  const csvExportConfig: CSVExportConfig = {
+    enabled: false, // Disabled - using separate export button
+    filename: '',
+    headers: [],
+    getRowData: () => [],
+  };
+
+
   const downloadTemplate = () => {
     const headers = [
       'Date',
@@ -626,199 +776,34 @@ export function AssetsPage() {
         </HStack>
       </HStack>
 
-      <Box p={4} bg="white" borderRadius="md" boxShadow="sm">
-        <HStack justify="space-between" mb={4}>
-          <Heading size="sm">Filters</Heading>
-          {getActiveFilterCount() > 0 && (
-            <HStack spacing={2}>
-              <Badge colorScheme="blue" fontSize="sm">
-                {getActiveFilterCount()} active
-              </Badge>
-              <Button size="xs" variant="ghost" onClick={clearAllFilters}>
-                Clear All
-              </Button>
-            </HStack>
-          )}
-        </HStack>
-        <HStack spacing={4}>
-          <InputGroup flex="1">
-            <InputLeftElement pointerEvents="none">
-              <SearchIcon color="gray.300" />
-            </InputLeftElement>
-            <Input
-              placeholder="Search assets..."
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value, page: 1 })}
-            />
-          </InputGroup>
-          <Select
-            placeholder="All Categories"
-            value={filters.categoryId}
-            onChange={(e) => setFilters({ ...filters, categoryId: e.target.value, page: 1 })}
-            width="200px"
-          >
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            placeholder="All Classifications"
-            value={filters.classificationId}
-            onChange={(e) => setFilters({ ...filters, classificationId: e.target.value, page: 1 })}
-            width="200px"
-          >
-            {classifications.map((cls) => (
-              <option key={cls.id} value={cls.id}>
-                {cls.name}
-              </option>
-            ))}
-          </Select>
-        </HStack>
-      </Box>
-
-      {loading ? (
-        <Box textAlign="center" py={8}>
-          <Spinner size="xl" />
-        </Box>
-      ) : (
-        <Box overflowX="auto" position="relative">
-          <Table variant="simple" size="sm">
-            <Thead>
-              <Tr>
-                <Th cursor="pointer" onClick={() => handleSort('date')} _hover={{ bg: 'gray.50' }} whiteSpace="nowrap">
-                  <HStack spacing={1}>
-                    <Text>Date</Text>
-                    {filters.sortBy === 'date' && (
-                      filters.sortOrder === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />
-                    )}
-                  </HStack>
-                </Th>
-                <Th cursor="pointer" onClick={() => handleSort('category')} _hover={{ bg: 'gray.50' }} whiteSpace="nowrap">
-                  <HStack spacing={1}>
-                    <Text>Category</Text>
-                    {filters.sortBy === 'category' && (
-                      filters.sortOrder === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />
-                    )}
-                  </HStack>
-                </Th>
-                <Th whiteSpace="nowrap">Sub-category</Th>
-                <Th cursor="pointer" onClick={() => handleSort('owner')} _hover={{ bg: 'gray.50' }} whiteSpace="nowrap">
-                  <HStack spacing={1}>
-                    <Text>Owner</Text>
-                    {filters.sortBy === 'owner' && (
-                      filters.sortOrder === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />
-                    )}
-                  </HStack>
-                </Th>
-                <Th whiteSpace="nowrap">Primary User</Th>
-                <Th whiteSpace="nowrap">Model</Th>
-                <Th whiteSpace="nowrap">Serial No</Th>
-                <Th whiteSpace="nowrap">Classification</Th>
-                <Th whiteSpace="nowrap">CDE</Th>
-                <Th whiteSpace="nowrap">Risks</Th>
-                <Th position="sticky" right={0} bg="white" zIndex={10} boxShadow="sm" whiteSpace="nowrap">Actions</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {assets.length === 0 ? (
-                <Tr>
-                  <Td colSpan={11} textAlign="center">
-                    <Text color="gray.500">No assets found</Text>
-                  </Td>
-                </Tr>
-              ) : (
-                assets.map((asset) => (
-                  <Tr key={asset.id}>
-                    <Td>{new Date(asset.date).toLocaleDateString()}</Td>
-                    <Td>{asset.category.name}</Td>
-                    <Td>{asset.assetSubCategory || <Text color="gray.400" fontSize="xs">—</Text>}</Td>
-                    <Td>{asset.owner}</Td>
-                    <Td>{asset.primaryUser || <Text color="gray.400" fontSize="xs">Not assigned</Text>}</Td>
-                    <Td>{asset.model || <Text color="gray.400">—</Text>}</Td>
-                    <Td>{asset.nameSerialNo || <Text color="gray.400">—</Text>}</Td>
-                    <Td>
-                      <Badge colorScheme={getClassificationColor(asset.classification.name)}>
-                        {asset.classification.name}
-                      </Badge>
-                    </Td>
-                    <Td>
-                      {asset.cdeImpacting ? (
-                        <Badge colorScheme="red" display="flex" alignItems="center" justifyContent="center" w="50px">
-                          ✓
-                        </Badge>
-                      ) : (
-                        <Badge colorScheme="gray" display="flex" alignItems="center" justifyContent="center" w="50px">
-                          ✗
-                        </Badge>
-                      )}
-                    </Td>
-                    <Td>
-                      {(asset._count?.risks || 0) > 0 ? (
-                        <Badge colorScheme="purple">{asset._count?.risks || 0}</Badge>
-                      ) : (
-                        <Text fontSize="xs" color="gray.400">—</Text>
-                      )}
-                    </Td>
-                    <Td position="sticky" right={0} bg="white" zIndex={10} boxShadow="-2px 0 4px rgba(0,0,0,0.1)">
-                      <HStack spacing={2}>
-                        {canEdit && (
-                          <>
-                            <Tooltip label="Edit">
-                              <IconButton
-                                aria-label="Edit asset"
-                                icon={<EditIcon />}
-                                size="sm"
-                                onClick={() => handleEdit(asset)}
-                              />
-                            </Tooltip>
-                            <Tooltip label="Delete">
-                              <IconButton
-                                aria-label="Delete asset"
-                                icon={<DeleteIcon />}
-                                size="sm"
-                                colorScheme="red"
-                                onClick={() => handleDelete(asset)}
-                              />
-                            </Tooltip>
-                          </>
-                        )}
-                      </HStack>
-                    </Td>
-                  </Tr>
-                ))
-              )}
-            </Tbody>
-          </Table>
-        </Box>
-      )}
-
-      {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <HStack justify="center" spacing={4}>
-          <Text fontSize="sm" color="gray.600">
-            Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} assets
-          </Text>
-          <HStack spacing={2}>
-            <Button
-              isDisabled={pagination.page === 1}
-              onClick={() => setFilters({ ...filters, page: filters.page - 1 })}
-            >
-              Previous
-            </Button>
-            <Text>
-              Page {pagination.page} of {pagination.totalPages}
-            </Text>
-            <Button
-              isDisabled={pagination.page === pagination.totalPages}
-              onClick={() => setFilters({ ...filters, page: filters.page + 1 })}
-            >
-              Next
-            </Button>
-          </HStack>
-        </HStack>
-      )}
+      <DataTable
+        title=""
+        data={assets}
+        columns={columns}
+        loading={loading}
+        emptyMessage="No assets found"
+        filters={filterConfigs}
+        filterValues={{
+          search: filters.search,
+          categoryId: filters.categoryId,
+          classificationId: filters.classificationId,
+        }}
+        onFilterChange={(key, value) => {
+          setFilters({ ...filters, [key]: value, page: 1 });
+        }}
+        onClearFilters={clearAllFilters}
+        showFiltersHeading={true}
+        sortConfig={sortConfig}
+        enableSelection={canEdit}
+        selectedIds={selectedAssets}
+        onSelectAll={handleSelectAll}
+        onSelectRow={handleSelectAsset}
+        getRowId={(asset) => asset.id}
+        pagination={paginationConfig}
+        actions={actions}
+        csvExport={csvExportConfig}
+        onRowClick={canEdit ? handleEdit : undefined}
+      />
 
       {/* Create/Edit Modal */}
       <Modal isOpen={isOpen} onClose={handleCloseAttempt} size="xl">

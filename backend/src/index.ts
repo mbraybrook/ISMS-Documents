@@ -15,6 +15,7 @@ import { usersRouter } from './routes/users';
 import classificationsRouter from './routes/classifications';
 import assetCategoriesRouter from './routes/assetCategories';
 import assetsRouter from './routes/assets';
+import interestedPartiesRouter from './routes/interestedParties';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -38,6 +39,7 @@ app.use('/api/users', usersRouter);
 app.use('/api/classifications', classificationsRouter);
 app.use('/api/asset-categories', assetCategoriesRouter);
 app.use('/api/assets', assetsRouter);
+app.use('/api/interested-parties', interestedPartiesRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);

@@ -1,0 +1,77 @@
+Interested Parties,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+Date Added,Group,Interested party,Requirements,Will this be addressed through ISMS: Yes/No?,How the Requirements will be addressed through the ISMS,Source/Link to Supporting Information,Key products / services,Our obligations,Their obligations,Risk links
+07/10/2024,Suppliers,Amazon Web Services,Compliance with security and privacy policies,Yes,"Implementing AWS security best practices, regular audits, continuous monitoring",https://aws.amazon.com/security/,Web hosting and services,"Use as per published guidance.
+Keep payments up-to-date.","Maintain relevant security compliance (ISO 27001, PCI DSS).","20, 48"
+07/10/2024,Suppliers,Rackspace,"Adherence to service level agreements (SLAs), data protection",Yes,"SLA management, data encryption, regular compliance reviews",NA,Support and support portal,Keep payments up-to-date.,Maintain relevant security compliance (PCI DSS).,31
+07/10/2024,Suppliers,Claranet (Security testing company),"Timely and secure access for testing, reporting vulnerabilities",Yes,"Controlled access management, vulnerability management process",NA,"Penetration testing, vulnerability scanning","Keep payments up-to-date. 
+Agree terms of engagement to prevent disruption.","Maintain relevant compliance (CREST, CEH, OSCE, ISO 27001, PCI DSS).",48
+07/10/2024,Suppliers,Alert Logic,"Incident detection and response, compliance reporting",Yes,"Implementing SIEM solutions, incident response procedures",https://www.alertlogic.com/,"Vulnerability scanning, Intrusion Detection System","Verify security status, check SSL certificates.
+Use services as documented.","Maintain relevant compliance (PCI DSS, ISO 27001).",
+07/10/2024,Suppliers,Payment gateways / connected acquirers,"PCI-DSS compliance, secure transaction processing",Yes,"PCI-DSS certified processes, transaction monitoring, encryption",https://www.pcisecuritystandards.org/,Payment API’s,"Verify security status, check SSL certificates.
+Use services as documented.","Maintain relevant compliance (PCI DSS, ISO 27001).",9
+07/10/2024,Clients,"Financial sector clients (e.g. Target, STB)","Data protection, regulatory compliance, risk management",Yes,"Implementing industry-specific controls, regular audits, compliance checks",NA,Paythru gateway,"Maintain relevant compliance (PCI DSS, ISO 27001). Additional completion of clients' own security questionnaire.","Keep payments up-to-date. 
+Appropriately handle any information received from Paythru which is protected by copyright or security classifications.
+Comply with the requirements of the client contract (esp. Warranty). Including items such as:
+Use our products and APIs as documented and for the purposes they were designed. 
+Maintain the integrity of their interface with our platform. 
+Maintain their own applicable PCI DSS obligations. 
+Notify Paythru of any new or changing obligations. Implement recommendations provided by Paythru.","56, 57, 60"
+07/10/2024,Clients,Transport & mobility sector clients,"Secure data exchange, operational continuity",Yes,"Implementing secure communication protocols, business continuity planning",NA,Paythru gateway,"Maintain relevant compliance (PCI DSS, ISO 27001) inline with our contractual obligations.",,
+07/10/2024,Clients,General e-commerce sector clients,"Secure payment processing, customer data protection",Yes,"Implementing e-commerce security standards, data encryption, compliance",NA,Paythru gateway,"Maintain relevant compliance (PCI DSS, ISO 27001) inline with our contractual obligations.",,
+07/10/2024,Internal,Board,"Strategic oversight, risk management",Yes,"Regular ISMS reporting, risk assessments, compliance audits",Internal Audit reports,"All platforms, products and processes",Report on a regular basis on our ISMS policy and programme of continual improvement.,"Contribute to and support the continual improvement of the Information Security Management System via regular meetings, approving documentation changes and challenging the status quo.",
+07/10/2024,Internal,Shareholders,"Return on investment, risk mitigation	",Yes,"Transparency through ISMS performance reports, risk management strategies",Shareholder meetings/reports,Paythru gateway,"Maintain relevant compliance (PCI DSS, ISO 27001).",Adhere to Shareholder Agreement (August 2009) and the Companies Articles.,
+07/10/2024,Internal,Employees,"i. To ensure all internal policies and procedures are followed. 
+ii. To ensure that clients requests are adhered to appropriately. 
+iii. Job satisfaction and good conditions of service. 
+iv. Personal data are stored, processed, disposed of according to the privacy legislation within their jurisdiction. 
+v. secure working environments.",Yes,"Implementing access controls, security awareness training, privacy policies.
+
+The ISMS prescribes the practices and policies that all staff are beholden to undertake to uphold the required security competence and oversight. ","Employee handbook 
+ 
+
+Job descriptions 
+ 
+
+ISMS Policies and training programs",All operations,"Provide regular and up-to-date training on security topics and risk changes based on a programme of continual improvement.
+Encourage involvement from staff members in the development of the ISMS. ","Complete training, accurately and within the timescales set. Undertake tasks as delegated by the CISO or MD diligently and competently. Actively report on compromises or non-compliance issues through the appropriate channels. Actively feedback on the ISMS to promote continual improvement. Abide by the controls, procedures and requirements of the ISMS.",61
+07/10/2024,Regulatory Body,Information Commissioners Office,"Compliance with data protection regulations (e.g., GDPR)",Yes,"Implementing data protection policies, regular compliance audits, reporting mechanisms",https://www.ico.org.uk,Personal Data processing,Comply with all current relevant data protection and related regulations (see Legislation tab).,Provide national corrective enforcement of the Personal Data processing rules to ensure consistent implementation and a fair market (allowing those who do comply to compete effectively).,62
+07/10/2024,Regulatory Body,UK Government,"Compliance with national security standards, cyber resilience",Yes,"Adhering to NCSC guidelines, implementing government-mandated security controls",https://www.gov.uk/browse/business,"Supporting infrastructure, nation state",Comply with all current relevant data protection and related regulations (see Legislation tab). Maintain accurate accounting records and appropriate financial reporting.,Provide an industrial framework within which our company can operate.,63
+07/10/2024,Internal,Insurers,"i. Insurers require comprehensive risk management and data protection to assess the insurability of the organisation.
+
+ii. Compliance with cybersecurity standards (e.g., ISO 27001) and assurance that risks related to data breaches and incidents are managed properly.
+
+iii. Evidence of proper business continuity plans and incident management processes.
+
+iv. Regular audits and certifications to validate the security controls in place.",Yes,"i. The Information Security Management System (ISMS) will ensure that risk management processes are in place to identify, assess, and mitigate risks that could lead to a breach.
+
+ii. Data protection mechanisms will be implemented through encryption, access control, and secure data handling processes.
+
+iii. Business continuity and disaster recovery plans will be regularly tested and documented to ensure operations can continue in case of an incident.
+
+iv Regular audits and internal reviews will be conducted as part of ISMS to ensure compliance and readiness for insurer evaluations.",,"i. Cyber Insurance or Data Breach Insurance coverage.
+
+ii. Business Interruption Insurance which relies on the continuity of operations and data integrity.
+
+
+iii. Liability insurance for handling client data and protecting the company in case of data breaches or security incidents.","i. Maintain comprehensive documentation and audit trails for all information security processes.
+
+ii. Ensure compliance with data protection regulations (e.g., GDPR) and have appropriate controls in place to meet insurer requirements.
+
+
+iii. Report incidents in a timely manner and cooperate with insurers during assessments and claims.
+
+
+iv. Ensure that all staff are trained and aware of the security controls and processes required to mitigate risks.","i. Provide clear terms and expectations regarding risk management requirements for coverage.
+
+ii. Offer guidance or templates for specific security measures they expect paythru to implement.
+
+iii. Conduct periodic reviews or assessments to ensure that paythru continues to meet the necessary conditions for insurance coverage.
+
+
+iv. Provide support in the event of an incident, including legal, technical, and financial support as outlined in the policy agreement.",
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,

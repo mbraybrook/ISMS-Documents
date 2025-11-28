@@ -19,6 +19,8 @@ export interface SharePointItem {
   lastModifiedDateTime: string;
   createdDateTime: string;
   size: number;
+  siteId?: string; // Added to track which site the item belongs to
+  driveId?: string; // Added to track which drive the item belongs to
   folder?: {
     childCount: number;
   };
@@ -53,13 +55,29 @@ export async function getSharePointItem(
 ): Promise<SharePointItem | null> {
   try {
     const client = createGraphClient(accessToken);
-    const item = await client
-      .api(`/sites/${siteId}/drives/${driveId}/items/${itemId}`)
-      .get();
+    const apiPath = `/sites/${siteId}/drives/${driveId}/items/${itemId}`;
+    console.log('[SharePointService] Fetching item from Graph API', { apiPath, itemId });
+    
+    const item = await client.api(apiPath).get();
+
+    console.log('[SharePointService] Successfully fetched item', {
+      itemId,
+      hasWebUrl: !!(item as any)?.webUrl,
+      name: (item as any)?.name,
+    });
 
     return item as SharePointItem;
-  } catch (error) {
-    console.error('Error fetching SharePoint item:', error);
+  } catch (error: any) {
+    console.error('[SharePointService] Error fetching SharePoint item:', {
+      error: error.message,
+      code: error.code,
+      statusCode: error.statusCode,
+      status: error.status,
+      body: error.body,
+      itemId,
+      siteId,
+      driveId,
+    });
     return null;
   }
 }
@@ -102,15 +120,62 @@ export async function listSharePointItems(
 
 /**
  * Generate SharePoint URL for an item
+ * If accessToken is provided, attempts to fetch the actual webUrl from SharePoint
+ * Otherwise returns null (cannot generate a valid web URL without access token)
  */
-export function generateSharePointUrl(
+export async function generateSharePointUrl(
   siteId: string,
   driveId: string,
-  itemId: string
-): string {
-  // Construct SharePoint URL
-  // This is a simplified version - in production, you might need the actual site URL
-  return `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/items/${itemId}`;
+  itemId: string,
+  accessToken?: string
+): Promise<string | null> {
+  // If we have an access token, try to get the actual webUrl
+  if (accessToken) {
+    try {
+      // First, try to get the item directly (fastest)
+      const item = await getSharePointItem(accessToken, siteId, driveId, itemId);
+      if (item?.webUrl) {
+        return item.webUrl;
+      }
+
+      // If item doesn't have webUrl, try to get it from the site and construct the URL
+      const site = await getSharePointSite(accessToken, siteId);
+      if (site?.webUrl) {
+        // Try to get the item path from the drive
+        try {
+          const client = createGraphClient(accessToken);
+          const itemResponse = await client
+            .api(`/sites/${siteId}/drives/${driveId}/items/${itemId}?$select=webUrl`)
+            .get();
+          
+          if (itemResponse.webUrl) {
+            return itemResponse.webUrl;
+          }
+        } catch (itemError) {
+          console.warn('Could not fetch item webUrl, attempting to construct from site URL:', itemError);
+        }
+
+        // Last resort: construct URL from site webUrl and item name
+        // This is not ideal but better than returning a Graph API URL
+        try {
+          const item = await getSharePointItem(accessToken, siteId, driveId, itemId);
+          if (item?.name) {
+            // This is a fallback - the actual webUrl from the item is preferred
+            console.warn('Using constructed URL as fallback - may not be accurate');
+            return `${site.webUrl}/_layouts/15/Doc.aspx?sourcedoc=${itemId}`;
+          }
+        } catch (error) {
+          console.error('Error constructing fallback URL:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error generating SharePoint URL with access token:', error);
+    }
+  }
+
+  // Without access token, we cannot generate a valid web URL
+  // Return null instead of a Graph API URL that won't work in a browser
+  return null;
 }
 
 /**

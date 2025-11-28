@@ -73,7 +73,7 @@ router.get(
       if (sortBy === 'date') {
         orderBy = { date: sortOrder };
       } else if (sortBy === 'category') {
-        orderBy = { category: { name: sortOrder } };
+        orderBy = { AssetCategory: { name: sortOrder } };
       } else if (sortBy === 'owner') {
         orderBy = { owner: sortOrder };
       } else {
@@ -87,28 +87,41 @@ router.get(
           take: limitNum,
           orderBy,
           include: {
-            category: {
+            AssetCategory: {
               select: {
                 id: true,
                 name: true,
               },
             },
-            classification: {
+            Classification: {
               select: {
                 id: true,
                 name: true,
               },
             },
             _count: {
-              select: { risks: true },
+              select: { Risk: true },
             },
           },
         }),
         prisma.asset.count({ where }),
       ]);
 
+      // Map response to match frontend expectations (camelCase relation names)
+      const mappedAssets = assets.map((asset: any) => {
+        const { AssetCategory, Classification, _count, ...rest } = asset;
+        return {
+          ...rest,
+          category: AssetCategory,
+          classification: Classification,
+          _count: _count ? {
+            risks: _count.Risk || 0,
+          } : undefined,
+        };
+      });
+
       res.json({
-        data: assets,
+        data: mappedAssets,
         pagination: {
           page: pageNum,
           limit: limitNum,
@@ -134,9 +147,9 @@ router.get(
       const asset = await prisma.asset.findUnique({
         where: { id: req.params.id },
         include: {
-          category: true,
-          classification: true,
-          risks: {
+          AssetCategory: true,
+          Classification: true,
+          Risk: {
             select: {
               id: true,
               title: true,
@@ -151,7 +164,16 @@ router.get(
         return res.status(404).json({ error: 'Asset not found' });
       }
 
-      res.json(asset);
+      // Map response to match frontend expectations
+      const { AssetCategory, Classification, Risk, ...rest } = asset;
+      const mappedAsset = {
+        ...rest,
+        category: AssetCategory,
+        classification: Classification,
+        risks: Risk,
+      };
+
+      res.json(mappedAsset);
     } catch (error) {
       console.error('Error fetching asset:', error);
       res.status(500).json({ error: 'Failed to fetch asset' });
@@ -201,13 +223,13 @@ router.post(
           cost: req.body.cost,
         },
         include: {
-          category: {
+          AssetCategory: {
             select: {
               id: true,
               name: true,
             },
           },
-          classification: {
+          Classification: {
             select: {
               id: true,
               name: true,
@@ -216,7 +238,15 @@ router.post(
         },
       });
 
-      res.status(201).json(asset);
+      // Map response to match frontend expectations
+      const { AssetCategory, Classification, ...rest } = asset;
+      const mappedAsset = {
+        ...rest,
+        category: AssetCategory,
+        classification: Classification,
+      };
+
+      res.status(201).json(mappedAsset);
     } catch (error: any) {
       if (error.code === 'P2003') {
         return res.status(400).json({ error: 'Invalid category or classification ID' });
@@ -273,13 +303,13 @@ router.put(
         where: { id: req.params.id },
         data: updateData,
         include: {
-          category: {
+          AssetCategory: {
             select: {
               id: true,
               name: true,
             },
           },
-          classification: {
+          Classification: {
             select: {
               id: true,
               name: true,
@@ -288,7 +318,15 @@ router.put(
         },
       });
 
-      res.json(asset);
+      // Map response to match frontend expectations
+      const { AssetCategory, Classification, ...rest } = asset;
+      const mappedAsset = {
+        ...rest,
+        category: AssetCategory,
+        classification: Classification,
+      };
+
+      res.json(mappedAsset);
     } catch (error: any) {
       if (error.code === 'P2025') {
         return res.status(404).json({ error: 'Asset not found' });

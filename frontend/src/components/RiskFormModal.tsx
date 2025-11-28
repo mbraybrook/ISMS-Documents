@@ -97,6 +97,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   const [assets, setAssets] = useState<any[]>([]);
   const [filteredAssets, setFilteredAssets] = useState<any[]>([]);
   const [assetCategories, setAssetCategories] = useState<any[]>([]);
+  const [interestedParties, setInterestedParties] = useState<Array<{ id: string; name: string; group: string | null }>>([]);
   const [selectedControlIds, setSelectedControlIds] = useState<string[]>([]);
   const [controlSearchTerm, setControlSearchTerm] = useState('');
   const [assetSearchTerm, setAssetSearchTerm] = useState('');
@@ -119,7 +120,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
     assetCategory: '',
     assetId: '',
     assetCategoryId: '',
-    interestedParty: '',
+    interestedPartyId: '',
     threatDescription: '',
     confidentialityScore: 1,
     integrityScore: 1,
@@ -228,6 +229,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       fetchUsers();
       fetchControls();
       fetchAssetCategories();
+      fetchInterestedParties();
       // Don't fetch assets upfront - only when user searches
       setAssets([]);
       setFilteredAssets([]);
@@ -257,7 +259,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           assetCategory: risk.assetCategory || '',
           assetId: risk.assetId || '',
           assetCategoryId: risk.assetCategoryId || '',
-          interestedParty: risk.interestedParty || '',
+          interestedPartyId: risk.interestedParty?.id || '',
           threatDescription: risk.threatDescription || '',
           confidentialityScore: risk.confidentialityScore || 1,
           integrityScore: risk.integrityScore || 1,
@@ -306,7 +308,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           assetCategory: '',
           assetId: '',
           assetCategoryId: '',
-          interestedParty: '',
+          interestedPartyId: '',
           threatDescription: '',
           confidentialityScore: 1,
           integrityScore: 1,
@@ -450,6 +452,15 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
     }
   };
 
+  const fetchInterestedParties = async () => {
+    try {
+      const response = await api.get('/api/interested-parties');
+      setInterestedParties(response.data || []);
+    } catch (error) {
+      console.error('Error fetching interested parties:', error);
+    }
+  };
+
   const getSuggestedControls = async () => {
     if (!formData.title && !formData.description && !formData.threatDescription) {
       toast({
@@ -512,6 +523,10 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       newErrors.dateAdded = 'Date Added is required';
     }
     
+    if (!formData.interestedPartyId) {
+      newErrors.interestedPartyId = 'Interested Party is required';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -555,7 +570,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       if (payload.assetCategory === '') payload.assetCategory = undefined;
       if (payload.assetId === '') payload.assetId = undefined;
       if (payload.assetCategoryId === '') payload.assetCategoryId = undefined;
-      if (payload.interestedParty === '') payload.interestedParty = undefined;
+      // interestedPartyId is required, so don't remove it if it's set
       if (payload.threatDescription === '') payload.threatDescription = undefined;
       if (payload.initialRiskTreatmentCategory === '') payload.initialRiskTreatmentCategory = undefined;
       if (payload.mitigationDescription === '') payload.mitigationDescription = undefined;
@@ -671,16 +686,95 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           <ModalBody overflowY="auto" flex="1" pb={6} minH={0}>
             <Tabs colorScheme="blue" isLazy>
               <TabList>
-                <Tab>Basic Details</Tab>
+                <Tab>Essentials</Tab>
+                <Tab>Additional Details</Tab>
                 <Tab>Existing Controls Assessment</Tab>
                 <Tab>Additional Controls Assessment</Tab>
                 <Tab>Controls Linkage</Tab>
               </TabList>
 
               <TabPanels>
-                {/* Tab 1: Basic Details */}
+                {/* Tab 1: Essentials */}
                 <TabPanel>
                   <VStack spacing={4} align="stretch">
+                  <FormControl isRequired isInvalid={!!errors.title}>
+                    <FormLabel>Title</FormLabel>
+                    <Input
+                      value={formData.title}
+                      onChange={(e) => {
+                        setFormData({ ...formData, title: e.target.value });
+                        if (errors.title) setErrors({ ...errors, title: '' });
+                      }}
+                      isReadOnly={viewMode}
+                    />
+                    <FormErrorMessage>{errors.title}</FormErrorMessage>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>
+                      Threat Description
+                      {formData.threatDescription.length > 0 && (
+                        <Text as="span" fontSize="xs" color="gray.500" ml={2}>
+                          ({formData.threatDescription.length} characters)
+                        </Text>
+                      )}
+                    </FormLabel>
+                    <Textarea
+                      value={formData.threatDescription}
+                      onChange={(e) =>
+                        setFormData({ ...formData, threatDescription: e.target.value })
+                      }
+                      rows={3}
+                      maxLength={2000}
+                      isReadOnly={viewMode}
+                    />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Risk Description</FormLabel>
+                    <Textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      rows={3}
+                      isReadOnly={viewMode}
+                    />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Owner</FormLabel>
+                    <Select
+                      value={formData.ownerUserId}
+                      onChange={(e) => setFormData({ ...formData, ownerUserId: e.target.value })}
+                      placeholder="Select owner"
+                      isDisabled={viewMode}
+                    >
+                      {users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.displayName} ({user.email})
+                        </option>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <FormControl isRequired isInvalid={!!errors.interestedPartyId}>
+                    <FormLabel>Interested Party</FormLabel>
+                    <Select
+                      value={formData.interestedPartyId}
+                      onChange={(e) => setFormData({ ...formData, interestedPartyId: e.target.value })}
+                      isReadOnly={viewMode}
+                      placeholder="Select an interested party"
+                    >
+                      {interestedParties.map((party) => (
+                        <option key={party.id} value={party.id}>
+                          {party.name} {party.group ? `(${party.group})` : ''}
+                        </option>
+                      ))}
+                    </Select>
+                    {errors.interestedPartyId && (
+                      <FormErrorMessage>{errors.interestedPartyId}</FormErrorMessage>
+                    )}
+                  </FormControl>
+
                   <FormControl isRequired isInvalid={!!errors.dateAdded}>
                     <FormLabel>Date Added</FormLabel>
                     <Input
@@ -694,7 +788,12 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                     />
                     <FormErrorMessage>{errors.dateAdded}</FormErrorMessage>
                   </FormControl>
+                </VStack>
+                </TabPanel>
 
+                {/* Tab 2: Additional Details */}
+                <TabPanel>
+                  <VStack spacing={4} align="stretch">
                   <FormControl>
                     <FormLabel>Risk Category</FormLabel>
                     <Select
@@ -782,35 +881,6 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                       </FormControl>
                     </>
                   )}
-
-                  <FormControl>
-                    <Checkbox
-                      isChecked={formData.archived}
-                      onChange={(e) => setFormData({ ...formData, archived: e.target.checked })}
-                      isDisabled={viewMode}
-                    >
-                      Archived
-                    </Checkbox>
-                    <Text fontSize="xs" color="gray.500" mt={1}>
-                      Archived risks are hidden by default. Instance risks are typically archived when they expire.
-                    </Text>
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>Owner</FormLabel>
-                    <Select
-                      value={formData.ownerUserId}
-                      onChange={(e) => setFormData({ ...formData, ownerUserId: e.target.value })}
-                      placeholder="Select owner"
-                      isDisabled={viewMode}
-                    >
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.displayName} ({user.email})
-                        </option>
-                      ))}
-                    </Select>
-                  </FormControl>
 
                   <FormControl>
                     <FormLabel>Link to Asset (Optional)</FormLabel>
@@ -972,60 +1042,21 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                   </FormControl>
 
                   <FormControl>
-                    <FormLabel>Interested Party</FormLabel>
-                    <Input
-                      value={formData.interestedParty}
-                      onChange={(e) => setFormData({ ...formData, interestedParty: e.target.value })}
-                      isReadOnly={viewMode}
-                    />
-                  </FormControl>
-
-                  <FormControl isRequired isInvalid={!!errors.title}>
-                    <FormLabel>Title</FormLabel>
-                    <Input
-                      value={formData.title}
-                      onChange={(e) => {
-                        setFormData({ ...formData, title: e.target.value });
-                        if (errors.title) setErrors({ ...errors, title: '' });
-                      }}
-                      isReadOnly={viewMode}
-                    />
-                    <FormErrorMessage>{errors.title}</FormErrorMessage>
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>
-                      Threat Description
-                      {formData.threatDescription.length > 0 && (
-                        <Text as="span" fontSize="xs" color="gray.500" ml={2}>
-                          ({formData.threatDescription.length} characters)
-                        </Text>
-                      )}
-                    </FormLabel>
-                    <Textarea
-                      value={formData.threatDescription}
-                      onChange={(e) =>
-                        setFormData({ ...formData, threatDescription: e.target.value })
-                      }
-                      rows={3}
-                      maxLength={2000}
-                      isReadOnly={viewMode}
-                    />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>Risk Description</FormLabel>
-                    <Textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      rows={3}
-                      isReadOnly={viewMode}
-                    />
+                    <Checkbox
+                      isChecked={formData.archived}
+                      onChange={(e) => setFormData({ ...formData, archived: e.target.checked })}
+                      isDisabled={viewMode}
+                    >
+                      Archived
+                    </Checkbox>
+                    <Text fontSize="xs" color="gray.500" mt={1}>
+                      Archived risks are hidden by default. Instance risks are typically archived when they expire.
+                    </Text>
                   </FormControl>
                 </VStack>
                 </TabPanel>
 
-                {/* Tab 2: Existing Controls Assessment */}
+                {/* Tab 3: Existing Controls Assessment */}
                 <TabPanel>
                   <HStack spacing={6} align="flex-start">
                     {/* Left side: Sliders */}
@@ -1289,7 +1320,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                   </FormControl>
                 </TabPanel>
 
-                {/* Tab 3: Additional Controls Assessment */}
+                {/* Tab 4: Additional Controls Assessment */}
                 <TabPanel>
                   <VStack spacing={6} align="stretch">
                     <HStack justify="space-between">
@@ -1689,7 +1720,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                   </VStack>
                 </TabPanel>
 
-                {/* Tab 4: Controls Linkage */}
+                {/* Tab 5: Controls Linkage */}
                 <TabPanel>
                   <VStack spacing={4} align="stretch">
                     <HStack justify="space-between">

@@ -37,6 +37,8 @@ interface SharePointItem {
   lastModifiedDateTime: string;
   createdDateTime: string;
   size: number;
+  siteId?: string; // Site ID where the item is located
+  driveId?: string; // Drive ID where the item is located
   folder?: {
     childCount: number;
   };
@@ -112,6 +114,8 @@ export function MassImportPage() {
 
       const items = selectedFiles.map((file) => ({
         itemId: file.id,
+        siteId: file.siteId, // Include siteId if available
+        driveId: file.driveId, // Include driveId if available
       }));
 
       const response = await api.post(

@@ -14,6 +14,7 @@ import { SoAPage } from './pages/SoAPage'
 import { MassImportPage } from './pages/MassImportPage'
 import { AssetsPage } from './pages/AssetsPage'
 import { AssetCategoriesPage } from './pages/AssetCategoriesPage'
+import { InterestedPartiesPage } from './pages/InterestedPartiesPage'
 
 function App() {
   return (
@@ -117,6 +118,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <AssetCategoriesPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/risks/interested-parties"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <InterestedPartiesPage />
                 </Layout>
               </ProtectedRoute>
             }

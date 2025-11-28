@@ -241,6 +241,13 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
   };
 
   const loadDocumentUrl = async (doc: any) => {
+    // Use stored documentUrl if available
+    if (doc.documentUrl) {
+      console.log('[DocumentFormModal] Using stored document URL:', doc.documentUrl);
+      setDocumentUrl(doc.documentUrl);
+      return;
+    }
+    
     if (!doc.sharePointSiteId || !doc.sharePointDriveId || !doc.sharePointItemId) {
       console.log('[DocumentFormModal] Missing SharePoint IDs:', {
         siteId: doc.sharePointSiteId,
