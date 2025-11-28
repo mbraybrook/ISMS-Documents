@@ -165,7 +165,7 @@ export function MassImportPage() {
     <VStack spacing={6} align="stretch">
       <HStack justify="space-between">
         <Heading size="lg">Mass Import Documents</Heading>
-        <Button onClick={() => navigate('/documents')} variant="ghost">
+        <Button onClick={() => navigate('/documents/documents')} variant="ghost">
           Back to Documents
         </Button>
       </HStack>
@@ -348,7 +348,7 @@ export function MassImportPage() {
 
             {importResults.length > 0 && importErrors.length === 0 && (
               <Button
-                onClick={() => navigate('/documents')}
+                onClick={() => navigate('/documents/documents')}
                 colorScheme="blue"
                 width="fit-content"
               >

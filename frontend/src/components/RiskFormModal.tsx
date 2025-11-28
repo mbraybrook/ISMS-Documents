@@ -26,6 +26,7 @@ import {
   TagCloseButton,
   InputGroup,
   InputLeftElement,
+  InputRightElement,
   Spinner,
   Alert,
   AlertIcon,
@@ -49,7 +50,7 @@ import {
   Tab,
   TabPanel,
 } from '@chakra-ui/react';
-import { SearchIcon } from '@chakra-ui/icons';
+import { SearchIcon, DeleteIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 
@@ -75,7 +76,7 @@ interface Control {
   description: string | null;
 }
 
-const RISK_TYPES = [
+const RISK_CATEGORIES = [
   'INFORMATION_SECURITY',
   'OPERATIONAL',
   'FINANCIAL',
@@ -85,23 +86,39 @@ const RISK_TYPES = [
   'OTHER',
 ];
 
+const RISK_NATURES = ['STATIC', 'INSTANCE'];
+
 const TREATMENT_CATEGORIES = ['RETAIN', 'MODIFY', 'SHARE', 'AVOID'];
 
 export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, viewMode = false }: RiskFormModalProps) {
   const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [controls, setControls] = useState<Control[]>([]);
+  const [assets, setAssets] = useState<any[]>([]);
+  const [filteredAssets, setFilteredAssets] = useState<any[]>([]);
+  const [assetCategories, setAssetCategories] = useState<any[]>([]);
   const [selectedControlIds, setSelectedControlIds] = useState<string[]>([]);
   const [controlSearchTerm, setControlSearchTerm] = useState('');
+  const [assetSearchTerm, setAssetSearchTerm] = useState('');
+  const [showAssetDropdown, setShowAssetDropdown] = useState(false);
+  const [loadingAssets, setLoadingAssets] = useState(false);
   const [suggestedControls, setSuggestedControls] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const assetSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     dateAdded: new Date().toISOString().split('T')[0],
-    riskType: '',
+    riskCategory: '',
+    riskNature: '',
+    archived: false,
+    expiryDate: '',
+    lastReviewDate: '',
+    nextReviewDate: '',
     ownerUserId: '',
     assetCategory: '',
+    assetId: '',
+    assetCategoryId: '',
     interestedParty: '',
     threatDescription: '',
     confidentialityScore: 1,
@@ -210,6 +227,12 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
     if (isOpen) {
       fetchUsers();
       fetchControls();
+      fetchAssetCategories();
+      // Don't fetch assets upfront - only when user searches
+      setAssets([]);
+      setFilteredAssets([]);
+      setAssetSearchTerm('');
+      setShowAssetDropdown(false);
       let initialData: any;
       if (risk) {
         initialData = {
@@ -218,9 +241,22 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           dateAdded: risk.dateAdded
             ? new Date(risk.dateAdded).toISOString().split('T')[0]
             : new Date().toISOString().split('T')[0],
-          riskType: risk.riskType || '',
+          riskCategory: risk.riskCategory || risk.riskType || '',
+          riskNature: risk.riskNature || '',
+          archived: risk.archived || false,
+          expiryDate: risk.expiryDate
+            ? new Date(risk.expiryDate).toISOString().split('T')[0]
+            : '',
+          lastReviewDate: risk.lastReviewDate
+            ? new Date(risk.lastReviewDate).toISOString().split('T')[0]
+            : '',
+          nextReviewDate: risk.nextReviewDate
+            ? new Date(risk.nextReviewDate).toISOString().split('T')[0]
+            : '',
           ownerUserId: risk.ownerUserId || '',
           assetCategory: risk.assetCategory || '',
+          assetId: risk.assetId || '',
+          assetCategoryId: risk.assetCategoryId || '',
           interestedParty: risk.interestedParty || '',
           threatDescription: risk.threatDescription || '',
           confidentialityScore: risk.confidentialityScore || 1,
@@ -245,14 +281,31 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         } else {
           setSelectedControlIds([]);
         }
+        // If risk has an asset, fetch it to show in the search and set its category
+        if (risk.assetId && risk.asset) {
+          setAssets([risk.asset]);
+          setFilteredAssets([risk.asset]);
+          setAssetSearchTerm(risk.asset.nameSerialNo || risk.asset.model || 'Selected asset');
+          // Automatically set the category from the asset
+          if (risk.asset.assetCategoryId || risk.asset.category?.id) {
+            initialData.assetCategoryId = risk.asset.assetCategoryId || risk.asset.category?.id || '';
+          }
+        }
       } else {
         initialData = {
           title: '',
           description: '',
           dateAdded: new Date().toISOString().split('T')[0],
-          riskType: '',
+          riskCategory: '',
+          riskNature: '',
+          archived: false,
+          expiryDate: '',
+          lastReviewDate: '',
+          nextReviewDate: '',
           ownerUserId: '',
           assetCategory: '',
+          assetId: '',
+          assetCategoryId: '',
           interestedParty: '',
           threatDescription: '',
           confidentialityScore: 1,
@@ -283,6 +336,10 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       setHasUnsavedChanges(false);
       setControlSearchTerm('');
       setSuggestedControls([]);
+      setAssetSearchTerm('');
+      setShowAssetDropdown(false);
+      setAssets([]);
+      setFilteredAssets([]);
     }
   }, [isOpen, risk]);
 
@@ -337,6 +394,59 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       setControls(response.data.data || []);
     } catch (error) {
       console.error('Error fetching controls:', error);
+    }
+  };
+
+  const fetchAssets = async (searchTerm: string = '') => {
+    try {
+      setLoadingAssets(true);
+      const params: any = {
+        limit: 50, // Limit results for performance
+      };
+      if (searchTerm) {
+        params.search = searchTerm;
+      }
+      const response = await api.get('/api/assets', { params });
+      const fetchedAssets = response.data.data || [];
+      setAssets(fetchedAssets);
+      setFilteredAssets(fetchedAssets);
+    } catch (error) {
+      console.error('Error fetching assets:', error);
+    } finally {
+      setLoadingAssets(false);
+    }
+  };
+
+  // Debounced asset search
+  useEffect(() => {
+    if (assetSearchTimeoutRef.current) {
+      clearTimeout(assetSearchTimeoutRef.current);
+    }
+
+    if (assetSearchTerm.length >= 2) {
+      assetSearchTimeoutRef.current = setTimeout(() => {
+        fetchAssets(assetSearchTerm);
+        setShowAssetDropdown(true);
+      }, 300); // 300ms debounce
+    } else if (assetSearchTerm.length === 0) {
+      setFilteredAssets([]);
+      setShowAssetDropdown(false);
+    }
+
+    return () => {
+      if (assetSearchTimeoutRef.current) {
+        clearTimeout(assetSearchTimeoutRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetSearchTerm]);
+
+  const fetchAssetCategories = async () => {
+    try {
+      const response = await api.get('/api/asset-categories');
+      setAssetCategories(response.data || []);
+    } catch (error) {
+      console.error('Error fetching asset categories:', error);
     }
   };
 
@@ -436,9 +546,15 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       
       // Clean up empty strings - but keep them as null/undefined for optional fields
       if (payload.description === '') payload.description = undefined;
-      if (payload.riskType === '') payload.riskType = undefined;
+      if (payload.riskCategory === '') payload.riskCategory = undefined;
+      if (payload.riskNature === '') payload.riskNature = undefined;
+      if (payload.expiryDate === '') payload.expiryDate = undefined;
+      if (payload.lastReviewDate === '') payload.lastReviewDate = undefined;
+      if (payload.nextReviewDate === '') payload.nextReviewDate = undefined;
       if (payload.ownerUserId === '') payload.ownerUserId = undefined;
       if (payload.assetCategory === '') payload.assetCategory = undefined;
+      if (payload.assetId === '') payload.assetId = undefined;
+      if (payload.assetCategoryId === '') payload.assetCategoryId = undefined;
       if (payload.interestedParty === '') payload.interestedParty = undefined;
       if (payload.threatDescription === '') payload.threatDescription = undefined;
       if (payload.initialRiskTreatmentCategory === '') payload.initialRiskTreatmentCategory = undefined;
@@ -479,14 +595,29 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       // Update control associations
       if (riskId) {
         try {
+          // Ensure selectedControlIds is an array
+          const controlIdsArray = Array.isArray(selectedControlIds) 
+            ? selectedControlIds.filter(id => id && typeof id === 'string')
+            : [];
+          
+          console.log('Updating control associations:', {
+            riskId,
+            controlIdsCount: controlIdsArray.length,
+            controlIds: controlIdsArray,
+          });
+
           await api.post(`/api/risks/${riskId}/controls`, {
-            controlIds: selectedControlIds,
+            controlIds: controlIdsArray,
           });
         } catch (error: any) {
           console.error('Error updating control associations:', error);
+          console.error('Error response data:', error.response?.data);
+          console.error('Error response status:', error.response?.status);
+          console.error('Selected control IDs:', selectedControlIds);
+          console.error('Selected control IDs type:', typeof selectedControlIds, Array.isArray(selectedControlIds));
           toast({
             title: 'Warning',
-            description: 'Risk saved but control associations may not have updated',
+            description: error.response?.data?.error || error.response?.data?.message || 'Risk saved but control associations may not have updated',
             status: 'warning',
             duration: 5000,
             isClosable: true,
@@ -565,19 +696,104 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                   </FormControl>
 
                   <FormControl>
-                    <FormLabel>Risk Type</FormLabel>
+                    <FormLabel>Risk Category</FormLabel>
                     <Select
-                      value={formData.riskType}
-                      onChange={(e) => setFormData({ ...formData, riskType: e.target.value })}
-                      placeholder="Select risk type"
+                      value={formData.riskCategory}
+                      onChange={(e) => setFormData({ ...formData, riskCategory: e.target.value })}
+                      placeholder="Select risk category"
                       isDisabled={viewMode}
                     >
-                      {RISK_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type.replace(/_/g, ' ')}
+                      {RISK_CATEGORIES.map((category) => (
+                        <option key={category} value={category}>
+                          {category.replace(/_/g, ' ')}
                         </option>
                       ))}
                     </Select>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Risk Nature</FormLabel>
+                    <Select
+                      value={formData.riskNature}
+                      onChange={(e) => {
+                        const newNature = e.target.value;
+                        setFormData({
+                          ...formData,
+                          riskNature: newNature,
+                          // Clear incompatible fields when changing nature
+                          expiryDate: newNature === 'STATIC' ? '' : formData.expiryDate,
+                          lastReviewDate: newNature === 'INSTANCE' ? '' : formData.lastReviewDate,
+                          nextReviewDate: newNature === 'INSTANCE' ? '' : formData.nextReviewDate,
+                        });
+                      }}
+                      placeholder="Select risk nature"
+                      isDisabled={viewMode}
+                    >
+                      {RISK_NATURES.map((nature) => (
+                        <option key={nature} value={nature}>
+                          {nature}
+                        </option>
+                      ))}
+                    </Select>
+                    <Text fontSize="xs" color="gray.500" mt={1}>
+                      {formData.riskNature === 'STATIC' && 'Static risks are always present and require periodic review'}
+                      {formData.riskNature === 'INSTANCE' && 'Instance risks are transient and may expire'}
+                    </Text>
+                  </FormControl>
+
+                  {formData.riskNature === 'INSTANCE' && (
+                    <FormControl>
+                      <FormLabel>Expiry Date (Optional)</FormLabel>
+                      <Input
+                        type="date"
+                        value={formData.expiryDate}
+                        onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                        isReadOnly={viewMode}
+                      />
+                      <Text fontSize="xs" color="gray.500" mt={1}>
+                        Instance risks can expire when they are no longer relevant
+                      </Text>
+                    </FormControl>
+                  )}
+
+                  {formData.riskNature === 'STATIC' && (
+                    <>
+                      <FormControl>
+                        <FormLabel>Last Review Date</FormLabel>
+                        <Input
+                          type="date"
+                          value={formData.lastReviewDate}
+                          onChange={(e) => setFormData({ ...formData, lastReviewDate: e.target.value })}
+                          isReadOnly={viewMode}
+                        />
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Next Review Date</FormLabel>
+                        <Input
+                          type="date"
+                          value={formData.nextReviewDate}
+                          onChange={(e) => setFormData({ ...formData, nextReviewDate: e.target.value })}
+                          isReadOnly={viewMode}
+                        />
+                        <Text fontSize="xs" color="gray.500" mt={1}>
+                          Static risks should be reviewed annually
+                        </Text>
+                      </FormControl>
+                    </>
+                  )}
+
+                  <FormControl>
+                    <Checkbox
+                      isChecked={formData.archived}
+                      onChange={(e) => setFormData({ ...formData, archived: e.target.checked })}
+                      isDisabled={viewMode}
+                    >
+                      Archived
+                    </Checkbox>
+                    <Text fontSize="xs" color="gray.500" mt={1}>
+                      Archived risks are hidden by default. Instance risks are typically archived when they expire.
+                    </Text>
                   </FormControl>
 
                   <FormControl>
@@ -597,12 +813,162 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                   </FormControl>
 
                   <FormControl>
-                    <FormLabel>Asset/Asset Category</FormLabel>
-                    <Input
-                      value={formData.assetCategory}
-                      onChange={(e) => setFormData({ ...formData, assetCategory: e.target.value })}
-                      isReadOnly={viewMode}
-                    />
+                    <FormLabel>Link to Asset (Optional)</FormLabel>
+                    <Box position="relative">
+                      <InputGroup>
+                        <InputLeftElement pointerEvents="none">
+                          <SearchIcon color="gray.300" />
+                        </InputLeftElement>
+                        <Input
+                          placeholder="Type to search assets (min 2 characters)..."
+                          value={formData.assetId ? (assets.find(a => a.id === formData.assetId)?.nameSerialNo || assets.find(a => a.id === formData.assetId)?.model || 'Selected asset') : assetSearchTerm}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setAssetSearchTerm(value);
+                            // Clear asset selection if user is typing
+                            if (value !== (assets.find(a => a.id === formData.assetId)?.nameSerialNo || assets.find(a => a.id === formData.assetId)?.model || '')) {
+                              setFormData({
+                                ...formData,
+                                assetId: '',
+                                // Don't clear category - user can still select a category when no asset is selected
+                              });
+                            }
+                          }}
+                          onFocus={() => {
+                            if (assetSearchTerm.length >= 2) {
+                              setShowAssetDropdown(true);
+                            }
+                          }}
+                          onBlur={() => {
+                            // Delay to allow clicking on dropdown items
+                            setTimeout(() => setShowAssetDropdown(false), 200);
+                          }}
+                          isDisabled={viewMode}
+                        />
+                        {formData.assetId && (
+                          <InputRightElement>
+                            <IconButton
+                              aria-label="Clear selection"
+                              icon={<DeleteIcon />}
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => {
+                                setFormData({
+                                  ...formData,
+                                  assetId: '',
+                                  assetCategoryId: '', // Clear category when clearing asset
+                                });
+                                setAssetSearchTerm('');
+                                setShowAssetDropdown(false);
+                              }}
+                            />
+                          </InputRightElement>
+                        )}
+                      </InputGroup>
+                      {showAssetDropdown && (loadingAssets || filteredAssets.length > 0 || assetSearchTerm.length >= 2) && (
+                        <Box
+                          position="absolute"
+                          top="100%"
+                          left={0}
+                          right={0}
+                          zIndex={1000}
+                          mt={1}
+                          borderWidth="1px"
+                          borderRadius="md"
+                          bg="white"
+                          boxShadow="lg"
+                          maxH="300px"
+                          overflowY="auto"
+                        >
+                          {loadingAssets ? (
+                            <Box p={4} textAlign="center">
+                              <Spinner size="sm" />
+                              <Text fontSize="sm" color="gray.500" mt={2}>
+                                Searching assets...
+                              </Text>
+                            </Box>
+                          ) : filteredAssets.length === 0 && assetSearchTerm.length >= 2 ? (
+                            <Box p={4} textAlign="center">
+                              <Text fontSize="sm" color="gray.500">
+                                No assets found matching "{assetSearchTerm}"
+                              </Text>
+                            </Box>
+                          ) : (
+                            filteredAssets.slice(0, 20).map((asset) => (
+                              <Box
+                                key={asset.id}
+                                p={3}
+                                borderBottomWidth="1px"
+                                _hover={{ bg: 'blue.50', cursor: 'pointer' }}
+                                onClick={() => {
+                                  setFormData({
+                                    ...formData,
+                                    assetId: asset.id,
+                                    assetCategoryId: asset.assetCategoryId || asset.category?.id || '', // Set category from asset
+                                  });
+                                  setAssetSearchTerm(asset.nameSerialNo || asset.model || 'Unnamed');
+                                  setShowAssetDropdown(false);
+                                }}
+                              >
+                                <HStack justify="space-between">
+                                  <VStack align="start" spacing={0}>
+                                    <Text fontWeight="medium" fontSize="sm">
+                                      {asset.nameSerialNo || asset.model || 'Unnamed Asset'}
+                                    </Text>
+                                    <HStack spacing={2} fontSize="xs" color="gray.600">
+                                      <Text>{asset.category?.name || ''}</Text>
+                                      {asset.manufacturer && <Text>• {asset.manufacturer}</Text>}
+                                      {asset.primaryUser && <Text>• User: {asset.primaryUser}</Text>}
+                                    </HStack>
+                                  </VStack>
+                                  <Badge colorScheme={asset.cdeImpacting ? 'red' : 'gray'} fontSize="xs">
+                                    {asset.classification?.name || ''}
+                                  </Badge>
+                                </HStack>
+                              </Box>
+                            ))
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+                    {formData.assetId && (
+                      <Text fontSize="xs" color="green.600" mt={1}>
+                        ✓ Asset selected {assets.find(a => a.id === formData.assetId)?.category?.name ? `(Category: ${assets.find(a => a.id === formData.assetId)?.category?.name})` : ''}
+                      </Text>
+                    )}
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Link to Asset Category (Optional)</FormLabel>
+                    <Select
+                      value={formData.assetCategoryId || ''}
+                      onChange={(e) => {
+                        const assetCategoryId = e.target.value;
+                        setFormData({
+                          ...formData,
+                          assetCategoryId: assetCategoryId || '',
+                          assetId: assetCategoryId ? '' : formData.assetId, // Clear asset if category selected
+                        });
+                      }}
+                      placeholder="Select an asset category (or leave blank)"
+                      isDisabled={viewMode || !!formData.assetId}
+                    >
+                      <option value="">None</option>
+                      {assetCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </Select>
+                    {formData.assetId ? (
+                      <Text fontSize="sm" color="blue.600" mt={1}>
+                        ℹ️ Category is automatically set from the selected asset and cannot be changed.
+                      </Text>
+                    ) : (
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        Note: You can link to either a specific asset OR an asset category, not both. When an asset is selected, its category is automatically used.
+                      </Text>
+                    )}
                   </FormControl>
 
                   <FormControl>

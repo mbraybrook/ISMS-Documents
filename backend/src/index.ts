@@ -12,6 +12,9 @@ import { soaRouter } from './routes/soa';
 import { sharePointRouter } from './routes/sharepoint';
 import { confluenceRouter } from './routes/confluence';
 import { usersRouter } from './routes/users';
+import classificationsRouter from './routes/classifications';
+import assetCategoriesRouter from './routes/assetCategories';
+import assetsRouter from './routes/assets';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -32,6 +35,9 @@ app.use('/api/soa', soaRouter);
 app.use('/api/sharepoint', sharePointRouter);
 app.use('/api/confluence', confluenceRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/classifications', classificationsRouter);
+app.use('/api/asset-categories', assetCategoriesRouter);
+app.use('/api/assets', assetsRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);

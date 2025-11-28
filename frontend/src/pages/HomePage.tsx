@@ -11,7 +11,7 @@ export function HomePage() {
         <Text fontSize="lg" color="gray.600" mb={6}>
           Welcome to the ISMS Document Management and Compliance Application
         </Text>
-        <Link as={RouterLink} to="/documents">
+        <Link as={RouterLink} to="/documents/documents">
           <Button colorScheme="blue" size="lg">
             View Documents
           </Button>

@@ -12,6 +12,8 @@ import { RisksPage } from './pages/RisksPage'
 import { ControlsPage } from './pages/ControlsPage'
 import { SoAPage } from './pages/SoAPage'
 import { MassImportPage } from './pages/MassImportPage'
+import { AssetsPage } from './pages/AssetsPage'
+import { AssetCategoriesPage } from './pages/AssetCategoriesPage'
 
 function App() {
   return (
@@ -30,7 +32,7 @@ function App() {
             }
           />
           <Route
-            path="/documents"
+            path="/documents/documents"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -40,7 +42,7 @@ function App() {
             }
           />
           <Route
-            path="/documents/import"
+            path="/documents/documents/import"
             element={
               <ProtectedRoute requiredRole="EDITOR">
                 <Layout>
@@ -50,7 +52,7 @@ function App() {
             }
           />
           <Route
-            path="/acknowledgments"
+            path="/documents/acknowledgments"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -60,7 +62,7 @@ function App() {
             }
           />
           <Route
-            path="/reviews"
+            path="/documents/reviews"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -70,7 +72,7 @@ function App() {
             }
           />
           <Route
-            path="/risks"
+            path="/risks/risks"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -80,7 +82,7 @@ function App() {
             }
           />
           <Route
-            path="/controls"
+            path="/risks/controls"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -95,6 +97,26 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <SoAPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assets/assets"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AssetsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assets/asset-categories"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AssetCategoriesPage />
                 </Layout>
               </ProtectedRoute>
             }

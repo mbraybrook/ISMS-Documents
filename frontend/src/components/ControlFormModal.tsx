@@ -314,7 +314,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                               _hover={{ bg: "blue.100", borderColor: "blue.400" }}
                             >
                               <Link
-                                to={`/risks`}
+                                to={`/risks/risks`}
                                 onClick={() => {
                                   // Store risk ID to highlight it when risks page loads
                                   sessionStorage.setItem('highlightRiskId', riskControl.risk.id);
@@ -441,7 +441,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                               _hover={{ bg: "blue.100", borderColor: "blue.400" }}
                             >
                               <Link
-                                to={`/risks`}
+                                to={`/risks/risks`}
                                 onClick={() => {
                                   // Store risk ID to highlight it when risks page loads
                                   sessionStorage.setItem('highlightRiskId', riskControl.risk.id);
