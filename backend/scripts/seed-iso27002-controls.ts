@@ -1,0 +1,134 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
+import { PrismaClient } from '@prisma/client';
+import { parseISO27002Controls } from './parse-iso27002-controls';
+
+// Load environment variables using the same method as the main app
+import { config } from '../src/config';
+
+// Use the configured database URL from the main app config
+process.env.DATABASE_URL = config.databaseUrl;
+
+const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+});
+
+interface ParsedControl {
+  code: string;
+  title: string;
+  controlText: string;
+  purpose: string;
+  guidance: string;
+  otherInformation: string | null;
+  category: 'ORGANIZATIONAL' | 'PEOPLE' | 'PHYSICAL' | 'TECHNOLOGICAL';
+}
+
+/**
+ * Seed ISO 27002 controls into the database
+ */
+async function seedISO27002Controls() {
+  try {
+    console.log('🌱 Starting ISO 27002 controls seed...');
+    
+    // Parse controls from markdown file
+    const markdownPath = path.join(__dirname, '../../docs/ISO_IEC_27002_2022(en).md');
+    console.log(`📖 Parsing ISO 27002 document: ${markdownPath}`);
+    
+    const controls = parseISO27002Controls(markdownPath);
+    console.log(`✅ Parsed ${controls.length} controls from ISO 27002`);
+    
+    // Process each control
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    
+    for (const control of controls) {
+      try {
+        // Check if control already exists
+        const existing = await prisma.control.findUnique({
+          where: { code: control.code },
+        });
+        
+        if (existing) {
+          // Update existing control if it's not a standard control yet
+          // or if we need to update the standard control fields
+          if (!existing.isStandardControl) {
+            // Update non-standard control to become standard
+            await prisma.control.update({
+              where: { code: control.code },
+              data: {
+                title: control.title,
+                description: control.controlText.substring(0, 500), // Use control text as description
+                controlText: control.controlText,
+                purpose: control.purpose,
+                guidance: control.guidance,
+                otherInformation: control.otherInformation,
+                category: control.category,
+                isStandardControl: true,
+              },
+            });
+            updated++;
+            console.log(`  ↻ Updated: ${control.code} - ${control.title}`);
+          } else {
+            // Standard control already exists, skip
+            skipped++;
+            console.log(`  ⊘ Skipped (already exists): ${control.code} - ${control.title}`);
+          }
+        } else {
+          // Create new control
+          await prisma.control.create({
+            data: {
+              code: control.code,
+              title: control.title,
+              description: control.controlText.substring(0, 500), // Use control text as description
+              controlText: control.controlText,
+              purpose: control.purpose,
+              guidance: control.guidance,
+              otherInformation: control.otherInformation,
+              category: control.category,
+              isStandardControl: true,
+              selectedForRiskAssessment: false,
+              selectedForContractualObligation: false,
+              selectedForLegalRequirement: false,
+              selectedForBusinessRequirement: false,
+            },
+          });
+          created++;
+          console.log(`  ✨ Created: ${control.code} - ${control.title}`);
+        }
+      } catch (error: any) {
+        console.error(`  ❌ Error processing ${control.code}:`, error.message);
+      }
+    }
+    
+    console.log('\n📊 Seed Summary:');
+    console.log(`   Created: ${created}`);
+    console.log(`   Updated: ${updated}`);
+    console.log(`   Skipped: ${skipped}`);
+    console.log(`   Total: ${controls.length}`);
+    
+    console.log('\n✅ ISO 27002 controls seed completed successfully!');
+  } catch (error) {
+    console.error('❌ Error seeding ISO 27002 controls:', error);
+    throw error;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+// CLI execution
+if (require.main === module) {
+  seedISO27002Controls()
+    .then(() => {
+      console.log('Done!');
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('Seed failed:', error);
+      process.exit(1);
+    });
+}
+
+export { seedISO27002Controls };
+
