@@ -1,6 +1,7 @@
-import { Box, Container, Flex, Heading, Link, Button, Text } from '@chakra-ui/react'
+import { Box, Container, Flex, Heading, Link, Button, Text, Menu, MenuButton, MenuList, MenuItem } from '@chakra-ui/react'
+import { ChevronDownIcon } from '@chakra-ui/icons'
 import { ReactNode } from 'react'
-import { Link as RouterLink, useNavigate } from 'react-router-dom'
+import { Link as RouterLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 interface LayoutProps {
@@ -21,21 +22,48 @@ export function Layout({ children }: LayoutProps) {
             <Flex gap={4} align="center">
               {user && (
                 <>
-                  <Link as={RouterLink} to="/documents" fontSize="sm">
-                    Documents
-                  </Link>
-                  <Link as={RouterLink} to="/acknowledgments" fontSize="sm">
-                    Acknowledgment
-                  </Link>
-                  <Link as={RouterLink} to="/reviews" fontSize="sm">
-                    Reviews
-                  </Link>
-                  <Link as={RouterLink} to="/risks" fontSize="sm">
-                    Risks
-                  </Link>
-                  <Link as={RouterLink} to="/controls" fontSize="sm">
-                    Controls
-                  </Link>
+                  <Menu>
+                    <MenuButton as={Button} rightIcon={<ChevronDownIcon />} size="sm" variant="ghost" fontSize="sm">
+                      Document Management
+                    </MenuButton>
+                    <MenuList>
+                      <MenuItem as={RouterLink} to="/documents/documents">
+                        Documents
+                      </MenuItem>
+                      <MenuItem as={RouterLink} to="/documents/acknowledgments">
+                        Acknowledgment
+                      </MenuItem>
+                      <MenuItem as={RouterLink} to="/documents/reviews">
+                        Reviews
+                      </MenuItem>
+                    </MenuList>
+                  </Menu>
+                  <Menu>
+                    <MenuButton as={Button} rightIcon={<ChevronDownIcon />} size="sm" variant="ghost" fontSize="sm">
+                      Risk Management
+                    </MenuButton>
+                    <MenuList>
+                      <MenuItem as={RouterLink} to="/risks/risks">
+                        Risks
+                      </MenuItem>
+                      <MenuItem as={RouterLink} to="/risks/controls">
+                        Controls
+                      </MenuItem>
+                    </MenuList>
+                  </Menu>
+                  <Menu>
+                    <MenuButton as={Button} rightIcon={<ChevronDownIcon />} size="sm" variant="ghost" fontSize="sm">
+                      Asset Management
+                    </MenuButton>
+                    <MenuList>
+                      <MenuItem as={RouterLink} to="/assets/assets">
+                        Assets
+                      </MenuItem>
+                      <MenuItem as={RouterLink} to="/assets/asset-categories">
+                        Asset Categories
+                      </MenuItem>
+                    </MenuList>
+                  </Menu>
                   {(user.role === 'ADMIN' || user.role === 'EDITOR') && (
                     <Link as={RouterLink} to="/soa" fontSize="sm">
                       SoA Export

@@ -106,59 +106,6 @@ model Acknowledgment {
   @@index([documentId])
 }
 
-// RiskType values: INFORMATION_SECURITY, OPERATIONAL, FINANCIAL, COMPLIANCE, REPUTATIONAL, STRATEGIC, OTHER
-// RiskTreatmentCategory values: RETAIN, MODIFY, SHARE, AVOID
-model Risk {
-  id                  String   @id @default(uuid())
-  externalId          String?
-  title               String
-  description         String?
-  
-  // Grey Section: Basic Risk Information
-  dateAdded           DateTime @default(now())
-  riskType            String?  // INFORMATION_SECURITY, OPERATIONAL, FINANCIAL, COMPLIANCE, REPUTATIONAL, STRATEGIC, OTHER
-  ownerUserId         String?
-  assetCategory       String?
-  interestedParty     String?
-  threatDescription   String?
-  
-  // Orange Section: Existing Controls - Initial Assessment
-  confidentialityScore Int      @default(1)
-  integrityScore      Int      @default(1)
-  availabilityScore   Int      @default(1)
-  riskScore           Int?     // The "R" score (overall risk score)
-  likelihood          Int      @default(1)
-  calculatedScore     Int
-  initialRiskTreatmentCategory String? // RETAIN, MODIFY, SHARE, AVOID
-  
-  // Green Section: Additional Controls - Mitigated Assessment
-  mitigatedConfidentialityScore Int?
-  mitigatedIntegrityScore      Int?
-  mitigatedAvailabilityScore  Int?
-  mitigatedRiskScore          Int?
-  mitigatedLikelihood         Int?
-  mitigatedScore              Int?
-  mitigationImplemented      Boolean @default(false)
-  mitigationDescription       String?
-  residualRiskTreatmentCategory String? // RETAIN, MODIFY, SHARE, AVOID
-  
-  annexAControlsRaw   String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  // Relations
-  owner               User?    @relation("RiskOwner", fields: [ownerUserId], references: [id])
-  riskControls        RiskControl[]
-  documentRisks       DocumentRisk[]
-
-  @@index([calculatedScore])
-  @@index([externalId])
-  @@index([riskType])
-  @@index([ownerUserId])
-  @@index([initialRiskTreatmentCategory])
-  @@index([residualRiskTreatmentCategory])
-  @@index([mitigationImplemented])
-}
 
 // ControlCategory values: ORGANIZATIONAL, PEOPLE, PHYSICAL, TECHNOLOGICAL
 // Control selection reasons: RISK_ASSESSMENT (auto), CONTRACTUAL_OBLIGATION, LEGAL_REQUIREMENT, BUSINESS_REQUIREMENT
@@ -250,5 +197,134 @@ model SoAExport {
 
   @@index([generatedByUserId])
   @@index([generatedAt])
+}
+
+model Classification {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  assets      Asset[]
+
+  @@index([name])
+}
+
+model AssetCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  assets      Asset[]
+  risks       Risk[]
+
+  @@index([name])
+}
+
+model Asset {
+  id                String   @id @default(uuid())
+  date              DateTime
+  assetCategoryId   String
+  assetSubCategory  String?
+  owner             String
+  primaryUser       String?
+  location          String?
+  manufacturer      String?
+  model             String?
+  nameSerialNo      String?
+  cdeImpacting      Boolean  @default(false)
+  classificationId  String
+  purpose           String?
+  notes             String?
+  cost              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  category          AssetCategory @relation(fields: [assetCategoryId], references: [id])
+  classification   Classification @relation(fields: [classificationId], references: [id])
+  risks             Risk[]
+
+  @@index([assetCategoryId])
+  @@index([classificationId])
+  @@index([owner])
+  @@index([date])
+}
+
+// RiskCategory values: INFORMATION_SECURITY, OPERATIONAL, FINANCIAL, COMPLIANCE, REPUTATIONAL, STRATEGIC, OTHER
+// RiskNature values: STATIC, INSTANCE
+// RiskTreatmentCategory values: RETAIN, MODIFY, SHARE, AVOID
+model Risk {
+  id                  String   @id @default(uuid())
+  externalId          String?
+  title               String
+  description         String?
+  
+  // Grey Section: Basic Risk Information
+  dateAdded           DateTime @default(now())
+  riskCategory        String?  // INFORMATION_SECURITY, OPERATIONAL, FINANCIAL, COMPLIANCE, REPUTATIONAL, STRATEGIC, OTHER
+  riskNature          String?  // STATIC, INSTANCE
+  ownerUserId         String?
+  assetCategory       String?  // Deprecated - kept for backward compatibility
+  assetId             String?
+  assetCategoryId     String?
+  interestedParty     String?
+  threatDescription   String?
+  
+  // Risk Lifecycle Management
+  archived            Boolean  @default(false)
+  expiryDate          DateTime? // For INSTANCE risks - optional expiry date
+  lastReviewDate      DateTime? // For STATIC risks - last review date
+  nextReviewDate      DateTime? // For STATIC risks - next review date
+  
+  // Orange Section: Existing Controls - Initial Assessment
+  confidentialityScore Int      @default(1)
+  integrityScore      Int      @default(1)
+  availabilityScore   Int      @default(1)
+  riskScore           Int?     // The "R" score (overall risk score)
+  likelihood          Int      @default(1)
+  calculatedScore     Int
+  initialRiskTreatmentCategory String? // RETAIN, MODIFY, SHARE, AVOID
+  
+  // Green Section: Additional Controls - Mitigated Assessment
+  mitigatedConfidentialityScore Int?
+  mitigatedIntegrityScore      Int?
+  mitigatedAvailabilityScore  Int?
+  mitigatedRiskScore          Int?
+  mitigatedLikelihood         Int?
+  mitigatedScore              Int?
+  mitigationImplemented      Boolean @default(false)
+  mitigationDescription       String?
+  residualRiskTreatmentCategory String? // RETAIN, MODIFY, SHARE, AVOID
+  
+  annexAControlsRaw   String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  owner               User?    @relation("RiskOwner", fields: [ownerUserId], references: [id])
+  asset               Asset?   @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  linkedAssetCategory AssetCategory? @relation(fields: [assetCategoryId], references: [id], onDelete: SetNull)
+  riskControls        RiskControl[]
+  documentRisks       DocumentRisk[]
+
+  @@index([calculatedScore])
+  @@index([externalId])
+  @@index([riskCategory])
+  @@index([riskNature])
+  @@index([archived])
+  @@index([expiryDate])
+  @@index([nextReviewDate])
+  @@index([ownerUserId])
+  @@index([initialRiskTreatmentCategory])
+  @@index([residualRiskTreatmentCategory])
+  @@index([mitigationImplemented])
+  @@index([assetId])
+  @@index([assetCategoryId])
 }
 

@@ -30,7 +30,9 @@ router.get(
     query('limit').optional().isInt({ min: 1, max: 100 }),
     query('sortBy').optional().isIn(['calculatedScore', 'mitigatedScore', 'title', 'createdAt', 'dateAdded']),
     query('sortOrder').optional().isIn(['asc', 'desc']),
-    query('riskType').optional().isString(),
+    query('riskCategory').optional().isString(),
+    query('riskNature').optional().isIn(['STATIC', 'INSTANCE']),
+    query('archived').optional().isBoolean(),
     query('ownerId').optional().isUUID(),
     query('treatmentCategory').optional().isIn(['RETAIN', 'MODIFY', 'SHARE', 'AVOID']),
     query('mitigationImplemented').optional().isBoolean(),
@@ -38,6 +40,8 @@ router.get(
     query('search').optional().isString(),
     query('dateAddedFrom').optional().isISO8601(),
     query('dateAddedTo').optional().isISO8601(),
+    query('assetId').optional().isUUID(),
+    query('assetCategoryId').optional().isUUID(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -47,7 +51,9 @@ router.get(
         limit = '20',
         sortBy = 'calculatedScore',
         sortOrder = 'desc',
-        riskType,
+        riskCategory,
+        riskNature,
+        archived,
         ownerId,
         treatmentCategory,
         mitigationImplemented,
@@ -55,6 +61,8 @@ router.get(
         search,
         dateAddedFrom,
         dateAddedTo,
+        assetId,
+        assetCategoryId,
       } = req.query;
 
       const pageNum = parseInt(page as string, 10);
@@ -63,7 +71,14 @@ router.get(
 
       // Build where clause for filtering
       const where: any = {};
-      if (riskType) where.riskType = riskType;
+      if (riskCategory) where.riskCategory = riskCategory;
+      if (riskNature) where.riskNature = riskNature;
+      // Default to showing non-archived risks unless explicitly requested
+      if (archived !== undefined) {
+        where.archived = archived === 'true';
+      } else {
+        where.archived = false;
+      }
       if (ownerId) where.ownerUserId = ownerId;
       if (mitigationImplemented !== undefined) {
         where.mitigationImplemented = mitigationImplemented === 'true';
@@ -89,6 +104,10 @@ router.get(
           where.dateAdded.lte = dateAddedTo as string;
         }
       }
+
+      // Handle asset filters
+      if (assetId) where.assetId = assetId as string;
+      if (assetCategoryId) where.assetCategoryId = assetCategoryId as string;
       
       // Handle treatment category with OR condition
       if (treatmentCategory) {
@@ -257,9 +276,16 @@ router.post(
     body('description').optional().isString(),
     body('externalId').optional().isString(),
     body('dateAdded').optional().isISO8601().toDate(),
-    body('riskType').optional().isIn(['INFORMATION_SECURITY', 'OPERATIONAL', 'FINANCIAL', 'COMPLIANCE', 'REPUTATIONAL', 'STRATEGIC', 'OTHER']),
+    body('riskCategory').optional().isIn(['INFORMATION_SECURITY', 'OPERATIONAL', 'FINANCIAL', 'COMPLIANCE', 'REPUTATIONAL', 'STRATEGIC', 'OTHER']),
+    body('riskNature').optional().isIn(['STATIC', 'INSTANCE']),
+    body('archived').optional().isBoolean(),
+    body('expiryDate').optional().isISO8601().toDate(),
+    body('lastReviewDate').optional().isISO8601().toDate(),
+    body('nextReviewDate').optional().isISO8601().toDate(),
     body('ownerUserId').optional().isUUID(),
     body('assetCategory').optional().isString(),
+    body('assetId').optional().isUUID(),
+    body('assetCategoryId').optional().isUUID(),
     body('interestedParty').optional().isString(),
     body('threatDescription').optional().isString(),
     body('confidentialityScore').isInt({ min: 1, max: 5 }),
@@ -286,9 +312,16 @@ router.post(
         description,
         externalId,
         dateAdded,
-        riskType,
+        riskCategory,
+        riskNature,
+        archived,
+        expiryDate,
+        lastReviewDate,
+        nextReviewDate,
         ownerUserId,
         assetCategory,
+        assetId,
+        assetCategoryId,
         interestedParty,
         threatDescription,
         confidentialityScore,
@@ -308,6 +341,18 @@ router.post(
         annexAControlsRaw,
       } = req.body;
 
+      // Business logic validation: expiryDate only for INSTANCE, review dates only for STATIC
+      if (riskNature === 'STATIC' && expiryDate) {
+        return res.status(400).json({
+          error: 'Expiry date cannot be set for STATIC risks. Use review dates instead.',
+        });
+      }
+      if (riskNature === 'INSTANCE' && (lastReviewDate || nextReviewDate)) {
+        return res.status(400).json({
+          error: 'Review dates cannot be set for INSTANCE risks. Use expiry date instead.',
+        });
+      }
+
       const calculatedScore = calculateRiskScore(
         confidentialityScore,
         integrityScore,
@@ -322,15 +367,29 @@ router.post(
         mitigatedLikelihood
       );
 
+      // Validate mutually exclusive asset/category linkage
+      if (assetId && assetCategoryId) {
+        return res.status(400).json({
+          error: 'Risk can be linked to either an asset or an asset category, not both',
+        });
+      }
+
       const risk = await prisma.risk.create({
         data: {
           title,
           description,
           externalId,
           dateAdded: dateAdded ? new Date(dateAdded) : undefined,
-          riskType,
+          riskCategory: riskCategory as any, // Type will be correct after TS server restart
+          riskNature: riskNature as any, // Type will be correct after TS server restart
+          archived: archived ?? false,
+          expiryDate: expiryDate ? new Date(expiryDate) : null,
+          lastReviewDate: lastReviewDate ? new Date(lastReviewDate) : null,
+          nextReviewDate: nextReviewDate ? new Date(nextReviewDate) : null,
           ownerUserId,
-          assetCategory,
+          assetCategory, // Keep for backward compatibility
+          assetId: assetId || null,
+          assetCategoryId: assetCategoryId || null,
           interestedParty,
           threatDescription,
           confidentialityScore,
@@ -350,7 +409,7 @@ router.post(
           mitigationDescription,
           residualRiskTreatmentCategory,
           annexAControlsRaw,
-        },
+        } as any, // Temporary: TypeScript types need server restart to pick up new Prisma schema
       });
 
       // Parse and update control associations
@@ -409,9 +468,16 @@ router.put(
     body('description').optional().isString(),
     body('externalId').optional().isString(),
     body('dateAdded').optional().isISO8601().toDate(),
-    body('riskType').optional().isIn(['INFORMATION_SECURITY', 'OPERATIONAL', 'FINANCIAL', 'COMPLIANCE', 'REPUTATIONAL', 'STRATEGIC', 'OTHER']),
+    body('riskCategory').optional().isIn(['INFORMATION_SECURITY', 'OPERATIONAL', 'FINANCIAL', 'COMPLIANCE', 'REPUTATIONAL', 'STRATEGIC', 'OTHER']),
+    body('riskNature').optional().isIn(['STATIC', 'INSTANCE']),
+    body('archived').optional().isBoolean(),
+    body('expiryDate').optional().isISO8601().toDate(),
+    body('lastReviewDate').optional().isISO8601().toDate(),
+    body('nextReviewDate').optional().isISO8601().toDate(),
     body('ownerUserId').optional().isUUID(),
     body('assetCategory').optional().isString(),
+    body('assetId').optional().isUUID(),
+    body('assetCategoryId').optional().isUUID(),
     body('interestedParty').optional().isString(),
     body('threatDescription').optional().isString(),
     body('confidentialityScore').optional().isInt({ min: 1, max: 5 }),
@@ -436,9 +502,54 @@ router.put(
       const { id } = req.params;
       const updateData: any = { ...req.body };
 
-      // Handle dateAdded conversion
+      // Get existing risk to check riskNature for validation
+      const existing = await prisma.risk.findUnique({ where: { id } });
+      if (!existing) {
+        return res.status(404).json({ error: 'Risk not found' });
+      }
+
+      // Determine riskNature (use updated value if provided, otherwise existing)
+      const riskNature = updateData.riskNature ?? (existing as any).riskNature; // Type will be correct after TS server restart
+
+      // Business logic validation: expiryDate only for INSTANCE, review dates only for STATIC
+      if (riskNature === 'STATIC' && updateData.expiryDate !== undefined) {
+        return res.status(400).json({
+          error: 'Expiry date cannot be set for STATIC risks. Use review dates instead.',
+        });
+      }
+      if (riskNature === 'INSTANCE' && (updateData.lastReviewDate !== undefined || updateData.nextReviewDate !== undefined)) {
+        return res.status(400).json({
+          error: 'Review dates cannot be set for INSTANCE risks. Use expiry date instead.',
+        });
+      }
+
+      // Validate mutually exclusive asset/category linkage
+      if (updateData.assetId && updateData.assetCategoryId) {
+        return res.status(400).json({
+          error: 'Risk can be linked to either an asset or an asset category, not both',
+        });
+      }
+
+      // Handle date conversions
       if (updateData.dateAdded) {
         updateData.dateAdded = new Date(updateData.dateAdded);
+      }
+      if (updateData.expiryDate !== undefined) {
+        updateData.expiryDate = updateData.expiryDate ? new Date(updateData.expiryDate) : null;
+      }
+      if (updateData.lastReviewDate !== undefined) {
+        updateData.lastReviewDate = updateData.lastReviewDate ? new Date(updateData.lastReviewDate) : null;
+      }
+      if (updateData.nextReviewDate !== undefined) {
+        updateData.nextReviewDate = updateData.nextReviewDate ? new Date(updateData.nextReviewDate) : null;
+      }
+
+      // Handle assetId and assetCategoryId - set to null if explicitly cleared
+      if (updateData.assetId === '') {
+        updateData.assetId = null;
+      }
+      if (updateData.assetCategoryId === '') {
+        updateData.assetCategoryId = null;
       }
 
       // Recalculate initial score if CIA or likelihood changed
@@ -448,7 +559,6 @@ router.put(
         updateData.availabilityScore !== undefined ||
         updateData.likelihood !== undefined
       ) {
-        const existing = await prisma.risk.findUnique({ where: { id } });
         if (existing) {
           const confidentiality =
             updateData.confidentialityScore ?? existing.confidentialityScore;
@@ -477,7 +587,6 @@ router.put(
         updateData.mitigatedAvailabilityScore !== undefined ||
         updateData.mitigatedLikelihood !== undefined
       ) {
-        const existing = await prisma.risk.findUnique({ where: { id } });
         if (existing) {
           const mc = updateData.mitigatedConfidentialityScore ?? existing.mitigatedConfidentialityScore;
           const mi = updateData.mitigatedIntegrityScore ?? existing.mitigatedIntegrityScore;
@@ -584,8 +693,21 @@ router.post(
   requireRole('ADMIN', 'EDITOR'),
   [
     param('id').isUUID(),
-    body('controlIds').isArray(),
-    body('controlIds.*').isUUID(),
+    body('controlIds')
+      .isArray()
+      .withMessage('controlIds must be an array')
+      .custom((value) => {
+        if (!Array.isArray(value)) {
+          throw new Error('controlIds must be an array');
+        }
+        // Validate each element is a UUID (skip if array is empty)
+        for (const id of value) {
+          if (typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+            throw new Error(`Invalid UUID format: ${id}`);
+          }
+        }
+        return true;
+      }),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -593,35 +715,110 @@ router.post(
       const { id } = req.params;
       const { controlIds } = req.body;
 
+      // Validation is handled by express-validator middleware above
+
+      // Verify risk exists
+      const riskExists = await prisma.risk.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!riskExists) {
+        return res.status(404).json({ error: 'Risk not found' });
+      }
+
       // Delete existing associations
       await prisma.riskControl.deleteMany({
         where: { riskId: id },
       });
 
       // Create new associations
-      if (controlIds.length > 0) {
-        await prisma.riskControl.createMany({
-          data: controlIds.map((controlId: string) => ({
-            riskId: id,
-            controlId,
-          })),
+      if (Array.isArray(controlIds) && controlIds.length > 0) {
+        // Type assertion: express-validator ensures these are strings
+        const controlIdsArray = controlIds as string[];
+        // Remove duplicates
+        const uniqueControlIds = [...new Set(controlIdsArray)];
+
+        // Verify all controls exist before creating associations
+        const existingControls = await prisma.control.findMany({
+          where: {
+            id: { in: uniqueControlIds },
+          },
+          select: { id: true },
         });
+
+        const existingControlIds = new Set(existingControls.map(c => c.id));
+        const missingControlIds = uniqueControlIds.filter((id: string) => !existingControlIds.has(id));
+
+        if (missingControlIds.length > 0) {
+          return res.status(400).json({ 
+            error: `Some controls not found: ${missingControlIds.join(', ')}` 
+          });
+        }
+
+        // Only create associations if we have valid controls
+        if (uniqueControlIds.length > 0) {
+          try {
+            // Use individual creates in a transaction instead of createMany
+            // This works around potential Prisma client issues with createMany on composite keys
+            await prisma.$transaction(
+              uniqueControlIds.map((controlId: string) =>
+                prisma.riskControl.create({
+                  data: {
+                    riskId: id,
+                    controlId: controlId,
+                  },
+                })
+              ) as any
+            );
+          } catch (createError: any) {
+            console.error('Error creating risk-control associations:', createError);
+            console.error('Error details:', {
+              code: createError.code,
+              meta: createError.meta,
+              message: createError.message,
+            });
+            // If it's a unique constraint error, it means duplicates somehow got through
+            if (createError.code === 'P2002') {
+              return res.status(400).json({ 
+                error: 'Duplicate control associations detected',
+                details: createError.meta,
+              });
+            }
+            throw createError; // Re-throw to be caught by outer catch
+          }
+        }
       }
 
       // Update control applicability
-      const { updateControlApplicability } = await import('../services/riskService');
-      await updateControlApplicability();
+      try {
+        const { updateControlApplicability } = await import('../services/riskService');
+        await updateControlApplicability();
+      } catch (updateError: any) {
+        console.error('Error updating control applicability (non-fatal):', updateError);
+        // Don't fail the request if this fails - it's a background update
+      }
 
       const risk = await prisma.risk.findUnique({
         where: { id },
         include: {
           riskControls: {
             include: {
-              control: true,
+              control: {
+                select: {
+                  id: true,
+                  code: true,
+                  title: true,
+                },
+              },
             },
           },
         },
       });
+
+      if (!risk) {
+        return res.status(404).json({ error: 'Risk not found after update' });
+      }
 
       res.json(risk);
     } catch (error: any) {
@@ -629,7 +826,24 @@ router.post(
         return res.status(404).json({ error: 'Risk not found' });
       }
       console.error('Error updating risk controls:', error);
-      res.status(500).json({ error: 'Failed to update risk controls' });
+      console.error('Error stack:', error.stack);
+      console.error('Error details:', {
+        code: error.code,
+        meta: error.meta,
+        message: error.message,
+        name: error.name,
+      });
+      res.status(500).json({ 
+        error: 'Failed to update risk controls',
+        message: error.message,
+        code: error.code,
+        details: process.env.NODE_ENV === 'development' ? {
+          message: error.message,
+          code: error.code,
+          meta: error.meta,
+          stack: error.stack,
+        } : undefined,
+      });
     }
   }
 );

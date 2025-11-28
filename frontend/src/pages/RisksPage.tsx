@@ -49,7 +49,12 @@ interface Risk {
   title: string;
   description: string | null;
   dateAdded: string;
-  riskType: string | null;
+  riskCategory: string | null;
+  riskNature: string | null;
+  archived: boolean;
+  expiryDate: string | null;
+  lastReviewDate: string | null;
+  nextReviewDate: string | null;
   owner: {
     id: string;
     displayName: string;
@@ -57,6 +62,21 @@ interface Risk {
   } | null;
   ownerUserId: string | null;
   assetCategory: string | null;
+  assetId: string | null;
+  assetCategoryId: string | null;
+  asset: {
+    id: string;
+    nameSerialNo: string | null;
+    model: string | null;
+    category: {
+      id: string;
+      name: string;
+    };
+  } | null;
+  linkedAssetCategory: {
+    id: string;
+    name: string;
+  } | null;
   interestedParty: string | null;
   threatDescription: string | null;
   confidentialityScore: number;
@@ -86,7 +106,7 @@ interface Risk {
   }>;
 }
 
-const RISK_TYPES = [
+const RISK_CATEGORIES = [
   'INFORMATION_SECURITY',
   'OPERATIONAL',
   'FINANCIAL',
@@ -95,6 +115,8 @@ const RISK_TYPES = [
   'STRATEGIC',
   'OTHER',
 ];
+
+const RISK_NATURES = ['STATIC', 'INSTANCE'];
 
 const TREATMENT_CATEGORIES = ['RETAIN', 'MODIFY', 'SHARE', 'AVOID'];
 
@@ -115,7 +137,9 @@ export function RisksPage() {
 
   // Filters and pagination
   const [filters, setFilters] = useState({
-    riskType: '',
+    riskCategory: '',
+    riskNature: '',
+    archived: false,
     ownerId: '',
     treatmentCategory: '',
     mitigationImplemented: '',
@@ -138,7 +162,9 @@ export function RisksPage() {
   // Column visibility state
   const [visibleColumns, setVisibleColumns] = useState({
     title: true,
-    riskType: true,
+    riskCategory: true,
+    riskNature: true,
+    archived: true,
     owner: true,
     cia: true,
     likelihood: true,
@@ -191,7 +217,9 @@ export function RisksPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (filters.riskType) params.append('riskType', filters.riskType);
+      if (filters.riskCategory) params.append('riskCategory', filters.riskCategory);
+      if (filters.riskNature) params.append('riskNature', filters.riskNature);
+      if (filters.archived) params.append('archived', 'true');
       if (filters.ownerId) params.append('ownerId', filters.ownerId);
       if (filters.treatmentCategory) params.append('treatmentCategory', filters.treatmentCategory);
       if (filters.mitigationImplemented)
@@ -312,7 +340,9 @@ export function RisksPage() {
 
   const getActiveFilterCount = () => {
     let count = 0;
-    if (filters.riskType) count++;
+    if (filters.riskCategory) count++;
+    if (filters.riskNature) count++;
+    if (filters.archived) count++;
     if (filters.ownerId) count++;
     if (filters.treatmentCategory) count++;
     if (filters.mitigationImplemented) count++;
@@ -429,7 +459,9 @@ export function RisksPage() {
     try {
       const headers = [
         'Title',
-        'Risk Type',
+        'Risk Category',
+        'Risk Nature',
+        'Archived',
         'Owner',
         'C',
         'I',
@@ -466,7 +498,9 @@ export function RisksPage() {
 
         return [
           risk.title,
-          risk.riskType || '',
+          risk.riskCategory || '',
+          risk.riskNature || '',
+          risk.archived ? 'Yes' : 'No',
           risk.owner?.displayName || '',
           risk.confidentialityScore,
           risk.integrityScore,
@@ -598,12 +632,28 @@ export function RisksPage() {
                     Title
                   </Checkbox>
                   <Checkbox
-                    isChecked={visibleColumns.riskType}
+                    isChecked={visibleColumns.riskCategory}
                     onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, riskType: e.target.checked })
+                      setVisibleColumns({ ...visibleColumns, riskCategory: e.target.checked })
                     }
                   >
-                    Risk Type
+                    Risk Category
+                  </Checkbox>
+                  <Checkbox
+                    isChecked={visibleColumns.riskNature}
+                    onChange={(e) =>
+                      setVisibleColumns({ ...visibleColumns, riskNature: e.target.checked })
+                    }
+                  >
+                    Risk Nature
+                  </Checkbox>
+                  <Checkbox
+                    isChecked={visibleColumns.archived}
+                    onChange={(e) =>
+                      setVisibleColumns({ ...visibleColumns, archived: e.target.checked })
+                    }
+                  >
+                    Archived
                   </Checkbox>
                   <Checkbox
                     isChecked={visibleColumns.owner}
@@ -701,19 +751,41 @@ export function RisksPage() {
             />
           </InputGroup>
           <Select
-            placeholder="Risk Type"
-            value={filters.riskType}
-            onChange={(e) => setFilters({ ...filters, riskType: e.target.value })}
+            placeholder="Risk Category"
+            value={filters.riskCategory}
+            onChange={(e) => setFilters({ ...filters, riskCategory: e.target.value, page: 1 })}
             width="200px"
-            borderColor={filters.riskType ? 'blue.300' : undefined}
-            borderWidth={filters.riskType ? '2px' : '1px'}
+            borderColor={filters.riskCategory ? 'blue.300' : undefined}
+            borderWidth={filters.riskCategory ? '2px' : '1px'}
           >
-            {RISK_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type.replace(/_/g, ' ')}
+            {RISK_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {category.replace(/_/g, ' ')}
               </option>
             ))}
           </Select>
+
+          <Select
+            placeholder="Risk Nature"
+            value={filters.riskNature}
+            onChange={(e) => setFilters({ ...filters, riskNature: e.target.value, page: 1 })}
+            width="150px"
+            borderColor={filters.riskNature ? 'blue.300' : undefined}
+            borderWidth={filters.riskNature ? '2px' : '1px'}
+          >
+            {RISK_NATURES.map((nature) => (
+              <option key={nature} value={nature}>
+                {nature}
+              </option>
+            ))}
+          </Select>
+
+          <Checkbox
+            isChecked={filters.archived}
+            onChange={(e) => setFilters({ ...filters, archived: e.target.checked, page: 1 })}
+          >
+            Show Archived
+          </Checkbox>
 
           <Select
             placeholder="Treatment Category"
@@ -759,7 +831,9 @@ export function RisksPage() {
             size="sm"
             onClick={() =>
               setFilters({
-                riskType: '',
+                riskCategory: '',
+                riskNature: '',
+                archived: false,
                 ownerId: '',
                 treatmentCategory: '',
                 mitigationImplemented: '',
@@ -780,15 +854,45 @@ export function RisksPage() {
         </HStack>
         {getActiveFilterCount() > 0 && (
           <Wrap spacing={2}>
-            {filters.riskType && (
+            {filters.riskCategory && (
               <WrapItem>
                 <Badge colorScheme="blue">
-                  Risk Type: {filters.riskType.replace(/_/g, ' ')}
+                  Risk Category: {filters.riskCategory.replace(/_/g, ' ')}
                   <Button
                     size="xs"
                     ml={2}
                     variant="ghost"
-                    onClick={() => setFilters({ ...filters, riskType: '', page: 1 })}
+                    onClick={() => setFilters({ ...filters, riskCategory: '', page: 1 })}
+                  >
+                    ×
+                  </Button>
+                </Badge>
+              </WrapItem>
+            )}
+            {filters.riskNature && (
+              <WrapItem>
+                <Badge colorScheme="blue">
+                  Risk Nature: {filters.riskNature}
+                  <Button
+                    size="xs"
+                    ml={2}
+                    variant="ghost"
+                    onClick={() => setFilters({ ...filters, riskNature: '', page: 1 })}
+                  >
+                    ×
+                  </Button>
+                </Badge>
+              </WrapItem>
+            )}
+            {filters.archived && (
+              <WrapItem>
+                <Badge colorScheme="blue">
+                  Show Archived
+                  <Button
+                    size="xs"
+                    ml={2}
+                    variant="ghost"
+                    onClick={() => setFilters({ ...filters, archived: false, page: 1 })}
                   >
                     ×
                   </Button>
@@ -881,7 +985,9 @@ export function RisksPage() {
                 size="sm"
                 onClick={() =>
                   setFilters({
-                    riskType: '',
+                    riskCategory: '',
+                    riskNature: '',
+                    archived: false,
                     ownerId: '',
                     treatmentCategory: '',
                     mitigationImplemented: '',
@@ -922,8 +1028,11 @@ export function RisksPage() {
                     {filters.sortBy === 'title' && (filters.sortOrder === 'asc' ? ' ↑' : ' ↓')}
                   </Th>
                 )}
-                {visibleColumns.riskType && <Th>Risk Type</Th>}
+                {visibleColumns.riskCategory && <Th>Risk Category</Th>}
+                {visibleColumns.riskNature && <Th>Risk Nature</Th>}
+                {visibleColumns.archived && <Th>Archived</Th>}
                 {visibleColumns.owner && <Th>Owner</Th>}
+                <Th>Asset/Category</Th>
                 {visibleColumns.cia && (
                   <>
                     <Th>
@@ -988,8 +1097,9 @@ export function RisksPage() {
                   key={risk.id}
                   id={`risk-${risk.id}`}
                   bg={getRowBgColor(risk)}
-                  _hover={{ bg: getRowBgColor(risk), opacity: 0.9 }}
-                  cursor={selectedRiskIds.has(risk.id) ? 'default' : 'default'}
+                  _hover={{ bg: getRowBgColor(risk), opacity: 0.9, cursor: 'pointer' }}
+                  cursor="pointer"
+                  onClick={() => handleEdit(risk)}
                 >
                   {isAdminOrEditor && (
                     <Td onClick={(e) => e.stopPropagation()}>
@@ -1000,16 +1110,49 @@ export function RisksPage() {
                     </Td>
                   )}
                   {visibleColumns.title && <Td fontWeight="medium">{risk.title}</Td>}
-                  {visibleColumns.riskType && (
+                  {visibleColumns.riskCategory && (
                     <Td>
-                      {risk.riskType ? (
-                        <Badge colorScheme="gray">{risk.riskType.replace(/_/g, ' ')}</Badge>
+                      {risk.riskCategory ? (
+                        <Badge colorScheme="gray">{risk.riskCategory.replace(/_/g, ' ')}</Badge>
                       ) : (
                         'N/A'
                       )}
                     </Td>
                   )}
+                  {visibleColumns.riskNature && (
+                    <Td>
+                      {risk.riskNature ? (
+                        <Badge colorScheme={risk.riskNature === 'STATIC' ? 'blue' : 'purple'}>
+                          {risk.riskNature}
+                        </Badge>
+                      ) : (
+                        'N/A'
+                      )}
+                    </Td>
+                  )}
+                  {visibleColumns.archived && (
+                    <Td>
+                      {risk.archived ? (
+                        <Badge colorScheme="gray">Archived</Badge>
+                      ) : (
+                        <Text fontSize="xs" color="gray.400">—</Text>
+                      )}
+                    </Td>
+                  )}
                   {visibleColumns.owner && <Td>{risk.owner ? risk.owner.displayName : 'N/A'}</Td>}
+                  <Td onClick={(e) => e.stopPropagation()}>
+                    {risk.asset ? (
+                      <Badge colorScheme="blue" as="a" href={`/assets/assets`} cursor="pointer">
+                        {risk.asset.nameSerialNo || risk.asset.model || 'Asset'} ({risk.asset.category.name})
+                      </Badge>
+                    ) : risk.linkedAssetCategory ? (
+                      <Badge colorScheme="purple" as="a" href={`/assets/asset-categories`} cursor="pointer">
+                        {risk.linkedAssetCategory.name}
+                      </Badge>
+                    ) : (
+                      <Text fontSize="xs" color="gray.400">—</Text>
+                    )}
+                  </Td>
                   {visibleColumns.cia && (
                     <>
                       <Td>{risk.confidentialityScore}</Td>
@@ -1132,13 +1275,13 @@ export function RisksPage() {
                               <Text
                                 fontSize="xs"
                                 as="a"
-                                href={`/controls/${rc.control.id}`}
+                                href={`/risks/controls`}
                                 color="blue.600"
                                 _hover={{ textDecoration: 'underline', color: 'blue.800' }}
                                 cursor="pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  window.location.href = `/controls/${rc.control.id}`;
+                                  window.location.href = `/risks/controls`;
                                 }}
                               >
                                 {rc.control.code}

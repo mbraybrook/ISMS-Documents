@@ -549,7 +549,7 @@ export function DocumentsPage() {
         <Heading size="lg">Documents</Heading>
         {canEdit && (
           <HStack>
-            <Button colorScheme="green" variant="outline" onClick={() => navigate('/documents/import')}>
+            <Button colorScheme="green" variant="outline" onClick={() => navigate('/documents/documents/import')}>
               Mass Import
             </Button>
             <Button colorScheme="blue" onClick={handleCreate}>
