@@ -167,10 +167,6 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
   const riskLevel = getRiskLevel(calculatedRiskScore);
   const riskLevelColor = getRiskLevelColor(riskLevel);
 
-  // Get mitigated risk level and color
-  const mitigatedRiskLevel = mitigatedRiskScore !== null ? getRiskLevel(mitigatedRiskScore) : null;
-  const mitigatedRiskLevelColor = mitigatedRiskLevel ? getRiskLevelColor(mitigatedRiskLevel) : 'gray';
-
   // Calculate Mitigated Risk = MC + MI + MA (sum)
   const mitigatedRisk =
     formData.mitigatedConfidentialityScore !== null &&
@@ -186,6 +182,10 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
     mitigatedRisk !== null && formData.mitigatedLikelihood !== null
       ? mitigatedRisk * formData.mitigatedLikelihood
       : null;
+
+  // Get mitigated risk level and color
+  const mitigatedRiskLevel = mitigatedRiskScore !== null ? getRiskLevel(mitigatedRiskScore) : null;
+  const mitigatedRiskLevelColor = mitigatedRiskLevel ? getRiskLevelColor(mitigatedRiskLevel) : 'gray';
 
   useEffect(() => {
     if (isOpen) {
@@ -855,101 +855,294 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                   />
                 </HStack>
                 <Collapse in={sectionsOpen.mitigated} animateOpacity>
-                  <VStack spacing={4}>
-                  <HStack spacing={4} width="100%">
-                    <FormControl>
-                      <FormLabel>Mitigated Confidentiality (MC)</FormLabel>
-                      <NumberInput
-                        min={1}
-                        max={5}
-                        value={formData.mitigatedConfidentialityScore || ''}
-                        onChange={(_, val) =>
-                          setFormData({
-                            ...formData,
-                            mitigatedConfidentialityScore: val || null,
-                          })
-                        }
-                      >
-                        <NumberInputField />
-                        <NumberInputStepper>
-                          <NumberIncrementStepper />
-                          <NumberDecrementStepper />
-                        </NumberInputStepper>
-                      </NumberInput>
-                    </FormControl>
+                  <HStack spacing={6} align="flex-start">
+                    {/* Left side: Sliders */}
+                    <VStack spacing={6} flex="1">
+                      <HStack spacing={4} width="100%" justify="space-around">
+                        <FormControl>
+                          <FormLabel textAlign="center" mb={2}>
+                            Mitigated Confidentiality (MC)
+                            <Tooltip label="Mitigated impact on confidentiality">
+                              <IconButton
+                                aria-label="Help"
+                                icon={<Text fontSize="xs">?</Text>}
+                                size="xs"
+                                variant="ghost"
+                                ml={1}
+                              />
+                            </Tooltip>
+                          </FormLabel>
+                          <VStack spacing={2}>
+                            <Badge 
+                              colorScheme={
+                                formData.mitigatedConfidentialityScore !== null
+                                  ? getRiskLevelColor(getRiskLevel((formData.mitigatedConfidentialityScore || 0) * (formData.mitigatedLikelihood || 1)))
+                                  : 'gray'
+                              } 
+                              fontSize="sm" 
+                              px={3} 
+                              py={1}
+                            >
+                              {formData.mitigatedConfidentialityScore !== null 
+                                ? getScoreLabel(formData.mitigatedConfidentialityScore)
+                                : 'Not Set'}
+                            </Badge>
+                            <Box position="relative" height="200px" width="60px">
+                              <Slider
+                                orientation="vertical"
+                                min={1}
+                                max={5}
+                                step={1}
+                                value={formData.mitigatedConfidentialityScore || 1}
+                                onChange={(val) =>
+                                  setFormData({
+                                    ...formData,
+                                    mitigatedConfidentialityScore: val || null,
+                                  })
+                                }
+                              >
+                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  1
+                                </SliderMark>
+                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  3
+                                </SliderMark>
+                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  5
+                                </SliderMark>
+                                <SliderTrack>
+                                  <SliderFilledTrack />
+                                </SliderTrack>
+                                <SliderThumb />
+                              </Slider>
+                            </Box>
+                          </VStack>
+                        </FormControl>
 
-                    <FormControl>
-                      <FormLabel>Mitigated Integrity (MI)</FormLabel>
-                      <NumberInput
-                        min={1}
-                        max={5}
-                        value={formData.mitigatedIntegrityScore || ''}
-                        onChange={(_, val) =>
-                          setFormData({ ...formData, mitigatedIntegrityScore: val || null })
-                        }
-                      >
-                        <NumberInputField />
-                        <NumberInputStepper>
-                          <NumberIncrementStepper />
-                          <NumberDecrementStepper />
-                        </NumberInputStepper>
-                      </NumberInput>
-                    </FormControl>
+                        <FormControl>
+                          <FormLabel textAlign="center" mb={2}>
+                            Mitigated Integrity (MI)
+                            <Tooltip label="Mitigated impact on integrity">
+                              <IconButton
+                                aria-label="Help"
+                                icon={<Text fontSize="xs">?</Text>}
+                                size="xs"
+                                variant="ghost"
+                                ml={1}
+                              />
+                            </Tooltip>
+                          </FormLabel>
+                          <VStack spacing={2}>
+                            <Badge 
+                              colorScheme={
+                                formData.mitigatedIntegrityScore !== null
+                                  ? getRiskLevelColor(getRiskLevel((formData.mitigatedIntegrityScore || 0) * (formData.mitigatedLikelihood || 1)))
+                                  : 'gray'
+                              } 
+                              fontSize="sm" 
+                              px={3} 
+                              py={1}
+                            >
+                              {formData.mitigatedIntegrityScore !== null 
+                                ? getScoreLabel(formData.mitigatedIntegrityScore)
+                                : 'Not Set'}
+                            </Badge>
+                            <Box position="relative" height="200px" width="60px">
+                              <Slider
+                                orientation="vertical"
+                                min={1}
+                                max={5}
+                                step={1}
+                                value={formData.mitigatedIntegrityScore || 1}
+                                onChange={(val) =>
+                                  setFormData({ ...formData, mitigatedIntegrityScore: val || null })
+                                }
+                              >
+                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  1
+                                </SliderMark>
+                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  3
+                                </SliderMark>
+                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  5
+                                </SliderMark>
+                                <SliderTrack>
+                                  <SliderFilledTrack />
+                                </SliderTrack>
+                                <SliderThumb />
+                              </Slider>
+                            </Box>
+                          </VStack>
+                        </FormControl>
 
-                    <FormControl>
-                      <FormLabel>Mitigated Availability (MA)</FormLabel>
-                      <NumberInput
-                        min={1}
-                        max={5}
-                        value={formData.mitigatedAvailabilityScore || ''}
-                        onChange={(_, val) =>
-                          setFormData({ ...formData, mitigatedAvailabilityScore: val || null })
-                        }
-                      >
-                        <NumberInputField />
-                        <NumberInputStepper>
-                          <NumberIncrementStepper />
-                          <NumberDecrementStepper />
-                        </NumberInputStepper>
-                      </NumberInput>
-                    </FormControl>
+                        <FormControl>
+                          <FormLabel textAlign="center" mb={2}>
+                            Mitigated Availability (MA)
+                            <Tooltip label="Mitigated impact on availability">
+                              <IconButton
+                                aria-label="Help"
+                                icon={<Text fontSize="xs">?</Text>}
+                                size="xs"
+                                variant="ghost"
+                                ml={1}
+                              />
+                            </Tooltip>
+                          </FormLabel>
+                          <VStack spacing={2}>
+                            <Badge 
+                              colorScheme={
+                                formData.mitigatedAvailabilityScore !== null
+                                  ? getRiskLevelColor(getRiskLevel((formData.mitigatedAvailabilityScore || 0) * (formData.mitigatedLikelihood || 1)))
+                                  : 'gray'
+                              } 
+                              fontSize="sm" 
+                              px={3} 
+                              py={1}
+                            >
+                              {formData.mitigatedAvailabilityScore !== null 
+                                ? getScoreLabel(formData.mitigatedAvailabilityScore)
+                                : 'Not Set'}
+                            </Badge>
+                            <Box position="relative" height="200px" width="60px">
+                              <Slider
+                                orientation="vertical"
+                                min={1}
+                                max={5}
+                                step={1}
+                                value={formData.mitigatedAvailabilityScore || 1}
+                                onChange={(val) =>
+                                  setFormData({ ...formData, mitigatedAvailabilityScore: val || null })
+                                }
+                              >
+                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  1
+                                </SliderMark>
+                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  3
+                                </SliderMark>
+                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  5
+                                </SliderMark>
+                                <SliderTrack>
+                                  <SliderFilledTrack />
+                                </SliderTrack>
+                                <SliderThumb />
+                              </Slider>
+                            </Box>
+                          </VStack>
+                        </FormControl>
 
-                    <FormControl>
-                      <FormLabel>Mitigated Likelihood (ML)</FormLabel>
-                      <NumberInput
-                        min={1}
-                        max={5}
-                        value={formData.mitigatedLikelihood || ''}
-                        onChange={(_, val) =>
-                          setFormData({ ...formData, mitigatedLikelihood: val || null })
-                        }
+                        <FormControl>
+                          <FormLabel textAlign="center" mb={2}>
+                            Mitigated Likelihood (ML)
+                            <Tooltip label="Mitigated likelihood of risk occurring">
+                              <IconButton
+                                aria-label="Help"
+                                icon={<Text fontSize="xs">?</Text>}
+                                size="xs"
+                                variant="ghost"
+                                ml={1}
+                              />
+                            </Tooltip>
+                          </FormLabel>
+                          <VStack spacing={2}>
+                            <Badge 
+                              colorScheme={
+                                formData.mitigatedLikelihood !== null && mitigatedRisk !== null
+                                  ? getRiskLevelColor(getRiskLevel(mitigatedRisk * formData.mitigatedLikelihood))
+                                  : 'gray'
+                              } 
+                              fontSize="sm" 
+                              px={3} 
+                              py={1}
+                            >
+                              {formData.mitigatedLikelihood !== null 
+                                ? getScoreLabel(formData.mitigatedLikelihood)
+                                : 'Not Set'}
+                            </Badge>
+                            <Box position="relative" height="200px" width="60px">
+                              <Slider
+                                orientation="vertical"
+                                min={1}
+                                max={5}
+                                step={1}
+                                value={formData.mitigatedLikelihood || 1}
+                                onChange={(val) =>
+                                  setFormData({ ...formData, mitigatedLikelihood: val || null })
+                                }
+                              >
+                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  1
+                                </SliderMark>
+                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  3
+                                </SliderMark>
+                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                  5
+                                </SliderMark>
+                                <SliderTrack>
+                                  <SliderFilledTrack />
+                                </SliderTrack>
+                                <SliderThumb />
+                              </Slider>
+                            </Box>
+                          </VStack>
+                        </FormControl>
+                      </HStack>
+                    </VStack>
+
+                    {/* Right side: Mitigated Risk and Risk Score Cards */}
+                    <VStack spacing={4} minW="200px">
+                      <Card 
+                        width="100%" 
+                        bg={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.50` : 'gray.50'} 
+                        borderColor={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.300` : 'gray.300'} 
+                        borderWidth="2px"
                       >
-                        <NumberInputField />
-                        <NumberInputStepper>
-                          <NumberIncrementStepper />
-                          <NumberDecrementStepper />
-                        </NumberInputStepper>
-                      </NumberInput>
-                    </FormControl>
+                        <CardBody>
+                          <VStack spacing={2} align="stretch">
+                            <Text fontSize="sm" fontWeight="bold" color="gray.600">
+                              Mitigated Risk (MC + MI + MA)
+                            </Text>
+                            <Text fontSize="3xl" fontWeight="bold" color={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.700` : 'gray.500'}>
+                              {mitigatedRisk !== null ? mitigatedRisk : 'N/A'}
+                            </Text>
+                          </VStack>
+                        </CardBody>
+                      </Card>
+
+                      <Card 
+                        width="100%" 
+                        bg={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.50` : 'gray.50'} 
+                        borderColor={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.300` : 'gray.300'} 
+                        borderWidth="2px"
+                      >
+                        <CardBody>
+                          <VStack spacing={2} align="stretch">
+                            <Text fontSize="sm" fontWeight="bold" color="gray.600">
+                              Mitigated Risk Score
+                            </Text>
+                            <Text fontSize="3xl" fontWeight="bold" color={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.700` : 'gray.500'}>
+                              {mitigatedRiskScore !== null ? mitigatedRiskScore : 'N/A'}
+                            </Text>
+                            {mitigatedRiskLevel && (
+                              <>
+                                <Badge colorScheme={mitigatedRiskLevelColor} size="lg" alignSelf="center" mt={2}>
+                                  {mitigatedRiskLevel}
+                                </Badge>
+                                <Text fontSize="xs" color="gray.500" textAlign="center" mt={1}>
+                                  {mitigatedRiskLevel === 'HIGH' && 'Unacceptable - treatment required'}
+                                  {mitigatedRiskLevel === 'MEDIUM' && 'Warning - review frequently'}
+                                  {mitigatedRiskLevel === 'LOW' && 'Acceptable - no treatment required'}
+                                </Text>
+                              </>
+                            )}
+                          </VStack>
+                        </CardBody>
+                      </Card>
+                    </VStack>
                   </HStack>
-
-                  <FormControl>
-                    <FormLabel>Mitigated Risk (MC + MI + MA)</FormLabel>
-                    <Input
-                      value={mitigatedRisk !== null ? mitigatedRisk : 'N/A'}
-                      isReadOnly
-                      bg="gray.50"
-                    />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>Mitigated Risk Score (Mitigated Risk × Mitigated Likelihood)</FormLabel>
-                    <Input
-                      value={mitigatedRiskScore !== null ? mitigatedRiskScore : 'N/A'}
-                      isReadOnly
-                      bg="gray.50"
-                    />
-                  </FormControl>
 
                   <FormControl>
                     <Checkbox
@@ -979,7 +1172,6 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                       ))}
                     </Select>
                   </FormControl>
-                </VStack>
                 </Collapse>
               </Box>
 
