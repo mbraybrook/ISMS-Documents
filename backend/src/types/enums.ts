@@ -18,3 +18,4 @@ export type ApplicabilitySource = 'AUTO_FROM_RISK' | 'MANUAL_OVERRIDE';
 
 export type SoAExportFormat = 'EXCEL' | 'PDF';
 
+
