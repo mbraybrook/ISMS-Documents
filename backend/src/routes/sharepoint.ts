@@ -108,7 +108,27 @@ router.get(
           folderPath,
           folderId
         );
-        return res.json({ items });
+        
+        // Add siteId and driveId to each item so the frontend can save them
+        const itemsWithContext = items.map(item => ({
+          ...item,
+          siteId,
+          driveId,
+        }));
+        
+        console.log('[SharePoint] Returning items with context', {
+          itemCount: itemsWithContext.length,
+          siteId,
+          driveId,
+          sampleItem: itemsWithContext[0] ? {
+            id: itemsWithContext[0].id,
+            name: itemsWithContext[0].name,
+            hasSiteId: !!itemsWithContext[0].siteId,
+            hasDriveId: !!itemsWithContext[0].driveId,
+          } : null,
+        });
+        
+        return res.json({ items: itemsWithContext });
       } catch (error: any) {
         // If drive ID is invalid, fetch available drives to help debug
         if (error.code === 'invalidRequest' && error.message?.includes('drive')) {
@@ -178,6 +198,11 @@ router.get(
       const accessToken = req.headers['x-graph-token'] as string;
 
       if (!accessToken) {
+        console.warn('[SharePoint] Missing access token for items endpoint', {
+          itemId: req.params.itemId,
+          siteId: req.query.siteId,
+          driveId: req.query.driveId,
+        });
         return res.status(400).json({
           error:
             'Access token required. Please provide x-graph-token header with Microsoft Graph access token.',
@@ -187,6 +212,13 @@ router.get(
       const { siteId, driveId } = req.query;
       const { itemId } = req.params;
 
+      console.log('[SharePoint] Fetching item metadata', {
+        itemId,
+        siteId,
+        driveId,
+        userId: req.user.id,
+      });
+
       const item = await getSharePointItem(
         accessToken,
         siteId as string,
@@ -195,13 +227,35 @@ router.get(
       );
 
       if (!item) {
+        console.warn('[SharePoint] Item not found', {
+          itemId,
+          siteId,
+          driveId,
+        });
         return res.status(404).json({ error: 'SharePoint item not found' });
       }
 
+      console.log('[SharePoint] Successfully fetched item', {
+        itemId,
+        hasWebUrl: !!item.webUrl,
+        name: item.name,
+      });
+
       res.json(item);
-    } catch (error) {
-      console.error('Error fetching SharePoint item:', error);
-      res.status(500).json({ error: 'Failed to fetch SharePoint item' });
+    } catch (error: any) {
+      console.error('[SharePoint] Error fetching SharePoint item:', {
+        error: error.message,
+        code: error.code,
+        statusCode: error.statusCode,
+        body: error.body,
+        itemId: req.params.itemId,
+        siteId: req.query.siteId,
+        driveId: req.query.driveId,
+      });
+      res.status(500).json({
+        error: 'Failed to fetch SharePoint item',
+        details: error.message || 'Unknown error',
+      });
     }
   }
 );
@@ -221,9 +275,19 @@ router.get(
       const { siteId, driveId, itemId } = req.query;
       const accessToken = req.headers['x-graph-token'] as string;
 
+      console.log('[SharePoint] Generating URL', {
+        itemId,
+        siteId,
+        driveId,
+        hasAccessToken: !!accessToken,
+        userId: req.user?.id,
+      });
+
       // Try to get the actual webUrl from SharePoint if we have an access token
       if (accessToken) {
         try {
+          // First, try to get webUrl directly from the item
+          console.log('[SharePoint] Attempting to fetch item webUrl');
           const item = await getSharePointItem(
             accessToken,
             siteId as string,
@@ -231,24 +295,75 @@ router.get(
             itemId as string
           );
           if (item?.webUrl) {
+            console.log('[SharePoint] Successfully got webUrl from item', {
+              itemId,
+              webUrl: item.webUrl,
+            });
             return res.json({ url: item.webUrl });
           }
-        } catch (error) {
-          console.warn('Could not fetch webUrl from SharePoint, using generated URL:', error);
+          console.warn('[SharePoint] Item fetched but no webUrl', {
+            itemId,
+            itemName: item?.name,
+          });
+
+          // If item doesn't have webUrl, try generateSharePointUrl which will attempt
+          // to get it from the site or construct it
+          console.log('[SharePoint] Attempting to generate URL via generateSharePointUrl');
+          const generatedUrl = await generateSharePointUrl(
+            siteId as string,
+            driveId as string,
+            itemId as string,
+            accessToken
+          );
+          if (generatedUrl) {
+            console.log('[SharePoint] Successfully generated URL', {
+              itemId,
+              url: generatedUrl,
+            });
+            return res.json({ url: generatedUrl });
+          }
+          console.warn('[SharePoint] generateSharePointUrl returned null', {
+            itemId,
+          });
+        } catch (error: any) {
+          console.error('[SharePoint] Error fetching webUrl from SharePoint:', {
+            error: error.message,
+            code: error.code,
+            statusCode: error.statusCode,
+            body: error.body,
+            itemId,
+            siteId,
+            driveId,
+          });
         }
+      } else {
+        console.warn('[SharePoint] No access token provided for URL generation', {
+          itemId,
+          siteId,
+          driveId,
+        });
       }
 
-      // Fallback to generated URL
-      const url = generateSharePointUrl(
-        siteId as string,
-        driveId as string,
-        itemId as string
-      );
-
-      res.json({ url });
-    } catch (error) {
-      console.error('Error generating SharePoint URL:', error);
-      res.status(500).json({ error: 'Failed to generate SharePoint URL' });
+      // Without access token or if all attempts failed, return an error
+      // We cannot generate a valid web URL without access to SharePoint
+      return res.status(400).json({
+        error: 'Access token required to generate SharePoint URL. Please provide x-graph-token header.',
+        message: 'Cannot generate a valid SharePoint web URL without Microsoft Graph access token.',
+      });
+    } catch (error: any) {
+      console.error('[SharePoint] Error generating SharePoint URL:', {
+        error: error.message,
+        code: error.code,
+        statusCode: error.statusCode,
+        body: error.body,
+        itemId: req.query.itemId,
+        siteId: req.query.siteId,
+        driveId: req.query.driveId,
+      });
+      res.status(500).json({
+        error: 'Failed to generate SharePoint URL',
+        details: error.message || 'Unknown error',
+      });
     }
   }
 );

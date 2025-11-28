@@ -37,11 +37,13 @@ import {
   PopoverContent,
   PopoverBody,
 } from '@chakra-ui/react';
-import { SearchIcon } from '@chakra-ui/icons';
-import { DeleteIcon, DownloadIcon } from '@chakra-ui/icons';
+import { SearchIcon, ChevronUpIcon, ChevronDownIcon } from '@chakra-ui/icons';
+import { DeleteIcon, DownloadIcon, EditIcon, CopyIcon } from '@chakra-ui/icons';
 import api from '../services/api';
 import { RiskFormModal } from '../components/RiskFormModal';
 import { useAuth } from '../contexts/AuthContext';
+import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
+import { formatBoolean } from '../utils/tableUtils';
 
 interface Risk {
   id: string;
@@ -77,7 +79,11 @@ interface Risk {
     id: string;
     name: string;
   } | null;
-  interestedParty: string | null;
+  interestedParty: {
+    id: string;
+    name: string;
+    group: string | null;
+  } | null;
   threatDescription: string | null;
   confidentialityScore: number;
   integrityScore: number;
@@ -277,7 +283,7 @@ export function RisksPage() {
       description: risk.description || '',
       threatDescription: risk.threatDescription || '',
       assetCategory: risk.assetCategory || '',
-      interestedParty: risk.interestedParty || '',
+      interestedPartyId: risk.interestedParty?.id || '',
       dateAdded: new Date().toISOString().split('T')[0],
       // Reset mitigated scores for the duplicate
       mitigatedConfidentialityScore: null,
@@ -454,113 +460,536 @@ export function RisksPage() {
 
   const [isExporting, setIsExporting] = useState(false);
 
-  const exportToCSV = async () => {
-    setIsExporting(true);
-    try {
-      const headers = [
-        'Title',
-        'Risk Category',
-        'Risk Nature',
-        'Archived',
-        'Owner',
-        'C',
-        'I',
-        'A',
-        'L',
-        'Risk (C+I+A)',
-        'Initial Score',
-        'Risk Level',
-        'Initial Treatment',
-        'MC',
-        'MI',
-        'MA',
-        'ML',
-        'Mitigated Risk',
-        'Mitigated Score',
-        'Mitigated Risk Level',
-        'Residual Treatment',
-        'Mitigation Implemented',
-        'Controls',
-        'Date Added',
-      ];
-
-      const rows = risks.map((risk) => {
-        const riskValue = risk.confidentialityScore + risk.integrityScore + risk.availabilityScore;
-        const mitigatedRiskValue =
-          risk.mitigatedConfidentialityScore !== null &&
-          risk.mitigatedIntegrityScore !== null &&
-          risk.mitigatedAvailabilityScore !== null
-            ? risk.mitigatedConfidentialityScore +
-              risk.mitigatedIntegrityScore +
-              risk.mitigatedAvailabilityScore
-            : '';
-        const controls = risk.riskControls.map((rc) => rc.control.code).join('; ');
-
-        return [
-          risk.title,
-          risk.riskCategory || '',
-          risk.riskNature || '',
-          risk.archived ? 'Yes' : 'No',
-          risk.owner?.displayName || '',
-          risk.confidentialityScore,
-          risk.integrityScore,
-          risk.availabilityScore,
-          risk.likelihood,
-          riskValue,
-          risk.calculatedScore,
-          risk.riskLevel,
-          risk.initialRiskTreatmentCategory || '',
-          risk.mitigatedConfidentialityScore ?? '',
-          risk.mitigatedIntegrityScore ?? '',
-          risk.mitigatedAvailabilityScore ?? '',
-          risk.mitigatedLikelihood ?? '',
-          mitigatedRiskValue,
-          risk.mitigatedScore ?? '',
-          risk.mitigatedRiskLevel || '',
-          risk.residualRiskTreatmentCategory || '',
-          risk.mitigationImplemented ? 'Yes' : 'No',
-          controls || 'None',
-          risk.dateAdded,
-        ];
+  // Build columns dynamically based on visibleColumns
+  const buildColumns = (): Column<Risk>[] => {
+    const cols: Column<Risk>[] = [];
+    
+    if (visibleColumns.title) {
+      cols.push({
+        key: 'title',
+        header: 'Title',
+        sortable: true,
+        render: (risk) => <Text fontWeight="medium">{risk.title}</Text>,
       });
+    }
+    
+    if (visibleColumns.riskCategory) {
+      cols.push({
+        key: 'riskCategory',
+        header: 'Risk Category',
+        render: (risk) =>
+          risk.riskCategory ? (
+            <Badge colorScheme="gray">{risk.riskCategory.replace(/_/g, ' ')}</Badge>
+          ) : (
+            <Text color="gray.400">N/A</Text>
+          ),
+      });
+    }
+    
+    if (visibleColumns.riskNature) {
+      cols.push({
+        key: 'riskNature',
+        header: 'Risk Nature',
+        render: (risk) =>
+          risk.riskNature ? (
+            <Badge colorScheme={risk.riskNature === 'STATIC' ? 'blue' : 'purple'}>
+              {risk.riskNature}
+            </Badge>
+          ) : (
+            <Text color="gray.400">N/A</Text>
+          ),
+      });
+    }
+    
+    if (visibleColumns.archived) {
+      cols.push({
+        key: 'archived',
+        header: 'Archived',
+        render: (risk) =>
+          risk.archived ? (
+            <Badge colorScheme="gray">Archived</Badge>
+          ) : (
+            <Text fontSize="xs" color="gray.400">—</Text>
+          ),
+      });
+    }
+    
+    if (visibleColumns.owner) {
+      cols.push({
+        key: 'owner',
+        header: 'Owner',
+        render: (risk) => <Text>{risk.owner ? risk.owner.displayName : 'N/A'}</Text>,
+      });
+    }
+    
+    // Asset/Category is always visible
+    cols.push({
+      key: 'asset',
+      header: 'Asset/Category',
+      render: (risk) => (
+        risk.asset ? (
+          <Badge colorScheme="blue" as="a" href={`/assets/assets`} cursor="pointer">
+            {risk.asset.nameSerialNo || risk.asset.model || 'Asset'} ({risk.asset.category.name})
+          </Badge>
+        ) : risk.linkedAssetCategory ? (
+          <Badge colorScheme="purple" as="a" href={`/assets/asset-categories`} cursor="pointer">
+            {risk.linkedAssetCategory.name}
+          </Badge>
+        ) : (
+          <Text fontSize="xs" color="gray.400">—</Text>
+        )
+      ),
+    });
+    
+    // Interested Party is always visible
+    cols.push({
+      key: 'interestedParty',
+      header: 'Interested Party',
+      render: (risk) => (
+        risk.interestedParty ? (
+          <Badge colorScheme="teal" as="a" href={`/risks/interested-parties`} cursor="pointer">
+            {risk.interestedParty.name}
+            {risk.interestedParty.group && ` (${risk.interestedParty.group})`}
+          </Badge>
+        ) : (
+          <Text fontSize="xs" color="gray.400">—</Text>
+        )
+      ),
+    });
+    
+    if (visibleColumns.cia) {
+      cols.push(
+        {
+          key: 'confidentialityScore',
+          header: 'C',
+          render: (risk) => risk.confidentialityScore,
+        },
+        {
+          key: 'integrityScore',
+          header: 'I',
+          render: (risk) => risk.integrityScore,
+        },
+        {
+          key: 'availabilityScore',
+          header: 'A',
+          render: (risk) => risk.availabilityScore,
+        },
+        {
+          key: 'likelihood',
+          header: 'L',
+          render: (risk) => risk.likelihood,
+        }
+      );
+    }
+    
+    if (visibleColumns.initialScore) {
+      cols.push({
+        key: 'calculatedScore',
+        header: 'Initial Score',
+        sortable: true,
+        render: (risk) => (
+          <Box bg={`${getRiskLevelColor(risk.riskLevel)}.50`} px={3} py={2}>
+            <VStack spacing={1} align="center">
+              <Badge
+                colorScheme={getScoreColor(risk.calculatedScore)}
+                fontSize="md"
+                px={3}
+                py={1}
+                minW="60px"
+              >
+                {risk.calculatedScore}
+              </Badge>
+              <Badge
+                colorScheme={getRiskLevelColor(risk.riskLevel)}
+                size="md"
+                px={3}
+                py={1}
+                minW="60px"
+              >
+                {risk.riskLevel}
+              </Badge>
+            </VStack>
+          </Box>
+        ),
+      });
+    }
+    
+    if (visibleColumns.treatment) {
+      cols.push({
+        key: 'initialRiskTreatmentCategory',
+        header: 'Treatment',
+        render: (risk) =>
+          risk.initialRiskTreatmentCategory ? (
+            <Badge
+              colorScheme={
+                risk.initialRiskTreatmentCategory === 'MODIFY' ? 'blue' :
+                risk.initialRiskTreatmentCategory === 'RETAIN' ? 'green' :
+                risk.initialRiskTreatmentCategory === 'SHARE' ? 'purple' :
+                'red'
+              }
+              fontSize="sm"
+              px={3}
+              py={1}
+              minW="80px"
+            >
+              {risk.initialRiskTreatmentCategory}
+            </Badge>
+          ) : (
+            <Text fontSize="xs" color="gray.400" fontStyle="italic">N/A</Text>
+          ),
+      });
+    }
+    
+    if (visibleColumns.mitigatedCIA) {
+      cols.push(
+        {
+          key: 'mitigatedConfidentialityScore',
+          header: 'MC',
+          render: (risk) =>
+            risk.mitigatedConfidentialityScore !== null ? (
+              risk.mitigatedConfidentialityScore
+            ) : (
+              <Text as="span" color="gray.400">—</Text>
+            ),
+        },
+        {
+          key: 'mitigatedIntegrityScore',
+          header: 'MI',
+          render: (risk) =>
+            risk.mitigatedIntegrityScore !== null ? (
+              risk.mitigatedIntegrityScore
+            ) : (
+              <Text as="span" color="gray.400">—</Text>
+            ),
+        },
+        {
+          key: 'mitigatedAvailabilityScore',
+          header: 'MA',
+          render: (risk) =>
+            risk.mitigatedAvailabilityScore !== null ? (
+              risk.mitigatedAvailabilityScore
+            ) : (
+              <Text as="span" color="gray.400">—</Text>
+            ),
+        },
+        {
+          key: 'mitigatedLikelihood',
+          header: 'ML',
+          render: (risk) =>
+            risk.mitigatedLikelihood !== null ? (
+              risk.mitigatedLikelihood
+            ) : (
+              <Text as="span" color="gray.400">—</Text>
+            ),
+        }
+      );
+    }
+    
+    if (visibleColumns.mitigatedScore) {
+      cols.push({
+        key: 'mitigatedScore',
+        header: 'Mitigated Score',
+        sortable: true,
+        render: (risk) =>
+          risk.mitigatedScore !== null ? (
+            <VStack spacing={1} align="start">
+              <Badge colorScheme={getScoreColor(risk.mitigatedScore)}>
+                {risk.mitigatedScore}
+              </Badge>
+              {risk.mitigatedRiskLevel && (
+                <Badge colorScheme={getRiskLevelColor(risk.mitigatedRiskLevel)} size="sm">
+                  {risk.mitigatedRiskLevel}
+                </Badge>
+              )}
+            </VStack>
+          ) : (
+            <Text color="gray.400">-</Text>
+          ),
+      });
+    }
+    
+    if (visibleColumns.residualTreatment) {
+      cols.push({
+        key: 'residualRiskTreatmentCategory',
+        header: 'Residual Treatment',
+        render: (risk) =>
+          risk.residualRiskTreatmentCategory ? (
+            <Badge colorScheme="green">{risk.residualRiskTreatmentCategory}</Badge>
+          ) : (
+            <Text color="gray.400">N/A</Text>
+          ),
+      });
+    }
+    
+    if (visibleColumns.controls) {
+      cols.push({
+        key: 'controls',
+        header: 'Controls',
+        render: (risk) =>
+          risk.riskControls.length > 0 ? (
+            <HStack spacing={1} flexWrap="wrap">
+              {risk.riskControls.map((rc) => (
+                <Tooltip key={rc.control.id} label={rc.control.title}>
+                  <Text
+                    fontSize="xs"
+                    as="a"
+                    href={`/risks/controls`}
+                    color="blue.600"
+                    _hover={{ textDecoration: 'underline', color: 'blue.800' }}
+                    cursor="pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.href = `/risks/controls`;
+                    }}
+                  >
+                    {rc.control.code}
+                  </Text>
+                </Tooltip>
+              ))}
+            </HStack>
+          ) : (
+            <Badge colorScheme="orange" fontSize="xs" px={2} py={0.5}>
+              No controls
+            </Badge>
+          ),
+      });
+    }
+    
+    return cols;
+  };
 
-      const csvContent = [
-        headers.join(','),
-        ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
-      ].join('\n');
+  const filterConfigs: FilterConfig[] = [
+    {
+      key: 'search',
+      type: 'search',
+      placeholder: 'Search by title or description...',
+    },
+    {
+      key: 'riskCategory',
+      type: 'select',
+      placeholder: 'Risk Category',
+      options: RISK_CATEGORIES.map((cat) => ({ value: cat, label: cat.replace(/_/g, ' ') })),
+    },
+    {
+      key: 'riskNature',
+      type: 'select',
+      placeholder: 'Risk Nature',
+      options: RISK_NATURES.map((nature) => ({ value: nature, label: nature })),
+    },
+    {
+      key: 'archived',
+      type: 'select',
+      placeholder: 'Show Archived',
+      options: [
+        { value: 'true', label: 'Show Archived' },
+        { value: 'false', label: 'Hide Archived' },
+      ],
+    },
+    {
+      key: 'treatmentCategory',
+      type: 'select',
+      placeholder: 'Treatment Category',
+      options: TREATMENT_CATEGORIES.map((cat) => ({ value: cat, label: cat })),
+    },
+    {
+      key: 'riskLevel',
+      type: 'select',
+      placeholder: 'Risk Level',
+      options: [
+        { value: 'LOW', label: 'Low' },
+        { value: 'MEDIUM', label: 'Medium' },
+        { value: 'HIGH', label: 'High' },
+      ],
+    },
+    {
+      key: 'mitigationImplemented',
+      type: 'select',
+      placeholder: 'Mitigation Status',
+      options: [
+        { value: 'true', label: 'Implemented' },
+        { value: 'false', label: 'Not Implemented' },
+      ],
+    },
+  ];
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      const filename = `risks_export_${new Date().toISOString().split('T')[0]}.csv`;
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+  const actions: ActionButton<Risk>[] = [
+    {
+      icon: <EditIcon />,
+      label: 'Edit',
+      onClick: handleEdit,
+      colorScheme: 'blue',
+    },
+    ...(isAdminOrEditor
+      ? [
+          {
+            icon: <CopyIcon />,
+            label: 'Duplicate risk',
+            onClick: handleDuplicate,
+            colorScheme: 'blue',
+          } as ActionButton<Risk>,
+          {
+            icon: <DeleteIcon />,
+            label: 'Delete risk',
+            onClick: handleDelete,
+            colorScheme: 'red',
+          } as ActionButton<Risk>,
+        ]
+      : []),
+  ];
 
+  const paginationConfig: PaginationConfig = {
+    mode: 'server',
+    page: filters.page,
+    pageSize: filters.limit,
+    total: pagination.total,
+    totalPages: pagination.totalPages,
+    onPageChange: handlePageChange,
+    onPageSizeChange: (newSize) => {
+      setFilters({ ...filters, limit: newSize, page: 1 });
+    },
+  };
+
+  const sortConfig: SortConfig = {
+    field: filters.sortBy,
+    direction: filters.sortOrder,
+    onSort: handleSort,
+  };
+
+  const csvExportConfig: CSVExportConfig = {
+    enabled: true,
+    filename: `risks_export_${new Date().toISOString().split('T')[0]}.csv`,
+    headers: [
+      'Title',
+      'Risk Category',
+      'Risk Nature',
+      'Archived',
+      'Owner',
+      'C',
+      'I',
+      'A',
+      'L',
+      'Risk (C+I+A)',
+      'Initial Score',
+      'Risk Level',
+      'Initial Treatment',
+      'MC',
+      'MI',
+      'MA',
+      'ML',
+      'Mitigated Risk',
+      'Mitigated Score',
+      'Mitigated Risk Level',
+      'Residual Treatment',
+      'Mitigation Implemented',
+      'Controls',
+      'Date Added',
+    ],
+    getRowData: (risk) => {
+      const riskValue = risk.confidentialityScore + risk.integrityScore + risk.availabilityScore;
+      const mitigatedRiskValue =
+        risk.mitigatedConfidentialityScore !== null &&
+        risk.mitigatedIntegrityScore !== null &&
+        risk.mitigatedAvailabilityScore !== null
+          ? risk.mitigatedConfidentialityScore +
+            risk.mitigatedIntegrityScore +
+            risk.mitigatedAvailabilityScore
+          : '';
+      const controls = risk.riskControls.map((rc) => rc.control.code).join('; ');
+
+      return [
+        risk.title,
+        risk.riskCategory || '',
+        risk.riskNature || '',
+        formatBoolean(risk.archived),
+        risk.owner?.displayName || '',
+        risk.confidentialityScore,
+        risk.integrityScore,
+        risk.availabilityScore,
+        risk.likelihood,
+        riskValue,
+        risk.calculatedScore,
+        risk.riskLevel,
+        risk.initialRiskTreatmentCategory || '',
+        risk.mitigatedConfidentialityScore ?? '',
+        risk.mitigatedIntegrityScore ?? '',
+        risk.mitigatedAvailabilityScore ?? '',
+        risk.mitigatedLikelihood ?? '',
+        mitigatedRiskValue,
+        risk.mitigatedScore ?? '',
+        risk.mitigatedRiskLevel || '',
+        risk.residualRiskTreatmentCategory || '',
+        formatBoolean(risk.mitigationImplemented),
+        controls || 'None',
+        risk.dateAdded,
+      ];
+    },
+    onExport: () => {
       toast({
         title: 'Export Successful',
-        description: `Exported ${risks.length} risk(s) to ${filename}`,
+        description: `Exported ${risks.length} risk(s) to CSV`,
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
-    } catch (error: any) {
-      console.error('Error exporting CSV:', error);
-      toast({
-        title: 'Export Failed',
-        description: error.message || 'Failed to export risks to CSV',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setIsExporting(false);
-    }
+    },
   };
+
+  const renderRow = (risk: Risk, index: number) => {
+    return (
+      <Tr
+        key={risk.id}
+        id={`risk-${risk.id}`}
+        bg={getRowBgColor(risk)}
+        _hover={{ bg: getRowBgColor(risk), opacity: 0.9, cursor: 'pointer' }}
+        cursor="pointer"
+        onClick={() => handleEdit(risk)}
+      >
+        {isAdminOrEditor && (
+          <Td onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              isChecked={selectedRiskIds.has(risk.id)}
+              onChange={(e) => {
+                e.stopPropagation();
+                handleSelectRisk(risk.id, e.target.checked);
+              }}
+            />
+          </Td>
+        )}
+        {buildColumns().map((column) => {
+          let cellContent: React.ReactNode;
+          if (column.render) {
+            cellContent = column.render(risk);
+          } else {
+            const value = (risk as any)[column.key];
+            cellContent = value === null || value === undefined || value === '' 
+              ? <Text color="gray.400" fontSize="xs">—</Text>
+              : String(value);
+          }
+          return <Td key={column.key} onClick={column.key === 'asset' ? (e) => e.stopPropagation() : undefined}>{cellContent}</Td>;
+        })}
+        <Td onClick={(e) => e.stopPropagation()}>
+          <HStack spacing={2}>
+            {actions.map((action, idx) => (
+              <Tooltip key={idx} label={action.label}>
+                <IconButton
+                  aria-label={action.label}
+                  icon={action.icon}
+                  size="sm"
+                  colorScheme={action.colorScheme || 'blue'}
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    action.onClick(risk);
+                  }}
+                />
+              </Tooltip>
+            ))}
+          </HStack>
+        </Td>
+      </Tr>
+    );
+  };
+
 
   return (
     <VStack spacing={6} align="stretch">
@@ -600,17 +1029,6 @@ export function RisksPage() {
               </HStack>
             </Box>
           )}
-          <Button
-            leftIcon={<DownloadIcon />}
-            size="sm"
-            variant="outline"
-            onClick={exportToCSV}
-            isDisabled={risks.length === 0 || isExporting}
-            isLoading={isExporting}
-            loadingText="Exporting..."
-          >
-            Export CSV
-          </Button>
           <Popover>
             <PopoverTrigger>
               <Button size="sm" variant="outline">
@@ -729,640 +1147,65 @@ export function RisksPage() {
         </HStack>
       </HStack>
 
-      {/* Filters */}
-      <Box p={4} bg="white" borderRadius="md" boxShadow="sm">
-        <HStack justify="space-between" mb={4}>
-          <Heading size="sm">Filters</Heading>
-          {getActiveFilterCount() > 0 && (
-            <Badge colorScheme="blue" fontSize="sm">
-              {getActiveFilterCount()} active
-            </Badge>
-          )}
-        </HStack>
-        <HStack spacing={4} flexWrap="wrap" mb={4}>
-          <InputGroup maxW="300px">
-            <InputLeftElement pointerEvents="none">
-              <SearchIcon color="gray.300" />
-            </InputLeftElement>
-            <Input
-              placeholder="Search by title or description..."
-              value={filters.search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-            />
-          </InputGroup>
-          <Select
-            placeholder="Risk Category"
-            value={filters.riskCategory}
-            onChange={(e) => setFilters({ ...filters, riskCategory: e.target.value, page: 1 })}
-            width="200px"
-            borderColor={filters.riskCategory ? 'blue.300' : undefined}
-            borderWidth={filters.riskCategory ? '2px' : '1px'}
-          >
-            {RISK_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {category.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </Select>
+      <DataTable
+        title=""
+        data={risks}
+        columns={buildColumns()}
+        loading={loading}
+        emptyMessage={
+          getActiveFilterCount() > 0
+            ? 'No risks match your current filters. Try adjusting your filters.'
+            : 'Get started by creating your first risk.'
+        }
+        filters={filterConfigs}
+        filterValues={{
+          search: filters.search,
+          riskCategory: filters.riskCategory,
+          riskNature: filters.riskNature,
+          archived: filters.archived ? 'true' : '',
+          treatmentCategory: filters.treatmentCategory,
+          riskLevel: filters.riskLevel,
+          mitigationImplemented: filters.mitigationImplemented,
+        }}
+        onFilterChange={(key, value) => {
+          if (key === 'archived') {
+            setFilters({ ...filters, archived: value === 'true', page: 1 });
+          } else {
+            setFilters({ ...filters, [key]: value, page: 1 });
+          }
+        }}
+        onClearFilters={() => {
+          setFilters({
+            riskCategory: '',
+            riskNature: '',
+            archived: false,
+            ownerId: '',
+            treatmentCategory: '',
+            mitigationImplemented: '',
+            riskLevel: '',
+            search: '',
+            dateAddedFrom: '',
+            dateAddedTo: '',
+            sortBy: 'calculatedScore',
+            sortOrder: 'desc',
+            page: 1,
+            limit: 20,
+          });
+        }}
+        showFiltersHeading={true}
+        sortConfig={sortConfig}
+        enableSelection={isAdminOrEditor}
+        selectedIds={selectedRiskIds}
+        onSelectAll={handleSelectAll}
+        onSelectRow={handleSelectRisk}
+        getRowId={(risk) => risk.id}
+        pagination={paginationConfig}
+        actions={actions}
+        csvExport={csvExportConfig}
+        onRowClick={handleEdit}
+        renderRow={renderRow}
+      />
 
-          <Select
-            placeholder="Risk Nature"
-            value={filters.riskNature}
-            onChange={(e) => setFilters({ ...filters, riskNature: e.target.value, page: 1 })}
-            width="150px"
-            borderColor={filters.riskNature ? 'blue.300' : undefined}
-            borderWidth={filters.riskNature ? '2px' : '1px'}
-          >
-            {RISK_NATURES.map((nature) => (
-              <option key={nature} value={nature}>
-                {nature}
-              </option>
-            ))}
-          </Select>
-
-          <Checkbox
-            isChecked={filters.archived}
-            onChange={(e) => setFilters({ ...filters, archived: e.target.checked, page: 1 })}
-          >
-            Show Archived
-          </Checkbox>
-
-          <Select
-            placeholder="Treatment Category"
-            value={filters.treatmentCategory}
-            onChange={(e) => setFilters({ ...filters, treatmentCategory: e.target.value })}
-            width="200px"
-            borderColor={filters.treatmentCategory ? 'blue.300' : undefined}
-            borderWidth={filters.treatmentCategory ? '2px' : '1px'}
-          >
-            {TREATMENT_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </Select>
-
-          <Select
-            placeholder="Risk Level"
-            value={filters.riskLevel}
-            onChange={(e) => setFilters({ ...filters, riskLevel: e.target.value })}
-            width="150px"
-            borderColor={filters.riskLevel ? 'blue.300' : undefined}
-            borderWidth={filters.riskLevel ? '2px' : '1px'}
-          >
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-          </Select>
-
-          <Select
-            placeholder="Mitigation Status"
-            value={filters.mitigationImplemented}
-            onChange={(e) => setFilters({ ...filters, mitigationImplemented: e.target.value })}
-            width="180px"
-            borderColor={filters.mitigationImplemented ? 'blue.300' : undefined}
-            borderWidth={filters.mitigationImplemented ? '2px' : '1px'}
-          >
-            <option value="true">Implemented</option>
-            <option value="false">Not Implemented</option>
-          </Select>
-
-          <Button
-            size="sm"
-            onClick={() =>
-              setFilters({
-                riskCategory: '',
-                riskNature: '',
-                archived: false,
-                ownerId: '',
-                treatmentCategory: '',
-                mitigationImplemented: '',
-                riskLevel: '',
-                search: '',
-                dateAddedFrom: '',
-                dateAddedTo: '',
-                sortBy: 'calculatedScore',
-                sortOrder: 'desc',
-                page: 1,
-                limit: 20,
-              })
-            }
-            isDisabled={getActiveFilterCount() === 0}
-          >
-            Clear Filters
-          </Button>
-        </HStack>
-        {getActiveFilterCount() > 0 && (
-          <Wrap spacing={2}>
-            {filters.riskCategory && (
-              <WrapItem>
-                <Badge colorScheme="blue">
-                  Risk Category: {filters.riskCategory.replace(/_/g, ' ')}
-                  <Button
-                    size="xs"
-                    ml={2}
-                    variant="ghost"
-                    onClick={() => setFilters({ ...filters, riskCategory: '', page: 1 })}
-                  >
-                    ×
-                  </Button>
-                </Badge>
-              </WrapItem>
-            )}
-            {filters.riskNature && (
-              <WrapItem>
-                <Badge colorScheme="blue">
-                  Risk Nature: {filters.riskNature}
-                  <Button
-                    size="xs"
-                    ml={2}
-                    variant="ghost"
-                    onClick={() => setFilters({ ...filters, riskNature: '', page: 1 })}
-                  >
-                    ×
-                  </Button>
-                </Badge>
-              </WrapItem>
-            )}
-            {filters.archived && (
-              <WrapItem>
-                <Badge colorScheme="blue">
-                  Show Archived
-                  <Button
-                    size="xs"
-                    ml={2}
-                    variant="ghost"
-                    onClick={() => setFilters({ ...filters, archived: false, page: 1 })}
-                  >
-                    ×
-                  </Button>
-                </Badge>
-              </WrapItem>
-            )}
-            {filters.treatmentCategory && (
-              <WrapItem>
-                <Badge colorScheme="blue">
-                  Treatment: {filters.treatmentCategory}
-                  <Button
-                    size="xs"
-                    ml={2}
-                    variant="ghost"
-                    onClick={() => setFilters({ ...filters, treatmentCategory: '', page: 1 })}
-                  >
-                    ×
-                  </Button>
-                </Badge>
-              </WrapItem>
-            )}
-            {filters.riskLevel && (
-              <WrapItem>
-                <Badge colorScheme="blue">
-                  Level: {filters.riskLevel}
-                  <Button
-                    size="xs"
-                    ml={2}
-                    variant="ghost"
-                    onClick={() => setFilters({ ...filters, riskLevel: '', page: 1 })}
-                  >
-                    ×
-                  </Button>
-                </Badge>
-              </WrapItem>
-            )}
-            {filters.mitigationImplemented && (
-              <WrapItem>
-                <Badge colorScheme="blue">
-                  Mitigation: {filters.mitigationImplemented === 'true' ? 'Implemented' : 'Not Implemented'}
-                  <Button
-                    size="xs"
-                    ml={2}
-                    variant="ghost"
-                    onClick={() => setFilters({ ...filters, mitigationImplemented: '', page: 1 })}
-                  >
-                    ×
-                  </Button>
-                </Badge>
-              </WrapItem>
-            )}
-            {filters.search && (
-              <WrapItem>
-                <Badge colorScheme="blue">
-                  Search: "{filters.search}"
-                  <Button
-                    size="xs"
-                    ml={2}
-                    variant="ghost"
-                    onClick={() => setFilters({ ...filters, search: '', page: 1 })}
-                  >
-                    ×
-                  </Button>
-                </Badge>
-              </WrapItem>
-            )}
-          </Wrap>
-        )}
-      </Box>
-
-      <Box p={4} bg="white" borderRadius="md" boxShadow="sm" overflowX="auto">
-        {loading ? (
-          <Box p={8} textAlign="center">
-            <Spinner size="xl" thickness="4px" speed="0.65s" color="blue.500" />
-            <Text mt={4}>Loading risks...</Text>
-          </Box>
-        ) : risks.length === 0 ? (
-          <Box p={8} textAlign="center">
-            <Text fontSize="lg" color="gray.500" mb={2}>
-              No risks found
-            </Text>
-            <Text fontSize="sm" color="gray.400">
-              {getActiveFilterCount() > 0
-                ? 'No risks match your current filters. Try adjusting your filters.'
-                : 'Get started by creating your first risk.'}
-            </Text>
-            {getActiveFilterCount() > 0 && (
-              <Button
-                mt={4}
-                size="sm"
-                onClick={() =>
-                  setFilters({
-                    riskCategory: '',
-                    riskNature: '',
-                    archived: false,
-                    ownerId: '',
-                    treatmentCategory: '',
-                    mitigationImplemented: '',
-                    riskLevel: '',
-                    search: '',
-                    dateAddedFrom: '',
-                    dateAddedTo: '',
-                    sortBy: 'calculatedScore',
-                    sortOrder: 'desc',
-                    page: 1,
-                    limit: 20,
-                  })
-                }
-              >
-                Clear All Filters
-              </Button>
-            )}
-          </Box>
-        ) : (
-          <Table variant="simple" size="sm">
-            <Thead>
-              <Tr>
-                {isAdminOrEditor && (
-                  <Th width="50px">
-                    <Checkbox
-                      isChecked={risks.length > 0 && selectedRiskIds.size === risks.length}
-                      isIndeterminate={selectedRiskIds.size > 0 && selectedRiskIds.size < risks.length}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        handleSelectAll(e.target.checked);
-                      }}
-                    />
-                  </Th>
-                )}
-                {visibleColumns.title && (
-                  <Th cursor="pointer" onClick={() => handleSort('title')}>
-                    Title
-                    {filters.sortBy === 'title' && (filters.sortOrder === 'asc' ? ' ↑' : ' ↓')}
-                  </Th>
-                )}
-                {visibleColumns.riskCategory && <Th>Risk Category</Th>}
-                {visibleColumns.riskNature && <Th>Risk Nature</Th>}
-                {visibleColumns.archived && <Th>Archived</Th>}
-                {visibleColumns.owner && <Th>Owner</Th>}
-                <Th>Asset/Category</Th>
-                {visibleColumns.cia && (
-                  <>
-                    <Th>
-                      <Tooltip label="Confidentiality - Impact on data confidentiality">
-                        <Text as="span" cursor="help" borderBottom="1px dotted">
-                          C
-                        </Text>
-                      </Tooltip>
-                    </Th>
-                    <Th>
-                      <Tooltip label="Integrity - Impact on data integrity">
-                        <Text as="span" cursor="help" borderBottom="1px dotted">
-                          I
-                        </Text>
-                      </Tooltip>
-                    </Th>
-                    <Th>
-                      <Tooltip label="Availability - Impact on system availability">
-                        <Text as="span" cursor="help" borderBottom="1px dotted">
-                          A
-                        </Text>
-                      </Tooltip>
-                    </Th>
-                    <Th>
-                      <Tooltip label="Likelihood - Probability of risk occurring">
-                        <Text as="span" cursor="help" borderBottom="1px dotted">
-                          L
-                        </Text>
-                      </Tooltip>
-                    </Th>
-                  </>
-                )}
-                {visibleColumns.initialScore && (
-                  <Th cursor="pointer" onClick={() => handleSort('calculatedScore')}>
-                    Initial Score
-                    {filters.sortBy === 'calculatedScore' && (filters.sortOrder === 'asc' ? ' ↑' : ' ↓')}
-                  </Th>
-                )}
-                {visibleColumns.treatment && <Th>Treatment</Th>}
-                {visibleColumns.mitigatedCIA && (
-                  <>
-                    <Th>MC</Th>
-                    <Th>MI</Th>
-                    <Th>MA</Th>
-                    <Th>ML</Th>
-                  </>
-                )}
-                {visibleColumns.mitigatedScore && (
-                  <Th cursor="pointer" onClick={() => handleSort('mitigatedScore')}>
-                    Mitigated Score
-                    {filters.sortBy === 'mitigatedScore' && (filters.sortOrder === 'asc' ? ' ↑' : ' ↓')}
-                  </Th>
-                )}
-                {visibleColumns.residualTreatment && <Th>Residual Treatment</Th>}
-                {visibleColumns.controls && <Th>Controls</Th>}
-                <Th>Actions</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {risks.map((risk) => (
-                <Tr
-                  key={risk.id}
-                  id={`risk-${risk.id}`}
-                  bg={getRowBgColor(risk)}
-                  _hover={{ bg: getRowBgColor(risk), opacity: 0.9, cursor: 'pointer' }}
-                  cursor="pointer"
-                  onClick={() => handleEdit(risk)}
-                >
-                  {isAdminOrEditor && (
-                    <Td onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        isChecked={selectedRiskIds.has(risk.id)}
-                        onChange={(e) => handleSelectRisk(risk.id, e.target.checked)}
-                      />
-                    </Td>
-                  )}
-                  {visibleColumns.title && <Td fontWeight="medium">{risk.title}</Td>}
-                  {visibleColumns.riskCategory && (
-                    <Td>
-                      {risk.riskCategory ? (
-                        <Badge colorScheme="gray">{risk.riskCategory.replace(/_/g, ' ')}</Badge>
-                      ) : (
-                        'N/A'
-                      )}
-                    </Td>
-                  )}
-                  {visibleColumns.riskNature && (
-                    <Td>
-                      {risk.riskNature ? (
-                        <Badge colorScheme={risk.riskNature === 'STATIC' ? 'blue' : 'purple'}>
-                          {risk.riskNature}
-                        </Badge>
-                      ) : (
-                        'N/A'
-                      )}
-                    </Td>
-                  )}
-                  {visibleColumns.archived && (
-                    <Td>
-                      {risk.archived ? (
-                        <Badge colorScheme="gray">Archived</Badge>
-                      ) : (
-                        <Text fontSize="xs" color="gray.400">—</Text>
-                      )}
-                    </Td>
-                  )}
-                  {visibleColumns.owner && <Td>{risk.owner ? risk.owner.displayName : 'N/A'}</Td>}
-                  <Td onClick={(e) => e.stopPropagation()}>
-                    {risk.asset ? (
-                      <Badge colorScheme="blue" as="a" href={`/assets/assets`} cursor="pointer">
-                        {risk.asset.nameSerialNo || risk.asset.model || 'Asset'} ({risk.asset.category.name})
-                      </Badge>
-                    ) : risk.linkedAssetCategory ? (
-                      <Badge colorScheme="purple" as="a" href={`/assets/asset-categories`} cursor="pointer">
-                        {risk.linkedAssetCategory.name}
-                      </Badge>
-                    ) : (
-                      <Text fontSize="xs" color="gray.400">—</Text>
-                    )}
-                  </Td>
-                  {visibleColumns.cia && (
-                    <>
-                      <Td>{risk.confidentialityScore}</Td>
-                      <Td>{risk.integrityScore}</Td>
-                      <Td>{risk.availabilityScore}</Td>
-                      <Td>{risk.likelihood}</Td>
-                    </>
-                  )}
-                  {visibleColumns.initialScore && (
-                    <Td bg={`${getRiskLevelColor(risk.riskLevel)}.50`} px={3} py={2}>
-                      <VStack spacing={1} align="center">
-                        <Badge 
-                          colorScheme={getScoreColor(risk.calculatedScore)} 
-                          fontSize="md" 
-                          px={3} 
-                          py={1}
-                          minW="60px"
-                        >
-                          {risk.calculatedScore}
-                        </Badge>
-                        <Badge 
-                          colorScheme={getRiskLevelColor(risk.riskLevel)} 
-                          size="md"
-                          px={3}
-                          py={1}
-                          minW="60px"
-                        >
-                          {risk.riskLevel}
-                        </Badge>
-                      </VStack>
-                    </Td>
-                  )}
-                  {visibleColumns.treatment && (
-                    <Td>
-                      {risk.initialRiskTreatmentCategory ? (
-                        <Badge 
-                          colorScheme={
-                            risk.initialRiskTreatmentCategory === 'MODIFY' ? 'blue' :
-                            risk.initialRiskTreatmentCategory === 'RETAIN' ? 'green' :
-                            risk.initialRiskTreatmentCategory === 'SHARE' ? 'purple' :
-                            'red'
-                          }
-                          fontSize="sm"
-                          px={3}
-                          py={1}
-                          minW="80px"
-                        >
-                          {risk.initialRiskTreatmentCategory}
-                        </Badge>
-                      ) : (
-                        <Text fontSize="xs" color="gray.400" fontStyle="italic">N/A</Text>
-                      )}
-                    </Td>
-                  )}
-                  {visibleColumns.mitigatedCIA && (
-                    <>
-                      <Td>
-                        {risk.mitigatedConfidentialityScore !== null ? (
-                          risk.mitigatedConfidentialityScore
-                        ) : (
-                          <Text as="span" color="gray.400">—</Text>
-                        )}
-                      </Td>
-                      <Td>
-                        {risk.mitigatedIntegrityScore !== null ? (
-                          risk.mitigatedIntegrityScore
-                        ) : (
-                          <Text as="span" color="gray.400">—</Text>
-                        )}
-                      </Td>
-                      <Td>
-                        {risk.mitigatedAvailabilityScore !== null ? (
-                          risk.mitigatedAvailabilityScore
-                        ) : (
-                          <Text as="span" color="gray.400">—</Text>
-                        )}
-                      </Td>
-                      <Td>
-                        {risk.mitigatedLikelihood !== null ? (
-                          risk.mitigatedLikelihood
-                        ) : (
-                          <Text as="span" color="gray.400">—</Text>
-                        )}
-                      </Td>
-                    </>
-                  )}
-                  {visibleColumns.mitigatedScore && (
-                    <Td>
-                      {risk.mitigatedScore !== null ? (
-                        <VStack spacing={1} align="start">
-                          <Badge colorScheme={getScoreColor(risk.mitigatedScore)}>
-                            {risk.mitigatedScore}
-                          </Badge>
-                          {risk.mitigatedRiskLevel && (
-                            <Badge colorScheme={getRiskLevelColor(risk.mitigatedRiskLevel)} size="sm">
-                              {risk.mitigatedRiskLevel}
-                            </Badge>
-                          )}
-                        </VStack>
-                      ) : (
-                        '-'
-                      )}
-                    </Td>
-                  )}
-                  {visibleColumns.residualTreatment && (
-                    <Td>
-                      {risk.residualRiskTreatmentCategory ? (
-                        <Badge colorScheme="green">{risk.residualRiskTreatmentCategory}</Badge>
-                      ) : (
-                        'N/A'
-                      )}
-                    </Td>
-                  )}
-                  {visibleColumns.controls && (
-                    <Td>
-                      {risk.riskControls.length > 0 ? (
-                        <HStack spacing={1} flexWrap="wrap">
-                          {risk.riskControls.map((rc) => (
-                            <Tooltip key={rc.control.id} label={rc.control.title}>
-                              <Text
-                                fontSize="xs"
-                                as="a"
-                                href={`/risks/controls`}
-                                color="blue.600"
-                                _hover={{ textDecoration: 'underline', color: 'blue.800' }}
-                                cursor="pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.location.href = `/risks/controls`;
-                                }}
-                              >
-                                {rc.control.code}
-                              </Text>
-                            </Tooltip>
-                          ))}
-                        </HStack>
-                      ) : (
-                        <Badge colorScheme="orange" fontSize="xs" px={2} py={0.5}>
-                          No controls
-                        </Badge>
-                      )}
-                    </Td>
-                  )}
-                  <Td onClick={(e) => e.stopPropagation()}>
-                    <HStack spacing={2}>
-                      <Button size="sm" onClick={() => handleEdit(risk)}>
-                        Edit
-                      </Button>
-                      {isAdminOrEditor && (
-                        <>
-                          <Tooltip label="Duplicate risk">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDuplicate(risk)}
-                            >
-                              Duplicate
-                            </Button>
-                          </Tooltip>
-                          <Tooltip label="Delete risk">
-                            <IconButton
-                              aria-label="Delete risk"
-                              icon={<DeleteIcon />}
-                              size="sm"
-                              colorScheme="red"
-                              variant="ghost"
-                              onClick={() => handleDelete(risk)}
-                            />
-                          </Tooltip>
-                        </>
-                      )}
-                    </HStack>
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-        )}
-        {!loading && risks.length > 0 && (
-          <HStack justify="space-between" mt={4} p={4}>
-            <Text fontSize="sm" color="gray.600">
-              Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-              {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} risks
-            </Text>
-            <HStack spacing={2}>
-              <Button
-                size="sm"
-                onClick={() => handlePageChange(pagination.page - 1)}
-                isDisabled={pagination.page === 1}
-                opacity={pagination.page === 1 ? 0.4 : 1}
-                cursor={pagination.page === 1 ? 'not-allowed' : 'pointer'}
-              >
-                Previous
-              </Button>
-              <Text fontSize="sm">
-                Page {pagination.page} of {pagination.totalPages}
-              </Text>
-              <Button
-                size="sm"
-                onClick={() => handlePageChange(pagination.page + 1)}
-                isDisabled={pagination.page >= pagination.totalPages}
-                opacity={pagination.page >= pagination.totalPages ? 0.4 : 1}
-                cursor={pagination.page >= pagination.totalPages ? 'not-allowed' : 'pointer'}
-              >
-                Next
-              </Button>
-            </HStack>
-          </HStack>
-        )}
-      </Box>
 
       <RiskFormModal 
         isOpen={isOpen} 

@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
+import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -164,6 +165,13 @@ router.get(
                 email: true,
               },
             },
+            interestedParty: {
+              select: {
+                id: true,
+                name: true,
+                group: true,
+              },
+            },
             riskControls: {
               include: {
                 control: {
@@ -228,6 +236,13 @@ router.get(
               email: true,
             },
           },
+          interestedParty: {
+            select: {
+              id: true,
+              name: true,
+              group: true,
+            },
+          },
           riskControls: {
             include: {
               control: true,
@@ -286,7 +301,7 @@ router.post(
     body('assetCategory').optional().isString(),
     body('assetId').optional().isUUID(),
     body('assetCategoryId').optional().isUUID(),
-    body('interestedParty').optional().isString(),
+    body('interestedPartyId').optional().isUUID(),
     body('threatDescription').optional().isString(),
     body('confidentialityScore').isInt({ min: 1, max: 5 }),
     body('integrityScore').isInt({ min: 1, max: 5 }),
@@ -322,7 +337,7 @@ router.post(
         assetCategory,
         assetId,
         assetCategoryId,
-        interestedParty,
+        interestedPartyId,
         threatDescription,
         confidentialityScore,
         integrityScore,
@@ -376,6 +391,7 @@ router.post(
 
       const risk = await prisma.risk.create({
         data: {
+          id: randomUUID(),
           title,
           description,
           externalId,
@@ -390,7 +406,7 @@ router.post(
           assetCategory, // Keep for backward compatibility
           assetId: assetId || null,
           assetCategoryId: assetCategoryId || null,
-          interestedParty,
+          interestedPartyId,
           threatDescription,
           confidentialityScore,
           integrityScore,
@@ -409,6 +425,7 @@ router.post(
           mitigationDescription,
           residualRiskTreatmentCategory,
           annexAControlsRaw,
+          updatedAt: new Date(),
         } as any, // Temporary: TypeScript types need server restart to pick up new Prisma schema
       });
 
@@ -478,7 +495,7 @@ router.put(
     body('assetCategory').optional().isString(),
     body('assetId').optional().isUUID(),
     body('assetCategoryId').optional().isUUID(),
-    body('interestedParty').optional().isString(),
+    body('interestedPartyId').optional().isUUID(),
     body('threatDescription').optional().isString(),
     body('confidentialityScore').optional().isInt({ min: 1, max: 5 }),
     body('integrityScore').optional().isInt({ min: 1, max: 5 }),
@@ -617,6 +634,13 @@ router.put(
               id: true,
               displayName: true,
               email: true,
+            },
+          },
+          interestedParty: {
+            select: {
+              id: true,
+              name: true,
+              group: true,
             },
           },
           riskControls: {

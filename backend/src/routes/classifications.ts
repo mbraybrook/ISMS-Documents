@@ -24,7 +24,7 @@ router.get(
         orderBy: { name: 'asc' },
         include: {
           _count: {
-            select: { assets: true },
+            select: { Asset: true },
           },
         },
       });
@@ -49,7 +49,7 @@ router.get(
         where: { id: req.params.id },
         include: {
           _count: {
-            select: { assets: true },
+            select: { Asset: true },
           },
         },
       });

@@ -24,7 +24,7 @@ router.get(
         orderBy: { name: 'asc' },
         include: {
           _count: {
-            select: { assets: true, risks: true },
+            select: { Asset: true, Risk: true },
           },
         },
       });
@@ -61,7 +61,7 @@ router.get(
             },
           },
           _count: {
-            select: { assets: true, risks: true },
+            select: { Asset: true, Risk: true },
           },
         },
       });

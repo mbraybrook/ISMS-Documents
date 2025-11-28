@@ -35,6 +35,8 @@ interface SharePointItem {
   lastModifiedDateTime: string;
   createdDateTime: string;
   size: number;
+  siteId?: string; // Site ID where the item is located
+  driveId?: string; // Drive ID where the item is located
   folder?: {
     childCount: number;
   };

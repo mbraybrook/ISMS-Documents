@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
+import { retryDbOperation } from '../lib/dbRetry';
 
 const router = Router();
 
@@ -22,20 +23,25 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
     }
 
     // Find user by email or by Entra ID (for cases where email might have changed)
-    let user = await prisma.user.findUnique({
-      where: { email: email },
-    });
+    // Use retry logic for database operations to handle transient connection errors
+    let user = await retryDbOperation(() =>
+      prisma.user.findUnique({
+        where: { email: email },
+      })
+    );
 
     // Also try to find by Entra ID if not found by email
     if (!user && oid) {
-      user = await prisma.user.findFirst({
-        where: { entraObjectId: oid },
-      });
+      user = await retryDbOperation(() =>
+        prisma.user.findFirst({
+          where: { entraObjectId: oid },
+        })
+      );
     }
 
     if (!user) {
       // First user becomes admin, others default to STAFF
-      const userCount = await prisma.user.count();
+      const userCount = await retryDbOperation(() => prisma.user.count());
       const role = userCount === 0 ? 'ADMIN' : 'STAFF';
 
       // Ensure we have an email - if not, log a warning
@@ -48,14 +54,16 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
         });
       }
 
-      user = await prisma.user.create({
-        data: {
-          email: email || `user-${req.user.sub}@unknown.local`, // Fallback email if none provided
-          displayName: name || email || 'Unknown User',
-          entraObjectId: oid || req.user.sub,
-          role: role as any,
-        },
-      });
+      user = await retryDbOperation(() =>
+        prisma.user.create({
+          data: {
+            email: email || `user-${req.user.sub}@unknown.local`, // Fallback email if none provided
+            displayName: name || email || 'Unknown User',
+            entraObjectId: oid || req.user.sub,
+            role: role as any,
+          },
+        })
+      );
     } else {
       // Update user info if changed, including email if it was missing before
       const updateData: any = {
@@ -69,10 +77,19 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
         console.log('[AUTH] Updating user email from', user.email, 'to', email);
       }
       
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: updateData,
-      });
+      // Use retry logic for the update operation that was timing out
+      user = await retryDbOperation(
+        () =>
+          prisma.user.update({
+            where: { id: user.id },
+            data: updateData,
+          }),
+        {
+          maxRetries: 5, // More retries for update operations
+          initialDelayMs: 200, // Start with slightly longer delay
+          maxDelayMs: 3000, // Allow up to 3 seconds between retries
+        }
+      );
     }
 
     res.json({
@@ -94,17 +111,19 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: req.user.email || '' },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const user = await retryDbOperation(() =>
+      prisma.user.findUnique({
+        where: { email: req.user.email || '' },
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          role: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
+    );
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
