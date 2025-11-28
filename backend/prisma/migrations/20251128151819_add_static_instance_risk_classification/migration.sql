@@ -62,3 +62,4 @@ CREATE INDEX "Risk_assetCategoryId_idx" ON "Risk"("assetCategoryId");
 PRAGMA foreign_keys=ON;
 PRAGMA defer_foreign_keys=OFF;
 
+
