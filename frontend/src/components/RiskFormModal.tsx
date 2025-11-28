@@ -12,20 +12,12 @@ import {
   Input,
   VStack,
   Textarea,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-  NumberIncrementStepper,
-  NumberDecrementStepper,
   Select,
   Checkbox,
-  Divider,
-  Heading,
   Box,
   HStack,
   FormErrorMessage,
   useToast,
-  Collapse,
   IconButton,
   Tooltip,
   Text,
@@ -37,6 +29,12 @@ import {
   Spinner,
   Alert,
   AlertIcon,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
   Slider,
   SliderTrack,
   SliderFilledTrack,
@@ -45,8 +43,13 @@ import {
   Card,
   CardBody,
   Badge,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
 } from '@chakra-ui/react';
-import { ChevronDownIcon, ChevronUpIcon, SearchIcon } from '@chakra-ui/icons';
+import { SearchIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 
@@ -54,12 +57,15 @@ interface RiskFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   risk: any;
+  isDuplicateMode?: boolean;
+  viewMode?: boolean;
 }
 
 interface User {
   id: string;
   displayName: string;
   email: string;
+  role?: string;
 }
 
 interface Control {
@@ -81,7 +87,7 @@ const RISK_TYPES = [
 
 const TREATMENT_CATEGORIES = ['RETAIN', 'MODIFY', 'SHARE', 'AVOID'];
 
-export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
+export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, viewMode = false }: RiskFormModalProps) {
   const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [controls, setControls] = useState<Control[]>([]);
@@ -110,16 +116,14 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
     mitigatedRiskScore: null as number | null,
     mitigatedLikelihood: null as number | null,
     mitigationImplemented: false,
+    mitigationDescription: '',
     residualRiskTreatmentCategory: '',
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [sectionsOpen, setSectionsOpen] = useState({
-    basic: true,
-    initial: true,
-    mitigated: true,
-    controls: true,
-  });
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const initialFormDataRef = useRef<any>(null);
 
   // Calculate Risk = C + I + A (sum)
   const calculatedRisk = formData.confidentialityScore + formData.integrityScore + formData.availabilityScore;
@@ -164,6 +168,21 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
     }
   };
 
+  const getScoreLabelColor = (value: number): string => {
+    switch (value) {
+      case 1:
+      case 2:
+        return 'green';
+      case 3:
+        return 'yellow';
+      case 4:
+      case 5:
+        return 'red';
+      default:
+        return 'gray';
+    }
+  };
+
   const riskLevel = getRiskLevel(calculatedRiskScore);
   const riskLevelColor = getRiskLevelColor(riskLevel);
 
@@ -191,8 +210,9 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
     if (isOpen) {
       fetchUsers();
       fetchControls();
+      let initialData: any;
       if (risk) {
-        setFormData({
+        initialData = {
           title: risk.title || '',
           description: risk.description || '',
           dateAdded: risk.dateAdded
@@ -215,8 +235,10 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
           mitigatedRiskScore: risk.mitigatedRiskScore || null,
           mitigatedLikelihood: risk.mitigatedLikelihood || null,
           mitigationImplemented: risk.mitigationImplemented || false,
+          mitigationDescription: risk.mitigationDescription || '',
           residualRiskTreatmentCategory: risk.residualRiskTreatmentCategory || '',
-        });
+        };
+        setFormData(initialData);
         // Load existing control associations
         if (risk.riskControls && risk.riskControls.length > 0) {
           setSelectedControlIds(risk.riskControls.map((rc: any) => rc.control.id));
@@ -224,7 +246,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
           setSelectedControlIds([]);
         }
       } else {
-        setFormData({
+        initialData = {
           title: '',
           description: '',
           dateAdded: new Date().toISOString().split('T')[0],
@@ -245,14 +267,36 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
           mitigatedRiskScore: null,
           mitigatedLikelihood: null,
           mitigationImplemented: false,
+          mitigationDescription: '',
           residualRiskTreatmentCategory: '',
-        });
+        };
+        setFormData(initialData);
         setSelectedControlIds([]);
       }
+        const initialControlIds = risk && risk.riskControls && risk.riskControls.length > 0
+          ? risk.riskControls.map((rc: any) => rc.control.id).sort()
+          : [];
+        initialFormDataRef.current = JSON.stringify({ 
+          ...initialData, 
+          selectedControlIds: initialControlIds 
+        });
+      setHasUnsavedChanges(false);
       setControlSearchTerm('');
       setSuggestedControls([]);
     }
   }, [isOpen, risk]);
+
+  // Track form changes
+  useEffect(() => {
+    if (isOpen && initialFormDataRef.current) {
+      const currentData = JSON.stringify({ 
+        ...formData, 
+        selectedControlIds: [...selectedControlIds].sort() 
+      });
+      const hasChanges = currentData !== initialFormDataRef.current;
+      setHasUnsavedChanges(hasChanges);
+    }
+  }, [formData, selectedControlIds, isOpen]);
 
   // Keyboard shortcuts: Escape to close, Enter to submit (when not in textarea)
   useEffect(() => {
@@ -281,7 +325,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
       // Fetch all users and filter for ADMIN/EDITOR in frontend
       const response = await api.get('/api/users');
       const allUsers = response.data.data || [];
-      setUsers(allUsers.filter((u: User) => u.role === 'ADMIN' || u.role === 'EDITOR'));
+      setUsers(allUsers.filter((u: any) => (u.role === 'ADMIN' || u.role === 'EDITOR')));
     } catch (error) {
       console.error('Error fetching users:', error);
     }
@@ -337,6 +381,16 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
     }
   };
 
+  const handleUnsetMitigatedScores = () => {
+    setFormData({
+      ...formData,
+      mitigatedConfidentialityScore: null,
+      mitigatedIntegrityScore: null,
+      mitigatedAvailabilityScore: null,
+      mitigatedLikelihood: null,
+    });
+  };
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     
@@ -388,6 +442,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
       if (payload.interestedParty === '') payload.interestedParty = undefined;
       if (payload.threatDescription === '') payload.threatDescription = undefined;
       if (payload.initialRiskTreatmentCategory === '') payload.initialRiskTreatmentCategory = undefined;
+      if (payload.mitigationDescription === '') payload.mitigationDescription = undefined;
       if (payload.residualRiskTreatmentCategory === '') payload.residualRiskTreatmentCategory = undefined;
 
       // Remove null values for optional fields
@@ -399,7 +454,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
 
       let response;
       let riskId: string;
-      if (risk) {
+      if (risk && !isDuplicateMode) {
         response = await api.put(`/api/risks/${risk.id}`, payload);
         riskId = risk.id;
         toast({
@@ -414,7 +469,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
         riskId = response.data.id;
         toast({
           title: 'Success',
-          description: 'Risk created successfully',
+          description: isDuplicateMode ? 'Risk duplicated successfully' : 'Risk created successfully',
           status: 'success',
           duration: 3000,
           isClosable: true,
@@ -439,7 +494,10 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
         }
       }
 
-      onClose();
+      // Auto-close modal after brief delay to show toast
+      setTimeout(() => {
+        onClose();
+      }, 500);
     } catch (error: any) {
       console.error('Error saving risk:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to save risk';
@@ -455,31 +513,43 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
     }
   };
 
+  const handleCloseAttempt = () => {
+    if (hasUnsavedChanges) {
+      setShowUnsavedDialog(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleConfirmClose = () => {
+    setShowUnsavedDialog(false);
+    setHasUnsavedChanges(false);
+    onClose();
+  };
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="6xl" scrollBehavior="inside">
+    <>
+      <Modal isOpen={isOpen} onClose={handleCloseAttempt} size="6xl" scrollBehavior="inside">
       <ModalOverlay />
       <ModalContent maxH="90vh" display="flex" flexDirection="column" overflow="hidden">
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-          <ModalHeader flexShrink={0}>{risk ? 'Edit Risk' : 'Create Risk'}</ModalHeader>
-          <ModalCloseButton />
+          <ModalHeader flexShrink={0}>
+            {viewMode ? 'View Risk' : isDuplicateMode ? 'Duplicate Risk' : risk ? 'Edit Risk' : 'Create Risk'}
+          </ModalHeader>
+          <ModalCloseButton onClick={handleCloseAttempt} />
           <ModalBody overflowY="auto" flex="1" pb={6} minH={0}>
-            <VStack spacing={6} align="stretch">
-              {/* Section 1: Basic Risk Information */}
-              <Box>
-                <HStack justify="space-between" mb={4}>
-                  <Heading size="md" color="gray.700">
-                    Basic Risk Information
-                  </Heading>
-                  <IconButton
-                    aria-label={sectionsOpen.basic ? 'Collapse' : 'Expand'}
-                    icon={sectionsOpen.basic ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setSectionsOpen({ ...sectionsOpen, basic: !sectionsOpen.basic })}
-                  />
-                </HStack>
-                <Collapse in={sectionsOpen.basic} animateOpacity>
-                  <VStack spacing={4}>
+            <Tabs colorScheme="blue" isLazy>
+              <TabList>
+                <Tab>Basic Details</Tab>
+                <Tab>Existing Controls Assessment</Tab>
+                <Tab>Additional Controls Assessment</Tab>
+                <Tab>Controls Linkage</Tab>
+              </TabList>
+
+              <TabPanels>
+                {/* Tab 1: Basic Details */}
+                <TabPanel>
+                  <VStack spacing={4} align="stretch">
                   <FormControl isRequired isInvalid={!!errors.dateAdded}>
                     <FormLabel>Date Added</FormLabel>
                     <Input
@@ -489,6 +559,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                         setFormData({ ...formData, dateAdded: e.target.value });
                         if (errors.dateAdded) setErrors({ ...errors, dateAdded: '' });
                       }}
+                      isReadOnly={viewMode}
                     />
                     <FormErrorMessage>{errors.dateAdded}</FormErrorMessage>
                   </FormControl>
@@ -499,6 +570,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                       value={formData.riskType}
                       onChange={(e) => setFormData({ ...formData, riskType: e.target.value })}
                       placeholder="Select risk type"
+                      isDisabled={viewMode}
                     >
                       {RISK_TYPES.map((type) => (
                         <option key={type} value={type}>
@@ -514,6 +586,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                       value={formData.ownerUserId}
                       onChange={(e) => setFormData({ ...formData, ownerUserId: e.target.value })}
                       placeholder="Select owner"
+                      isDisabled={viewMode}
                     >
                       {users.map((user) => (
                         <option key={user.id} value={user.id}>
@@ -528,6 +601,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                     <Input
                       value={formData.assetCategory}
                       onChange={(e) => setFormData({ ...formData, assetCategory: e.target.value })}
+                      isReadOnly={viewMode}
                     />
                   </FormControl>
 
@@ -536,6 +610,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                     <Input
                       value={formData.interestedParty}
                       onChange={(e) => setFormData({ ...formData, interestedParty: e.target.value })}
+                      isReadOnly={viewMode}
                     />
                   </FormControl>
 
@@ -547,6 +622,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                         setFormData({ ...formData, title: e.target.value });
                         if (errors.title) setErrors({ ...errors, title: '' });
                       }}
+                      isReadOnly={viewMode}
                     />
                     <FormErrorMessage>{errors.title}</FormErrorMessage>
                   </FormControl>
@@ -567,6 +643,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                       }
                       rows={3}
                       maxLength={2000}
+                      isReadOnly={viewMode}
                     />
                   </FormControl>
 
@@ -576,29 +653,14 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       rows={3}
+                      isReadOnly={viewMode}
                     />
                   </FormControl>
                 </VStack>
-                </Collapse>
-              </Box>
+                </TabPanel>
 
-              <Divider />
-
-              {/* Section 2: Existing Controls - Initial Assessment */}
-              <Box>
-                <HStack justify="space-between" mb={4}>
-                  <Heading size="md" color="orange.600">
-                    Existing Controls - Initial Assessment
-                  </Heading>
-                  <IconButton
-                    aria-label={sectionsOpen.initial ? 'Collapse' : 'Expand'}
-                    icon={sectionsOpen.initial ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setSectionsOpen({ ...sectionsOpen, initial: !sectionsOpen.initial })}
-                  />
-                </HStack>
-                <Collapse in={sectionsOpen.initial} animateOpacity>
+                {/* Tab 2: Existing Controls Assessment */}
+                <TabPanel>
                   <HStack spacing={6} align="flex-start">
                     {/* Left side: Sliders */}
                     <VStack spacing={6} flex="1">
@@ -616,11 +678,16 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                               />
                             </Tooltip>
                           </FormLabel>
-                          <VStack spacing={2}>
-                            <Badge colorScheme={getRiskLevelColor(getRiskLevel(formData.confidentialityScore * formData.likelihood))} fontSize="sm" px={3} py={1}>
-                              {getScoreLabel(formData.confidentialityScore)}
-                            </Badge>
-                            <Box position="relative" height="200px" width="60px">
+                          <VStack spacing={3} align="center">
+                            <VStack spacing={1} align="center">
+                              <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.confidentialityScore)}.600`} mb={1}>
+                                {formData.confidentialityScore}
+                              </Text>
+                              <Badge colorScheme={getScoreLabelColor(formData.confidentialityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                {getScoreLabel(formData.confidentialityScore)}
+                              </Badge>
+                            </VStack>
+                            <Box position="relative" height="200px" width="60px" mt={3}>
                               <Slider
                                 orientation="vertical"
                                 min={1}
@@ -641,7 +708,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 <SliderTrack>
                                   <SliderFilledTrack />
                                 </SliderTrack>
-                                <SliderThumb />
+                                <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.confidentialityScore)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
                               </Slider>
                             </Box>
                           </VStack>
@@ -660,11 +727,16 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                               />
                             </Tooltip>
                           </FormLabel>
-                          <VStack spacing={2}>
-                            <Badge colorScheme={getRiskLevelColor(getRiskLevel(formData.integrityScore * formData.likelihood))} fontSize="sm" px={3} py={1}>
-                              {getScoreLabel(formData.integrityScore)}
-                            </Badge>
-                            <Box position="relative" height="200px" width="60px">
+                          <VStack spacing={3} align="center">
+                            <VStack spacing={1} align="center">
+                              <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.integrityScore)}.600`} mb={1}>
+                                {formData.integrityScore}
+                              </Text>
+                              <Badge colorScheme={getScoreLabelColor(formData.integrityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                {getScoreLabel(formData.integrityScore)}
+                              </Badge>
+                            </VStack>
+                            <Box position="relative" height="200px" width="60px" mt={3}>
                               <Slider
                                 orientation="vertical"
                                 min={1}
@@ -672,6 +744,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 step={1}
                                 value={formData.integrityScore}
                                 onChange={(val) => setFormData({ ...formData, integrityScore: val })}
+                                isDisabled={viewMode}
                               >
                                 <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
                                   1
@@ -685,7 +758,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 <SliderTrack>
                                   <SliderFilledTrack />
                                 </SliderTrack>
-                                <SliderThumb />
+                                <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.integrityScore)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
                               </Slider>
                             </Box>
                           </VStack>
@@ -704,11 +777,16 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                               />
                             </Tooltip>
                           </FormLabel>
-                          <VStack spacing={2}>
-                            <Badge colorScheme={getRiskLevelColor(getRiskLevel(formData.availabilityScore * formData.likelihood))} fontSize="sm" px={3} py={1}>
-                              {getScoreLabel(formData.availabilityScore)}
-                            </Badge>
-                            <Box position="relative" height="200px" width="60px">
+                          <VStack spacing={3} align="center">
+                            <VStack spacing={1} align="center">
+                              <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.availabilityScore)}.600`} mb={1}>
+                                {formData.availabilityScore}
+                              </Text>
+                              <Badge colorScheme={getScoreLabelColor(formData.availabilityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                {getScoreLabel(formData.availabilityScore)}
+                              </Badge>
+                            </VStack>
+                            <Box position="relative" height="200px" width="60px" mt={3}>
                               <Slider
                                 orientation="vertical"
                                 min={1}
@@ -716,6 +794,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 step={1}
                                 value={formData.availabilityScore}
                                 onChange={(val) => setFormData({ ...formData, availabilityScore: val })}
+                                isDisabled={viewMode}
                               >
                                 <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
                                   1
@@ -729,7 +808,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 <SliderTrack>
                                   <SliderFilledTrack />
                                 </SliderTrack>
-                                <SliderThumb />
+                                <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.availabilityScore)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
                               </Slider>
                             </Box>
                           </VStack>
@@ -748,11 +827,16 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                               />
                             </Tooltip>
                           </FormLabel>
-                          <VStack spacing={2}>
-                            <Badge colorScheme={getRiskLevelColor(getRiskLevel(calculatedRisk * formData.likelihood))} fontSize="sm" px={3} py={1}>
-                              {getScoreLabel(formData.likelihood)}
-                            </Badge>
-                            <Box position="relative" height="200px" width="60px">
+                          <VStack spacing={3} align="center">
+                            <VStack spacing={1} align="center">
+                              <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.likelihood)}.600`} mb={1}>
+                                {formData.likelihood}
+                              </Text>
+                              <Badge colorScheme={getScoreLabelColor(formData.likelihood)} fontSize="sm" px={3} py={1} minW="80px">
+                                {getScoreLabel(formData.likelihood)}
+                              </Badge>
+                            </VStack>
+                            <Box position="relative" height="200px" width="60px" mt={3}>
                               <Slider
                                 orientation="vertical"
                                 min={1}
@@ -760,6 +844,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 step={1}
                                 value={formData.likelihood}
                                 onChange={(val) => setFormData({ ...formData, likelihood: val })}
+                                isDisabled={viewMode}
                               >
                                 <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
                                   1
@@ -773,7 +858,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 <SliderTrack>
                                   <SliderFilledTrack />
                                 </SliderTrack>
-                                <SliderThumb />
+                                <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.likelihood)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
                               </Slider>
                             </Box>
                           </VStack>
@@ -783,32 +868,32 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
 
                     {/* Right side: Risk and Risk Score Cards */}
                     <VStack spacing={4} minW="200px">
-                      <Card width="100%" bg={`${riskLevelColor}.50`} borderColor={`${riskLevelColor}.300`} borderWidth="2px">
+                      <Card width="100%" minW="200px" maxW="200px" bg={`${riskLevelColor}.50`} borderColor={`${riskLevelColor}.300`} borderWidth="2px">
                         <CardBody>
                           <VStack spacing={2} align="stretch">
                             <Text fontSize="sm" fontWeight="bold" color="gray.600">
                               Risk (C + I + A)
                             </Text>
-                            <Text fontSize="3xl" fontWeight="bold" color={`${riskLevelColor}.700`}>
+                            <Text fontSize="3xl" fontWeight="bold" color={`${riskLevelColor}.700`} textAlign="center">
                               {calculatedRisk}
                             </Text>
                           </VStack>
                         </CardBody>
                       </Card>
 
-                      <Card width="100%" bg={`${riskLevelColor}.50`} borderColor={`${riskLevelColor}.300`} borderWidth="2px">
+                      <Card width="100%" minW="200px" maxW="200px" bg={`${riskLevelColor}.50`} borderColor={`${riskLevelColor}.300`} borderWidth="2px">
                         <CardBody>
                           <VStack spacing={2} align="stretch">
                             <Text fontSize="sm" fontWeight="bold" color="gray.600">
                               Risk Score
                             </Text>
-                            <Text fontSize="3xl" fontWeight="bold" color={`${riskLevelColor}.700`}>
+                            <Text fontSize="3xl" fontWeight="bold" color={`${riskLevelColor}.700`} textAlign="center">
                               {calculatedRiskScore}
                             </Text>
-                            <Badge colorScheme={riskLevelColor} size="lg" alignSelf="center" mt={2}>
+                            <Badge colorScheme={riskLevelColor} size="lg" alignSelf="center" mt={2} minW="80px" justifyContent="center">
                               {riskLevel}
                             </Badge>
-                            <Text fontSize="xs" color="gray.500" textAlign="center" mt={1}>
+                            <Text fontSize="xs" color="gray.500" textAlign="center" mt={1} minH="40px" lineHeight="1.4">
                               {riskLevel === 'HIGH' && 'Unacceptable - treatment required'}
                               {riskLevel === 'MEDIUM' && 'Warning - review frequently'}
                               {riskLevel === 'LOW' && 'Acceptable - no treatment required'}
@@ -827,6 +912,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                         setFormData({ ...formData, initialRiskTreatmentCategory: e.target.value })
                       }
                       placeholder="Select treatment category"
+                      isDisabled={viewMode}
                     >
                       {TREATMENT_CATEGORIES.map((cat) => (
                         <option key={cat} value={cat}>
@@ -835,27 +921,28 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                       ))}
                     </Select>
                   </FormControl>
-                </Collapse>
-              </Box>
+                </TabPanel>
 
-              <Divider />
-
-              {/* Section 3: Additional Controls - Mitigated Assessment */}
-              <Box>
-                <HStack justify="space-between" mb={4}>
-                  <Heading size="md" color="green.600">
-                    Additional Controls - Mitigated Assessment
-                  </Heading>
-                  <IconButton
-                    aria-label={sectionsOpen.mitigated ? 'Collapse' : 'Expand'}
-                    icon={sectionsOpen.mitigated ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setSectionsOpen({ ...sectionsOpen, mitigated: !sectionsOpen.mitigated })}
-                  />
-                </HStack>
-                <Collapse in={sectionsOpen.mitigated} animateOpacity>
-                  <HStack spacing={6} align="flex-start">
+                {/* Tab 3: Additional Controls Assessment */}
+                <TabPanel>
+                  <VStack spacing={6} align="stretch">
+                    <HStack justify="space-between">
+                      <Text fontSize="md" fontWeight="semibold" color="green.600">
+                        Additional Controls - Mitigated Assessment
+                      </Text>
+                      {mitigatedRiskScore !== null && (
+                        <Button size="sm" variant="outline" onClick={handleUnsetMitigatedScores}>
+                          Unset Mitigated Scores
+                        </Button>
+                      )}
+                    </HStack>
+                    {mitigatedRiskScore === null && (
+                      <Alert status="info" mb={4} borderRadius="md">
+                        <AlertIcon />
+                        Mitigated scores are not set. Adjust the sliders below to calculate them.
+                      </Alert>
+                    )}
+                    <HStack spacing={6} align="flex-start">
                     {/* Left side: Sliders */}
                     <VStack spacing={6} flex="1">
                       <HStack spacing={4} width="100%" justify="space-around">
@@ -872,22 +959,24 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                               />
                             </Tooltip>
                           </FormLabel>
-                          <VStack spacing={2}>
-                            <Badge 
-                              colorScheme={
-                                formData.mitigatedConfidentialityScore !== null
-                                  ? getRiskLevelColor(getRiskLevel((formData.mitigatedConfidentialityScore || 0) * (formData.mitigatedLikelihood || 1)))
-                                  : 'gray'
-                              } 
-                              fontSize="sm" 
-                              px={3} 
-                              py={1}
-                            >
-                              {formData.mitigatedConfidentialityScore !== null 
-                                ? getScoreLabel(formData.mitigatedConfidentialityScore)
-                                : 'Not Set'}
-                            </Badge>
-                            <Box position="relative" height="200px" width="60px">
+                          <VStack spacing={3} align="center">
+                            <VStack spacing={1} align="center">
+                              {formData.mitigatedConfidentialityScore !== null ? (
+                                <>
+                                  <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedConfidentialityScore)}.600`} mb={1}>
+                                    {formData.mitigatedConfidentialityScore}
+                                  </Text>
+                                  <Badge colorScheme={getScoreLabelColor(formData.mitigatedConfidentialityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                    {getScoreLabel(formData.mitigatedConfidentialityScore)}
+                                  </Badge>
+                                </>
+                              ) : (
+                                <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
+                                  Not Set
+                                </Badge>
+                              )}
+                            </VStack>
+                            <Box position="relative" height="200px" width="60px" mt={3}>
                               <Slider
                                 orientation="vertical"
                                 min={1}
@@ -900,6 +989,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                     mitigatedConfidentialityScore: val || null,
                                   })
                                 }
+                                isDisabled={viewMode}
                               >
                                 <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
                                   1
@@ -913,7 +1003,13 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 <SliderTrack>
                                   <SliderFilledTrack />
                                 </SliderTrack>
-                                <SliderThumb />
+                                <SliderThumb 
+                                  boxSize={6} 
+                                  bg={formData.mitigatedConfidentialityScore !== null ? `${getScoreLabelColor(formData.mitigatedConfidentialityScore)}.500` : 'gray.400'} 
+                                  borderWidth="2px" 
+                                  borderColor="white" 
+                                  boxShadow="md" 
+                                />
                               </Slider>
                             </Box>
                           </VStack>
@@ -932,22 +1028,24 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                               />
                             </Tooltip>
                           </FormLabel>
-                          <VStack spacing={2}>
-                            <Badge 
-                              colorScheme={
-                                formData.mitigatedIntegrityScore !== null
-                                  ? getRiskLevelColor(getRiskLevel((formData.mitigatedIntegrityScore || 0) * (formData.mitigatedLikelihood || 1)))
-                                  : 'gray'
-                              } 
-                              fontSize="sm" 
-                              px={3} 
-                              py={1}
-                            >
-                              {formData.mitigatedIntegrityScore !== null 
-                                ? getScoreLabel(formData.mitigatedIntegrityScore)
-                                : 'Not Set'}
-                            </Badge>
-                            <Box position="relative" height="200px" width="60px">
+                          <VStack spacing={3} align="center">
+                            <VStack spacing={1} align="center">
+                              {formData.mitigatedIntegrityScore !== null ? (
+                                <>
+                                  <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedIntegrityScore)}.600`} mb={1}>
+                                    {formData.mitigatedIntegrityScore}
+                                  </Text>
+                                  <Badge colorScheme={getScoreLabelColor(formData.mitigatedIntegrityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                    {getScoreLabel(formData.mitigatedIntegrityScore)}
+                                  </Badge>
+                                </>
+                              ) : (
+                                <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
+                                  Not Set
+                                </Badge>
+                              )}
+                            </VStack>
+                            <Box position="relative" height="200px" width="60px" mt={3}>
                               <Slider
                                 orientation="vertical"
                                 min={1}
@@ -957,6 +1055,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 onChange={(val) =>
                                   setFormData({ ...formData, mitigatedIntegrityScore: val || null })
                                 }
+                                isDisabled={viewMode}
                               >
                                 <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
                                   1
@@ -970,7 +1069,13 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 <SliderTrack>
                                   <SliderFilledTrack />
                                 </SliderTrack>
-                                <SliderThumb />
+                                <SliderThumb 
+                                  boxSize={6} 
+                                  bg={formData.mitigatedIntegrityScore !== null ? `${getScoreLabelColor(formData.mitigatedIntegrityScore)}.500` : 'gray.400'} 
+                                  borderWidth="2px" 
+                                  borderColor="white" 
+                                  boxShadow="md" 
+                                />
                               </Slider>
                             </Box>
                           </VStack>
@@ -989,22 +1094,24 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                               />
                             </Tooltip>
                           </FormLabel>
-                          <VStack spacing={2}>
-                            <Badge 
-                              colorScheme={
-                                formData.mitigatedAvailabilityScore !== null
-                                  ? getRiskLevelColor(getRiskLevel((formData.mitigatedAvailabilityScore || 0) * (formData.mitigatedLikelihood || 1)))
-                                  : 'gray'
-                              } 
-                              fontSize="sm" 
-                              px={3} 
-                              py={1}
-                            >
-                              {formData.mitigatedAvailabilityScore !== null 
-                                ? getScoreLabel(formData.mitigatedAvailabilityScore)
-                                : 'Not Set'}
-                            </Badge>
-                            <Box position="relative" height="200px" width="60px">
+                          <VStack spacing={3} align="center">
+                            <VStack spacing={1} align="center">
+                              {formData.mitigatedAvailabilityScore !== null ? (
+                                <>
+                                  <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedAvailabilityScore)}.600`} mb={1}>
+                                    {formData.mitigatedAvailabilityScore}
+                                  </Text>
+                                  <Badge colorScheme={getScoreLabelColor(formData.mitigatedAvailabilityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                    {getScoreLabel(formData.mitigatedAvailabilityScore)}
+                                  </Badge>
+                                </>
+                              ) : (
+                                <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
+                                  Not Set
+                                </Badge>
+                              )}
+                            </VStack>
+                            <Box position="relative" height="200px" width="60px" mt={3}>
                               <Slider
                                 orientation="vertical"
                                 min={1}
@@ -1014,6 +1121,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 onChange={(val) =>
                                   setFormData({ ...formData, mitigatedAvailabilityScore: val || null })
                                 }
+                                isDisabled={viewMode}
                               >
                                 <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
                                   1
@@ -1027,7 +1135,13 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 <SliderTrack>
                                   <SliderFilledTrack />
                                 </SliderTrack>
-                                <SliderThumb />
+                                <SliderThumb 
+                                  boxSize={6} 
+                                  bg={formData.mitigatedAvailabilityScore !== null ? `${getScoreLabelColor(formData.mitigatedAvailabilityScore)}.500` : 'gray.400'} 
+                                  borderWidth="2px" 
+                                  borderColor="white" 
+                                  boxShadow="md" 
+                                />
                               </Slider>
                             </Box>
                           </VStack>
@@ -1046,22 +1160,24 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                               />
                             </Tooltip>
                           </FormLabel>
-                          <VStack spacing={2}>
-                            <Badge 
-                              colorScheme={
-                                formData.mitigatedLikelihood !== null && mitigatedRisk !== null
-                                  ? getRiskLevelColor(getRiskLevel(mitigatedRisk * formData.mitigatedLikelihood))
-                                  : 'gray'
-                              } 
-                              fontSize="sm" 
-                              px={3} 
-                              py={1}
-                            >
-                              {formData.mitigatedLikelihood !== null 
-                                ? getScoreLabel(formData.mitigatedLikelihood)
-                                : 'Not Set'}
-                            </Badge>
-                            <Box position="relative" height="200px" width="60px">
+                          <VStack spacing={3} align="center">
+                            <VStack spacing={1} align="center">
+                              {formData.mitigatedLikelihood !== null ? (
+                                <>
+                                  <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedLikelihood)}.600`} mb={1}>
+                                    {formData.mitigatedLikelihood}
+                                  </Text>
+                                  <Badge colorScheme={getScoreLabelColor(formData.mitigatedLikelihood)} fontSize="sm" px={3} py={1} minW="80px">
+                                    {getScoreLabel(formData.mitigatedLikelihood)}
+                                  </Badge>
+                                </>
+                              ) : (
+                                <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
+                                  Not Set
+                                </Badge>
+                              )}
+                            </VStack>
+                            <Box position="relative" height="200px" width="60px" mt={3}>
                               <Slider
                                 orientation="vertical"
                                 min={1}
@@ -1071,6 +1187,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 onChange={(val) =>
                                   setFormData({ ...formData, mitigatedLikelihood: val || null })
                                 }
+                                isDisabled={viewMode}
                               >
                                 <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
                                   1
@@ -1084,7 +1201,13 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                                 <SliderTrack>
                                   <SliderFilledTrack />
                                 </SliderTrack>
-                                <SliderThumb />
+                                <SliderThumb 
+                                  boxSize={6} 
+                                  bg={formData.mitigatedLikelihood !== null ? `${getScoreLabelColor(formData.mitigatedLikelihood)}.500` : 'gray.400'} 
+                                  borderWidth="2px" 
+                                  borderColor="white" 
+                                  boxShadow="md" 
+                                />
                               </Slider>
                             </Box>
                           </VStack>
@@ -1096,16 +1219,19 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                     <VStack spacing={4} minW="200px">
                       <Card 
                         width="100%" 
+                        minW="200px" 
+                        maxW="200px"
                         bg={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.50` : 'gray.50'} 
                         borderColor={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.300` : 'gray.300'} 
                         borderWidth="2px"
+                        borderStyle={mitigatedRisk === null ? 'dashed' : 'solid'}
                       >
                         <CardBody>
                           <VStack spacing={2} align="stretch">
                             <Text fontSize="sm" fontWeight="bold" color="gray.600">
                               Mitigated Risk (MC + MI + MA)
                             </Text>
-                            <Text fontSize="3xl" fontWeight="bold" color={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.700` : 'gray.500'}>
+                            <Text fontSize="3xl" fontWeight="bold" color={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.700` : 'gray.500'} textAlign="center">
                               {mitigatedRisk !== null ? mitigatedRisk : 'N/A'}
                             </Text>
                           </VStack>
@@ -1114,29 +1240,36 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
 
                       <Card 
                         width="100%" 
+                        minW="200px" 
+                        maxW="200px"
                         bg={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.50` : 'gray.50'} 
                         borderColor={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.300` : 'gray.300'} 
                         borderWidth="2px"
+                        borderStyle={mitigatedRiskScore === null ? 'dashed' : 'solid'}
                       >
                         <CardBody>
                           <VStack spacing={2} align="stretch">
                             <Text fontSize="sm" fontWeight="bold" color="gray.600">
                               Mitigated Risk Score
                             </Text>
-                            <Text fontSize="3xl" fontWeight="bold" color={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.700` : 'gray.500'}>
+                            <Text fontSize="3xl" fontWeight="bold" color={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.700` : 'gray.500'} textAlign="center">
                               {mitigatedRiskScore !== null ? mitigatedRiskScore : 'N/A'}
                             </Text>
-                            {mitigatedRiskLevel && (
+                            {mitigatedRiskLevel ? (
                               <>
-                                <Badge colorScheme={mitigatedRiskLevelColor} size="lg" alignSelf="center" mt={2}>
+                                <Badge colorScheme={mitigatedRiskLevelColor} size="lg" alignSelf="center" mt={2} minW="80px" justifyContent="center">
                                   {mitigatedRiskLevel}
                                 </Badge>
-                                <Text fontSize="xs" color="gray.500" textAlign="center" mt={1}>
+                                <Text fontSize="xs" color="gray.500" textAlign="center" mt={1} minH="40px" lineHeight="1.4">
                                   {mitigatedRiskLevel === 'HIGH' && 'Unacceptable - treatment required'}
                                   {mitigatedRiskLevel === 'MEDIUM' && 'Warning - review frequently'}
                                   {mitigatedRiskLevel === 'LOW' && 'Acceptable - no treatment required'}
                                 </Text>
                               </>
+                            ) : (
+                              <Text fontSize="xs" color="gray.400" textAlign="center" mt={1} fontStyle="italic" minH="32px">
+                                Set mitigated scores to calculate
+                              </Text>
                             )}
                           </VStack>
                         </CardBody>
@@ -1151,9 +1284,23 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                         const checked = e.target.checked;
                         setFormData((prev) => ({ ...prev, mitigationImplemented: checked }));
                       }}
+                      isDisabled={viewMode}
                     >
                       Mitigation Implemented
                     </Checkbox>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Mitigation Description</FormLabel>
+                    <Textarea
+                      value={formData.mitigationDescription}
+                      onChange={(e) =>
+                        setFormData({ ...formData, mitigationDescription: e.target.value })
+                      }
+                      rows={4}
+                      placeholder="Describe the mitigation measures implemented..."
+                      isReadOnly={viewMode}
+                    />
                   </FormControl>
 
                   <FormControl>
@@ -1164,6 +1311,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                         setFormData({ ...formData, residualRiskTreatmentCategory: e.target.value })
                       }
                       placeholder="Select treatment category"
+                      isDisabled={viewMode}
                     >
                       {TREATMENT_CATEGORIES.map((cat) => (
                         <option key={cat} value={cat}>
@@ -1172,26 +1320,11 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                       ))}
                     </Select>
                   </FormControl>
-                </Collapse>
-              </Box>
+                  </VStack>
+                </TabPanel>
 
-              <Divider />
-
-              {/* Section 4: Annex A Controls */}
-              <Box>
-                <HStack justify="space-between" mb={4}>
-                  <Heading size="md" color="blue.600">
-                    Annex A Applicable Controls (ISO 27001:2022)
-                  </Heading>
-                  <IconButton
-                    aria-label={sectionsOpen.controls ? 'Collapse' : 'Expand'}
-                    icon={sectionsOpen.controls ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setSectionsOpen({ ...sectionsOpen, controls: !sectionsOpen.controls })}
-                  />
-                </HStack>
-                <Collapse in={sectionsOpen.controls} animateOpacity>
+                {/* Tab 4: Controls Linkage */}
+                <TabPanel>
                   <VStack spacing={4} align="stretch">
                     <HStack justify="space-between">
                       <FormLabel>Annex A Applicable Controls</FormLabel>
@@ -1202,6 +1335,7 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                         isLoading={loadingSuggestions}
                         variant="outline"
                         colorScheme="purple"
+                        isDisabled={viewMode}
                       >
                         Get AI Suggestions
                       </Button>
@@ -1329,21 +1463,50 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
                       </Box>
                     )}
                   </VStack>
-                </Collapse>
-              </Box>
-            </VStack>
+                </TabPanel>
+              </TabPanels>
+            </Tabs>
           </ModalBody>
 
           <ModalFooter flexShrink={0}>
-            <Button variant="ghost" mr={3} onClick={onClose}>
-              Cancel
+            <Button variant="ghost" mr={3} onClick={handleCloseAttempt}>
+              {viewMode ? 'Close' : 'Cancel'}
             </Button>
-            <Button colorScheme="blue" type="submit" isLoading={loading}>
-              {risk ? 'Update' : 'Create'}
-            </Button>
+            {!viewMode && (
+              <Button colorScheme="blue" type="submit" isLoading={loading}>
+                {isDuplicateMode ? 'Create' : risk ? 'Update' : 'Create'}
+              </Button>
+            )}
           </ModalFooter>
         </form>
       </ModalContent>
     </Modal>
+
+    {/* Unsaved Changes Dialog */}
+    <AlertDialog
+      isOpen={showUnsavedDialog}
+      leastDestructiveRef={useRef(null)}
+      onClose={() => setShowUnsavedDialog(false)}
+    >
+      <AlertDialogOverlay>
+        <AlertDialogContent>
+          <AlertDialogHeader fontSize="lg" fontWeight="bold">
+            Unsaved Changes
+          </AlertDialogHeader>
+          <AlertDialogBody>
+            You have unsaved changes. Are you sure you want to close without saving?
+          </AlertDialogBody>
+          <AlertDialogFooter>
+            <Button onClick={() => setShowUnsavedDialog(false)}>
+              Continue Editing
+            </Button>
+            <Button colorScheme="red" onClick={handleConfirmClose} ml={3}>
+              Discard Changes
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogOverlay>
+    </AlertDialog>
+    </>
   );
 }

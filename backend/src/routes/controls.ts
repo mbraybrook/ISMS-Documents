@@ -410,5 +410,48 @@ router.put(
   }
 );
 
+// DELETE /api/controls/:id - delete control (only custom controls)
+router.delete(
+  '/:id',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [param('id').isUUID()],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Check if control exists and is not a standard control
+      const existing = await prisma.control.findUnique({
+        where: { id },
+        select: { isStandardControl: true },
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Control not found' });
+      }
+
+      if (existing.isStandardControl) {
+        return res.status(403).json({ 
+          error: 'Cannot delete standard ISO 27002 controls. Only custom controls can be deleted.' 
+        });
+      }
+
+      // Delete the control (cascade will handle related records)
+      await prisma.control.delete({
+        where: { id },
+      });
+
+      res.status(204).send();
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'Control not found' });
+      }
+      console.error('Error deleting control:', error);
+      res.status(500).json({ error: 'Failed to delete control' });
+    }
+  }
+);
+
 export { router as controlsRouter };
 

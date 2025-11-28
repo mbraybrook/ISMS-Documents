@@ -18,8 +18,19 @@ import {
   AlertIcon,
   AlertDescription,
   useToast,
+  Checkbox,
+  useDisclosure,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
+  Text,
+  Link,
+  Box,
 } from '@chakra-ui/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
@@ -49,12 +60,19 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
     confluencePageId: '',
     lastReviewDate: '',
     nextReviewDate: '',
+    requiresAcknowledgement: false,
   });
   const [loading, setLoading] = useState(false);
   const [sharePointUrl, setSharePointUrl] = useState('');
   const [parsingUrl, setParsingUrl] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [browserOpen, setBrowserOpen] = useState(false);
+  const [showReplaceOptions, setShowReplaceOptions] = useState(false);
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null);
+  const [loadingUrl, setLoadingUrl] = useState(false);
+  const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose } = useDisclosure();
+  const [pendingSubmit, setPendingSubmit] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   // Handle Escape key
   useEffect(() => {
@@ -84,13 +102,20 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
         confluencePageId: '',
         lastReviewDate: '',
         nextReviewDate: '',
+        requiresAcknowledgement: false,
       });
       setSharePointUrl('');
       setUrlError(null);
+      setShowReplaceOptions(false);
+      setDocumentUrl(null);
       return;
     }
 
     if (document) {
+      // Load document URL if it has SharePoint IDs
+      if (document.storageLocation === 'SHAREPOINT' && document.sharePointSiteId && document.sharePointDriveId && document.sharePointItemId) {
+        loadDocumentUrl(document);
+      }
       setFormData({
         title: document.title || '',
         type: document.type || 'POLICY',
@@ -109,6 +134,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
         nextReviewDate: document.nextReviewDate
           ? new Date(document.nextReviewDate).toISOString().split('T')[0]
           : '',
+        requiresAcknowledgement: document.requiresAcknowledgement ?? (document.type === 'POLICY'),
       });
     } else {
       // Auto-populate default dates for new documents
@@ -130,6 +156,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
         confluencePageId: '',
         lastReviewDate: today.toISOString().split('T')[0],
         nextReviewDate: nextYear.toISOString().split('T')[0],
+        requiresAcknowledgement: true, // Default to true for POLICY type
       });
     }
   }, [document, user, isOpen]);
@@ -178,6 +205,15 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
       });
 
       setSharePointUrl('');
+      setShowReplaceOptions(false);
+      // Reload document URL if in edit mode
+      if (document) {
+        loadDocumentUrl({
+          sharePointSiteId: parsed.siteId,
+          sharePointDriveId: parsed.driveId,
+          sharePointItemId: parsed.itemId,
+        });
+      }
       toast({
         title: 'Success',
         description: 'SharePoint URL parsed successfully',
@@ -204,14 +240,123 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
     }
   };
 
+  const loadDocumentUrl = async (doc: any) => {
+    if (!doc.sharePointSiteId || !doc.sharePointDriveId || !doc.sharePointItemId) {
+      console.log('[DocumentFormModal] Missing SharePoint IDs:', {
+        siteId: doc.sharePointSiteId,
+        driveId: doc.sharePointDriveId,
+        itemId: doc.sharePointItemId,
+      });
+      return;
+    }
+    
+    setLoadingUrl(true);
+    try {
+      // Try to get webUrl from SharePoint item
+      const graphToken = await authService.getGraphAccessToken();
+      if (graphToken) {
+        try {
+          const response = await api.get(`/api/sharepoint/items/${doc.sharePointItemId}`, {
+            params: {
+              siteId: doc.sharePointSiteId,
+              driveId: doc.sharePointDriveId,
+            },
+            headers: {
+              'x-graph-token': graphToken,
+            },
+          });
+          if (response.data?.webUrl) {
+            console.log('[DocumentFormModal] Loaded document URL from Graph API:', response.data.webUrl);
+            setDocumentUrl(response.data.webUrl);
+            setLoadingUrl(false);
+            return;
+          }
+        } catch (error: any) {
+          console.warn('[DocumentFormModal] Error fetching SharePoint item from Graph API:', error.response?.data || error.message);
+          // Continue to fallback
+        }
+      } else {
+        console.warn('[DocumentFormModal] No Graph token available, using fallback URL');
+      }
+      
+      // Fallback to generated URL - try with access token first
+      try {
+        const fallbackToken = graphToken || await authService.getGraphAccessToken();
+        const headers = fallbackToken ? { 'x-graph-token': fallbackToken } : {};
+        
+        const response = await api.get('/api/sharepoint/url', {
+          params: {
+            siteId: doc.sharePointSiteId,
+            driveId: doc.sharePointDriveId,
+            itemId: doc.sharePointItemId,
+          },
+          headers,
+        });
+        if (response.data?.url) {
+          // Check if it's a Graph API URL (not a web URL) - if so, try to get webUrl from item endpoint
+          if (response.data.url.includes('graph.microsoft.com')) {
+            console.warn('[DocumentFormModal] Got Graph API URL instead of web URL, trying item endpoint');
+            // The backend should have already tried this, but if we got a Graph URL, the item endpoint might work
+            if (fallbackToken) {
+              try {
+                const itemResponse = await api.get(`/api/sharepoint/items/${doc.sharePointItemId}`, {
+                  params: {
+                    siteId: doc.sharePointSiteId,
+                    driveId: doc.sharePointDriveId,
+                  },
+                  headers: { 'x-graph-token': fallbackToken },
+                });
+                if (itemResponse.data?.webUrl) {
+                  console.log('[DocumentFormModal] Got webUrl from item endpoint:', itemResponse.data.webUrl);
+                  setDocumentUrl(itemResponse.data.webUrl);
+                  setLoadingUrl(false);
+                  return;
+                }
+              } catch (itemError) {
+                console.warn('[DocumentFormModal] Could not get webUrl from item endpoint:', itemError);
+              }
+            }
+            // If we still have a Graph URL, it's not usable as a web link
+            console.error('[DocumentFormModal] Got Graph API URL which cannot be used as web link');
+            setDocumentUrl(null);
+          } else {
+            console.log('[DocumentFormModal] Loaded document URL from fallback:', response.data.url);
+            setDocumentUrl(response.data.url);
+          }
+        } else {
+          console.error('[DocumentFormModal] Fallback URL endpoint returned no URL:', response.data);
+          setDocumentUrl(null);
+        }
+      } catch (error: any) {
+        console.error('[DocumentFormModal] Error generating fallback URL:', error.response?.data || error.message);
+        setDocumentUrl(null);
+      }
+    } catch (error: any) {
+      console.error('[DocumentFormModal] Unexpected error loading document URL:', error);
+      setDocumentUrl(null);
+    } finally {
+      setLoadingUrl(false);
+    }
+  };
+
   const handleFileSelect = (item: any) => {
     setFormData({
       ...formData,
-      sharePointSiteId: formData.sharePointSiteId || '', // Will be populated from config if not set
-      sharePointDriveId: formData.sharePointDriveId || '', // Will be populated from config if not set
+      sharePointSiteId: item.siteId || formData.sharePointSiteId || '', // Will be populated from config if not set
+      sharePointDriveId: item.driveId || formData.sharePointDriveId || '', // Will be populated from config if not set
       sharePointItemId: item.id,
       title: item.name || formData.title,
     });
+    setBrowserOpen(false);
+    setShowReplaceOptions(false);
+    // Reload document URL if in edit mode
+    if (document) {
+      loadDocumentUrl({
+        sharePointSiteId: item.siteId || formData.sharePointSiteId,
+        sharePointDriveId: item.driveId || formData.sharePointDriveId,
+        sharePointItemId: item.id,
+      });
+    }
     toast({
       title: 'Success',
       description: 'File selected from SharePoint',
@@ -222,12 +367,24 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     if (readOnly) {
       onClose();
       return;
     }
+
+    // Check if editing an APPROVED document and version is changing
+    if (document && document.status === 'APPROVED' && formData.version !== document.version) {
+      if (!pendingSubmit) {
+        setPendingSubmit(true);
+        onConfirmOpen();
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -242,17 +399,48 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
 
       if (document) {
         await api.put(`/api/documents/${document.id}`, payload);
+        toast({
+          title: 'Success',
+          description: 'Document updated successfully',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+          position: 'top-right',
+        });
       } else {
         await api.post('/api/documents', payload);
+        toast({
+          title: 'Success',
+          description: 'Document created successfully',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+          position: 'top-right',
+        });
       }
 
+      setPendingSubmit(false);
+      onConfirmClose();
       onClose();
     } catch (error) {
       console.error('Error saving document:', error);
-      alert('Failed to save document');
+      toast({
+        title: 'Error',
+        description: 'Failed to save document',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
+      setPendingSubmit(false);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleConfirmSubmit = () => {
+    setPendingSubmit(true);
+    handleSubmit();
   };
 
   return (
@@ -277,7 +465,15 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
                 <FormLabel>Type</FormLabel>
                 <Select
                   value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setFormData({
+                      ...formData,
+                      type: newType,
+                      // Auto-set requiresAcknowledgement for POLICY type
+                      requiresAcknowledgement: newType === 'POLICY',
+                    });
+                  }}
                   isDisabled={readOnly}
                 >
                   <option value="POLICY">Policy</option>
@@ -328,82 +524,154 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
 
               {formData.storageLocation === 'SHAREPOINT' && (
                 <>
-                  <FormControl>
-                    <FormLabel>SharePoint Link (Optional)</FormLabel>
-                    <HStack spacing={2}>
-                      <Input
-                        placeholder="Paste SharePoint file URL here"
-                        value={sharePointUrl}
-                        onChange={(e) => {
-                          setSharePointUrl(e.target.value);
-                          setUrlError(null);
-                        }}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleParseUrl();
-                          }
-                        }}
-                      />
-                      <Button
-                        onClick={handleParseUrl}
-                        isLoading={parsingUrl}
-                        colorScheme="blue"
-                        size="md"
-                        isDisabled={readOnly}
-                      >
-                        Parse URL
-                      </Button>
-                    </HStack>
-                    {urlError && (
-                      <Alert status="error" mt={2} size="sm">
-                        <AlertIcon />
-                        <AlertDescription>{urlError}</AlertDescription>
-                      </Alert>
-                    )}
-                  </FormControl>
-                  <FormControl>
-                    <FormLabel>Or Browse SharePoint</FormLabel>
-                    <Button
-                      onClick={() => setBrowserOpen(true)}
-                      colorScheme="blue"
-                      variant="outline"
-                      width="100%"
-                      isDisabled={readOnly}
-                    >
-                      Browse SharePoint Files
-                    </Button>
-                  </FormControl>
-                  <FormControl>
-                    <FormLabel>SharePoint Site ID</FormLabel>
-                    <Input
-                      value={formData.sharePointSiteId}
-                      onChange={(e) =>
-                        setFormData({ ...formData, sharePointSiteId: e.target.value })
-                      }
-                      isReadOnly={readOnly}
-                    />
-                  </FormControl>
-                  <FormControl>
-                    <FormLabel>SharePoint Drive ID</FormLabel>
-                    <Input
-                      value={formData.sharePointDriveId}
-                      onChange={(e) =>
-                        setFormData({ ...formData, sharePointDriveId: e.target.value })
-                      }
-                      isReadOnly={readOnly}
-                    />
-                  </FormControl>
-                  <FormControl>
-                    <FormLabel>SharePoint Item ID</FormLabel>
-                    <Input
-                      value={formData.sharePointItemId}
-                      onChange={(e) =>
-                        setFormData({ ...formData, sharePointItemId: e.target.value })
-                      }
-                      isReadOnly={readOnly}
-                    />
-                  </FormControl>
+                  {!document ? (
+                    // Create mode: Show paste URL and browse options
+                    <>
+                      <FormControl>
+                        <FormLabel>SharePoint Link (Optional)</FormLabel>
+                        <HStack spacing={2}>
+                          <Input
+                            placeholder="Paste SharePoint file URL here"
+                            value={sharePointUrl}
+                            onChange={(e) => {
+                              setSharePointUrl(e.target.value);
+                              setUrlError(null);
+                            }}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleParseUrl();
+                              }
+                            }}
+                          />
+                          <Button
+                            onClick={handleParseUrl}
+                            isLoading={parsingUrl}
+                            colorScheme="blue"
+                            size="md"
+                          >
+                            Parse URL
+                          </Button>
+                        </HStack>
+                        {urlError && (
+                          <Alert status="error" mt={2} size="sm">
+                            <AlertIcon />
+                            <AlertDescription>{urlError}</AlertDescription>
+                          </Alert>
+                        )}
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>Or Browse SharePoint</FormLabel>
+                        <Button
+                          onClick={() => setBrowserOpen(true)}
+                          colorScheme="blue"
+                          variant="outline"
+                          width="100%"
+                        >
+                          Browse SharePoint Files
+                        </Button>
+                      </FormControl>
+                    </>
+                  ) : (
+                    // Edit/View mode: Show document link and replace option
+                    <>
+                      {formData.sharePointItemId && (
+                        <FormControl>
+                          <FormLabel>SharePoint Item ID</FormLabel>
+                          <Input
+                            value={formData.sharePointItemId}
+                            isReadOnly
+                            bg="gray.50"
+                          />
+                        </FormControl>
+                      )}
+                      {!showReplaceOptions ? (
+                        <FormControl>
+                          <FormLabel>SharePoint Document</FormLabel>
+                          <VStack align="start" spacing={2}>
+                            {loadingUrl ? (
+                              <Text fontSize="sm" color="gray.500">Loading document link...</Text>
+                            ) : documentUrl ? (
+                              <Link href={documentUrl} isExternal color="blue.500" fontWeight="medium">
+                                Open in SharePoint
+                              </Link>
+                            ) : formData.sharePointItemId ? (
+                              <Text fontSize="sm" color="gray.500">Document link unavailable</Text>
+                            ) : (
+                              <Text fontSize="sm" color="gray.500">No SharePoint document selected</Text>
+                            )}
+                            {!readOnly && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setShowReplaceOptions(true)}
+                              >
+                                Replace Document
+                              </Button>
+                            )}
+                          </VStack>
+                        </FormControl>
+                      ) : (
+                        <>
+                          <FormControl>
+                            <FormLabel>Replace SharePoint Document</FormLabel>
+                            <VStack spacing={3} align="stretch">
+                              <HStack spacing={2}>
+                                <Input
+                                  placeholder="Paste SharePoint file URL here"
+                                  value={sharePointUrl}
+                                  onChange={(e) => {
+                                    setSharePointUrl(e.target.value);
+                                    setUrlError(null);
+                                  }}
+                                  onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleParseUrl();
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  onClick={handleParseUrl}
+                                  isLoading={parsingUrl}
+                                  colorScheme="blue"
+                                  size="md"
+                                >
+                                  Parse URL
+                                </Button>
+                              </HStack>
+                              {urlError && (
+                                <Alert status="error" size="sm">
+                                  <AlertIcon />
+                                  <AlertDescription>{urlError}</AlertDescription>
+                                </Alert>
+                              )}
+                              <Text textAlign="center" fontSize="sm" color="gray.500">OR</Text>
+                              <Button
+                                onClick={() => setBrowserOpen(true)}
+                                colorScheme="blue"
+                                variant="outline"
+                                width="100%"
+                              >
+                                Browse SharePoint Files
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setShowReplaceOptions(false);
+                                  setSharePointUrl('');
+                                  setUrlError(null);
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </VStack>
+                          </FormControl>
+                        </>
+                      )}
+                    </>
+                  )}
                 </>
               )}
 
@@ -455,6 +723,23 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
                   isReadOnly={readOnly}
                 />
               </FormControl>
+
+              <FormControl>
+                <Checkbox
+                  isChecked={formData.requiresAcknowledgement}
+                  onChange={(e) =>
+                    setFormData({ ...formData, requiresAcknowledgement: e.target.checked })
+                  }
+                  isDisabled={readOnly || formData.type === 'POLICY'}
+                >
+                  Requires Staff Acknowledgment
+                </Checkbox>
+                {formData.type === 'POLICY' && (
+                  <Text fontSize="sm" color="gray.600" mt={1} ml={6}>
+                    Policy documents automatically require staff acknowledgment when changed.
+                  </Text>
+                )}
+              </FormControl>
             </VStack>
           </ModalBody>
 
@@ -486,6 +771,36 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
           driveId={formData.sharePointDriveId || undefined}
         />
       </ModalContent>
+
+      <AlertDialog
+        isOpen={isConfirmOpen}
+        leastDestructiveRef={cancelRef}
+        onClose={onConfirmClose}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Update Version on Approved Document
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              This document is approved. Updating the version will mark it as changed and may require staff acknowledgment (if the document requires acknowledgment).
+              <br />
+              <br />
+              The document status will remain APPROVED since the approval process occurred outside this platform.
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onConfirmClose}>
+                Cancel
+              </Button>
+              <Button colorScheme="blue" onClick={handleConfirmSubmit} ml={3} isLoading={loading}>
+                Continue
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Modal>
   );
 }

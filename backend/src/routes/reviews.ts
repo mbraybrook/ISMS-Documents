@@ -116,14 +116,20 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
       take: 20,
     });
 
-    // Also check documents with nextReviewDate in next 30 days
-    const documentsNeedingReview = await prisma.document.findMany({
+    // Documents with nextReviewDate in next 30 days (upcoming)
+    const upcomingDocuments = await prisma.document.findMany({
       where: {
         nextReviewDate: {
           gte: now,
           lte: thirtyDaysFromNow,
         },
         status: { in: ['APPROVED', 'IN_REVIEW'] },
+        // Exclude documents that already have active ReviewTasks
+        reviewTasks: {
+          none: {
+            status: { in: ['PENDING', 'OVERDUE'] },
+          },
+        },
       },
       include: {
         owner: {
@@ -139,11 +145,69 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
       },
     });
 
+    // Documents overdue for review (nextReviewDate < today)
+    const overdueDocuments = await prisma.document.findMany({
+      where: {
+        nextReviewDate: {
+          lt: now,
+        },
+        status: { in: ['APPROVED', 'IN_REVIEW'] },
+        // Exclude documents that already have active ReviewTasks
+        reviewTasks: {
+          none: {
+            status: { in: ['PENDING', 'OVERDUE'] },
+          },
+        },
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        nextReviewDate: 'asc', // Most overdue first (earliest dates)
+      },
+    });
+
+    // Documents missing nextReviewDate
+    // Exclude documents that already have active ReviewTasks (they have a review scheduled)
+    const needsReviewDate = await prisma.document.findMany({
+      where: {
+        nextReviewDate: null,
+        status: { in: ['APPROVED', 'IN_REVIEW'] },
+        // Exclude documents that already have active ReviewTasks
+        reviewTasks: {
+          none: {
+            status: { in: ['PENDING', 'OVERDUE'] },
+          },
+        },
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+
     res.json({
       upcomingReviews,
       overdueReviews,
       recentlyCompletedReviews,
-      documentsNeedingReview,
+      documentsNeedingReview: upcomingDocuments, // Keep for backward compatibility
+      upcomingDocuments,
+      overdueDocuments,
+      needsReviewDate,
     });
   } catch (error) {
     console.error('Error fetching review dashboard:', error);
@@ -180,6 +244,15 @@ router.post(
       const dueDateObj = new Date(dueDate);
       const now = new Date();
       const status = dueDateObj < now ? 'OVERDUE' : 'PENDING';
+
+      // If document doesn't have a nextReviewDate, update it to match the review due date
+      // This ensures documents with scheduled reviews don't appear in "Missing Review Date"
+      if (!document.nextReviewDate) {
+        await prisma.document.update({
+          where: { id: documentId },
+          data: { nextReviewDate: dueDateObj },
+        });
+      }
 
       const reviewTask = await prisma.reviewTask.create({
         data: {

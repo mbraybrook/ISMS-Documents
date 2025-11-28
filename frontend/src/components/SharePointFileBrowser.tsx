@@ -245,11 +245,19 @@ export function SharePointFileBrowser({
             <HStack spacing={2} flexWrap="wrap">
               {breadcrumbs.map((crumb, index) => (
                 <HStack key={index} spacing={1}>
-                  {index > 0 && <ChevronRightIcon />}
+                  {index > 0 && <ChevronRightIcon color="gray.400" />}
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleBreadcrumbClick(index)}
+                    _hover={{ 
+                      textDecoration: 'underline',
+                      bg: 'blue.50',
+                      color: 'blue.600'
+                    }}
+                    textDecoration={index === breadcrumbs.length - 1 ? 'none' : 'underline'}
+                    fontWeight={index === breadcrumbs.length - 1 ? 'semibold' : 'normal'}
+                    color={index === breadcrumbs.length - 1 ? 'gray.700' : 'blue.600'}
                   >
                     {crumb.name}
                   </Button>

@@ -31,6 +31,7 @@ interface Document {
   };
   lastReviewDate: string | null;
   nextReviewDate: string | null;
+  lastChangedDate?: string | null;
   sharePointSiteId?: string;
   sharePointDriveId?: string;
   sharePointItemId?: string;
@@ -158,6 +159,11 @@ export function AcknowledgmentPage() {
         <Heading size="lg" mb={4}>
           Documents Requiring Acknowledgment
         </Heading>
+        <Alert status="info" mb={4}>
+          <AlertIcon />
+          Showing only documents that require staff acknowledgment (typically Policy documents).
+          Documents are shown here when their version has changed since your last acknowledgment.
+        </Alert>
         {documents.length === 0 ? (
           <Alert status="success">
             <AlertIcon />
@@ -189,6 +195,7 @@ export function AcknowledgmentPage() {
                     <Th>Version</Th>
                     <Th>Owner</Th>
                     <Th>Last Review</Th>
+                    <Th>Last Changed</Th>
                     <Th>Actions</Th>
                   </Tr>
                 </Thead>
@@ -212,6 +219,15 @@ export function AcknowledgmentPage() {
                         <Td>
                           {doc.lastReviewDate
                             ? new Date(doc.lastReviewDate).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })
+                            : 'N/A'}
+                        </Td>
+                        <Td>
+                          {doc.lastChangedDate
+                            ? new Date(doc.lastChangedDate).toLocaleDateString('en-GB', {
                                 day: '2-digit',
                                 month: '2-digit',
                                 year: 'numeric',

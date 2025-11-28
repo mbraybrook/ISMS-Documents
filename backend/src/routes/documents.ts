@@ -173,12 +173,19 @@ router.post(
     body('confluencePageId').optional().isString(),
     body('lastReviewDate').optional().isISO8601(),
     body('nextReviewDate').optional().isISO8601(),
+    body('requiresAcknowledgement').optional().isBoolean(),
+    body('lastChangedDate').optional().isISO8601(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
       // Convert date strings to DateTime objects if provided
       const data: any = { ...req.body };
+
+      // Auto-set requiresAcknowledgement based on type
+      if (data.type === 'POLICY' && !('requiresAcknowledgement' in data)) {
+        data.requiresAcknowledgement = true;
+      }
       if (data.lastReviewDate && typeof data.lastReviewDate === 'string') {
         // If it's just a date (YYYY-MM-DD), convert to full datetime
         if (data.lastReviewDate.length === 10) {
@@ -230,11 +237,22 @@ router.put(
     body('version').optional().notEmpty().trim(),
     body('status').optional().isIn(['DRAFT', 'IN_REVIEW', 'APPROVED', 'SUPERSEDED']),
     body('ownerUserId').optional().isUUID(),
+    body('requiresAcknowledgement').optional().isBoolean(),
+    body('lastChangedDate').optional().isISO8601(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
+
+      // Get existing document to check for version changes
+      const existingDocument = await prisma.document.findUnique({
+        where: { id },
+      });
+
+      if (!existingDocument) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
 
       // Convert date strings to DateTime objects if provided
       const data: any = { ...req.body };
@@ -253,6 +271,32 @@ router.put(
         } else {
           data.nextReviewDate = new Date(data.nextReviewDate);
         }
+      }
+      if (data.lastChangedDate && typeof data.lastChangedDate === 'string') {
+        if (data.lastChangedDate.length === 10) {
+          data.lastChangedDate = new Date(data.lastChangedDate + 'T00:00:00.000Z');
+        } else {
+          data.lastChangedDate = new Date(data.lastChangedDate);
+        }
+      }
+
+      // Handle version change on APPROVED document
+      if (data.version && existingDocument.status === 'APPROVED' && data.version !== existingDocument.version) {
+        // Version changed on approved document - set lastChangedDate and keep status as APPROVED
+        data.lastChangedDate = new Date();
+        // Don't change status - keep it as APPROVED since approval happened outside platform
+      }
+
+      // Auto-set requiresAcknowledgement based on type if type is being changed
+      if (data.type) {
+        // If type is POLICY, automatically set requiresAcknowledgement to true
+        // But allow manual override if requiresAcknowledgement is explicitly provided
+        if (data.type === 'POLICY' && !('requiresAcknowledgement' in data)) {
+          data.requiresAcknowledgement = true;
+        }
+      } else if (existingDocument.type === 'POLICY' && !('requiresAcknowledgement' in data)) {
+        // If existing document is POLICY and requiresAcknowledgement not provided, ensure it's true
+        data.requiresAcknowledgement = true;
       }
 
       const document = await prisma.document.update({
@@ -416,21 +460,32 @@ router.post(
   }
 );
 
-// DELETE /api/documents/:id - soft delete (mark as superseded)
+// DELETE /api/documents/:id - soft delete (mark as superseded) or hard delete
 router.delete(
   '/:id',
   authenticateToken,
   requireRole('ADMIN', 'EDITOR'),
-  [param('id').isUUID()],
+  [
+    param('id').isUUID(),
+    query('hard').optional().isBoolean(),
+  ],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
+      const hardDelete = req.query.hard === 'true';
 
-      const document = await prisma.document.update({
-        where: { id },
-        data: { status: 'SUPERSEDED' },
-      });
+      let document;
+      if (hardDelete) {
+        document = await prisma.document.delete({
+          where: { id },
+        });
+      } else {
+        document = await prisma.document.update({
+          where: { id },
+          data: { status: 'SUPERSEDED' },
+        });
+      }
 
       res.json(document);
     } catch (error: any) {

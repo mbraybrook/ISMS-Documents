@@ -29,10 +29,11 @@ router.get('/pending', authenticateToken, async (req: AuthRequest, res: Response
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Get all approved documents
+    // Get all approved documents that require acknowledgment
     const approvedDocuments = await prisma.document.findMany({
       where: {
         status: 'APPROVED',
+        requiresAcknowledgement: true,
       },
       include: {
         owner: {
@@ -108,7 +109,10 @@ router.post(
       if (!documentIds || documentIds.length === 0) {
         // Get all pending documents (same logic as GET /pending)
         const approvedDocuments = await prisma.document.findMany({
-          where: { status: 'APPROVED' },
+          where: { 
+            status: 'APPROVED',
+            requiresAcknowledgement: true,
+          },
         });
 
         const userAcknowledgments = await prisma.acknowledgment.findMany({
@@ -133,6 +137,7 @@ router.post(
           where: {
             id: { in: documentIds },
             status: 'APPROVED',
+            requiresAcknowledgement: true,
           },
         });
       }
@@ -210,6 +215,10 @@ router.post(
 
       if (document.status !== 'APPROVED') {
         return res.status(400).json({ error: 'Document is not approved' });
+      }
+
+      if (!document.requiresAcknowledgement) {
+        return res.status(400).json({ error: 'Document does not require acknowledgment' });
       }
 
       // Check if already acknowledged for this version

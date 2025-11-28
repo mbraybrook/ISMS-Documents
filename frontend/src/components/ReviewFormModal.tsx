@@ -13,6 +13,7 @@ import {
   Select,
   VStack,
   Textarea,
+  useToast,
 } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 import api from '../services/api';
@@ -20,12 +21,13 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface ReviewFormModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (success?: boolean) => void;
   document: any;
 }
 
 export function ReviewFormModal({ isOpen, onClose, document }: ReviewFormModalProps) {
   const { user } = useAuth();
+  const toast = useToast();
   const [users, setUsers] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     reviewerUserId: user?.id || '',
@@ -77,17 +79,24 @@ export function ReviewFormModal({ isOpen, onClose, document }: ReviewFormModalPr
       };
 
       await api.post('/api/reviews', payload);
-      onClose();
-    } catch (error) {
+      onClose(true);
+    } catch (error: any) {
       console.error('Error creating review:', error);
-      alert('Failed to create review');
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to create review',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md">
+    <Modal isOpen={isOpen} onClose={() => onClose(false)} size="md">
       <ModalOverlay />
       <ModalContent>
         <form onSubmit={handleSubmit}>
@@ -143,7 +152,7 @@ export function ReviewFormModal({ isOpen, onClose, document }: ReviewFormModalPr
           </ModalBody>
 
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onClose}>
+            <Button variant="ghost" mr={3} onClick={() => onClose(false)}>
               Cancel
             </Button>
             <Button colorScheme="blue" type="submit" isLoading={loading}>

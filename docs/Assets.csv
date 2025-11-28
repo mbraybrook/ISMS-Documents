@@ -1,0 +1,106 @@
+Date,Asset Category,Asset Sub-category,Owner,[Primary] User,Location,Manufacturer / Supplier,Model / Version,Name / Serial No.,CDE Impacting?,Paythru Classification,Purpose,Notes,Cost
+04/06/2018,Hardware,Monitor,CISO,Sue Brown,User Home,Flatron W2261VP,LG,001MAAQ72471,No,Paythru Sensitive,Administrative work,, £100.00 
+05/06/2018,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,Carbon X1,Lenovo,R902EK0D,No,Paythru Proprietary,Administrative work,," £1,800.00 "
+05/06/2018,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,T440,Lenovo,PF01PZRM,No,Paythru Proprietary,Administrative work,," £1,200.00 "
+05/11/2018,Hardware,Laptop,CISO,Mark Braybrook,User Home,ThinkPad T480,Lenovo,PF-1E675E,No,Paythru Proprietary,Administrative work,," £1,800.00 "
+07/11/2018,Hardware,Docking station,CISO,Mark Braybrook (Spare),User Home,ThinkPad Pro,Lenovo,40A2 M2A2K71A,No,Paythru Sensitive,Administrative work,, £240.00 
+07/11/2018,Hardware,Docking station,CISO,Mark Braybrook,User Home,ThinkPad Pro,Lenovo,40AH M3F0947F,No,Paythru Sensitive,Administrative work,, £240.00 
+22/04/2020,Hardware,Monitor,CISO,Alison Webber,User Home,Flatron W2442PE,LG,105MAVD3S151,No,Paythru Sensitive,Administrative work,, £140.00 
+23/04/2020,Hardware,Monitor,CISO,Alison Webber,User Home,Flatron W2442PE,LG,109MALF03512,No,Paythru Sensitive,Administrative work,, £140.00 
+24/04/2020,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,T440P,Lenovo,PB009914,No,Paythru Proprietary,Administrative work,," £1,200.00 "
+25/04/2020,Hardware,Mobile Phone,CISO,Alison Webber,User Home,iPhone 6 MG482B/A,Apple,C7KP40QPG5MP,No,Paythru Proprietary,Administrative work,, £350.00 
+26/04/2020,Hardware,Docking station,CISO,Alison Webber,User Home,ThinkPad Pro,Lenovo,40A2 M2A1Y21H,No,Paythru Sensitive,Administrative work,, £240.00 
+28/04/2020,Hardware,Laptop,CISO,David Martin,User Home,T470P,Lenovo,PF-OPVG35 17/04,No,Paythru Proprietary,Administrative work,," £1,800.00 "
+29/04/2020,Hardware,Mobile Phone,CISO,David Martin,User Home,iPhone 8 MQ7C2B/A,Apple,F4GVFR5EJC6K,No,Paythru Proprietary,Administrative work,, £700.00 
+30/04/2020,Hardware,Docking station,CISO,David Martin,User Home,ThinkPad Pro,Lenovo,N/A,No,Paythru Sensitive,Administrative work,, £240.00 
+01/05/2020,Hardware,Laptop,CISO,Jim Campbell,User Home,ThinkPad T4,Lenovo,PF01PSC,No,Paythru Proprietary,Administrative work,," £1,200.00 "
+02/05/2020,Hardware,Mobile Phone,CISO,Keith Brown,User Home,iphone 11 Pro MWHD2B/A,Apple,G6TZP0N8N70R,No,Paythru Proprietary,Administrative work,," £1,100.00 "
+03/05/2020,Hardware,Laptop,CISO,Keith Brown,User Home,Carbon X1,Lenovo,PF-168973,No,Paythru Proprietary,Administrative work,," £1,800.00 "
+04/05/2020,Hardware,Docking station,CISO,Keith Brown,User Home,ThinkPad Pro,Lenovo,40AH M3F0679A,No,Paythru Sensitive,Administrative work,, £240.00 
+05/05/2020,Hardware,Monitor,CISO,Lindsay Martin,User Home,Flatron W2442PE,LG,106MAFC7D347,No,Paythru Sensitive,Administrative work,, £240.00 
+06/05/2020,Hardware,Laptop,CISO,Lindsay Martin,User Home,T470P,Lenovo,PF0PVG2S,No,Paythru Proprietary,Administrative work,," £1,200.00 "
+07/05/2020,Hardware,Docking station,CISO,Lindsay Martin,User Home,ThinkPad Pro,Lenovo,40A2 M3-0002K2,No,Paythru Sensitive,Administrative work,, £240.00 
+11/09/2020,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,ThinkPad T490,Lenovo,PF26E150,No,Paythru Proprietary,Administrative work,, £900.00 
+11/09/2020,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,ThinkPad T490,Lenovo,PF26EV6S,No,Paythru Proprietary,Administrative work,, £900.00 
+30/10/2020,Hardware,Desktop Computer,CISO,Mark Braybrook,User Home,Mac Mini,Apple,C07D70HVPJH8,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+06/08/2021,Hardware,Laptop,CISO,David Martin,User Home,Carbon X1,Lenovo,PF31AQ9Z,No,Paythru Proprietary,Administrative work,," £1,800.00 "
+06/08/2021,Hardware,Docking station,CISO,David Martin,User Home,USB Dock,Lenovo,40AF0135UK,No,Paythru Sensitive,Administrative work,, £180.00 
+06/08/2021,Hardware,Mobile Phone,CISO,David Martin,User Home,Pixel 4a,Google,TBC,No,Paythru Sensitive,Administrative work,, £350.00 
+06/08/2021,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,T14s,Lenovo,PC22JXMD,No,Paythru Confidential,Administrative work,," £1,800.00 "
+06/08/2021,Hardware,Docking station,CISO,Mark Braybrook (Spare),User Home,USB Dock,Lenovo,40AF0135UK,No,Paythru Sensitive,Administrative work,, £180.00 
+06/08/2021,Hardware,Laptop,CISO,Mark Braybrook,User Home,Carbon X1,Lenovo,PF01PZRM,No,Paythru Confidential,Administrative work,," £1,800.00 "
+06/08/2021,Hardware,Docking station,CISO,Mark Braybrook (Spare),User Home,USB Dock,Lenovo,40AF0135UK,No,Paythru Sensitive,Administrative work,, £180.00 
+06/08/2021,Hardware,Mobile Phone,CISO,Mark Braybrook,User Home,iPhone SE,Apple,GWVFM3RRPLJT,No,Paythru Sensitive,Administrative work,, £400.00 
+09/09/2021,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,Carbon X1,Lenovo,PF31AX36,No,Paythru Confidential,Administrative work,," £1,800.00 "
+21/04/2020,Hardware,Monitor,CISO,Naveen Keloth,User Home,Flatron W2442PE,LG,106MABT7D349,No,Paythru Sensitive,Administrative work,, £140.00 
+21/04/2020,Hardware,Monitor,CISO,Naveen Keloth,User Home,Flatron W2442PE,LG,105MATW3S161,No,Paythru Sensitive,Administrative work,, £140.00 
+26/10/2021,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,Macbook Pro,Apple,L34735M4PQ,No,Paythru Confidential,Administrative work,," £2,000.00 "
+26/10/2021,Hardware,Mouse,CISO,Mark Braybrook (Spare),User Home,Magic Mouse,Apple,N/A,No,Paythru Sensitive,Administrative work,, £79.00 
+19/04/2022,Hardware,Laptop,CISO,Ashish Kharche,User Home,T14s,Lenovo,PC26N3LT,No,Paythru Confidential,Administrative work,," £1,800.00 "
+19/04/2022,Hardware,Docking station,CISO,Ashish Kharche,User Home,USB Dock,Lenovo,40AF0135UK,No,Paythru Sensitive,Administrative work,, £180.00 
+19/04/2022,Hardware,Mobile Phone,CISO,Ashish Kharche,User Home,Pixel 6,Google,356214582151848,No,Paythru Confidential,Administrative work,, £549.00 
+04/10/2022,Hardware,Laptop,CISO,Ciaran O'Donnell,User Home,Latitude 5430,Dell,3YK4KR3,No,Paythru Confidential,Administrative work,," £1,500.00 "
+04/10/2022,Hardware,Laptop,CISO,Ketan Lathiya,User Home,Latitude 5430,Dell,62CZKR3,No,Paythru Confidential,Administrative work,," £1,500.00 "
+04/10/2022,Hardware,Monitor,CISO,Ciaran O'Donnell,User Home,Philips 325E1C,Philips,N/A,No,Paythru Confidential,Administrative work,, £200.00 
+04/10/2022,Hardware,Laptop,CISO,William Daniel,User Home,Latitude 5430,Dell,2H17LR3,No,Paythru Confidential,Administrative work,," £1,500.00 "
+04/10/2022,Hardware,Docking station,CISO,William Daniel,User Home,USB Dock,Dell,,No,Paythru Confidential,Administrative work,, £300.00 
+23/10/2025,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,XPS,Dell,HH9FJR3,No,Paythru Confidential,Administrative work,," £1,200.00 "
+06/08/2021,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,XPS,Dell,J8WNPN3,No,Paythru Confidential,Administrative work,," £1,500.00 "
+06/08/2021,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,T14s,Lenovo,PF31AVNY,No,Paythru Confidential,Administrative work,," £1,800.00 "
+14/02/2023,Hardware,Laptop,CISO,Bansari Brahmbhatt,User Home,Latitude 5430,Dell,B42ZVV3,No,Paythru Confidential,Administrative work,," £1,500.00 "
+14/02/2023,Hardware,Monitor,CISO,Ketan Lathiya,User Home,,Dell,62CZKR3,No,Paythru Sensitive,Administrative work,, £140.00 
+14/02/2023,Hardware,Laptop,CISO,Keith Brown,User Home,XPS,Dell,60D33T3,No,Paythru Proprietary,Administrative work,," £1,600.00 "
+14/02/2023,Hardware,Laptop,CISO,Jonathan Back,User Home,XPS,Dell,5DR33T3,No,Paythru Proprietary,Administrative work,," £1,600.00 "
+14/02/2023,Hardware,Laptop,CISO,Lawrence Della Valle,User Home,XPS,Dell,4M7MRQ3,No,Paythru Proprietary,Administrative work,," £1,600.00 "
+19/06/2023,Hardware,Mobile Phone,CISO,Lawrence Della Valle,User Home,Apple,iPhone 14,v4p4mk2k4d,No,Paythru Confidential,Administrative work,," £1,000.00 "
+25/04/2023,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,Lattitude 5440,Dell,JYH8VV3,No,Paythru Confidential,Administrative work,," £1,500.00 "
+04/08/2023,Hardware,Laptop,CISO,Imre Nagy,User Home,Macbook Air,Apple,LWPN237613,No,Paythru Confidential,Administrative work,," £2,000.00 "
+08/12/2023,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,Precision 3580,Dell,5XWFPX3,No,Paythru Confidential,Administrative work,," £1,600.00 "
+11/12/2023,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,Precision 3580,Dell,29PFPX3,No,Paythru Confidential,Administrative work,," £1,600.00 "
+20/09/2024,Hardware,Laptop,CISO,Sara Sloman,User Home,XPS,Dell,39GK314,No,Paythru Confidential,Administrative work,," £1,600.00 "
+20/09/2024,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,XPS,Dell,4WBR9Y3,No,Paythru Confidential,Administrative work,," £1,600.00 "
+20/09/2024,Hardware,Laptop,CISO,Sue Brown,User Home,XPS,Dell,87VRSQ3,No,Paythru Proprietary,Administrative work,," £1,600.00 "
+20/09/2024,Hardware,Laptop,CISO,Simon Brown,User Home,Latitude 5430,Dell,76F3LR3,No,Paythru Confidential,Administrative work,," £1,500.00 "
+20/09/2024,Hardware,Laptop,CISO,Alison Webber,User Home,ThinkPad T14s,Lenovo,PC22JXMD,No,Paythru Confidential,Administrative work,," £1,200.00 "
+20/09/2024,Hardware,Laptop,CISO,Naveen Keloth,User Home,ThinkPad T490,Lenovo,PF1TC9KK,No,Paythru Proprietary,Administrative work,," £1,600.00 "
+20/09/2024,Hardware,Laptop,CISO,Chevaun Mudzingwa,User Home,Lattitude 5440,Dell,1MJZSV3,No,Paythru Proprietary,Administrative work,," £1,600.00 "
+20/09/2024,Hardware,Laptop,CISO,Mark Braybrook (Spare),User Home,Precision 3580,Dell,B4ZVB04,No,Paythru Proprietary,Administrative work,," £1,600.00 "
+20/09/2024,Hardware,Laptop,CISO,Jamei-Jade McGregor-Coope,User Home,Lattitude 5440,Dell,JWQ5TV3,No,Paythru Proprietary,Administrative work,," £1,600.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Mark Braybrook,User Home,Apple,iPhone 15 Pro,KN929DVW5G,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Lindsay Martin,User Home,Apple,iPhone 15 Pro,KG7VKJF39V,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Sue Brown,User Home,Apple,iPhone 15 Pro Max,JFWGHD4YPL,No,Paythru Proprietary,Administrative work,," £1,200.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Chris Westlake,User Home,Apple,iPhone 15 Pro,M6PJQCGJDQ,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Imi Nagy,User Home,Apple,iPhone 15 Pro Max,H9NX7GY9CX,No,Paythru Proprietary,Administrative work,," £1,200.00 "
+23/10/2025,Hardware,Mobile Phone,CISO,Mark Braybrook (Spare),User Home,Apple,iPhone 15 Pro,,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Elliot Green,User Home,Apple,iPhone 15 Pro,,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Alison Webber,User Home,Apple,iPhone 15 Pro Max,HT75C4YXMX,No,Paythru Proprietary,Administrative work,," £1,200.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Mark Braybrook (Spare),User Home,Apple,iPhone 15 Pro,J7H60D71TW,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Simon Brown,User Home,Apple,iPhone 15 Pro Max,KFPFC24FNH,No,Paythru Proprietary,Administrative work,," £1,200.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Keith Brown,User Home,Apple,iPhone 15 Pro,,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Peter Sutcliffe,User Home,Apple,iPhone 15 Pro,,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Lawrence Della Valle,User Home,Apple,iPhone 15 Pro,,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,Sara Sloman,User Home,Apple,iPhone 15 Pro,D0975FWK2C,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+20/09/2024,Hardware,Mobile Phone,CISO,David Martin,User Home,Apple,iPhone 15 Pro,,No,Paythru Proprietary,Administrative work,," £1,000.00 "
+20/05/2025,Hardware,Tablet,CISO,Mark Braybrook,User Home,reMarkable,reMarkable 2,RM110-209-75447,No,Paythru Confidential,Administrative work,, £400.00 
+20/05/2025,Hardware,Tablet,CISO,Elliot Green,User Home,reMarkable,reMarkable 2,,No,Paythru Confidential,Administrative work,, £400.00 
+20/05/2025,Hardware,Tablet,CISO,Sara Sloman,User Home,reMarkable,reMarkable 2,,No,Paythru Confidential,Administrative work,, £400.00 
+20/05/2025,Hardware,Tablet,CISO,Lawrence Della Valle,User Home,reMarkable,reMarkable 2,,No,Paythru Confidential,Administrative work,, £400.00 
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,Virtual,repo.paythru.com,No, Paythru Proprietary ,PreProd,Code repository and build server,
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,Virtual,demo.paythru.com,No, Paythru Proprietary ,PreProd,Application UAT server,
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,RDS-Instance,preprod-fyjaokq321d834,No, Paythru Proprietary ,PreProd,Application DB,
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,EC2-Instance,dev.paythru.com,No, Paythru Proprietary ,PreProd,Application dev server,
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,EC2-Instance,dev1.paythru.com,No, Paythru Proprietary ,PreProd,Application prototyping server,
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,EC2-Instance,Puppet-CI,No, Paythru Proprietary ,PreProd,Infrastructure testing server,
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,EC2-Instance,apps-02.paythru.com,No, Paythru Proprietary ,Apps,Third party application server,
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,EC2-Instance,Paythru-INGRESS-server,No, Paythru Proprietary ,Apps,Jump host for Apps infrastructure,
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,RDS-Instance,cgizricwcyvezks,No, Paythru Proprietary ,Apps,Application DB server,
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,EC2-Instance,Web[x],Yes, Paythru Proprietary ,production,Application web server (multiple),
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,EC2-Instance,AlertLogicApplianceV3,Yes, Paythru Proprietary ,production,Intrusion detection server,
+01/11/2019,Hosted Infrastructure,Virtual,DSO,Platform,AWS eu-west-2,AWS,RDS-Instance,privaterdsmaria-v00,Yes, Paythru Proprietary ,production,Application DB server,
+22/08/2018,Cardholder Data,Cardholder data,CISO,Business,AWS,,,,Yes,Paythru Proprietary,,,
+22/08/2018,Intellectual Property,Application code,CISO,Business,AWS/Developer Laptops,,,,Yes,Paythru Proprietary,,,
+12/08/2021,Business Information,Insurance Paperwork,CISO,Business,UK,Microsoft,Office 365,,No,Paythru Proprietary,,"Invoices, contracts, specifications, marketing materials, minutes, all other day-to-day ",
+27/02/2025,Business Information,Projects,CISO,Employees,Jira,Atlassian,,,No,Paythru Proprietary,,,
+30/05/2025,Business Information,Projects,COO,Employees,Monday.com,Monday.com,,,No,Paythru Confidential,,"In flight projects, client support, technical deliveries",
+30/05/2025,Intellectual Property,Designs,CPO,Employees,Figma,Figma,,,No,Paythru Confidential,,"User journeys, user experience designs.",
+17/10/2025,Hardware,Tablet,CISO,Simon Brown,User Home,reMarkable,reMarkable 2,,No,Paythru Confidential,Administrative work,, £400.00 
