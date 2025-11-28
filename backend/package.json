@@ -9,13 +9,15 @@
     "start": "node dist/index.js",
     "test": "jest",
     "lint": "eslint src --ext .ts",
+    "prisma": "bash -c 'source ./scripts/prisma-env.sh && npx prisma \"$@\"' --",
     "db:migrate": "./scripts/run-prisma.sh migrate dev",
     "db:migrate:deploy": "./scripts/run-prisma.sh migrate deploy",
     "db:migrate:create": "./scripts/run-prisma.sh migrate dev --create-only",
     "db:generate": "./scripts/run-prisma.sh generate",
     "db:studio": "./scripts/run-prisma.sh studio",
     "db:seed": "tsx src/prisma/seed.ts",
-    "db:status": "./scripts/run-prisma.sh migrate status"
+    "db:status": "./scripts/run-prisma.sh migrate status",
+    "postinstall": "node scripts/setup-prisma-env.js"
   },
   "dependencies": {
     "@microsoft/microsoft-graph-client": "^3.0.7",

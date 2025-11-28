@@ -108,6 +108,8 @@ export function RisksPage() {
   const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
   const [riskToDelete, setRiskToDelete] = useState<Risk | null>(null);
   const [selectedRiskIds, setSelectedRiskIds] = useState<Set<string>>(new Set());
+  const [isDuplicateMode, setIsDuplicateMode] = useState(false);
+  const [viewMode, setViewMode] = useState(false);
   const { isOpen: isBulkDeleteOpen, onOpen: onBulkDeleteOpen, onClose: onBulkDeleteClose } = useDisclosure();
   const cancelRef = useRef(null);
 
@@ -217,29 +219,61 @@ export function RisksPage() {
 
   const handleEdit = (risk: Risk) => {
     setSelectedRisk(risk);
+    setIsDuplicateMode(false);
+    setViewMode(false);
+    onOpen();
+  };
+
+  const handleView = (risk: Risk) => {
+    setSelectedRisk(risk);
+    setIsDuplicateMode(false);
+    setViewMode(true);
     onOpen();
   };
 
   const handleCreate = () => {
     setSelectedRisk(null);
+    setIsDuplicateMode(false);
+    setViewMode(false);
     onOpen();
   };
 
   const handleDuplicate = (risk: Risk) => {
     // Create a copy of the risk without the id and with "Copy of" prefix
+    // Copy ALL fields including text areas and dropdown selections
     const duplicatedRisk = {
       ...risk,
       id: undefined,
+      externalId: undefined,
       title: `Copy of ${risk.title}`,
+      description: risk.description || '',
+      threatDescription: risk.threatDescription || '',
+      assetCategory: risk.assetCategory || '',
+      interestedParty: risk.interestedParty || '',
       dateAdded: new Date().toISOString().split('T')[0],
+      // Reset mitigated scores for the duplicate
+      mitigatedConfidentialityScore: null,
+      mitigatedIntegrityScore: null,
+      mitigatedAvailabilityScore: null,
+      mitigatedRiskScore: null,
+      mitigatedLikelihood: null,
+      mitigatedScore: null,
+      mitigatedRiskLevel: null,
+      mitigationImplemented: false,
+      residualRiskTreatmentCategory: null,
+      // Keep control associations
+      riskControls: risk.riskControls || [],
     };
     setSelectedRisk(duplicatedRisk as any);
+    setIsDuplicateMode(true);
     onOpen();
   };
 
   const handleClose = () => {
     onClose();
     setSelectedRisk(null);
+    setIsDuplicateMode(false);
+    setViewMode(false);
     fetchRisks();
     // Success toast will be shown by RiskFormModal
   };
@@ -348,8 +382,10 @@ export function RisksPage() {
 
   const handleSelectAll = (isSelected: boolean) => {
     if (isSelected) {
+      // Select all risks on current page
       setSelectedRiskIds(new Set(risks.map((r) => r.id)));
     } else {
+      // Deselect all
       setSelectedRiskIds(new Set());
     }
   };
@@ -386,84 +422,110 @@ export function RisksPage() {
     }
   };
 
-  const exportToCSV = () => {
-    const headers = [
-      'Title',
-      'Risk Type',
-      'Owner',
-      'C',
-      'I',
-      'A',
-      'L',
-      'Risk (C+I+A)',
-      'Initial Score',
-      'Risk Level',
-      'Initial Treatment',
-      'MC',
-      'MI',
-      'MA',
-      'ML',
-      'Mitigated Risk',
-      'Mitigated Score',
-      'Mitigated Risk Level',
-      'Residual Treatment',
-      'Mitigation Implemented',
-      'Controls',
-      'Date Added',
-    ];
+  const [isExporting, setIsExporting] = useState(false);
 
-    const rows = risks.map((risk) => {
-      const riskValue = risk.confidentialityScore + risk.integrityScore + risk.availabilityScore;
-      const mitigatedRiskValue =
-        risk.mitigatedConfidentialityScore !== null &&
-        risk.mitigatedIntegrityScore !== null &&
-        risk.mitigatedAvailabilityScore !== null
-          ? risk.mitigatedConfidentialityScore +
-            risk.mitigatedIntegrityScore +
-            risk.mitigatedAvailabilityScore
-          : '';
-      const controls = risk.riskControls.map((rc) => rc.control.code).join('; ');
-
-      return [
-        risk.title,
-        risk.riskType || '',
-        risk.owner?.displayName || '',
-        risk.confidentialityScore,
-        risk.integrityScore,
-        risk.availabilityScore,
-        risk.likelihood,
-        riskValue,
-        risk.calculatedScore,
-        risk.riskLevel,
-        risk.initialRiskTreatmentCategory || '',
-        risk.mitigatedConfidentialityScore ?? '',
-        risk.mitigatedIntegrityScore ?? '',
-        risk.mitigatedAvailabilityScore ?? '',
-        risk.mitigatedLikelihood ?? '',
-        mitigatedRiskValue,
-        risk.mitigatedScore ?? '',
-        risk.mitigatedRiskLevel || '',
-        risk.residualRiskTreatmentCategory || '',
-        risk.mitigationImplemented ? 'Yes' : 'No',
-        controls || 'None',
-        risk.dateAdded,
+  const exportToCSV = async () => {
+    setIsExporting(true);
+    try {
+      const headers = [
+        'Title',
+        'Risk Type',
+        'Owner',
+        'C',
+        'I',
+        'A',
+        'L',
+        'Risk (C+I+A)',
+        'Initial Score',
+        'Risk Level',
+        'Initial Treatment',
+        'MC',
+        'MI',
+        'MA',
+        'ML',
+        'Mitigated Risk',
+        'Mitigated Score',
+        'Mitigated Risk Level',
+        'Residual Treatment',
+        'Mitigation Implemented',
+        'Controls',
+        'Date Added',
       ];
-    });
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
-    ].join('\n');
+      const rows = risks.map((risk) => {
+        const riskValue = risk.confidentialityScore + risk.integrityScore + risk.availabilityScore;
+        const mitigatedRiskValue =
+          risk.mitigatedConfidentialityScore !== null &&
+          risk.mitigatedIntegrityScore !== null &&
+          risk.mitigatedAvailabilityScore !== null
+            ? risk.mitigatedConfidentialityScore +
+              risk.mitigatedIntegrityScore +
+              risk.mitigatedAvailabilityScore
+            : '';
+        const controls = risk.riskControls.map((rc) => rc.control.code).join('; ');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `risks_export_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        return [
+          risk.title,
+          risk.riskType || '',
+          risk.owner?.displayName || '',
+          risk.confidentialityScore,
+          risk.integrityScore,
+          risk.availabilityScore,
+          risk.likelihood,
+          riskValue,
+          risk.calculatedScore,
+          risk.riskLevel,
+          risk.initialRiskTreatmentCategory || '',
+          risk.mitigatedConfidentialityScore ?? '',
+          risk.mitigatedIntegrityScore ?? '',
+          risk.mitigatedAvailabilityScore ?? '',
+          risk.mitigatedLikelihood ?? '',
+          mitigatedRiskValue,
+          risk.mitigatedScore ?? '',
+          risk.mitigatedRiskLevel || '',
+          risk.residualRiskTreatmentCategory || '',
+          risk.mitigationImplemented ? 'Yes' : 'No',
+          controls || 'None',
+          risk.dateAdded,
+        ];
+      });
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      const filename = `risks_export_${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export Successful',
+        description: `Exported ${risks.length} risk(s) to ${filename}`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error: any) {
+      console.error('Error exporting CSV:', error);
+      toast({
+        title: 'Export Failed',
+        description: error.message || 'Failed to export risks to CSV',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -472,26 +534,46 @@ export function RisksPage() {
         <Heading size="lg">Risks</Heading>
         <HStack spacing={2}>
           {selectedRiskIds.size > 0 && (
-            <>
-              <Text fontSize="sm" color="gray.600">
-                {selectedRiskIds.size} selected
+            <Box
+              p={3}
+              bg="blue.50"
+              borderRadius="md"
+              borderWidth="1px"
+              borderColor="blue.200"
+              display="flex"
+              alignItems="center"
+              gap={3}
+            >
+              <Text fontSize="sm" fontWeight="medium" color="blue.700">
+                {selectedRiskIds.size} risk{selectedRiskIds.size !== 1 ? 's' : ''} selected
               </Text>
-              <Button
-                colorScheme="red"
-                size="sm"
-                onClick={onBulkDeleteOpen}
-                isDisabled={!isAdminOrEditor}
-              >
-                Delete Selected
-              </Button>
-            </>
+              <HStack spacing={2}>
+                <Button
+                  colorScheme="red"
+                  size="sm"
+                  onClick={onBulkDeleteOpen}
+                  isDisabled={!isAdminOrEditor}
+                >
+                  Delete Selected
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedRiskIds(new Set())}
+                >
+                  Clear Selection
+                </Button>
+              </HStack>
+            </Box>
           )}
           <Button
             leftIcon={<DownloadIcon />}
             size="sm"
             variant="outline"
             onClick={exportToCSV}
-            isDisabled={risks.length === 0}
+            isDisabled={risks.length === 0 || isExporting}
+            isLoading={isExporting}
+            loadingText="Exporting..."
           >
             Export CSV
           </Button>
@@ -623,6 +705,8 @@ export function RisksPage() {
             value={filters.riskType}
             onChange={(e) => setFilters({ ...filters, riskType: e.target.value })}
             width="200px"
+            borderColor={filters.riskType ? 'blue.300' : undefined}
+            borderWidth={filters.riskType ? '2px' : '1px'}
           >
             {RISK_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -636,6 +720,8 @@ export function RisksPage() {
             value={filters.treatmentCategory}
             onChange={(e) => setFilters({ ...filters, treatmentCategory: e.target.value })}
             width="200px"
+            borderColor={filters.treatmentCategory ? 'blue.300' : undefined}
+            borderWidth={filters.treatmentCategory ? '2px' : '1px'}
           >
             {TREATMENT_CATEGORIES.map((cat) => (
               <option key={cat} value={cat}>
@@ -649,6 +735,8 @@ export function RisksPage() {
             value={filters.riskLevel}
             onChange={(e) => setFilters({ ...filters, riskLevel: e.target.value })}
             width="150px"
+            borderColor={filters.riskLevel ? 'blue.300' : undefined}
+            borderWidth={filters.riskLevel ? '2px' : '1px'}
           >
             <option value="LOW">Low</option>
             <option value="MEDIUM">Medium</option>
@@ -660,6 +748,8 @@ export function RisksPage() {
             value={filters.mitigationImplemented}
             onChange={(e) => setFilters({ ...filters, mitigationImplemented: e.target.value })}
             width="180px"
+            borderColor={filters.mitigationImplemented ? 'blue.300' : undefined}
+            borderWidth={filters.mitigationImplemented ? '2px' : '1px'}
           >
             <option value="true">Implemented</option>
             <option value="false">Not Implemented</option>
@@ -819,7 +909,10 @@ export function RisksPage() {
                     <Checkbox
                       isChecked={risks.length > 0 && selectedRiskIds.size === risks.length}
                       isIndeterminate={selectedRiskIds.size > 0 && selectedRiskIds.size < risks.length}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        handleSelectAll(e.target.checked);
+                      }}
                     />
                   </Th>
                 )}
@@ -833,10 +926,34 @@ export function RisksPage() {
                 {visibleColumns.owner && <Th>Owner</Th>}
                 {visibleColumns.cia && (
                   <>
-                    <Th>C</Th>
-                    <Th>I</Th>
-                    <Th>A</Th>
-                    <Th>L</Th>
+                    <Th>
+                      <Tooltip label="Confidentiality - Impact on data confidentiality">
+                        <Text as="span" cursor="help" borderBottom="1px dotted">
+                          C
+                        </Text>
+                      </Tooltip>
+                    </Th>
+                    <Th>
+                      <Tooltip label="Integrity - Impact on data integrity">
+                        <Text as="span" cursor="help" borderBottom="1px dotted">
+                          I
+                        </Text>
+                      </Tooltip>
+                    </Th>
+                    <Th>
+                      <Tooltip label="Availability - Impact on system availability">
+                        <Text as="span" cursor="help" borderBottom="1px dotted">
+                          A
+                        </Text>
+                      </Tooltip>
+                    </Th>
+                    <Th>
+                      <Tooltip label="Likelihood - Probability of risk occurring">
+                        <Text as="span" cursor="help" borderBottom="1px dotted">
+                          L
+                        </Text>
+                      </Tooltip>
+                    </Th>
                   </>
                 )}
                 {visibleColumns.initialScore && (
@@ -871,8 +988,8 @@ export function RisksPage() {
                   key={risk.id}
                   id={`risk-${risk.id}`}
                   bg={getRowBgColor(risk)}
-                  _hover={{ bg: getRowBgColor(risk), opacity: 0.9, cursor: 'pointer' }}
-                  onClick={() => isAdminOrEditor && !selectedRiskIds.has(risk.id) && handleEdit(risk)}
+                  _hover={{ bg: getRowBgColor(risk), opacity: 0.9 }}
+                  cursor={selectedRiskIds.has(risk.id) ? 'default' : 'default'}
                 >
                   {isAdminOrEditor && (
                     <Td onClick={(e) => e.stopPropagation()}>
@@ -902,12 +1019,24 @@ export function RisksPage() {
                     </>
                   )}
                   {visibleColumns.initialScore && (
-                    <Td>
-                      <VStack spacing={1} align="start">
-                        <Badge colorScheme={getScoreColor(risk.calculatedScore)}>
+                    <Td bg={`${getRiskLevelColor(risk.riskLevel)}.50`} px={3} py={2}>
+                      <VStack spacing={1} align="center">
+                        <Badge 
+                          colorScheme={getScoreColor(risk.calculatedScore)} 
+                          fontSize="md" 
+                          px={3} 
+                          py={1}
+                          minW="60px"
+                        >
                           {risk.calculatedScore}
                         </Badge>
-                        <Badge colorScheme={getRiskLevelColor(risk.riskLevel)} size="sm">
+                        <Badge 
+                          colorScheme={getRiskLevelColor(risk.riskLevel)} 
+                          size="md"
+                          px={3}
+                          py={1}
+                          minW="60px"
+                        >
                           {risk.riskLevel}
                         </Badge>
                       </VStack>
@@ -916,18 +1045,55 @@ export function RisksPage() {
                   {visibleColumns.treatment && (
                     <Td>
                       {risk.initialRiskTreatmentCategory ? (
-                        <Badge colorScheme="blue">{risk.initialRiskTreatmentCategory}</Badge>
+                        <Badge 
+                          colorScheme={
+                            risk.initialRiskTreatmentCategory === 'MODIFY' ? 'blue' :
+                            risk.initialRiskTreatmentCategory === 'RETAIN' ? 'green' :
+                            risk.initialRiskTreatmentCategory === 'SHARE' ? 'purple' :
+                            'red'
+                          }
+                          fontSize="sm"
+                          px={3}
+                          py={1}
+                          minW="80px"
+                        >
+                          {risk.initialRiskTreatmentCategory}
+                        </Badge>
                       ) : (
-                        'N/A'
+                        <Text fontSize="xs" color="gray.400" fontStyle="italic">N/A</Text>
                       )}
                     </Td>
                   )}
                   {visibleColumns.mitigatedCIA && (
                     <>
-                      <Td>{risk.mitigatedConfidentialityScore ?? '-'}</Td>
-                      <Td>{risk.mitigatedIntegrityScore ?? '-'}</Td>
-                      <Td>{risk.mitigatedAvailabilityScore ?? '-'}</Td>
-                      <Td>{risk.mitigatedLikelihood ?? '-'}</Td>
+                      <Td>
+                        {risk.mitigatedConfidentialityScore !== null ? (
+                          risk.mitigatedConfidentialityScore
+                        ) : (
+                          <Text as="span" color="gray.400">—</Text>
+                        )}
+                      </Td>
+                      <Td>
+                        {risk.mitigatedIntegrityScore !== null ? (
+                          risk.mitigatedIntegrityScore
+                        ) : (
+                          <Text as="span" color="gray.400">—</Text>
+                        )}
+                      </Td>
+                      <Td>
+                        {risk.mitigatedAvailabilityScore !== null ? (
+                          risk.mitigatedAvailabilityScore
+                        ) : (
+                          <Text as="span" color="gray.400">—</Text>
+                        )}
+                      </Td>
+                      <Td>
+                        {risk.mitigatedLikelihood !== null ? (
+                          risk.mitigatedLikelihood
+                        ) : (
+                          <Text as="span" color="gray.400">—</Text>
+                        )}
+                      </Td>
                     </>
                   )}
                   {visibleColumns.mitigatedScore && (
@@ -960,15 +1126,30 @@ export function RisksPage() {
                   {visibleColumns.controls && (
                     <Td>
                       {risk.riskControls.length > 0 ? (
-                        <Tooltip label={risk.riskControls.map((rc) => rc.control.code).join(', ')}>
-                          <Text fontSize="xs" noOfLines={2} cursor="help">
-                            {risk.riskControls.map((rc) => rc.control.code).join(', ')}
-                          </Text>
-                        </Tooltip>
+                        <HStack spacing={1} flexWrap="wrap">
+                          {risk.riskControls.map((rc) => (
+                            <Tooltip key={rc.control.id} label={rc.control.title}>
+                              <Text
+                                fontSize="xs"
+                                as="a"
+                                href={`/controls/${rc.control.id}`}
+                                color="blue.600"
+                                _hover={{ textDecoration: 'underline', color: 'blue.800' }}
+                                cursor="pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.location.href = `/controls/${rc.control.id}`;
+                                }}
+                              >
+                                {rc.control.code}
+                              </Text>
+                            </Tooltip>
+                          ))}
+                        </HStack>
                       ) : (
-                        <Text fontSize="xs" color="gray.400" fontStyle="italic">
+                        <Badge colorScheme="orange" fontSize="xs" px={2} py={0.5}>
                           No controls
-                        </Text>
+                        </Badge>
                       )}
                     </Td>
                   )}
@@ -1018,6 +1199,8 @@ export function RisksPage() {
                 size="sm"
                 onClick={() => handlePageChange(pagination.page - 1)}
                 isDisabled={pagination.page === 1}
+                opacity={pagination.page === 1 ? 0.4 : 1}
+                cursor={pagination.page === 1 ? 'not-allowed' : 'pointer'}
               >
                 Previous
               </Button>
@@ -1028,6 +1211,8 @@ export function RisksPage() {
                 size="sm"
                 onClick={() => handlePageChange(pagination.page + 1)}
                 isDisabled={pagination.page >= pagination.totalPages}
+                opacity={pagination.page >= pagination.totalPages ? 0.4 : 1}
+                cursor={pagination.page >= pagination.totalPages ? 'not-allowed' : 'pointer'}
               >
                 Next
               </Button>
@@ -1036,7 +1221,13 @@ export function RisksPage() {
         )}
       </Box>
 
-      <RiskFormModal isOpen={isOpen} onClose={handleClose} risk={selectedRisk} />
+      <RiskFormModal 
+        isOpen={isOpen} 
+        onClose={handleClose} 
+        risk={selectedRisk} 
+        isDuplicateMode={isDuplicateMode}
+        viewMode={viewMode}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog

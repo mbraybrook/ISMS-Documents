@@ -16,6 +16,16 @@ const dbPath = dbUrl.replace(/^file:/, '');
 const normalizedPath = path.normalize(dbPath);
 const absoluteDbUrl = `file:${normalizedPath}`;
 
+// SAFEGUARD: Detect nested prisma/prisma paths (common configuration error)
+if (normalizedPath.includes('/prisma/prisma/') || normalizedPath.includes('\\prisma\\prisma\\')) {
+  console.error('[PRISMA] ERROR: Detected nested prisma/prisma path in database URL!');
+  console.error('[PRISMA] This usually happens when DATABASE_URL is not properly resolved.');
+  console.error('[PRISMA] Current path:', normalizedPath);
+  console.error('[PRISMA] SOLUTION: Always use npm run db:* commands (e.g., npm run db:migrate)');
+  console.error('[PRISMA] DO NOT run npx prisma commands directly!');
+  throw new Error('Invalid database path: nested prisma/prisma directory detected. Use npm run db:* commands instead of npx prisma.');
+}
+
 // Verify the database file exists (or can be created)
 const dbDir = path.dirname(normalizedPath);
 if (!fs.existsSync(dbDir)) {

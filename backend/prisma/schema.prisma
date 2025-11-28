@@ -50,6 +50,8 @@ model Document {
   ownerUserId          String
   lastReviewDate       DateTime?
   nextReviewDate       DateTime?
+  requiresAcknowledgement Boolean       @default(false)
+  lastChangedDate      DateTime?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
@@ -137,6 +139,7 @@ model Risk {
   mitigatedLikelihood         Int?
   mitigatedScore              Int?
   mitigationImplemented      Boolean @default(false)
+  mitigationDescription       String?
   residualRiskTreatmentCategory String? // RETAIN, MODIFY, SHARE, AVOID
   
   annexAControlsRaw   String?

@@ -219,7 +219,26 @@ router.get(
   async (req: AuthRequest, res: Response) => {
     try {
       const { siteId, driveId, itemId } = req.query;
+      const accessToken = req.headers['x-graph-token'] as string;
 
+      // Try to get the actual webUrl from SharePoint if we have an access token
+      if (accessToken) {
+        try {
+          const item = await getSharePointItem(
+            accessToken,
+            siteId as string,
+            driveId as string,
+            itemId as string
+          );
+          if (item?.webUrl) {
+            return res.json({ url: item.webUrl });
+          }
+        } catch (error) {
+          console.warn('Could not fetch webUrl from SharePoint, using generated URL:', error);
+        }
+      }
+
+      // Fallback to generated URL
       const url = generateSharePointUrl(
         siteId as string,
         driveId as string,
