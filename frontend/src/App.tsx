@@ -1,0 +1,119 @@
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { AuthProvider } from './contexts/AuthContext'
+import { Layout } from './components/Layout'
+import { ProtectedRoute } from './components/ProtectedRoute'
+import { HomePage } from './pages/HomePage'
+import { LoginPage } from './pages/LoginPage'
+import { ProfilePage } from './pages/ProfilePage'
+import { DocumentsPage } from './pages/DocumentsPage'
+import { AcknowledgmentPage } from './pages/AcknowledgmentPage'
+import { ReviewsPage } from './pages/ReviewsPage'
+import { RisksPage } from './pages/RisksPage'
+import { ControlsPage } from './pages/ControlsPage'
+import { SoAPage } from './pages/SoAPage'
+import { MassImportPage } from './pages/MassImportPage'
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <HomePage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/documents"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <DocumentsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/documents/import"
+            element={
+              <ProtectedRoute requiredRole="EDITOR">
+                <Layout>
+                  <MassImportPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/acknowledgments"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AcknowledgmentPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reviews"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ReviewsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/risks"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <RisksPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/controls"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ControlsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/soa"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <SoAPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ProfilePage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+    </AuthProvider>
+  )
+}
+
+export default App
+
