@@ -167,6 +167,10 @@ export function RiskFormModal({ isOpen, onClose, risk }: RiskFormModalProps) {
   const riskLevel = getRiskLevel(calculatedRiskScore);
   const riskLevelColor = getRiskLevelColor(riskLevel);
 
+  // Get mitigated risk level and color
+  const mitigatedRiskLevel = mitigatedRiskScore !== null ? getRiskLevel(mitigatedRiskScore) : null;
+  const mitigatedRiskLevelColor = mitigatedRiskLevel ? getRiskLevelColor(mitigatedRiskLevel) : 'gray';
+
   // Calculate Mitigated Risk = MC + MI + MA (sum)
   const mitigatedRisk =
     formData.mitigatedConfidentialityScore !== null &&
