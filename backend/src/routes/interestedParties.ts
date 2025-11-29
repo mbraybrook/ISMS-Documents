@@ -88,6 +88,14 @@ router.post(
     body('name').notEmpty().trim(),
     body('group').optional().isString(),
     body('description').optional().isString(),
+    body('dateAdded').optional().isISO8601().toDate(),
+    body('requirements').optional().isString(),
+    body('addressedThroughISMS').optional().isBoolean(),
+    body('howAddressedThroughISMS').optional().isString(),
+    body('sourceLink').optional().isString(),
+    body('keyProductsServices').optional().isString(),
+    body('ourObligations').optional().isString(),
+    body('theirObligations').optional().isString(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -97,6 +105,14 @@ router.post(
           name: req.body.name,
           group: req.body.group,
           description: req.body.description,
+          dateAdded: req.body.dateAdded,
+          requirements: req.body.requirements,
+          addressedThroughISMS: req.body.addressedThroughISMS,
+          howAddressedThroughISMS: req.body.howAddressedThroughISMS,
+          sourceLink: req.body.sourceLink,
+          keyProductsServices: req.body.keyProductsServices,
+          ourObligations: req.body.ourObligations,
+          theirObligations: req.body.theirObligations,
         },
       });
 
@@ -121,17 +137,34 @@ router.put(
     body('name').optional().notEmpty().trim(),
     body('group').optional().isString(),
     body('description').optional().isString(),
+    body('dateAdded').optional().isISO8601().toDate(),
+    body('requirements').optional().isString(),
+    body('addressedThroughISMS').optional().isBoolean(),
+    body('howAddressedThroughISMS').optional().isString(),
+    body('sourceLink').optional().isString(),
+    body('keyProductsServices').optional().isString(),
+    body('ourObligations').optional().isString(),
+    body('theirObligations').optional().isString(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
+      const updateData: any = {};
+      if (req.body.name !== undefined) updateData.name = req.body.name;
+      if (req.body.group !== undefined) updateData.group = req.body.group;
+      if (req.body.description !== undefined) updateData.description = req.body.description;
+      if (req.body.dateAdded !== undefined) updateData.dateAdded = req.body.dateAdded;
+      if (req.body.requirements !== undefined) updateData.requirements = req.body.requirements;
+      if (req.body.addressedThroughISMS !== undefined) updateData.addressedThroughISMS = req.body.addressedThroughISMS;
+      if (req.body.howAddressedThroughISMS !== undefined) updateData.howAddressedThroughISMS = req.body.howAddressedThroughISMS;
+      if (req.body.sourceLink !== undefined) updateData.sourceLink = req.body.sourceLink;
+      if (req.body.keyProductsServices !== undefined) updateData.keyProductsServices = req.body.keyProductsServices;
+      if (req.body.ourObligations !== undefined) updateData.ourObligations = req.body.ourObligations;
+      if (req.body.theirObligations !== undefined) updateData.theirObligations = req.body.theirObligations;
+
       const interestedParty = await prisma.interestedParty.update({
         where: { id: req.params.id },
-        data: {
-          ...(req.body.name && { name: req.body.name }),
-          ...(req.body.group !== undefined && { group: req.body.group }),
-          ...(req.body.description !== undefined && { description: req.body.description }),
-        },
+        data: updateData,
       });
 
       res.json(interestedParty);

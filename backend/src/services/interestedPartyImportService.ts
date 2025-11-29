@@ -102,6 +102,49 @@ function normalizeName(name: string): string {
 }
 
 /**
+ * Convert Yes/No string to boolean
+ */
+function parseYesNo(value: string | undefined): boolean | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'yes' || normalized === 'y' || normalized === 'true') {
+    return true;
+  }
+  if (normalized === 'no' || normalized === 'n' || normalized === 'false') {
+    return false;
+  }
+  return null;
+}
+
+/**
+ * Parse date string to Date object
+ */
+function parseDate(dateStr: string | undefined): Date | null {
+  if (!dateStr || !dateStr.trim()) return null;
+  try {
+    // Try parsing DD/MM/YYYY format (common in CSV)
+    const parts = dateStr.trim().split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+      const year = parseInt(parts[2], 10);
+      const date = new Date(year, month, day);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+    // Try ISO format
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+  } catch (e) {
+    // Ignore parsing errors
+  }
+  return null;
+}
+
+/**
  * Import interested parties from CSV file path or file content
  */
 export async function importInterestedPartiesFromCSV(csvFilePathOrContent: string | Buffer): Promise<ImportResult> {
@@ -124,21 +167,44 @@ export async function importInterestedPartiesFromCSV(csvFilePathOrContent: strin
       rows = parseCSVFromContent(content);
     }
     
-    // Get unique interested parties (by name)
-    const uniqueParties = new Map<string, { name: string; group: string | null }>();
+    // Get unique interested parties (by name), preserving all field data
+    interface PartyData {
+      name: string;
+      group: string | null;
+      dateAdded: Date | null;
+      requirements: string | null;
+      addressedThroughISMS: boolean | null;
+      howAddressedThroughISMS: string | null;
+      sourceLink: string | null;
+      keyProductsServices: string | null;
+      ourObligations: string | null;
+      theirObligations: string | null;
+    }
+    
+    const uniqueParties = new Map<string, PartyData>();
     
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const name = normalizeName(row['Interested party'] || '');
-      const group = (row['Group'] || '').trim() || null;
       
       if (!name) {
         continue; // Skip rows without a name
       }
       
-      // Use the first occurrence's group if multiple rows have the same name
+      // Use the first occurrence's data if multiple rows have the same name
       if (!uniqueParties.has(name)) {
-        uniqueParties.set(name, { name, group });
+        uniqueParties.set(name, {
+          name,
+          group: (row['Group'] || '').trim() || null,
+          dateAdded: parseDate(row['Date Added']),
+          requirements: (row['Requirements'] || '').trim() || null,
+          addressedThroughISMS: parseYesNo(row['Will this be addressed through ISMS: Yes/No?']),
+          howAddressedThroughISMS: (row['How the Requirements will be addressed through the ISMS'] || '').trim() || null,
+          sourceLink: (row['Source/Link to Supporting Information'] || '').trim() || null,
+          keyProductsServices: (row['Key products / services'] || '').trim() || null,
+          ourObligations: (row['Our obligations'] || '').trim() || null,
+          theirObligations: (row['Their obligations'] || '').trim() || null,
+        });
       }
     }
     
@@ -161,7 +227,15 @@ export async function importInterestedPartiesFromCSV(csvFilePathOrContent: strin
           data: {
             name: data.name,
             group: data.group,
-            description: null, // Could be populated from Requirements column if needed
+            description: data.requirements, // Use requirements as description for backward compatibility
+            dateAdded: data.dateAdded,
+            requirements: data.requirements,
+            addressedThroughISMS: data.addressedThroughISMS,
+            howAddressedThroughISMS: data.howAddressedThroughISMS,
+            sourceLink: data.sourceLink,
+            keyProductsServices: data.keyProductsServices,
+            ourObligations: data.ourObligations,
+            theirObligations: data.theirObligations,
           },
         });
         
