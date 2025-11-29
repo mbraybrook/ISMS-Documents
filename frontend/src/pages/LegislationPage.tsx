@@ -16,6 +16,7 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
+  InputRightElement,
   Text,
   IconButton,
   Tooltip,
@@ -41,10 +42,22 @@ import {
   Link,
   Collapse,
   SimpleGrid,
+  Select,
+  Checkbox,
+  Tag,
+  TagLabel,
+  TagCloseButton,
 } from '@chakra-ui/react';
 import { SearchIcon, EditIcon, DeleteIcon, AddIcon, ChevronDownIcon, ChevronUpIcon, DownloadIcon } from '@chakra-ui/icons';
+import { Link as RouterLink } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+
+interface Risk {
+  id: string;
+  externalId: string | null;
+  title: string;
+}
 
 interface Legislation {
   id: string;
@@ -56,6 +69,9 @@ interface Legislation {
   howComplianceAchieved: string | null;
   createdAt: string;
   updatedAt: string;
+  risks?: Array<{
+    risk: Risk;
+  }>;
   _count?: {
     risks: number;
   };
@@ -80,7 +96,13 @@ export function LegislationPage() {
     description: '',
     riskOfNonCompliance: '',
     howComplianceAchieved: '',
+    riskIds: [] as string[],
   });
+  const [allRisks, setAllRisks] = useState<Risk[]>([]);
+  const [loadingRisks, setLoadingRisks] = useState(false);
+  const [riskSearchTerm, setRiskSearchTerm] = useState('');
+  const [suggestedRiskIds, setSuggestedRiskIds] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { isOpen: isImportModalOpen, onOpen: onImportModalOpen, onClose: onImportModalClose } = useDisclosure();
@@ -89,7 +111,71 @@ export function LegislationPage() {
 
   useEffect(() => {
     fetchLegislation();
+    fetchRisks();
   }, []);
+
+  const fetchRisks = async () => {
+    setLoadingRisks(true);
+    try {
+      // Fetch risks with max limit (100) and get all pages if needed
+      let allRisksData: Risk[] = [];
+      let page = 1;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const response = await api.get(`/api/risks?limit=100&page=${page}&archived=false`);
+        // The API returns { data: [...], pagination: {...} }
+        const risks = Array.isArray(response.data.data) 
+          ? response.data.data 
+          : Array.isArray(response.data.risks) 
+          ? response.data.risks 
+          : Array.isArray(response.data) 
+          ? response.data 
+          : [];
+        
+        allRisksData = [...allRisksData, ...risks];
+        
+        // Check if there are more pages
+        const totalPages = response.data.pagination?.totalPages || 1;
+        hasMore = page < totalPages && risks.length > 0;
+        page++;
+        
+        // Safety limit to prevent infinite loops
+        if (page > 50) break;
+      }
+      
+      // Ensure we always set an array
+      setAllRisks(Array.isArray(allRisksData) ? allRisksData : []);
+      console.log(`Loaded ${allRisksData.length} risks`);
+    } catch (error: any) {
+      console.error('Error fetching risks:', error);
+      // If pagination fails, try a single request with max limit
+      try {
+        const response = await api.get('/api/risks?limit=100&page=1&archived=false');
+        const risks = Array.isArray(response.data.data) 
+          ? response.data.data 
+          : Array.isArray(response.data.risks) 
+          ? response.data.risks 
+          : Array.isArray(response.data) 
+          ? response.data 
+          : [];
+        setAllRisks(Array.isArray(risks) ? risks : []);
+        console.log(`Loaded ${risks.length} risks (fallback)`);
+      } catch (fallbackError: any) {
+        console.error('Error fetching risks (fallback):', fallbackError);
+        setAllRisks([]); // Ensure it's always an array
+        toast({
+          title: 'Warning',
+          description: 'Failed to load risks. Risk linking may not be available.',
+          status: 'warning',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } finally {
+      setLoadingRisks(false);
+    }
+  };
 
   useEffect(() => {
     applyFilters();
@@ -99,7 +185,21 @@ export function LegislationPage() {
     try {
       setLoading(true);
       const response = await api.get('/api/legislation');
-      setLegislation(response.data);
+      // Fetch detailed legislation with risks for expanded rows
+      const legislationWithRisks = await Promise.all(
+        response.data.map(async (item: Legislation) => {
+          if (expandedRows.has(item.id)) {
+            try {
+              const detailResponse = await api.get(`/api/legislation/${item.id}`);
+              return detailResponse.data;
+            } catch {
+              return item;
+            }
+          }
+          return item;
+        })
+      );
+      setLegislation(legislationWithRisks);
     } catch (error) {
       console.error('Error fetching legislation:', error);
       toast({
@@ -132,12 +232,21 @@ export function LegislationPage() {
     setFilteredLegislation(filtered);
   };
 
-  const toggleRowExpansion = (legislationId: string) => {
+  const toggleRowExpansion = async (legislationId: string) => {
     const newExpanded = new Set(expandedRows);
     if (newExpanded.has(legislationId)) {
       newExpanded.delete(legislationId);
     } else {
       newExpanded.add(legislationId);
+      // Fetch detailed legislation with risks when expanding
+      try {
+        const response = await api.get(`/api/legislation/${legislationId}`);
+        setLegislation(prev => prev.map(item => 
+          item.id === legislationId ? response.data : item
+        ));
+      } catch (error) {
+        console.error('Error fetching legislation details:', error);
+      }
     }
     setExpandedRows(newExpanded);
   };
@@ -151,20 +260,46 @@ export function LegislationPage() {
       description: '',
       riskOfNonCompliance: '',
       howComplianceAchieved: '',
+      riskIds: [],
     });
+    // Ensure risks are loaded when opening modal
+    if (allRisks.length === 0 && !loadingRisks) {
+      fetchRisks();
+    }
     onOpen();
   };
 
-  const handleEdit = (item: Legislation) => {
+  const handleEdit = async (item: Legislation) => {
     setSelectedLegislation(item);
-    setFormData({
-      dateAdded: item.dateAdded ? new Date(item.dateAdded).toISOString().split('T')[0] : '',
-      interestedParty: item.interestedParty || '',
-      actRegulationRequirement: item.actRegulationRequirement,
-      description: item.description || '',
-      riskOfNonCompliance: item.riskOfNonCompliance || '',
-      howComplianceAchieved: item.howComplianceAchieved || '',
-    });
+    // Ensure risks are loaded when opening modal
+    if (allRisks.length === 0 && !loadingRisks) {
+      fetchRisks();
+    }
+    // Fetch full details including risks
+    try {
+      const response = await api.get(`/api/legislation/${item.id}`);
+      const fullItem = response.data;
+      setFormData({
+        dateAdded: fullItem.dateAdded ? new Date(fullItem.dateAdded).toISOString().split('T')[0] : '',
+        interestedParty: fullItem.interestedParty || '',
+        actRegulationRequirement: fullItem.actRegulationRequirement,
+        description: fullItem.description || '',
+        riskOfNonCompliance: fullItem.riskOfNonCompliance || '',
+        howComplianceAchieved: fullItem.howComplianceAchieved || '',
+        riskIds: fullItem.risks?.map((lr: any) => lr.risk.id) || [],
+      });
+    } catch (error) {
+      console.error('Error fetching legislation details:', error);
+      setFormData({
+        dateAdded: item.dateAdded ? new Date(item.dateAdded).toISOString().split('T')[0] : '',
+        interestedParty: item.interestedParty || '',
+        actRegulationRequirement: item.actRegulationRequirement,
+        description: item.description || '',
+        riskOfNonCompliance: item.riskOfNonCompliance || '',
+        howComplianceAchieved: item.howComplianceAchieved || '',
+        riskIds: [],
+      });
+    }
     onOpen();
   };
 
@@ -181,6 +316,7 @@ export function LegislationPage() {
         description: formData.description || null,
         riskOfNonCompliance: formData.riskOfNonCompliance || null,
         howComplianceAchieved: formData.howComplianceAchieved || null,
+        riskIds: formData.riskIds,
       };
       
       if (formData.dateAdded) {
@@ -207,6 +343,8 @@ export function LegislationPage() {
         });
       }
       onClose();
+      setRiskSearchTerm('');
+      setSuggestedRiskIds([]);
       fetchLegislation();
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to save legislation';
@@ -219,6 +357,79 @@ export function LegislationPage() {
       });
     }
   };
+
+  const toggleRiskSelection = (riskId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      riskIds: prev.riskIds.includes(riskId)
+        ? prev.riskIds.filter(id => id !== riskId)
+        : [...prev.riskIds, riskId],
+    }));
+  };
+
+  const getSuggestedRisks = async () => {
+    if (!formData.riskOfNonCompliance && !formData.actRegulationRequirement) {
+      toast({
+        title: 'No content to analyze',
+        description: 'Please fill in "Risk of Non-Compliance" or "Act / Regulation / Requirement" to get suggestions',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    setLoadingSuggestions(true);
+    try {
+      const response = await api.post('/api/legislation/suggest-risks', {
+        riskOfNonCompliance: formData.riskOfNonCompliance,
+        actRegulationRequirement: formData.actRegulationRequirement,
+        description: formData.description,
+      });
+      const suggestedIds = response.data.suggestedRiskIds || [];
+      setSuggestedRiskIds(suggestedIds);
+      
+      // Auto-select suggested risks that aren't already selected
+      setFormData(prev => ({
+        ...prev,
+        riskIds: [...new Set([...prev.riskIds, ...suggestedIds])],
+      }));
+      
+      toast({
+        title: 'Suggestions generated',
+        description: `Found ${suggestedIds.length} relevant risks and added them to your selection`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error: any) {
+      console.error('Error getting risk suggestions:', error);
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to get risk suggestions',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const filteredRisks = React.useMemo(() => {
+    if (!riskSearchTerm.trim()) {
+      return allRisks.filter(risk => !formData.riskIds.includes(risk.id)).slice(0, 10);
+    }
+    const searchLower = riskSearchTerm.toLowerCase();
+    return allRisks
+      .filter(
+        (risk) =>
+          !formData.riskIds.includes(risk.id) &&
+          (risk.externalId?.toLowerCase().includes(searchLower) ||
+            risk.title.toLowerCase().includes(searchLower))
+      )
+      .slice(0, 10);
+  }, [allRisks, riskSearchTerm, formData.riskIds]);
 
   const handleConfirmDelete = async () => {
     if (!legislationToDelete) return;
@@ -473,6 +684,43 @@ export function LegislationPage() {
                                     </Text>
                                   </Box>
                                 )}
+                                {item.risks && item.risks.length > 0 && (
+                                  <Box gridColumn={{ base: 1, md: 'span 2' }}>
+                                    <Text fontWeight="semibold" fontSize="sm" color="gray.600" mb={2}>
+                                      Linked Risks ({item.risks.length})
+                                    </Text>
+                                    <VStack align="stretch" spacing={2}>
+                                      {item.risks.map((lr) => (
+                                        <Box
+                                          key={lr.risk.id}
+                                          p={2}
+                                          bg="white"
+                                          borderRadius="md"
+                                          border="1px"
+                                          borderColor="blue.200"
+                                        >
+                                          <Link
+                                            as={RouterLink}
+                                            to="/risks/risks"
+                                            onClick={() => {
+                                              sessionStorage.setItem('highlightRiskId', lr.risk.id);
+                                            }}
+                                            style={{ textDecoration: 'none' }}
+                                          >
+                                            <HStack spacing={2}>
+                                              <Badge colorScheme="blue" fontSize="xs">
+                                                {lr.risk.externalId || 'Risk'}
+                                              </Badge>
+                                              <Text fontSize="sm" fontWeight="medium" color="blue.700" _hover={{ textDecoration: "underline" }}>
+                                                {lr.risk.title}
+                                              </Text>
+                                            </HStack>
+                                          </Link>
+                                        </Box>
+                                      ))}
+                                    </VStack>
+                                  </Box>
+                                )}
                               </SimpleGrid>
                             </Box>
                           </Collapse>
@@ -488,7 +736,7 @@ export function LegislationPage() {
       )}
 
       {/* Create/Edit Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} size="xl">
+      <Modal isOpen={isOpen} onClose={onClose} size="6xl">
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>
@@ -547,6 +795,116 @@ export function LegislationPage() {
                   placeholder="Describe how compliance is achieved"
                   rows={4}
                 />
+              </FormControl>
+              <FormControl>
+                <FormLabel>Linked Risks</FormLabel>
+                <VStack align="stretch" spacing={3}>
+                  {/* Search input */}
+                  <InputGroup>
+                    <InputLeftElement pointerEvents="none">
+                      <SearchIcon color="gray.300" />
+                    </InputLeftElement>
+                    <Input
+                      placeholder="Search risks by ID or title..."
+                      value={riskSearchTerm}
+                      onChange={(e) => setRiskSearchTerm(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && filteredRisks.length > 0) {
+                          toggleRiskSelection(filteredRisks[0].id);
+                          setRiskSearchTerm('');
+                        }
+                      }}
+                    />
+                    <InputRightElement width="auto" mr={2}>
+                      <Button
+                        size="xs"
+                        colorScheme="purple"
+                        onClick={getSuggestedRisks}
+                        isLoading={loadingSuggestions}
+                        loadingText="..."
+                      >
+                        AI Suggest
+                      </Button>
+                    </InputRightElement>
+                  </InputGroup>
+
+                  {/* Search results dropdown */}
+                  {riskSearchTerm && filteredRisks.length > 0 && (
+                    <Box
+                      borderWidth="1px"
+                      borderRadius="md"
+                      p={2}
+                      maxH="200px"
+                      overflowY="auto"
+                      bg="white"
+                      borderColor="gray.300"
+                    >
+                      <VStack align="stretch" spacing={1}>
+                        {filteredRisks.map((risk) => (
+                          <Box
+                            key={risk.id}
+                            p={2}
+                            _hover={{ bg: 'blue.50', cursor: 'pointer' }}
+                            onClick={() => {
+                              toggleRiskSelection(risk.id);
+                              setRiskSearchTerm('');
+                            }}
+                            borderLeft="3px solid"
+                            borderColor="blue.200"
+                          >
+                            <HStack spacing={2}>
+                              {risk.externalId && (
+                                <Badge colorScheme="blue" fontSize="xs">
+                                  {risk.externalId}
+                                </Badge>
+                              )}
+                              <Text fontSize="sm" fontWeight="medium">
+                                {risk.title}
+                              </Text>
+                            </HStack>
+                          </Box>
+                        ))}
+                      </VStack>
+                    </Box>
+                  )}
+
+                  {/* Selected risks */}
+                  {formData.riskIds.length > 0 && (
+                    <Box>
+                      <Text fontSize="sm" color="gray.600" mb={2} fontWeight="semibold">
+                        Selected Risks ({formData.riskIds.length}):
+                      </Text>
+                      <HStack spacing={2} flexWrap="wrap">
+                        {formData.riskIds.map((riskId) => {
+                          const risk = allRisks.find(r => r.id === riskId);
+                          if (!risk) return null;
+                          return (
+                            <Tag key={riskId} colorScheme="blue" size="md">
+                              <TagLabel>
+                                {risk.externalId && `${risk.externalId}: `}
+                                {risk.title}
+                              </TagLabel>
+                              <TagCloseButton onClick={() => toggleRiskSelection(riskId)} />
+                            </Tag>
+                          );
+                        })}
+                      </HStack>
+                    </Box>
+                  )}
+
+                  {/* AI Suggestions indicator */}
+                  {suggestedRiskIds.length > 0 && (
+                    <Box p={2} bg="purple.50" borderRadius="md" border="1px" borderColor="purple.200">
+                      <Text fontSize="xs" color="purple.700">
+                        💡 {suggestedRiskIds.length} AI-suggested risk{suggestedRiskIds.length !== 1 ? 's' : ''} based on your "Risk of Non-Compliance" text
+                      </Text>
+                    </Box>
+                  )}
+
+                  {loadingRisks && (
+                    <Text color="gray.500" fontSize="sm">Loading risks...</Text>
+                  )}
+                </VStack>
               </FormControl>
             </VStack>
           </ModalBody>

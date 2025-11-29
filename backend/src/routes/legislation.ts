@@ -53,13 +53,16 @@ router.get(
         where: { id: req.params.id },
         include: {
           risks: {
-            take: 10,
-            orderBy: { dateAdded: 'desc' },
-            select: {
-              id: true,
-              title: true,
-              dateAdded: true,
-              calculatedScore: true,
+            include: {
+              risk: {
+                select: {
+                  id: true,
+                  externalId: true,
+                  title: true,
+                  dateAdded: true,
+                  calculatedScore: true,
+                },
+              },
             },
           },
           _count: {
@@ -287,6 +290,140 @@ router.post(
     } catch (error: any) {
       console.error('Error importing legislation:', error);
       res.status(500).json({ error: error.message || 'Failed to import legislation' });
+    }
+  }
+);
+
+// POST /api/legislation/suggest-risks - AI-based risk suggestions based on risk of non-compliance
+router.post(
+  '/suggest-risks',
+  authenticateToken,
+  [
+    body('riskOfNonCompliance').notEmpty().isString(),
+    body('actRegulationRequirement').optional().isString(),
+    body('description').optional().isString(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { riskOfNonCompliance, actRegulationRequirement, description } = req.body;
+
+      // Combine all text fields for analysis
+      const combinedText = [
+        riskOfNonCompliance || '',
+        actRegulationRequirement || '',
+        description || '',
+      ]
+        .filter((text) => text.trim().length > 0)
+        .join(' ')
+        .toLowerCase();
+
+      if (combinedText.length === 0) {
+        return res.status(400).json({ error: 'No text provided for analysis' });
+      }
+
+      // Get all risks
+      const allRisks = await prisma.risk.findMany({
+        where: {
+          archived: false,
+        },
+        select: {
+          id: true,
+          externalId: true,
+          title: true,
+          description: true,
+          threatDescription: true,
+          riskCategory: true,
+        },
+      });
+
+      // Simple keyword-based matching (can be enhanced with AI/ML later)
+      const suggestedRiskIds: string[] = [];
+
+      for (const risk of allRisks) {
+        let score = 0;
+        const riskText = [
+          risk.externalId || '',
+          risk.title || '',
+          risk.description || '',
+          risk.threatDescription || '',
+          risk.riskCategory || '',
+        ]
+          .join(' ')
+          .toLowerCase();
+
+        // Check if risk external ID appears in text
+        if (risk.externalId && combinedText.includes(risk.externalId.toLowerCase())) {
+          score += 10;
+        }
+
+        // Check for keyword matches in title
+        if (risk.title) {
+          const titleWords = risk.title.toLowerCase().split(/\s+/).filter((word) => word.length > 4);
+          for (const word of titleWords) {
+            if (combinedText.includes(word)) {
+              score += 2;
+            }
+          }
+        }
+
+        // Check for common compliance and security terms
+        const complianceTerms = [
+          'compliance',
+          'breach',
+          'violation',
+          'penalty',
+          'fine',
+          'legal',
+          'regulatory',
+          'data protection',
+          'privacy',
+          'security',
+          'risk',
+          'non-compliance',
+          'contract',
+          'termination',
+          'reputation',
+          'financial',
+          'operational',
+          'information security',
+          'access control',
+          'encryption',
+          'audit',
+          'monitoring',
+        ];
+
+        for (const term of complianceTerms) {
+          if (combinedText.includes(term) && riskText.includes(term)) {
+            score += 3;
+          }
+        }
+
+        // Check for category matches
+        if (risk.riskCategory) {
+          const categoryLower = risk.riskCategory.toLowerCase();
+          if (combinedText.includes(categoryLower)) {
+            score += 5;
+          }
+        }
+
+        // If score is high enough, suggest this risk
+        if (score >= 3) {
+          suggestedRiskIds.push(risk.id);
+        }
+      }
+
+      // Sort by score (we'll use the order they were found, but could enhance with actual scoring)
+      // Limit to top 10 suggestions
+      const limitedSuggestions = suggestedRiskIds.slice(0, 10);
+
+      res.json({
+        suggestedRiskIds: limitedSuggestions,
+        totalMatches: suggestedRiskIds.length,
+      });
+    } catch (error) {
+      console.error('Error suggesting risks:', error);
+      res.status(500).json({ error: 'Failed to generate risk suggestions' });
     }
   }
 );

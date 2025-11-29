@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
 import multer from 'multer';
 import * as fs from 'fs';
+import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -31,6 +32,12 @@ router.get(
           },
         },
       });
+
+      // Add createdBy and updatedBy info if available (from User relation if added later)
+      const partiesWithAudit = interestedParties.map(party => ({
+        ...party,
+        // createdAt and updatedAt are already included from the model
+      }));
 
       res.json(interestedParties);
     } catch (error) {
@@ -100,20 +107,28 @@ router.post(
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
+      // Build data object, excluding undefined values
+      const data: any = {
+        id: randomUUID(),
+        name: req.body.name,
+        updatedAt: new Date(),
+        // Auto-populate dateAdded with current date if not provided
+        dateAdded: req.body.dateAdded ? new Date(req.body.dateAdded) : new Date(),
+      };
+
+      if (req.body.group !== undefined) data.group = req.body.group || null;
+      if (req.body.description !== undefined) data.description = req.body.description || null;
+      if (req.body.requirements !== undefined) data.requirements = req.body.requirements || null;
+      // Always set boolean explicitly, even if false
+      data.addressedThroughISMS = req.body.addressedThroughISMS === true || req.body.addressedThroughISMS === 'true';
+      if (req.body.howAddressedThroughISMS !== undefined) data.howAddressedThroughISMS = req.body.howAddressedThroughISMS || null;
+      if (req.body.sourceLink !== undefined) data.sourceLink = req.body.sourceLink || null;
+      if (req.body.keyProductsServices !== undefined) data.keyProductsServices = req.body.keyProductsServices || null;
+      if (req.body.ourObligations !== undefined) data.ourObligations = req.body.ourObligations || null;
+      if (req.body.theirObligations !== undefined) data.theirObligations = req.body.theirObligations || null;
+
       const interestedParty = await prisma.interestedParty.create({
-        data: {
-          name: req.body.name,
-          group: req.body.group,
-          description: req.body.description,
-          dateAdded: req.body.dateAdded,
-          requirements: req.body.requirements,
-          addressedThroughISMS: req.body.addressedThroughISMS,
-          howAddressedThroughISMS: req.body.howAddressedThroughISMS,
-          sourceLink: req.body.sourceLink,
-          keyProductsServices: req.body.keyProductsServices,
-          ourObligations: req.body.ourObligations,
-          theirObligations: req.body.theirObligations,
-        },
+        data,
       });
 
       res.status(201).json(interestedParty);
@@ -149,18 +164,23 @@ router.put(
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
-      const updateData: any = {};
+      const updateData: any = {
+        updatedAt: new Date(),
+      };
       if (req.body.name !== undefined) updateData.name = req.body.name;
-      if (req.body.group !== undefined) updateData.group = req.body.group;
-      if (req.body.description !== undefined) updateData.description = req.body.description;
-      if (req.body.dateAdded !== undefined) updateData.dateAdded = req.body.dateAdded;
-      if (req.body.requirements !== undefined) updateData.requirements = req.body.requirements;
-      if (req.body.addressedThroughISMS !== undefined) updateData.addressedThroughISMS = req.body.addressedThroughISMS;
-      if (req.body.howAddressedThroughISMS !== undefined) updateData.howAddressedThroughISMS = req.body.howAddressedThroughISMS;
-      if (req.body.sourceLink !== undefined) updateData.sourceLink = req.body.sourceLink;
-      if (req.body.keyProductsServices !== undefined) updateData.keyProductsServices = req.body.keyProductsServices;
-      if (req.body.ourObligations !== undefined) updateData.ourObligations = req.body.ourObligations;
-      if (req.body.theirObligations !== undefined) updateData.theirObligations = req.body.theirObligations;
+      if (req.body.group !== undefined) updateData.group = req.body.group || null;
+      if (req.body.description !== undefined) updateData.description = req.body.description || null;
+      if (req.body.dateAdded !== undefined) updateData.dateAdded = req.body.dateAdded ? new Date(req.body.dateAdded) : null;
+      if (req.body.requirements !== undefined) updateData.requirements = req.body.requirements || null;
+      // Always set boolean explicitly, even if false
+      if (req.body.addressedThroughISMS !== undefined) {
+        updateData.addressedThroughISMS = req.body.addressedThroughISMS === true || req.body.addressedThroughISMS === 'true';
+      }
+      if (req.body.howAddressedThroughISMS !== undefined) updateData.howAddressedThroughISMS = req.body.howAddressedThroughISMS || null;
+      if (req.body.sourceLink !== undefined) updateData.sourceLink = req.body.sourceLink || null;
+      if (req.body.keyProductsServices !== undefined) updateData.keyProductsServices = req.body.keyProductsServices || null;
+      if (req.body.ourObligations !== undefined) updateData.ourObligations = req.body.ourObligations || null;
+      if (req.body.theirObligations !== undefined) updateData.theirObligations = req.body.theirObligations || null;
 
       const interestedParty = await prisma.interestedParty.update({
         where: { id: req.params.id },
