@@ -15,6 +15,7 @@ import { MassImportPage } from './pages/MassImportPage'
 import { AssetsPage } from './pages/AssetsPage'
 import { AssetCategoriesPage } from './pages/AssetCategoriesPage'
 import { InterestedPartiesPage } from './pages/InterestedPartiesPage'
+import { LegislationPage } from './pages/LegislationPage'
 
 function App() {
   return (
@@ -128,6 +129,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <InterestedPartiesPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/risks/legislation"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <LegislationPage />
                 </Layout>
               </ProtectedRoute>
             }

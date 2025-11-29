@@ -157,16 +157,40 @@ model DocumentRisk {
 }
 
 model InterestedParty {
-  id          String   @id
-  name        String   @unique
-  group       String?
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-  risks       Risk[]
+  id                      String   @id
+  name                    String   @unique
+  group                   String?
+  description             String?
+  dateAdded               DateTime?
+  requirements            String?
+  addressedThroughISMS    Boolean?
+  howAddressedThroughISMS String?
+  sourceLink              String?
+  keyProductsServices     String?
+  ourObligations          String?
+  theirObligations        String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime
+  risks                   Risk[]
 
   @@index([group])
   @@index([name])
+}
+
+model Legislation {
+  id                    String          @id
+  dateAdded             DateTime?
+  interestedParty       String?
+  actRegulationRequirement String
+  description           String?
+  riskOfNonCompliance   String?
+  howComplianceAchieved String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime
+  risks                 LegislationRisk[]
+
+  @@index([actRegulationRequirement])
+  @@index([interestedParty])
 }
 
 model ReviewTask {
@@ -231,6 +255,7 @@ model Risk {
   asset                         Asset?          @relation(fields: [assetId], references: [id])
   owner                         User?           @relation("RiskOwner", fields: [ownerUserId], references: [id])
   riskControls                  RiskControl[]
+  legislationRisks              LegislationRisk[]
 
   @@index([interestedPartyId])
   @@index([assetCategoryId])
@@ -257,6 +282,17 @@ model RiskControl {
   @@id([riskId, controlId])
   @@index([controlId])
   @@index([riskId])
+}
+
+model LegislationRisk {
+  legislationId String
+  riskId        String
+  legislation   Legislation @relation(fields: [legislationId], references: [id], onDelete: Cascade)
+  risk          Risk        @relation(fields: [riskId], references: [id], onDelete: Cascade)
+
+  @@id([legislationId, riskId])
+  @@index([riskId])
+  @@index([legislationId])
 }
 
 model SoAExport {
