@@ -101,6 +101,13 @@ export const config = {
     username: process.env.CONFLUENCE_USERNAME || '',
     apiToken: process.env.CONFLUENCE_API_TOKEN || '',
   },
+  // LLM configuration for similarity analysis
+  llm: {
+    provider: process.env.LLM_PROVIDER || 'ollama',
+    baseUrl: process.env.LLM_BASE_URL || 'http://localhost:11434',
+    model: process.env.LLM_MODEL || 'llama2',
+    similarityThreshold: parseFloat(process.env.LLM_SIMILARITY_THRESHOLD || '70'),
+  },
 };
 
 // Log config on startup to verify env vars are loaded (in development only)

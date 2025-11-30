@@ -53,6 +53,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
     selectedForLegalRequirement: false,
     selectedForBusinessRequirement: false,
     justification: '',
+    implemented: false,
   });
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -71,6 +72,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
         selectedForLegalRequirement: control.selectedForLegalRequirement || false,
         selectedForBusinessRequirement: control.selectedForBusinessRequirement || false,
         justification: control.justification || '',
+        implemented: control.implemented || false,
       });
     } else {
       setFormData({
@@ -83,6 +85,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
         selectedForLegalRequirement: false,
         selectedForBusinessRequirement: false,
         justification: '',
+        implemented: false,
       });
     }
     setErrors({});
@@ -126,6 +129,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
           selectedForLegalRequirement: formData.selectedForLegalRequirement,
           selectedForBusinessRequirement: formData.selectedForBusinessRequirement,
           justification: formData.justification || null,
+          implemented: formData.implemented,
         };
       } else {
         // For custom controls, send all fields
@@ -500,6 +504,22 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                 >
                   Business Requirement/Best Practice
                 </Checkbox>
+              </FormControl>
+
+              <Divider />
+
+              <FormControl>
+                <Checkbox
+                  isChecked={formData.implemented}
+                  onChange={(e) =>
+                    setFormData({ ...formData, implemented: e.target.checked })
+                  }
+                >
+                  Implemented
+                </Checkbox>
+                <Box fontSize="sm" color="gray.600" mt={1} ml={6}>
+                  Mark this control as implemented
+                </Box>
               </FormControl>
 
               <FormControl>

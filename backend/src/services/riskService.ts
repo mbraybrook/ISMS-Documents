@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { prisma } from '../lib/prisma';
 
 /**
@@ -78,6 +79,7 @@ export async function updateRiskControls(riskId: string, controlCodes: string[])
         // Create control if it doesn't exist
         control = await prisma.control.create({
           data: {
+            id: randomUUID(),
             code,
             title: `Control ${code}`,
             description: `Annex A Control ${code}`,
@@ -85,6 +87,7 @@ export async function updateRiskControls(riskId: string, controlCodes: string[])
             selectedForContractualObligation: false,
             selectedForLegalRequirement: false,
             selectedForBusinessRequirement: false,
+            updatedAt: new Date(),
           },
         });
       }
@@ -100,12 +103,16 @@ export async function updateRiskControls(riskId: string, controlCodes: string[])
 
   // Create new associations
   if (controls.length > 0) {
-    await prisma.riskControl.createMany({
-      data: controls.map((control) => ({
-        riskId,
-        controlId: control.id,
-      })),
-    });
+    await Promise.all(
+      controls.map((control) =>
+        prisma.riskControl.create({
+          data: {
+            riskId,
+            controlId: control.id,
+          },
+        })
+      )
+    );
   }
 
   // Update control applicability
@@ -118,22 +125,19 @@ export async function updateRiskControls(riskId: string, controlCodes: string[])
  * is linked to any risks
  */
 export async function updateControlApplicability() {
-  // Get all controls
-  const controls = await prisma.control.findMany();
-
-  for (const control of controls) {
-    // Check if control is referenced by any risk
-    const riskCount = await prisma.riskControl.count({
-      where: { controlId: control.id },
-    });
-
-    // Automatically update Risk Assessment reason based on risk relationships
-    await prisma.control.update({
-      where: { id: control.id },
-      data: {
-        selectedForRiskAssessment: riskCount > 0,
-      },
-    });
-  }
+  // Optimize: Use a single raw SQL query to update all controls at once
+  // This sets selectedForRiskAssessment to true if the control is referenced in RiskControl, false otherwise
+  // SQLite syntax used here matches the project's database
+  await prisma.$executeRaw`
+    UPDATE Control
+    SET selectedForRiskAssessment = (
+      CASE 
+        WHEN EXISTS (
+          SELECT 1 FROM RiskControl WHERE RiskControl.controlId = Control.id
+        ) THEN 1 
+        ELSE 0 
+      END
+    )
+  `;
 }
 

@@ -17,6 +17,7 @@ import assetCategoriesRouter from './routes/assetCategories';
 import assetsRouter from './routes/assets';
 import interestedPartiesRouter from './routes/interestedParties';
 import legislationRouter from './routes/legislation';
+import { dashboardRouter } from './routes/dashboard';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -42,6 +43,7 @@ app.use('/api/asset-categories', assetCategoriesRouter);
 app.use('/api/assets', assetsRouter);
 app.use('/api/interested-parties', interestedPartiesRouter);
 app.use('/api/legislation', legislationRouter);
+app.use('/api/dashboard', dashboardRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);

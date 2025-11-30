@@ -88,6 +88,7 @@ model Control {
   otherInformation                 String?
   category                         String?
   isStandardControl                Boolean           @default(false)
+  implemented                      Boolean           @default(false)
   createdAt                        DateTime          @default(now())
   updatedAt                        DateTime
   documentControls                 DocumentControl[]
@@ -100,6 +101,7 @@ model Control {
   @@index([isStandardControl])
   @@index([category])
   @@index([code])
+  @@index([implemented])
 }
 
 model Document {

@@ -1,0 +1,396 @@
+import { Router, Response } from 'express';
+import { AuthRequest, authenticateToken } from '../middleware/auth';
+import { prisma } from '../lib/prisma';
+import { getRiskLevel } from '../services/riskService';
+
+const router = Router();
+
+// GET /api/dashboard - comprehensive dashboard statistics
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
+
+    // Get current user for acknowledgment stats
+    const user = req.user ? await prisma.user.findUnique({
+      where: { email: req.user.email || '' },
+    }) : null;
+
+    // ===== DOCUMENT STATISTICS =====
+    // Overdue documents
+    const overdueDocuments = await prisma.document.findMany({
+      where: {
+        nextReviewDate: {
+          lt: now,
+        },
+        status: { in: ['APPROVED', 'IN_REVIEW'] },
+        ReviewTask: {
+          none: {
+            status: { in: ['PENDING', 'OVERDUE'] },
+          },
+        },
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        nextReviewDate: 'asc',
+      },
+      take: 10,
+    });
+
+    // Upcoming documents (next 30 days)
+    const upcomingDocuments = await prisma.document.findMany({
+      where: {
+        nextReviewDate: {
+          gte: now,
+          lte: thirtyDaysFromNow,
+        },
+        status: { in: ['APPROVED', 'IN_REVIEW'] },
+        ReviewTask: {
+          none: {
+            status: { in: ['PENDING', 'OVERDUE'] },
+          },
+        },
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        nextReviewDate: 'asc',
+      },
+      take: 10,
+    });
+
+    // Documents missing review dates
+    const documentsMissingReviewDate = await prisma.document.findMany({
+      where: {
+        nextReviewDate: null,
+        status: { in: ['APPROVED', 'IN_REVIEW'] },
+        ReviewTask: {
+          none: {
+            status: { in: ['PENDING', 'OVERDUE'] },
+          },
+        },
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+      take: 10,
+    });
+
+    // Overdue review tasks
+    const overdueReviewTasks = await prisma.reviewTask.findMany({
+      where: {
+        dueDate: {
+          lt: now,
+        },
+        status: { in: ['PENDING', 'OVERDUE'] },
+      },
+      include: {
+        document: {
+          select: {
+            id: true,
+            title: true,
+            version: true,
+            type: true,
+          },
+        },
+        reviewer: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        dueDate: 'asc',
+      },
+      take: 10,
+    });
+
+    // Documents by status
+    const documentsByStatus = await prisma.document.groupBy({
+      by: ['status'],
+      _count: true,
+    });
+
+    // ===== RISK STATISTICS =====
+    // Get all non-archived risks
+    const allRisks = await prisma.risk.findMany({
+      where: {
+        archived: false,
+      },
+      select: {
+        id: true,
+        title: true,
+        externalId: true,
+        calculatedScore: true,
+        mitigatedScore: true,
+        mitigationImplemented: true,
+        initialRiskTreatmentCategory: true,
+        residualRiskTreatmentCategory: true,
+      },
+    });
+
+    // Calculate risk statistics
+    let totalRiskScore = 0;
+    let implementedMitigationRiskScore = 0;
+    let nonImplementedMitigationRiskScore = 0;
+    const risksByLevel: { LOW: number; MEDIUM: number; HIGH: number } = { LOW: 0, MEDIUM: 0, HIGH: 0 };
+    const mitigatedRisksByLevel: { LOW: number; MEDIUM: number; HIGH: number } = { LOW: 0, MEDIUM: 0, HIGH: 0 };
+    const risksWithMitigationNotImplemented: Array<{
+      id: string;
+      title: string;
+      externalId: string | null;
+      calculatedScore: number;
+      mitigatedScore: number | null;
+    }> = [];
+    const risksByTreatmentCategory: { [key: string]: number } = {};
+
+    allRisks.forEach((risk) => {
+      // Total risk score
+      totalRiskScore += risk.calculatedScore;
+
+      // Risk levels
+      const riskLevel = getRiskLevel(risk.calculatedScore);
+      risksByLevel[riskLevel]++;
+
+      // Mitigated scores
+      if (risk.mitigatedScore !== null) {
+        if (risk.mitigationImplemented) {
+          implementedMitigationRiskScore += risk.mitigatedScore;
+        } else {
+          nonImplementedMitigationRiskScore += risk.mitigatedScore;
+          risksWithMitigationNotImplemented.push({
+            id: risk.id,
+            title: risk.title,
+            externalId: risk.externalId,
+            calculatedScore: risk.calculatedScore,
+            mitigatedScore: risk.mitigatedScore,
+          });
+        }
+
+        // Mitigated risk levels
+        const mitigatedLevel = getRiskLevel(risk.mitigatedScore);
+        mitigatedRisksByLevel[mitigatedLevel]++;
+      }
+
+      // Treatment categories
+      const treatmentCategory = risk.residualRiskTreatmentCategory || risk.initialRiskTreatmentCategory || 'UNCATEGORIZED';
+      risksByTreatmentCategory[treatmentCategory] = (risksByTreatmentCategory[treatmentCategory] || 0) + 1;
+    });
+
+    // Risk score delta
+    const riskScoreDelta = totalRiskScore - (implementedMitigationRiskScore + nonImplementedMitigationRiskScore);
+
+    // ===== CONTROL STATISTICS =====
+    // Get all controls
+    const allControls = await prisma.control.findMany({
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        selectedForRiskAssessment: true,
+        selectedForContractualObligation: true,
+        selectedForLegalRequirement: true,
+        selectedForBusinessRequirement: true,
+        implemented: true,
+      },
+    });
+
+    // Calculate control statistics
+    let selectedControlsCount = 0;
+    let excludedControlsCount = 0;
+    let selectedButNotImplementedCount = 0;
+    const controlsBySelectionReason = {
+      riskAssessment: 0,
+      contractualObligation: 0,
+      legalRequirement: 0,
+      businessRequirement: 0,
+    };
+    const selectedButNotImplementedControls: Array<{
+      id: string;
+      code: string;
+      title: string;
+    }> = [];
+
+    allControls.forEach((control) => {
+      const isSelected =
+        control.selectedForRiskAssessment ||
+        control.selectedForContractualObligation ||
+        control.selectedForLegalRequirement ||
+        control.selectedForBusinessRequirement;
+
+      if (isSelected) {
+        selectedControlsCount++;
+        if (!control.implemented) {
+          selectedButNotImplementedCount++;
+          selectedButNotImplementedControls.push({
+            id: control.id,
+            code: control.code,
+            title: control.title,
+          });
+        }
+      } else {
+        excludedControlsCount++;
+      }
+
+      // Selection reason breakdown
+      if (control.selectedForRiskAssessment) controlsBySelectionReason.riskAssessment++;
+      if (control.selectedForContractualObligation) controlsBySelectionReason.contractualObligation++;
+      if (control.selectedForLegalRequirement) controlsBySelectionReason.legalRequirement++;
+      if (control.selectedForBusinessRequirement) controlsBySelectionReason.businessRequirement++;
+    });
+
+    // ===== ACKNOWLEDGMENT STATISTICS =====
+    let pendingAcknowledgments: any[] = [];
+    let acknowledgmentStats: any = null;
+
+    if (user) {
+      // Get documents requiring acknowledgment
+      const approvedDocuments = await prisma.document.findMany({
+        where: {
+          status: 'APPROVED',
+          requiresAcknowledgement: true,
+        },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      // Get user's latest acknowledgments
+      const userAcknowledgments = await prisma.acknowledgment.findMany({
+        where: {
+          userId: user.id,
+        },
+        orderBy: {
+          acknowledgedAt: 'desc',
+        },
+      });
+
+      // Create a map of documentId -> latest acknowledgment version
+      const acknowledgmentMap = new Map<string, string>();
+      userAcknowledgments.forEach((ack) => {
+        const existing = acknowledgmentMap.get(ack.documentId);
+        if (!existing || ack.documentVersion > existing) {
+          acknowledgmentMap.set(ack.documentId, ack.documentVersion);
+        }
+      });
+
+      // Filter documents that need acknowledgment
+      pendingAcknowledgments = approvedDocuments
+        .filter((doc) => {
+          const lastAcknowledgedVersion = acknowledgmentMap.get(doc.id);
+          return !lastAcknowledgedVersion || doc.version !== lastAcknowledgedVersion;
+        })
+        .slice(0, 10);
+
+      // Overall acknowledgment statistics
+      const totalStaffUsers = await prisma.user.count({
+        where: {
+          role: 'STAFF',
+        },
+      });
+
+      const acknowledgmentCompletionPromises = approvedDocuments.map(async (doc) => {
+        const acknowledgments = await prisma.acknowledgment.count({
+          where: {
+            documentId: doc.id,
+            documentVersion: doc.version,
+          },
+        });
+
+        return {
+          documentId: doc.id,
+          documentTitle: doc.title,
+          documentVersion: doc.version,
+          acknowledgedCount: acknowledgments,
+          totalStaffCount: totalStaffUsers,
+          completionPercentage: totalStaffUsers > 0 ? (acknowledgments / totalStaffUsers) * 100 : 0,
+        };
+      });
+
+      const acknowledgmentCompletion = await Promise.all(acknowledgmentCompletionPromises);
+
+      acknowledgmentStats = {
+        totalDocumentsRequiringAcknowledgment: approvedDocuments.length,
+        totalStaffUsers,
+        acknowledgmentCompletion,
+      };
+    }
+
+    // ===== RESPONSE =====
+    res.json({
+      documents: {
+        overdue: overdueDocuments,
+        upcoming: upcomingDocuments,
+        missingReviewDate: documentsMissingReviewDate,
+        overdueReviewTasks,
+        byStatus: documentsByStatus.reduce((acc, item) => {
+          acc[item.status] = item._count;
+          return acc;
+        }, {} as Record<string, number>),
+      },
+      risks: {
+        totalCount: allRisks.length,
+        totalRiskScore,
+        implementedMitigationRiskScore,
+        nonImplementedMitigationRiskScore,
+        riskScoreDelta,
+        byLevel: risksByLevel,
+        mitigatedByLevel: mitigatedRisksByLevel,
+        withMitigationNotImplemented: risksWithMitigationNotImplemented.slice(0, 20),
+        byTreatmentCategory: risksByTreatmentCategory,
+      },
+      controls: {
+        totalCount: allControls.length,
+        selectedCount: selectedControlsCount,
+        excludedCount: excludedControlsCount,
+        selectedButNotImplementedCount,
+        selectedButNotImplemented: selectedButNotImplementedControls.slice(0, 20),
+        bySelectionReason: controlsBySelectionReason,
+      },
+      acknowledgments: {
+        pending: pendingAcknowledgments,
+        stats: acknowledgmentStats,
+      },
+      lastUpdated: now.toISOString(),
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
+    res.status(500).json({ error: 'Failed to fetch dashboard data' });
+  }
+});
+
+export { router as dashboardRouter };
+
