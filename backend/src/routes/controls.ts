@@ -274,6 +274,7 @@ router.post(
     body('otherInformation').optional().isString(),
     body('category').optional().isIn(['ORGANIZATIONAL', 'PEOPLE', 'PHYSICAL', 'TECHNOLOGICAL']),
     body('isStandardControl').optional().isBoolean(),
+    body('implemented').optional().isBoolean(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -325,6 +326,7 @@ router.put(
     body('guidance').optional().isString(),
     body('otherInformation').optional().isString(),
     body('category').optional().isIn(['ORGANIZATIONAL', 'PEOPLE', 'PHYSICAL', 'TECHNOLOGICAL']),
+    body('implemented').optional().isBoolean(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -347,7 +349,8 @@ router.put(
           'selectedForContractualObligation',
           'selectedForLegalRequirement',
           'selectedForBusinessRequirement',
-          'justification'
+          'justification',
+          'implemented'
         ];
         const updateData: any = {};
         

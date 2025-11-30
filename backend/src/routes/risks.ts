@@ -1,6 +1,8 @@
 import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { randomUUID } from 'crypto';
+import * as fs from 'fs';
+import multer from 'multer';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -11,6 +13,8 @@ import {
   parseControlCodes,
   updateRiskControls,
 } from '../services/riskService';
+import { importRisksFromCSV } from '../services/riskImportService';
+import { findSimilarRisksForRisk, checkSimilarityForNewRisk } from '../services/similarityService';
 
 const router = Router();
 
@@ -694,9 +698,23 @@ router.delete(
         return res.status(404).json({ error: 'Risk not found' });
       }
 
-      // Delete the risk (cascade will handle related records)
-      await prisma.risk.delete({
-        where: { id },
+      // Manually delete related records in a transaction to avoid timeout
+      await prisma.$transaction(async (tx) => {
+        // Delete related records first (cascade deletes can timeout with many records)
+        await tx.documentRisk.deleteMany({
+          where: { riskId: id },
+        });
+        await tx.riskControl.deleteMany({
+          where: { riskId: id },
+        });
+        await tx.legislationRisk.deleteMany({
+          where: { riskId: id },
+        });
+
+        // Now delete the risk itself
+        await tx.risk.delete({
+          where: { id },
+        });
       });
 
       res.status(204).send();
@@ -986,6 +1004,145 @@ router.post(
     } catch (error) {
       console.error('Error suggesting controls:', error);
       res.status(500).json({ error: 'Failed to generate control suggestions' });
+    }
+  }
+);
+
+// Configure multer for file uploads (memory storage)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed'));
+    }
+  },
+});
+
+// POST /api/risks/import - bulk import from CSV
+router.post(
+  '/import',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  upload.single('file'),
+  (err: any, req: AuthRequest, res: Response, next: any) => {
+    // Handle multer errors
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: 'File too large. Maximum size is 10MB.' });
+        }
+        return res.status(400).json({ error: `Upload error: ${err.message}` });
+      }
+      return res.status(400).json({ error: err.message || 'File upload error' });
+    }
+    next();
+  },
+  async (req: AuthRequest, res: Response) => {
+    try {
+      let result;
+      
+      if (req.file) {
+        // File was uploaded - use the file buffer
+        result = await importRisksFromCSV(req.file.buffer);
+      } else if (req.body.filePath) {
+        // Legacy support: file path provided in body
+        const csvPath = req.body.filePath;
+        if (!fs.existsSync(csvPath)) {
+          return res.status(400).json({ error: `CSV file not found: ${csvPath}` });
+        }
+        result = await importRisksFromCSV(csvPath);
+      } else {
+        // No file provided
+        return res.status(400).json({ 
+          error: 'No file provided. Please upload a CSV file.' 
+        });
+      }
+
+      res.json({
+        success: result.success,
+        failed: result.failed,
+        total: result.total,
+        errors: result.errors,
+      });
+    } catch (error: any) {
+      console.error('Error importing risks:', error);
+      res.status(500).json({ error: error.message || 'Failed to import risks' });
+    }
+  }
+);
+
+// POST /api/risks/check-similarity - check similarity for a new risk being created/edited
+// This route must come before /:id/similar to avoid route conflicts
+router.post(
+  '/check-similarity',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    body('title').isString().notEmpty(),
+    body('threatDescription').optional().isString(),
+    body('description').optional().isString(),
+    body('excludeId').optional().isUUID(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { title, threatDescription, description, excludeId } = req.body;
+
+      const similarRisks = await checkSimilarityForNewRisk(
+        {
+          title,
+          threatDescription: threatDescription || null,
+          description: description || null,
+          excludeId: excludeId || undefined,
+        },
+        5
+      );
+
+      res.json({
+        similarRisks: similarRisks.map((result) => ({
+          risk: result.risk,
+          similarityScore: result.score,
+          matchedFields: result.fields,
+        })),
+      });
+    } catch (error: any) {
+      console.error('Error checking similarity:', error);
+      res.status(500).json({ error: error.message || 'Failed to check similarity' });
+    }
+  }
+);
+
+// POST /api/risks/:id/similar - find similar risks for an existing risk
+router.post(
+  '/:id/similar',
+  authenticateToken,
+  [
+    param('id').isUUID(),
+    query('limit').optional().isInt({ min: 1, max: 50 }),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const riskId = req.params.id;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+
+      const similarRisks = await findSimilarRisksForRisk(riskId, limit);
+
+      res.json({
+        similarRisks: similarRisks.map((result) => ({
+          risk: result.risk,
+          similarityScore: result.score,
+          matchedFields: result.fields,
+        })),
+      });
+    } catch (error: any) {
+      console.error('Error finding similar risks:', error);
+      res.status(500).json({ error: error.message || 'Failed to find similar risks' });
     }
   }
 );

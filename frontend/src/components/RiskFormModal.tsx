@@ -49,10 +49,16 @@ import {
   TabPanels,
   Tab,
   TabPanel,
+  Progress,
 } from '@chakra-ui/react';
-import { SearchIcon, DeleteIcon } from '@chakra-ui/icons';
+import { SearchIcon, DeleteIcon, CopyIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
+import { similarityApi } from '../services/api';
+import { SimilarRisk } from '../types/risk';
+import { SimilarRisksPanel } from './SimilarRisksPanel';
+import { SimilarityAlert } from './SimilarityAlert';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface RiskFormModalProps {
   isOpen: boolean;
@@ -60,6 +66,8 @@ interface RiskFormModalProps {
   risk: any;
   isDuplicateMode?: boolean;
   viewMode?: boolean;
+  onDuplicate?: (risk: any) => void;
+  onDelete?: (risk: any) => void;
 }
 
 interface User {
@@ -90,7 +98,7 @@ const RISK_NATURES = ['STATIC', 'INSTANCE'];
 
 const TREATMENT_CATEGORIES = ['RETAIN', 'MODIFY', 'SHARE', 'AVOID'];
 
-export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, viewMode = false }: RiskFormModalProps) {
+export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, viewMode = false, onDuplicate, onDelete }: RiskFormModalProps) {
   const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [controls, setControls] = useState<Control[]>([]);
@@ -142,6 +150,20 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const initialFormDataRef = useRef<any>(null);
+
+  // Similarity features state
+  const [similarRisks, setSimilarRisks] = useState<SimilarRisk[]>([]);
+  const [showSimilarRisks, setShowSimilarRisks] = useState(false);
+  const [similarRisksLoading, setSimilarRisksLoading] = useState(false);
+  const [selectedSimilarRiskIds, setSelectedSimilarRiskIds] = useState<Set<string>>(new Set());
+  const [similarityAlertRisks, setSimilarityAlertRisks] = useState<SimilarRisk[]>([]);
+  const [showSimilarityAlert, setShowSimilarityAlert] = useState(false);
+  const [similarityProgress, setSimilarityProgress] = useState({ current: 0, total: 0, percentage: 0 });
+
+  // Debounced values for similarity checking during creation
+  const debouncedTitle = useDebounce(formData.title, 1500);
+  const debouncedThreatDescription = useDebounce(formData.threatDescription, 1500);
+  const debouncedDescription = useDebounce(formData.description, 1500);
 
   // Calculate Risk = C + I + A (sum)
   const calculatedRisk = formData.confidentialityScore + formData.integrityScore + formData.availabilityScore;
@@ -207,11 +229,11 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   // Calculate Mitigated Risk = MC + MI + MA (sum)
   const mitigatedRisk =
     formData.mitigatedConfidentialityScore !== null &&
-    formData.mitigatedIntegrityScore !== null &&
-    formData.mitigatedAvailabilityScore !== null
+      formData.mitigatedIntegrityScore !== null &&
+      formData.mitigatedAvailabilityScore !== null
       ? formData.mitigatedConfidentialityScore +
-        formData.mitigatedIntegrityScore +
-        formData.mitigatedAvailabilityScore
+      formData.mitigatedIntegrityScore +
+      formData.mitigatedAvailabilityScore
       : null;
 
   // Calculate Mitigated Risk Score = Mitigated Risk × Mitigated Likelihood
@@ -224,6 +246,231 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   const mitigatedRiskLevel = mitigatedRiskScore !== null ? getRiskLevel(mitigatedRiskScore) : null;
   const mitigatedRiskLevelColor = mitigatedRiskLevel ? getRiskLevelColor(mitigatedRiskLevel) : 'gray';
 
+  // Similarity handlers
+  const handleFindSimilarRisks = async () => {
+    if (!risk?.id) return;
+
+    setSimilarRisksLoading(true);
+    setShowSimilarRisks(true);
+    setSimilarityProgress({ current: 0, total: 0, percentage: 0 });
+
+    let progressInterval: NodeJS.Timeout | null = null;
+
+    try {
+      // First, get total risk count for progress estimation
+      const countResponse = await api.get('/api/risks?page=1&limit=1');
+      const totalRisks = countResponse.data.pagination?.total || 0;
+      setSimilarityProgress({ current: 0, total: totalRisks, percentage: 0 });
+
+      // Estimate: ~100ms per risk for embeddings (processed in batches of 50)
+      // This accounts for network latency and processing time
+      // Start progress animation
+      const startTime = Date.now();
+      const estimatedTimePerRisk = 100; // milliseconds per risk (conservative estimate)
+      progressInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const estimatedProcessed = Math.min(totalRisks, Math.floor(elapsed / estimatedTimePerRisk));
+        const percentage = Math.min(95, Math.round((estimatedProcessed / totalRisks) * 100)); // Cap at 95% until done
+        setSimilarityProgress({
+          current: estimatedProcessed,
+          total: totalRisks,
+          percentage,
+        });
+      }, 200); // Update every 200ms for smoother animation
+
+      const response = await similarityApi.findSimilarRisks(risk.id, 10);
+
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+
+      setSimilarityProgress({ current: totalRisks, total: totalRisks, percentage: 100 });
+
+      // Small delay to show 100% before hiding
+      setTimeout(() => {
+        setSimilarRisks(response.similarRisks);
+        setSimilarRisksLoading(false);
+        setSimilarityProgress({ current: 0, total: 0, percentage: 0 });
+      }, 300);
+    } catch (error: any) {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+      console.error('Error finding similar risks:', error);
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to find similar risks. Similarity checking may be temporarily unavailable.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      setSimilarRisks([]);
+      setSimilarRisksLoading(false);
+      setSimilarityProgress({ current: 0, total: 0, percentage: 0 });
+    }
+  };
+
+  const handleViewSimilarRisk = (riskId: string) => {
+    window.open(`/risks/risks?view=${riskId}`, '_blank');
+  };
+
+  const handleUseAsTemplate = async (riskId: string) => {
+    try {
+      const response = await api.get(`/api/risks/${riskId}`);
+      const templateRisk = response.data;
+
+      // Populate form with template risk data (excluding ID, dates)
+      setFormData({
+        title: templateRisk.title || '',
+        description: templateRisk.description || '',
+        dateAdded: new Date().toISOString().split('T')[0],
+        riskCategory: templateRisk.riskCategory || '',
+        riskNature: templateRisk.riskNature || '',
+        archived: false,
+        expiryDate: templateRisk.expiryDate ? new Date(templateRisk.expiryDate).toISOString().split('T')[0] : '',
+        lastReviewDate: templateRisk.lastReviewDate ? new Date(templateRisk.lastReviewDate).toISOString().split('T')[0] : '',
+        nextReviewDate: templateRisk.nextReviewDate ? new Date(templateRisk.nextReviewDate).toISOString().split('T')[0] : '',
+        ownerUserId: templateRisk.ownerUserId || '',
+        assetCategory: templateRisk.assetCategory || '',
+        assetId: templateRisk.assetId || '',
+        assetCategoryId: templateRisk.assetCategoryId || '',
+        interestedPartyId: templateRisk.interestedPartyId || '',
+        threatDescription: templateRisk.threatDescription || '',
+        confidentialityScore: templateRisk.confidentialityScore || 1,
+        integrityScore: templateRisk.integrityScore || 1,
+        availabilityScore: templateRisk.availabilityScore || 1,
+        riskScore: templateRisk.riskScore || null,
+        likelihood: templateRisk.likelihood || 1,
+        initialRiskTreatmentCategory: templateRisk.initialRiskTreatmentCategory || '',
+        mitigatedConfidentialityScore: templateRisk.mitigatedConfidentialityScore || null,
+        mitigatedIntegrityScore: templateRisk.mitigatedIntegrityScore || null,
+        mitigatedAvailabilityScore: templateRisk.mitigatedAvailabilityScore || null,
+        mitigatedRiskScore: templateRisk.mitigatedRiskScore || null,
+        mitigatedLikelihood: templateRisk.mitigatedLikelihood || null,
+        mitigationImplemented: templateRisk.mitigationImplemented || false,
+        mitigationDescription: templateRisk.mitigationDescription || '',
+        residualRiskTreatmentCategory: templateRisk.residualRiskTreatmentCategory || '',
+      });
+
+      // Load control associations if available
+      if (templateRisk.riskControls && templateRisk.riskControls.length > 0) {
+        setSelectedControlIds(templateRisk.riskControls.map((rc: any) => rc.control.id));
+      } else {
+        setSelectedControlIds([]);
+      }
+
+      // Load asset if available
+      if (templateRisk.assetId && templateRisk.asset) {
+        setAssets([templateRisk.asset]);
+        setFilteredAssets([templateRisk.asset]);
+        setAssetSearchTerm(templateRisk.asset.nameSerialNo || templateRisk.asset.model || 'Selected asset');
+        if (templateRisk.asset.assetCategoryId || templateRisk.asset.category?.id) {
+          setFormData((prev) => ({
+            ...prev,
+            assetCategoryId: templateRisk.assetCategoryId || templateRisk.asset.category?.id || '',
+          }));
+        }
+      }
+
+      setShowSimilarityAlert(false);
+      toast({
+        title: 'Template Loaded',
+        description: 'Risk data loaded. Review and save as new risk.',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error: any) {
+      console.error('Error loading template risk:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load risk template',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleSelectSimilarRisk = (riskId: string, selected: boolean) => {
+    setSelectedSimilarRiskIds((prev) => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(riskId);
+      } else {
+        newSet.delete(riskId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleBulkDeleteSimilarRisks = async () => {
+    if (selectedSimilarRiskIds.size === 0) return;
+
+    const confirmMessage = `Are you sure you want to delete ${selectedSimilarRiskIds.size} selected risk(s)?`;
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      const deletePromises = Array.from(selectedSimilarRiskIds).map((id) =>
+        api.delete(`/api/risks/${id}`)
+      );
+      await Promise.all(deletePromises);
+
+      toast({
+        title: 'Success',
+        description: `Deleted ${selectedSimilarRiskIds.size} risk(s)`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      // Remove deleted risks from the list
+      setSimilarRisks((prev) => prev.filter((sr) => !selectedSimilarRiskIds.has(sr.risk.id)));
+      setSelectedSimilarRiskIds(new Set());
+    } catch (error: any) {
+      console.error('Error deleting risks:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete some risks',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  // Debounced similarity checking during creation
+  useEffect(() => {
+    // Only check similarity during creation (not editing existing risk)
+    if (!risk && !isDuplicateMode && debouncedTitle.length >= 3) {
+      const checkSimilarity = async () => {
+        try {
+          const response = await similarityApi.checkSimilarity({
+            title: debouncedTitle,
+            threatDescription: debouncedThreatDescription || undefined,
+            description: debouncedDescription || undefined,
+          });
+
+          if (response.similarRisks.length > 0) {
+            setSimilarityAlertRisks(response.similarRisks);
+            setShowSimilarityAlert(true);
+          } else {
+            setShowSimilarityAlert(false);
+          }
+        } catch (error: any) {
+          // Silently fail - don't show error to user, just don't show alert
+          console.error('Error checking similarity:', error);
+          setShowSimilarityAlert(false);
+        }
+      };
+
+      checkSimilarity();
+    } else {
+      setShowSimilarityAlert(false);
+    }
+  }, [debouncedTitle, debouncedThreatDescription, debouncedDescription, risk, isDuplicateMode]);
+
   useEffect(() => {
     if (isOpen) {
       fetchUsers();
@@ -235,6 +482,12 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       setFilteredAssets([]);
       setAssetSearchTerm('');
       setShowAssetDropdown(false);
+      // Reset similarity state
+      setSimilarRisks([]);
+      setShowSimilarRisks(false);
+      setSelectedSimilarRiskIds(new Set());
+      setSimilarityAlertRisks([]);
+      setShowSimilarityAlert(false);
       let initialData: any;
       if (risk) {
         initialData = {
@@ -328,13 +581,13 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         setFormData(initialData);
         setSelectedControlIds([]);
       }
-        const initialControlIds = risk && risk.riskControls && risk.riskControls.length > 0
-          ? risk.riskControls.map((rc: any) => rc.control.id).sort()
-          : [];
-        initialFormDataRef.current = JSON.stringify({ 
-          ...initialData, 
-          selectedControlIds: initialControlIds 
-        });
+      const initialControlIds = risk && risk.riskControls && risk.riskControls.length > 0
+        ? risk.riskControls.map((rc: any) => rc.control.id).sort()
+        : [];
+      initialFormDataRef.current = JSON.stringify({
+        ...initialData,
+        selectedControlIds: initialControlIds
+      });
       setHasUnsavedChanges(false);
       setControlSearchTerm('');
       setSuggestedControls([]);
@@ -348,9 +601,9 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   // Track form changes
   useEffect(() => {
     if (isOpen && initialFormDataRef.current) {
-      const currentData = JSON.stringify({ 
-        ...formData, 
-        selectedControlIds: [...selectedControlIds].sort() 
+      const currentData = JSON.stringify({
+        ...formData,
+        selectedControlIds: [...selectedControlIds].sort()
       });
       const hasChanges = currentData !== initialFormDataRef.current;
       setHasUnsavedChanges(hasChanges);
@@ -514,26 +767,26 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
     }
-    
+
     if (!formData.dateAdded) {
       newErrors.dateAdded = 'Date Added is required';
     }
-    
+
     if (!formData.interestedPartyId) {
       newErrors.interestedPartyId = 'Interested Party is required';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       toast({
         title: 'Validation Error',
@@ -550,15 +803,15 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
 
     try {
       const payload: any = { ...formData };
-      
+
       // Always set riskScore to calculated value
       payload.riskScore = calculatedRiskScore;
-      
+
       // Always set mitigatedRiskScore to calculated value if mitigated values exist
       if (mitigatedRiskScore !== null) {
         payload.mitigatedRiskScore = mitigatedRiskScore;
       }
-      
+
       // Clean up empty strings - but keep them as null/undefined for optional fields
       if (payload.description === '') payload.description = undefined;
       if (payload.riskCategory === '') payload.riskCategory = undefined;
@@ -611,10 +864,10 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       if (riskId) {
         try {
           // Ensure selectedControlIds is an array
-          const controlIdsArray = Array.isArray(selectedControlIds) 
+          const controlIdsArray = Array.isArray(selectedControlIds)
             ? selectedControlIds.filter(id => id && typeof id === 'string')
             : [];
-          
+
           console.log('Updating control associations:', {
             riskId,
             controlIdsCount: controlIdsArray.length,
@@ -646,7 +899,15 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       }, 500);
     } catch (error: any) {
       console.error('Error saving risk:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to save risk';
+      let errorMessage = error.response?.data?.error || error.message || 'Failed to save risk';
+
+      // Provide more specific error message for authorization errors
+      if (error.response?.status === 403 || error.response?.status === 401) {
+        errorMessage = 'You do not have permission to create or edit risks. Please contact an administrator if you need this access.';
+      } else if (error.response?.status === 400) {
+        errorMessage = error.response?.data?.error || 'Invalid data provided. Please check all required fields.';
+      }
+
       toast({
         title: 'Error',
         description: errorMessage,
@@ -676,1234 +937,1304 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   return (
     <>
       <Modal isOpen={isOpen} onClose={handleCloseAttempt} size="6xl" scrollBehavior="inside">
-      <ModalOverlay />
-      <ModalContent maxH="90vh" display="flex" flexDirection="column" overflow="hidden">
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-          <ModalHeader flexShrink={0}>
-            {viewMode ? 'View Risk' : isDuplicateMode ? 'Duplicate Risk' : risk ? 'Edit Risk' : 'Create Risk'}
-          </ModalHeader>
-          <ModalCloseButton onClick={handleCloseAttempt} />
-          <ModalBody overflowY="auto" flex="1" pb={6} minH={0}>
-            <Tabs colorScheme="blue" isLazy>
-              <TabList>
-                <Tab>Essentials</Tab>
-                <Tab>Additional Details</Tab>
-                <Tab>Existing Controls Assessment</Tab>
-                <Tab>Additional Controls Assessment</Tab>
-                <Tab>Controls Linkage</Tab>
-              </TabList>
+        <ModalOverlay />
+        <ModalContent maxH="90vh" display="flex" flexDirection="column" overflow="hidden">
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+            <ModalHeader flexShrink={0}>
+              {viewMode ? 'View Risk' : isDuplicateMode ? 'Duplicate Risk' : risk ? 'Edit Risk' : 'Create Risk'}
+            </ModalHeader>
+            <ModalCloseButton onClick={handleCloseAttempt} />
+            <ModalBody overflowY="auto" flex="1" pb={6} minH={0}>
+              <Tabs colorScheme="blue" isLazy>
+                <TabList>
+                  <Tab>Essentials</Tab>
+                  <Tab>Additional Details</Tab>
+                  <Tab>Existing Controls Assessment</Tab>
+                  <Tab>Additional Controls Assessment</Tab>
+                  <Tab>Controls Linkage</Tab>
+                </TabList>
 
-              <TabPanels>
-                {/* Tab 1: Essentials */}
-                <TabPanel>
-                  <VStack spacing={4} align="stretch">
-                  <FormControl isRequired isInvalid={!!errors.title}>
-                    <FormLabel>Title</FormLabel>
-                    <Input
-                      value={formData.title}
-                      onChange={(e) => {
-                        setFormData({ ...formData, title: e.target.value });
-                        if (errors.title) setErrors({ ...errors, title: '' });
-                      }}
-                      isReadOnly={viewMode}
-                    />
-                    <FormErrorMessage>{errors.title}</FormErrorMessage>
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>
-                      Threat Description
-                      {formData.threatDescription.length > 0 && (
-                        <Text as="span" fontSize="xs" color="gray.500" ml={2}>
-                          ({formData.threatDescription.length} characters)
-                        </Text>
+                <TabPanels>
+                  {/* Tab 1: Essentials */}
+                  <TabPanel>
+                    <VStack spacing={4} align="stretch">
+                      {/* Similarity Alert for creation mode */}
+                      {showSimilarityAlert && similarityAlertRisks.length > 0 && !risk && (
+                        <SimilarityAlert
+                          similarRisks={similarityAlertRisks}
+                          onViewRisk={handleViewSimilarRisk}
+                          onUseAsTemplate={handleUseAsTemplate}
+                          onDismiss={() => setShowSimilarityAlert(false)}
+                        />
                       )}
-                    </FormLabel>
-                    <Textarea
-                      value={formData.threatDescription}
-                      onChange={(e) =>
-                        setFormData({ ...formData, threatDescription: e.target.value })
-                      }
-                      rows={3}
-                      maxLength={2000}
-                      isReadOnly={viewMode}
-                    />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>Risk Description</FormLabel>
-                    <Textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      rows={3}
-                      isReadOnly={viewMode}
-                    />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>Owner</FormLabel>
-                    <Select
-                      value={formData.ownerUserId}
-                      onChange={(e) => setFormData({ ...formData, ownerUserId: e.target.value })}
-                      placeholder="Select owner"
-                      isDisabled={viewMode}
-                    >
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.displayName} ({user.email})
-                        </option>
-                      ))}
-                    </Select>
-                  </FormControl>
-
-                  <FormControl isRequired isInvalid={!!errors.interestedPartyId}>
-                    <FormLabel>Interested Party</FormLabel>
-                    <Select
-                      value={formData.interestedPartyId}
-                      onChange={(e) => setFormData({ ...formData, interestedPartyId: e.target.value })}
-                      isReadOnly={viewMode}
-                      placeholder="Select an interested party"
-                    >
-                      {interestedParties.map((party) => (
-                        <option key={party.id} value={party.id}>
-                          {party.name} {party.group ? `(${party.group})` : ''}
-                        </option>
-                      ))}
-                    </Select>
-                    {errors.interestedPartyId && (
-                      <FormErrorMessage>{errors.interestedPartyId}</FormErrorMessage>
-                    )}
-                  </FormControl>
-
-                  <FormControl isRequired isInvalid={!!errors.dateAdded}>
-                    <FormLabel>Date Added</FormLabel>
-                    <Input
-                      type="date"
-                      value={formData.dateAdded}
-                      onChange={(e) => {
-                        setFormData({ ...formData, dateAdded: e.target.value });
-                        if (errors.dateAdded) setErrors({ ...errors, dateAdded: '' });
-                      }}
-                      isReadOnly={viewMode}
-                    />
-                    <FormErrorMessage>{errors.dateAdded}</FormErrorMessage>
-                  </FormControl>
-                </VStack>
-                </TabPanel>
-
-                {/* Tab 2: Additional Details */}
-                <TabPanel>
-                  <VStack spacing={4} align="stretch">
-                  <FormControl>
-                    <FormLabel>Risk Category</FormLabel>
-                    <Select
-                      value={formData.riskCategory}
-                      onChange={(e) => setFormData({ ...formData, riskCategory: e.target.value })}
-                      placeholder="Select risk category"
-                      isDisabled={viewMode}
-                    >
-                      {RISK_CATEGORIES.map((category) => (
-                        <option key={category} value={category}>
-                          {category.replace(/_/g, ' ')}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>Risk Nature</FormLabel>
-                    <Select
-                      value={formData.riskNature}
-                      onChange={(e) => {
-                        const newNature = e.target.value;
-                        setFormData({
-                          ...formData,
-                          riskNature: newNature,
-                          // Clear incompatible fields when changing nature
-                          expiryDate: newNature === 'STATIC' ? '' : formData.expiryDate,
-                          lastReviewDate: newNature === 'INSTANCE' ? '' : formData.lastReviewDate,
-                          nextReviewDate: newNature === 'INSTANCE' ? '' : formData.nextReviewDate,
-                        });
-                      }}
-                      placeholder="Select risk nature"
-                      isDisabled={viewMode}
-                    >
-                      {RISK_NATURES.map((nature) => (
-                        <option key={nature} value={nature}>
-                          {nature}
-                        </option>
-                      ))}
-                    </Select>
-                    <Text fontSize="xs" color="gray.500" mt={1}>
-                      {formData.riskNature === 'STATIC' && 'Static risks are always present and require periodic review'}
-                      {formData.riskNature === 'INSTANCE' && 'Instance risks are transient and may expire'}
-                    </Text>
-                  </FormControl>
-
-                  {formData.riskNature === 'INSTANCE' && (
-                    <FormControl>
-                      <FormLabel>Expiry Date (Optional)</FormLabel>
-                      <Input
-                        type="date"
-                        value={formData.expiryDate}
-                        onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                        isReadOnly={viewMode}
-                      />
-                      <Text fontSize="xs" color="gray.500" mt={1}>
-                        Instance risks can expire when they are no longer relevant
-                      </Text>
-                    </FormControl>
-                  )}
-
-                  {formData.riskNature === 'STATIC' && (
-                    <>
-                      <FormControl>
-                        <FormLabel>Last Review Date</FormLabel>
+                      <FormControl isRequired isInvalid={!!errors.title}>
+                        <FormLabel>Title</FormLabel>
                         <Input
-                          type="date"
-                          value={formData.lastReviewDate}
-                          onChange={(e) => setFormData({ ...formData, lastReviewDate: e.target.value })}
+                          value={formData.title}
+                          onChange={(e) => {
+                            setFormData({ ...formData, title: e.target.value });
+                            if (errors.title) setErrors({ ...errors, title: '' });
+                          }}
+                          isReadOnly={viewMode}
+                        />
+                        <FormErrorMessage>{errors.title}</FormErrorMessage>
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>
+                          Threat Description
+                          {formData.threatDescription.length > 0 && (
+                            <Text as="span" fontSize="xs" color="gray.500" ml={2}>
+                              ({formData.threatDescription.length} characters)
+                            </Text>
+                          )}
+                        </FormLabel>
+                        <Textarea
+                          value={formData.threatDescription}
+                          onChange={(e) =>
+                            setFormData({ ...formData, threatDescription: e.target.value })
+                          }
+                          rows={3}
+                          maxLength={2000}
                           isReadOnly={viewMode}
                         />
                       </FormControl>
 
                       <FormControl>
-                        <FormLabel>Next Review Date</FormLabel>
-                        <Input
-                          type="date"
-                          value={formData.nextReviewDate}
-                          onChange={(e) => setFormData({ ...formData, nextReviewDate: e.target.value })}
+                        <FormLabel>Risk Description</FormLabel>
+                        <Textarea
+                          value={formData.description}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                          rows={3}
                           isReadOnly={viewMode}
                         />
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Owner</FormLabel>
+                        <Select
+                          value={formData.ownerUserId}
+                          onChange={(e) => setFormData({ ...formData, ownerUserId: e.target.value })}
+                          placeholder="Select owner"
+                          isDisabled={viewMode}
+                        >
+                          {users.map((user) => (
+                            <option key={user.id} value={user.id}>
+                              {user.displayName} ({user.email})
+                            </option>
+                          ))}
+                        </Select>
+                      </FormControl>
+
+                      <FormControl isRequired isInvalid={!!errors.interestedPartyId}>
+                        <FormLabel>Interested Party</FormLabel>
+                        <Select
+                          value={formData.interestedPartyId}
+                          onChange={(e) => setFormData({ ...formData, interestedPartyId: e.target.value })}
+                          isReadOnly={viewMode}
+                          placeholder="Select an interested party"
+                        >
+                          {interestedParties.map((party) => (
+                            <option key={party.id} value={party.id}>
+                              {party.name} {party.group ? `(${party.group})` : ''}
+                            </option>
+                          ))}
+                        </Select>
+                        {errors.interestedPartyId && (
+                          <FormErrorMessage>{errors.interestedPartyId}</FormErrorMessage>
+                        )}
+                      </FormControl>
+
+                      <FormControl isRequired isInvalid={!!errors.dateAdded}>
+                        <FormLabel>Date Added</FormLabel>
+                        <Input
+                          type="date"
+                          value={formData.dateAdded}
+                          onChange={(e) => {
+                            setFormData({ ...formData, dateAdded: e.target.value });
+                            if (errors.dateAdded) setErrors({ ...errors, dateAdded: '' });
+                          }}
+                          isReadOnly={viewMode}
+                        />
+                        <FormErrorMessage>{errors.dateAdded}</FormErrorMessage>
+                      </FormControl>
+                    </VStack>
+                  </TabPanel>
+
+                  {/* Tab 2: Additional Details */}
+                  <TabPanel>
+                    <VStack spacing={4} align="stretch">
+                      <FormControl>
+                        <FormLabel>Risk Category</FormLabel>
+                        <Select
+                          value={formData.riskCategory}
+                          onChange={(e) => setFormData({ ...formData, riskCategory: e.target.value })}
+                          placeholder="Select risk category"
+                          isDisabled={viewMode}
+                        >
+                          {RISK_CATEGORIES.map((category) => (
+                            <option key={category} value={category}>
+                              {category.replace(/_/g, ' ')}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Risk Nature</FormLabel>
+                        <Select
+                          value={formData.riskNature}
+                          onChange={(e) => {
+                            const newNature = e.target.value;
+                            setFormData({
+                              ...formData,
+                              riskNature: newNature,
+                              // Clear incompatible fields when changing nature
+                              expiryDate: newNature === 'STATIC' ? '' : formData.expiryDate,
+                              lastReviewDate: newNature === 'INSTANCE' ? '' : formData.lastReviewDate,
+                              nextReviewDate: newNature === 'INSTANCE' ? '' : formData.nextReviewDate,
+                            });
+                          }}
+                          placeholder="Select risk nature"
+                          isDisabled={viewMode}
+                        >
+                          {RISK_NATURES.map((nature) => (
+                            <option key={nature} value={nature}>
+                              {nature}
+                            </option>
+                          ))}
+                        </Select>
                         <Text fontSize="xs" color="gray.500" mt={1}>
-                          Static risks should be reviewed annually
+                          {formData.riskNature === 'STATIC' && 'Static risks are always present and require periodic review'}
+                          {formData.riskNature === 'INSTANCE' && 'Instance risks are transient and may expire'}
                         </Text>
                       </FormControl>
-                    </>
-                  )}
 
-                  <FormControl>
-                    <FormLabel>Link to Asset (Optional)</FormLabel>
-                    <Box position="relative">
-                      <InputGroup>
-                        <InputLeftElement pointerEvents="none">
-                          <SearchIcon color="gray.300" />
-                        </InputLeftElement>
-                        <Input
-                          placeholder="Type to search assets (min 2 characters)..."
-                          value={formData.assetId ? (assets.find(a => a.id === formData.assetId)?.nameSerialNo || assets.find(a => a.id === formData.assetId)?.model || 'Selected asset') : assetSearchTerm}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setAssetSearchTerm(value);
-                            // Clear asset selection if user is typing
-                            if (value !== (assets.find(a => a.id === formData.assetId)?.nameSerialNo || assets.find(a => a.id === formData.assetId)?.model || '')) {
-                              setFormData({
-                                ...formData,
-                                assetId: '',
-                                // Don't clear category - user can still select a category when no asset is selected
-                              });
-                            }
-                          }}
-                          onFocus={() => {
-                            if (assetSearchTerm.length >= 2) {
-                              setShowAssetDropdown(true);
-                            }
-                          }}
-                          onBlur={() => {
-                            // Delay to allow clicking on dropdown items
-                            setTimeout(() => setShowAssetDropdown(false), 200);
-                          }}
-                          isDisabled={viewMode}
-                        />
-                        {formData.assetId && (
-                          <InputRightElement>
-                            <IconButton
-                              aria-label="Clear selection"
-                              icon={<DeleteIcon />}
-                              size="xs"
-                              variant="ghost"
-                              onClick={() => {
-                                setFormData({
-                                  ...formData,
-                                  assetId: '',
-                                  assetCategoryId: '', // Clear category when clearing asset
-                                });
-                                setAssetSearchTerm('');
-                                setShowAssetDropdown(false);
-                              }}
+                      {formData.riskNature === 'INSTANCE' && (
+                        <FormControl>
+                          <FormLabel>Expiry Date (Optional)</FormLabel>
+                          <Input
+                            type="date"
+                            value={formData.expiryDate}
+                            onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                            isReadOnly={viewMode}
+                          />
+                          <Text fontSize="xs" color="gray.500" mt={1}>
+                            Instance risks can expire when they are no longer relevant
+                          </Text>
+                        </FormControl>
+                      )}
+
+                      {formData.riskNature === 'STATIC' && (
+                        <>
+                          <FormControl>
+                            <FormLabel>Last Review Date</FormLabel>
+                            <Input
+                              type="date"
+                              value={formData.lastReviewDate}
+                              onChange={(e) => setFormData({ ...formData, lastReviewDate: e.target.value })}
+                              isReadOnly={viewMode}
                             />
-                          </InputRightElement>
-                        )}
-                      </InputGroup>
-                      {showAssetDropdown && (loadingAssets || filteredAssets.length > 0 || assetSearchTerm.length >= 2) && (
-                        <Box
-                          position="absolute"
-                          top="100%"
-                          left={0}
-                          right={0}
-                          zIndex={1000}
-                          mt={1}
-                          borderWidth="1px"
-                          borderRadius="md"
-                          bg="white"
-                          boxShadow="lg"
-                          maxH="300px"
-                          overflowY="auto"
-                        >
-                          {loadingAssets ? (
-                            <Box p={4} textAlign="center">
-                              <Spinner size="sm" />
-                              <Text fontSize="sm" color="gray.500" mt={2}>
-                                Searching assets...
-                              </Text>
-                            </Box>
-                          ) : filteredAssets.length === 0 && assetSearchTerm.length >= 2 ? (
-                            <Box p={4} textAlign="center">
-                              <Text fontSize="sm" color="gray.500">
-                                No assets found matching "{assetSearchTerm}"
-                              </Text>
-                            </Box>
-                          ) : (
-                            filteredAssets.slice(0, 20).map((asset) => (
-                              <Box
-                                key={asset.id}
-                                p={3}
-                                borderBottomWidth="1px"
-                                _hover={{ bg: 'blue.50', cursor: 'pointer' }}
-                                onClick={() => {
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel>Next Review Date</FormLabel>
+                            <Input
+                              type="date"
+                              value={formData.nextReviewDate}
+                              onChange={(e) => setFormData({ ...formData, nextReviewDate: e.target.value })}
+                              isReadOnly={viewMode}
+                            />
+                            <Text fontSize="xs" color="gray.500" mt={1}>
+                              Static risks should be reviewed annually
+                            </Text>
+                          </FormControl>
+                        </>
+                      )}
+
+                      <FormControl>
+                        <FormLabel>Link to Asset (Optional)</FormLabel>
+                        <Box position="relative">
+                          <InputGroup>
+                            <InputLeftElement pointerEvents="none">
+                              <SearchIcon color="gray.300" />
+                            </InputLeftElement>
+                            <Input
+                              placeholder="Type to search assets (min 2 characters)..."
+                              value={formData.assetId ? (assets.find(a => a.id === formData.assetId)?.nameSerialNo || assets.find(a => a.id === formData.assetId)?.model || 'Selected asset') : assetSearchTerm}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setAssetSearchTerm(value);
+                                // Clear asset selection if user is typing
+                                if (value !== (assets.find(a => a.id === formData.assetId)?.nameSerialNo || assets.find(a => a.id === formData.assetId)?.model || '')) {
                                   setFormData({
                                     ...formData,
-                                    assetId: asset.id,
-                                    assetCategoryId: asset.assetCategoryId || asset.category?.id || '', // Set category from asset
+                                    assetId: '',
+                                    // Don't clear category - user can still select a category when no asset is selected
                                   });
-                                  setAssetSearchTerm(asset.nameSerialNo || asset.model || 'Unnamed');
-                                  setShowAssetDropdown(false);
-                                }}
-                              >
-                                <HStack justify="space-between">
-                                  <VStack align="start" spacing={0}>
-                                    <Text fontWeight="medium" fontSize="sm">
-                                      {asset.nameSerialNo || asset.model || 'Unnamed Asset'}
-                                    </Text>
-                                    <HStack spacing={2} fontSize="xs" color="gray.600">
-                                      <Text>{asset.category?.name || ''}</Text>
-                                      {asset.manufacturer && <Text>• {asset.manufacturer}</Text>}
-                                      {asset.primaryUser && <Text>• User: {asset.primaryUser}</Text>}
+                                }
+                              }}
+                              onFocus={() => {
+                                if (assetSearchTerm.length >= 2) {
+                                  setShowAssetDropdown(true);
+                                }
+                              }}
+                              onBlur={() => {
+                                // Delay to allow clicking on dropdown items
+                                setTimeout(() => setShowAssetDropdown(false), 200);
+                              }}
+                              isDisabled={viewMode}
+                            />
+                            {formData.assetId && (
+                              <InputRightElement>
+                                <IconButton
+                                  aria-label="Clear selection"
+                                  icon={<DeleteIcon />}
+                                  size="xs"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setFormData({
+                                      ...formData,
+                                      assetId: '',
+                                      assetCategoryId: '', // Clear category when clearing asset
+                                    });
+                                    setAssetSearchTerm('');
+                                    setShowAssetDropdown(false);
+                                  }}
+                                />
+                              </InputRightElement>
+                            )}
+                          </InputGroup>
+                          {showAssetDropdown && (loadingAssets || filteredAssets.length > 0 || assetSearchTerm.length >= 2) && (
+                            <Box
+                              position="absolute"
+                              top="100%"
+                              left={0}
+                              right={0}
+                              zIndex={1000}
+                              mt={1}
+                              borderWidth="1px"
+                              borderRadius="md"
+                              bg="white"
+                              boxShadow="lg"
+                              maxH="300px"
+                              overflowY="auto"
+                            >
+                              {loadingAssets ? (
+                                <Box p={4} textAlign="center">
+                                  <Spinner size="sm" />
+                                  <Text fontSize="sm" color="gray.500" mt={2}>
+                                    Searching assets...
+                                  </Text>
+                                </Box>
+                              ) : filteredAssets.length === 0 && assetSearchTerm.length >= 2 ? (
+                                <Box p={4} textAlign="center">
+                                  <Text fontSize="sm" color="gray.500">
+                                    No assets found matching "{assetSearchTerm}"
+                                  </Text>
+                                </Box>
+                              ) : (
+                                filteredAssets.slice(0, 20).map((asset) => (
+                                  <Box
+                                    key={asset.id}
+                                    p={3}
+                                    borderBottomWidth="1px"
+                                    _hover={{ bg: 'blue.50', cursor: 'pointer' }}
+                                    onClick={() => {
+                                      setFormData({
+                                        ...formData,
+                                        assetId: asset.id,
+                                        assetCategoryId: asset.assetCategoryId || asset.category?.id || '', // Set category from asset
+                                      });
+                                      setAssetSearchTerm(asset.nameSerialNo || asset.model || 'Unnamed');
+                                      setShowAssetDropdown(false);
+                                    }}
+                                  >
+                                    <HStack justify="space-between">
+                                      <VStack align="start" spacing={0}>
+                                        <Text fontWeight="medium" fontSize="sm">
+                                          {asset.nameSerialNo || asset.model || 'Unnamed Asset'}
+                                        </Text>
+                                        <HStack spacing={2} fontSize="xs" color="gray.600">
+                                          <Text>{asset.category?.name || ''}</Text>
+                                          {asset.manufacturer && <Text>• {asset.manufacturer}</Text>}
+                                          {asset.primaryUser && <Text>• User: {asset.primaryUser}</Text>}
+                                        </HStack>
+                                      </VStack>
+                                      <Badge colorScheme={asset.cdeImpacting ? 'red' : 'gray'} fontSize="xs">
+                                        {asset.classification?.name || ''}
+                                      </Badge>
                                     </HStack>
-                                  </VStack>
-                                  <Badge colorScheme={asset.cdeImpacting ? 'red' : 'gray'} fontSize="xs">
-                                    {asset.classification?.name || ''}
-                                  </Badge>
-                                </HStack>
-                              </Box>
-                            ))
+                                  </Box>
+                                ))
+                              )}
+                            </Box>
                           )}
                         </Box>
-                      )}
-                    </Box>
-                    {formData.assetId && (
-                      <Text fontSize="xs" color="green.600" mt={1}>
-                        ✓ Asset selected {assets.find(a => a.id === formData.assetId)?.category?.name ? `(Category: ${assets.find(a => a.id === formData.assetId)?.category?.name})` : ''}
-                      </Text>
-                    )}
-                  </FormControl>
+                        {formData.assetId && (
+                          <Text fontSize="xs" color="green.600" mt={1}>
+                            ✓ Asset selected {assets.find(a => a.id === formData.assetId)?.category?.name ? `(Category: ${assets.find(a => a.id === formData.assetId)?.category?.name})` : ''}
+                          </Text>
+                        )}
+                      </FormControl>
 
-                  <FormControl>
-                    <FormLabel>Link to Asset Category (Optional)</FormLabel>
-                    <Select
-                      value={formData.assetCategoryId || ''}
-                      onChange={(e) => {
-                        const assetCategoryId = e.target.value;
-                        setFormData({
-                          ...formData,
-                          assetCategoryId: assetCategoryId || '',
-                          assetId: assetCategoryId ? '' : formData.assetId, // Clear asset if category selected
-                        });
-                      }}
-                      placeholder="Select an asset category (or leave blank)"
-                      isDisabled={viewMode || !!formData.assetId}
-                    >
-                      <option value="">None</option>
-                      {assetCategories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </Select>
-                    {formData.assetId ? (
-                      <Text fontSize="sm" color="blue.600" mt={1}>
-                        ℹ️ Category is automatically set from the selected asset and cannot be changed.
-                      </Text>
-                    ) : (
-                      <Text fontSize="sm" color="gray.500" mt={1}>
-                        Note: You can link to either a specific asset OR an asset category, not both. When an asset is selected, its category is automatically used.
-                      </Text>
-                    )}
-                  </FormControl>
+                      <FormControl>
+                        <FormLabel>Link to Asset Category (Optional)</FormLabel>
+                        <Select
+                          value={formData.assetCategoryId || ''}
+                          onChange={(e) => {
+                            const assetCategoryId = e.target.value;
+                            setFormData({
+                              ...formData,
+                              assetCategoryId: assetCategoryId || '',
+                              assetId: assetCategoryId ? '' : formData.assetId, // Clear asset if category selected
+                            });
+                          }}
+                          placeholder="Select an asset category (or leave blank)"
+                          isDisabled={viewMode || !!formData.assetId}
+                        >
+                          <option value="">None</option>
+                          {assetCategories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </option>
+                          ))}
+                        </Select>
+                        {formData.assetId ? (
+                          <Text fontSize="sm" color="blue.600" mt={1}>
+                            ℹ️ Category is automatically set from the selected asset and cannot be changed.
+                          </Text>
+                        ) : (
+                          <Text fontSize="sm" color="gray.500" mt={1}>
+                            Note: You can link to either a specific asset OR an asset category, not both. When an asset is selected, its category is automatically used.
+                          </Text>
+                        )}
+                      </FormControl>
 
-                  <FormControl>
-                    <Checkbox
-                      isChecked={formData.archived}
-                      onChange={(e) => setFormData({ ...formData, archived: e.target.checked })}
-                      isDisabled={viewMode}
-                    >
-                      Archived
-                    </Checkbox>
-                    <Text fontSize="xs" color="gray.500" mt={1}>
-                      Archived risks are hidden by default. Instance risks are typically archived when they expire.
-                    </Text>
-                  </FormControl>
-                </VStack>
-                </TabPanel>
-
-                {/* Tab 3: Existing Controls Assessment */}
-                <TabPanel>
-                  <HStack spacing={6} align="flex-start">
-                    {/* Left side: Sliders */}
-                    <VStack spacing={6} flex="1">
-                      <HStack spacing={4} width="100%" justify="space-around">
-                        <FormControl isRequired>
-                          <FormLabel textAlign="center" mb={2}>
-                            Confidentiality (C)
-                            <Tooltip label="Impact on confidentiality">
-                              <IconButton
-                                aria-label="Help"
-                                icon={<Text fontSize="xs">?</Text>}
-                                size="xs"
-                                variant="ghost"
-                                ml={1}
-                              />
-                            </Tooltip>
-                          </FormLabel>
-                          <VStack spacing={3} align="center">
-                            <VStack spacing={1} align="center">
-                              <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.confidentialityScore)}.600`} mb={1}>
-                                {formData.confidentialityScore}
-                              </Text>
-                              <Badge colorScheme={getScoreLabelColor(formData.confidentialityScore)} fontSize="sm" px={3} py={1} minW="80px">
-                                {getScoreLabel(formData.confidentialityScore)}
-                              </Badge>
-                            </VStack>
-                            <Box position="relative" height="200px" width="60px" mt={3}>
-                              <Slider
-                                orientation="vertical"
-                                min={1}
-                                max={5}
-                                step={1}
-                                value={formData.confidentialityScore}
-                                onChange={(val) => setFormData({ ...formData, confidentialityScore: val })}
-                              >
-                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  1
-                                </SliderMark>
-                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  3
-                                </SliderMark>
-                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  5
-                                </SliderMark>
-                                <SliderTrack>
-                                  <SliderFilledTrack />
-                                </SliderTrack>
-                                <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.confidentialityScore)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
-                              </Slider>
-                            </Box>
-                          </VStack>
-                        </FormControl>
-
-                        <FormControl isRequired>
-                          <FormLabel textAlign="center" mb={2}>
-                            Integrity (I)
-                            <Tooltip label="Impact on integrity">
-                              <IconButton
-                                aria-label="Help"
-                                icon={<Text fontSize="xs">?</Text>}
-                                size="xs"
-                                variant="ghost"
-                                ml={1}
-                              />
-                            </Tooltip>
-                          </FormLabel>
-                          <VStack spacing={3} align="center">
-                            <VStack spacing={1} align="center">
-                              <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.integrityScore)}.600`} mb={1}>
-                                {formData.integrityScore}
-                              </Text>
-                              <Badge colorScheme={getScoreLabelColor(formData.integrityScore)} fontSize="sm" px={3} py={1} minW="80px">
-                                {getScoreLabel(formData.integrityScore)}
-                              </Badge>
-                            </VStack>
-                            <Box position="relative" height="200px" width="60px" mt={3}>
-                              <Slider
-                                orientation="vertical"
-                                min={1}
-                                max={5}
-                                step={1}
-                                value={formData.integrityScore}
-                                onChange={(val) => setFormData({ ...formData, integrityScore: val })}
-                                isDisabled={viewMode}
-                              >
-                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  1
-                                </SliderMark>
-                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  3
-                                </SliderMark>
-                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  5
-                                </SliderMark>
-                                <SliderTrack>
-                                  <SliderFilledTrack />
-                                </SliderTrack>
-                                <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.integrityScore)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
-                              </Slider>
-                            </Box>
-                          </VStack>
-                        </FormControl>
-
-                        <FormControl isRequired>
-                          <FormLabel textAlign="center" mb={2}>
-                            Availability (A)
-                            <Tooltip label="Impact on availability">
-                              <IconButton
-                                aria-label="Help"
-                                icon={<Text fontSize="xs">?</Text>}
-                                size="xs"
-                                variant="ghost"
-                                ml={1}
-                              />
-                            </Tooltip>
-                          </FormLabel>
-                          <VStack spacing={3} align="center">
-                            <VStack spacing={1} align="center">
-                              <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.availabilityScore)}.600`} mb={1}>
-                                {formData.availabilityScore}
-                              </Text>
-                              <Badge colorScheme={getScoreLabelColor(formData.availabilityScore)} fontSize="sm" px={3} py={1} minW="80px">
-                                {getScoreLabel(formData.availabilityScore)}
-                              </Badge>
-                            </VStack>
-                            <Box position="relative" height="200px" width="60px" mt={3}>
-                              <Slider
-                                orientation="vertical"
-                                min={1}
-                                max={5}
-                                step={1}
-                                value={formData.availabilityScore}
-                                onChange={(val) => setFormData({ ...formData, availabilityScore: val })}
-                                isDisabled={viewMode}
-                              >
-                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  1
-                                </SliderMark>
-                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  3
-                                </SliderMark>
-                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  5
-                                </SliderMark>
-                                <SliderTrack>
-                                  <SliderFilledTrack />
-                                </SliderTrack>
-                                <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.availabilityScore)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
-                              </Slider>
-                            </Box>
-                          </VStack>
-                        </FormControl>
-
-                        <FormControl isRequired>
-                          <FormLabel textAlign="center" mb={2}>
-                            Likelihood (L)
-                            <Tooltip label="Likelihood of risk occurring">
-                              <IconButton
-                                aria-label="Help"
-                                icon={<Text fontSize="xs">?</Text>}
-                                size="xs"
-                                variant="ghost"
-                                ml={1}
-                              />
-                            </Tooltip>
-                          </FormLabel>
-                          <VStack spacing={3} align="center">
-                            <VStack spacing={1} align="center">
-                              <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.likelihood)}.600`} mb={1}>
-                                {formData.likelihood}
-                              </Text>
-                              <Badge colorScheme={getScoreLabelColor(formData.likelihood)} fontSize="sm" px={3} py={1} minW="80px">
-                                {getScoreLabel(formData.likelihood)}
-                              </Badge>
-                            </VStack>
-                            <Box position="relative" height="200px" width="60px" mt={3}>
-                              <Slider
-                                orientation="vertical"
-                                min={1}
-                                max={5}
-                                step={1}
-                                value={formData.likelihood}
-                                onChange={(val) => setFormData({ ...formData, likelihood: val })}
-                                isDisabled={viewMode}
-                              >
-                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  1
-                                </SliderMark>
-                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  3
-                                </SliderMark>
-                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  5
-                                </SliderMark>
-                                <SliderTrack>
-                                  <SliderFilledTrack />
-                                </SliderTrack>
-                                <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.likelihood)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
-                              </Slider>
-                            </Box>
-                          </VStack>
-                        </FormControl>
-                      </HStack>
+                      <FormControl>
+                        <Checkbox
+                          isChecked={formData.archived}
+                          onChange={(e) => setFormData({ ...formData, archived: e.target.checked })}
+                          isDisabled={viewMode}
+                        >
+                          Archived
+                        </Checkbox>
+                        <Text fontSize="xs" color="gray.500" mt={1}>
+                          Archived risks are hidden by default. Instance risks are typically archived when they expire.
+                        </Text>
+                      </FormControl>
                     </VStack>
+                  </TabPanel>
 
-                    {/* Right side: Risk and Risk Score Cards */}
-                    <VStack spacing={4} minW="200px">
-                      <Card width="100%" minW="200px" maxW="200px" bg={`${riskLevelColor}.50`} borderColor={`${riskLevelColor}.300`} borderWidth="2px">
-                        <CardBody>
-                          <VStack spacing={2} align="stretch">
-                            <Text fontSize="sm" fontWeight="bold" color="gray.600">
-                              Risk (C + I + A)
-                            </Text>
-                            <Text fontSize="3xl" fontWeight="bold" color={`${riskLevelColor}.700`} textAlign="center">
-                              {calculatedRisk}
-                            </Text>
-                          </VStack>
-                        </CardBody>
-                      </Card>
-
-                      <Card width="100%" minW="200px" maxW="200px" bg={`${riskLevelColor}.50`} borderColor={`${riskLevelColor}.300`} borderWidth="2px">
-                        <CardBody>
-                          <VStack spacing={2} align="stretch">
-                            <Text fontSize="sm" fontWeight="bold" color="gray.600">
-                              Risk Score
-                            </Text>
-                            <Text fontSize="3xl" fontWeight="bold" color={`${riskLevelColor}.700`} textAlign="center">
-                              {calculatedRiskScore}
-                            </Text>
-                            <Badge colorScheme={riskLevelColor} size="lg" alignSelf="center" mt={2} minW="80px" justifyContent="center">
-                              {riskLevel}
-                            </Badge>
-                            <Text fontSize="xs" color="gray.500" textAlign="center" mt={1} minH="40px" lineHeight="1.4">
-                              {riskLevel === 'HIGH' && 'Unacceptable - treatment required'}
-                              {riskLevel === 'MEDIUM' && 'Warning - review frequently'}
-                              {riskLevel === 'LOW' && 'Acceptable - no treatment required'}
-                            </Text>
-                          </VStack>
-                        </CardBody>
-                      </Card>
-                    </VStack>
-                  </HStack>
-
-                  <FormControl>
-                    <FormLabel>Initial Risk Treatment Category</FormLabel>
-                    <Select
-                      value={formData.initialRiskTreatmentCategory}
-                      onChange={(e) =>
-                        setFormData({ ...formData, initialRiskTreatmentCategory: e.target.value })
-                      }
-                      placeholder="Select treatment category"
-                      isDisabled={viewMode}
-                    >
-                      {TREATMENT_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </TabPanel>
-
-                {/* Tab 4: Additional Controls Assessment */}
-                <TabPanel>
-                  <VStack spacing={6} align="stretch">
-                    <HStack justify="space-between">
-                      <Text fontSize="md" fontWeight="semibold" color="green.600">
-                        Additional Controls - Mitigated Assessment
-                      </Text>
-                      {mitigatedRiskScore !== null && (
-                        <Button size="sm" variant="outline" onClick={handleUnsetMitigatedScores}>
-                          Unset Mitigated Scores
-                        </Button>
-                      )}
-                    </HStack>
-                    {mitigatedRiskScore === null && (
-                      <Alert status="info" mb={4} borderRadius="md">
-                        <AlertIcon />
-                        Mitigated scores are not set. Adjust the sliders below to calculate them.
-                      </Alert>
-                    )}
+                  {/* Tab 3: Existing Controls Assessment */}
+                  <TabPanel>
                     <HStack spacing={6} align="flex-start">
-                    {/* Left side: Sliders */}
-                    <VStack spacing={6} flex="1">
-                      <HStack spacing={4} width="100%" justify="space-around">
-                        <FormControl>
-                          <FormLabel textAlign="center" mb={2}>
-                            Mitigated Confidentiality (MC)
-                            <Tooltip label="Mitigated impact on confidentiality">
-                              <IconButton
-                                aria-label="Help"
-                                icon={<Text fontSize="xs">?</Text>}
-                                size="xs"
-                                variant="ghost"
-                                ml={1}
-                              />
-                            </Tooltip>
-                          </FormLabel>
-                          <VStack spacing={3} align="center">
-                            <VStack spacing={1} align="center">
-                              {formData.mitigatedConfidentialityScore !== null ? (
-                                <>
-                                  <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedConfidentialityScore)}.600`} mb={1}>
-                                    {formData.mitigatedConfidentialityScore}
-                                  </Text>
-                                  <Badge colorScheme={getScoreLabelColor(formData.mitigatedConfidentialityScore)} fontSize="sm" px={3} py={1} minW="80px">
-                                    {getScoreLabel(formData.mitigatedConfidentialityScore)}
-                                  </Badge>
-                                </>
-                              ) : (
-                                <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
-                                  Not Set
-                                </Badge>
-                              )}
-                            </VStack>
-                            <Box position="relative" height="200px" width="60px" mt={3}>
-                              <Slider
-                                orientation="vertical"
-                                min={1}
-                                max={5}
-                                step={1}
-                                value={formData.mitigatedConfidentialityScore || 1}
-                                onChange={(val) =>
-                                  setFormData({
-                                    ...formData,
-                                    mitigatedConfidentialityScore: val || null,
-                                  })
-                                }
-                                isDisabled={viewMode}
-                              >
-                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  1
-                                </SliderMark>
-                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  3
-                                </SliderMark>
-                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  5
-                                </SliderMark>
-                                <SliderTrack>
-                                  <SliderFilledTrack />
-                                </SliderTrack>
-                                <SliderThumb 
-                                  boxSize={6} 
-                                  bg={formData.mitigatedConfidentialityScore !== null ? `${getScoreLabelColor(formData.mitigatedConfidentialityScore)}.500` : 'gray.400'} 
-                                  borderWidth="2px" 
-                                  borderColor="white" 
-                                  boxShadow="md" 
+                      {/* Left side: Sliders */}
+                      <VStack spacing={6} flex="1">
+                        <HStack spacing={4} width="100%" justify="space-around">
+                          <FormControl isRequired>
+                            <FormLabel textAlign="center" mb={2}>
+                              Confidentiality (C)
+                              <Tooltip label="Impact on confidentiality">
+                                <IconButton
+                                  aria-label="Help"
+                                  icon={<Text fontSize="xs">?</Text>}
+                                  size="xs"
+                                  variant="ghost"
+                                  ml={1}
                                 />
-                              </Slider>
-                            </Box>
-                          </VStack>
-                        </FormControl>
-
-                        <FormControl>
-                          <FormLabel textAlign="center" mb={2}>
-                            Mitigated Integrity (MI)
-                            <Tooltip label="Mitigated impact on integrity">
-                              <IconButton
-                                aria-label="Help"
-                                icon={<Text fontSize="xs">?</Text>}
-                                size="xs"
-                                variant="ghost"
-                                ml={1}
-                              />
-                            </Tooltip>
-                          </FormLabel>
-                          <VStack spacing={3} align="center">
-                            <VStack spacing={1} align="center">
-                              {formData.mitigatedIntegrityScore !== null ? (
-                                <>
-                                  <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedIntegrityScore)}.600`} mb={1}>
-                                    {formData.mitigatedIntegrityScore}
-                                  </Text>
-                                  <Badge colorScheme={getScoreLabelColor(formData.mitigatedIntegrityScore)} fontSize="sm" px={3} py={1} minW="80px">
-                                    {getScoreLabel(formData.mitigatedIntegrityScore)}
-                                  </Badge>
-                                </>
-                              ) : (
-                                <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
-                                  Not Set
-                                </Badge>
-                              )}
-                            </VStack>
-                            <Box position="relative" height="200px" width="60px" mt={3}>
-                              <Slider
-                                orientation="vertical"
-                                min={1}
-                                max={5}
-                                step={1}
-                                value={formData.mitigatedIntegrityScore || 1}
-                                onChange={(val) =>
-                                  setFormData({ ...formData, mitigatedIntegrityScore: val || null })
-                                }
-                                isDisabled={viewMode}
-                              >
-                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  1
-                                </SliderMark>
-                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  3
-                                </SliderMark>
-                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  5
-                                </SliderMark>
-                                <SliderTrack>
-                                  <SliderFilledTrack />
-                                </SliderTrack>
-                                <SliderThumb 
-                                  boxSize={6} 
-                                  bg={formData.mitigatedIntegrityScore !== null ? `${getScoreLabelColor(formData.mitigatedIntegrityScore)}.500` : 'gray.400'} 
-                                  borderWidth="2px" 
-                                  borderColor="white" 
-                                  boxShadow="md" 
-                                />
-                              </Slider>
-                            </Box>
-                          </VStack>
-                        </FormControl>
-
-                        <FormControl>
-                          <FormLabel textAlign="center" mb={2}>
-                            Mitigated Availability (MA)
-                            <Tooltip label="Mitigated impact on availability">
-                              <IconButton
-                                aria-label="Help"
-                                icon={<Text fontSize="xs">?</Text>}
-                                size="xs"
-                                variant="ghost"
-                                ml={1}
-                              />
-                            </Tooltip>
-                          </FormLabel>
-                          <VStack spacing={3} align="center">
-                            <VStack spacing={1} align="center">
-                              {formData.mitigatedAvailabilityScore !== null ? (
-                                <>
-                                  <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedAvailabilityScore)}.600`} mb={1}>
-                                    {formData.mitigatedAvailabilityScore}
-                                  </Text>
-                                  <Badge colorScheme={getScoreLabelColor(formData.mitigatedAvailabilityScore)} fontSize="sm" px={3} py={1} minW="80px">
-                                    {getScoreLabel(formData.mitigatedAvailabilityScore)}
-                                  </Badge>
-                                </>
-                              ) : (
-                                <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
-                                  Not Set
-                                </Badge>
-                              )}
-                            </VStack>
-                            <Box position="relative" height="200px" width="60px" mt={3}>
-                              <Slider
-                                orientation="vertical"
-                                min={1}
-                                max={5}
-                                step={1}
-                                value={formData.mitigatedAvailabilityScore || 1}
-                                onChange={(val) =>
-                                  setFormData({ ...formData, mitigatedAvailabilityScore: val || null })
-                                }
-                                isDisabled={viewMode}
-                              >
-                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  1
-                                </SliderMark>
-                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  3
-                                </SliderMark>
-                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  5
-                                </SliderMark>
-                                <SliderTrack>
-                                  <SliderFilledTrack />
-                                </SliderTrack>
-                                <SliderThumb 
-                                  boxSize={6} 
-                                  bg={formData.mitigatedAvailabilityScore !== null ? `${getScoreLabelColor(formData.mitigatedAvailabilityScore)}.500` : 'gray.400'} 
-                                  borderWidth="2px" 
-                                  borderColor="white" 
-                                  boxShadow="md" 
-                                />
-                              </Slider>
-                            </Box>
-                          </VStack>
-                        </FormControl>
-
-                        <FormControl>
-                          <FormLabel textAlign="center" mb={2}>
-                            Mitigated Likelihood (ML)
-                            <Tooltip label="Mitigated likelihood of risk occurring">
-                              <IconButton
-                                aria-label="Help"
-                                icon={<Text fontSize="xs">?</Text>}
-                                size="xs"
-                                variant="ghost"
-                                ml={1}
-                              />
-                            </Tooltip>
-                          </FormLabel>
-                          <VStack spacing={3} align="center">
-                            <VStack spacing={1} align="center">
-                              {formData.mitigatedLikelihood !== null ? (
-                                <>
-                                  <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedLikelihood)}.600`} mb={1}>
-                                    {formData.mitigatedLikelihood}
-                                  </Text>
-                                  <Badge colorScheme={getScoreLabelColor(formData.mitigatedLikelihood)} fontSize="sm" px={3} py={1} minW="80px">
-                                    {getScoreLabel(formData.mitigatedLikelihood)}
-                                  </Badge>
-                                </>
-                              ) : (
-                                <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
-                                  Not Set
-                                </Badge>
-                              )}
-                            </VStack>
-                            <Box position="relative" height="200px" width="60px" mt={3}>
-                              <Slider
-                                orientation="vertical"
-                                min={1}
-                                max={5}
-                                step={1}
-                                value={formData.mitigatedLikelihood || 1}
-                                onChange={(val) =>
-                                  setFormData({ ...formData, mitigatedLikelihood: val || null })
-                                }
-                                isDisabled={viewMode}
-                              >
-                                <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  1
-                                </SliderMark>
-                                <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  3
-                                </SliderMark>
-                                <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
-                                  5
-                                </SliderMark>
-                                <SliderTrack>
-                                  <SliderFilledTrack />
-                                </SliderTrack>
-                                <SliderThumb 
-                                  boxSize={6} 
-                                  bg={formData.mitigatedLikelihood !== null ? `${getScoreLabelColor(formData.mitigatedLikelihood)}.500` : 'gray.400'} 
-                                  borderWidth="2px" 
-                                  borderColor="white" 
-                                  boxShadow="md" 
-                                />
-                              </Slider>
-                            </Box>
-                          </VStack>
-                        </FormControl>
-                      </HStack>
-                    </VStack>
-
-                    {/* Right side: Mitigated Risk and Risk Score Cards */}
-                    <VStack spacing={4} minW="200px">
-                      <Card 
-                        width="100%" 
-                        minW="200px" 
-                        maxW="200px"
-                        bg={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.50` : 'gray.50'} 
-                        borderColor={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.300` : 'gray.300'} 
-                        borderWidth="2px"
-                        borderStyle={mitigatedRisk === null ? 'dashed' : 'solid'}
-                      >
-                        <CardBody>
-                          <VStack spacing={2} align="stretch">
-                            <Text fontSize="sm" fontWeight="bold" color="gray.600">
-                              Mitigated Risk (MC + MI + MA)
-                            </Text>
-                            <Text fontSize="3xl" fontWeight="bold" color={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.700` : 'gray.500'} textAlign="center">
-                              {mitigatedRisk !== null ? mitigatedRisk : 'N/A'}
-                            </Text>
-                          </VStack>
-                        </CardBody>
-                      </Card>
-
-                      <Card 
-                        width="100%" 
-                        minW="200px" 
-                        maxW="200px"
-                        bg={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.50` : 'gray.50'} 
-                        borderColor={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.300` : 'gray.300'} 
-                        borderWidth="2px"
-                        borderStyle={mitigatedRiskScore === null ? 'dashed' : 'solid'}
-                      >
-                        <CardBody>
-                          <VStack spacing={2} align="stretch">
-                            <Text fontSize="sm" fontWeight="bold" color="gray.600">
-                              Mitigated Risk Score
-                            </Text>
-                            <Text fontSize="3xl" fontWeight="bold" color={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.700` : 'gray.500'} textAlign="center">
-                              {mitigatedRiskScore !== null ? mitigatedRiskScore : 'N/A'}
-                            </Text>
-                            {mitigatedRiskLevel ? (
-                              <>
-                                <Badge colorScheme={mitigatedRiskLevelColor} size="lg" alignSelf="center" mt={2} minW="80px" justifyContent="center">
-                                  {mitigatedRiskLevel}
-                                </Badge>
-                                <Text fontSize="xs" color="gray.500" textAlign="center" mt={1} minH="40px" lineHeight="1.4">
-                                  {mitigatedRiskLevel === 'HIGH' && 'Unacceptable - treatment required'}
-                                  {mitigatedRiskLevel === 'MEDIUM' && 'Warning - review frequently'}
-                                  {mitigatedRiskLevel === 'LOW' && 'Acceptable - no treatment required'}
+                              </Tooltip>
+                            </FormLabel>
+                            <VStack spacing={3} align="center">
+                              <VStack spacing={1} align="center">
+                                <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.confidentialityScore)}.600`} mb={1}>
+                                  {formData.confidentialityScore}
                                 </Text>
-                              </>
-                            ) : (
-                              <Text fontSize="xs" color="gray.400" textAlign="center" mt={1} fontStyle="italic" minH="32px">
-                                Set mitigated scores to calculate
+                                <Badge colorScheme={getScoreLabelColor(formData.confidentialityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                  {getScoreLabel(formData.confidentialityScore)}
+                                </Badge>
+                              </VStack>
+                              <Box position="relative" height="200px" width="60px" mt={3}>
+                                <Slider
+                                  orientation="vertical"
+                                  min={1}
+                                  max={5}
+                                  step={1}
+                                  value={formData.confidentialityScore}
+                                  onChange={(val) => setFormData({ ...formData, confidentialityScore: val })}
+                                >
+                                  <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    1
+                                  </SliderMark>
+                                  <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    3
+                                  </SliderMark>
+                                  <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    5
+                                  </SliderMark>
+                                  <SliderTrack>
+                                    <SliderFilledTrack />
+                                  </SliderTrack>
+                                  <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.confidentialityScore)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
+                                </Slider>
+                              </Box>
+                            </VStack>
+                          </FormControl>
+
+                          <FormControl isRequired>
+                            <FormLabel textAlign="center" mb={2}>
+                              Integrity (I)
+                              <Tooltip label="Impact on integrity">
+                                <IconButton
+                                  aria-label="Help"
+                                  icon={<Text fontSize="xs">?</Text>}
+                                  size="xs"
+                                  variant="ghost"
+                                  ml={1}
+                                />
+                              </Tooltip>
+                            </FormLabel>
+                            <VStack spacing={3} align="center">
+                              <VStack spacing={1} align="center">
+                                <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.integrityScore)}.600`} mb={1}>
+                                  {formData.integrityScore}
+                                </Text>
+                                <Badge colorScheme={getScoreLabelColor(formData.integrityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                  {getScoreLabel(formData.integrityScore)}
+                                </Badge>
+                              </VStack>
+                              <Box position="relative" height="200px" width="60px" mt={3}>
+                                <Slider
+                                  orientation="vertical"
+                                  min={1}
+                                  max={5}
+                                  step={1}
+                                  value={formData.integrityScore}
+                                  onChange={(val) => setFormData({ ...formData, integrityScore: val })}
+                                  isDisabled={viewMode}
+                                >
+                                  <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    1
+                                  </SliderMark>
+                                  <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    3
+                                  </SliderMark>
+                                  <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    5
+                                  </SliderMark>
+                                  <SliderTrack>
+                                    <SliderFilledTrack />
+                                  </SliderTrack>
+                                  <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.integrityScore)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
+                                </Slider>
+                              </Box>
+                            </VStack>
+                          </FormControl>
+
+                          <FormControl isRequired>
+                            <FormLabel textAlign="center" mb={2}>
+                              Availability (A)
+                              <Tooltip label="Impact on availability">
+                                <IconButton
+                                  aria-label="Help"
+                                  icon={<Text fontSize="xs">?</Text>}
+                                  size="xs"
+                                  variant="ghost"
+                                  ml={1}
+                                />
+                              </Tooltip>
+                            </FormLabel>
+                            <VStack spacing={3} align="center">
+                              <VStack spacing={1} align="center">
+                                <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.availabilityScore)}.600`} mb={1}>
+                                  {formData.availabilityScore}
+                                </Text>
+                                <Badge colorScheme={getScoreLabelColor(formData.availabilityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                  {getScoreLabel(formData.availabilityScore)}
+                                </Badge>
+                              </VStack>
+                              <Box position="relative" height="200px" width="60px" mt={3}>
+                                <Slider
+                                  orientation="vertical"
+                                  min={1}
+                                  max={5}
+                                  step={1}
+                                  value={formData.availabilityScore}
+                                  onChange={(val) => setFormData({ ...formData, availabilityScore: val })}
+                                  isDisabled={viewMode}
+                                >
+                                  <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    1
+                                  </SliderMark>
+                                  <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    3
+                                  </SliderMark>
+                                  <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    5
+                                  </SliderMark>
+                                  <SliderTrack>
+                                    <SliderFilledTrack />
+                                  </SliderTrack>
+                                  <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.availabilityScore)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
+                                </Slider>
+                              </Box>
+                            </VStack>
+                          </FormControl>
+
+                          <FormControl isRequired>
+                            <FormLabel textAlign="center" mb={2}>
+                              Likelihood (L)
+                              <Tooltip label="Likelihood of risk occurring">
+                                <IconButton
+                                  aria-label="Help"
+                                  icon={<Text fontSize="xs">?</Text>}
+                                  size="xs"
+                                  variant="ghost"
+                                  ml={1}
+                                />
+                              </Tooltip>
+                            </FormLabel>
+                            <VStack spacing={3} align="center">
+                              <VStack spacing={1} align="center">
+                                <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.likelihood)}.600`} mb={1}>
+                                  {formData.likelihood}
+                                </Text>
+                                <Badge colorScheme={getScoreLabelColor(formData.likelihood)} fontSize="sm" px={3} py={1} minW="80px">
+                                  {getScoreLabel(formData.likelihood)}
+                                </Badge>
+                              </VStack>
+                              <Box position="relative" height="200px" width="60px" mt={3}>
+                                <Slider
+                                  orientation="vertical"
+                                  min={1}
+                                  max={5}
+                                  step={1}
+                                  value={formData.likelihood}
+                                  onChange={(val) => setFormData({ ...formData, likelihood: val })}
+                                  isDisabled={viewMode}
+                                >
+                                  <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    1
+                                  </SliderMark>
+                                  <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    3
+                                  </SliderMark>
+                                  <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                    5
+                                  </SliderMark>
+                                  <SliderTrack>
+                                    <SliderFilledTrack />
+                                  </SliderTrack>
+                                  <SliderThumb boxSize={6} bg={`${getScoreLabelColor(formData.likelihood)}.500`} borderWidth="2px" borderColor="white" boxShadow="md" />
+                                </Slider>
+                              </Box>
+                            </VStack>
+                          </FormControl>
+                        </HStack>
+                      </VStack>
+
+                      {/* Right side: Risk and Risk Score Cards */}
+                      <VStack spacing={4} minW="200px">
+                        <Card width="100%" minW="200px" maxW="200px" bg={`${riskLevelColor}.50`} borderColor={`${riskLevelColor}.300`} borderWidth="2px">
+                          <CardBody>
+                            <VStack spacing={2} align="stretch">
+                              <Text fontSize="sm" fontWeight="bold" color="gray.600">
+                                Risk (C + I + A)
                               </Text>
-                            )}
-                          </VStack>
-                        </CardBody>
-                      </Card>
-                    </VStack>
-                  </HStack>
+                              <Text fontSize="3xl" fontWeight="bold" color={`${riskLevelColor}.700`} textAlign="center">
+                                {calculatedRisk}
+                              </Text>
+                            </VStack>
+                          </CardBody>
+                        </Card>
 
-                  <FormControl>
-                    <Checkbox
-                      isChecked={formData.mitigationImplemented}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setFormData((prev) => ({ ...prev, mitigationImplemented: checked }));
-                      }}
-                      isDisabled={viewMode}
-                    >
-                      Mitigation Implemented
-                    </Checkbox>
-                  </FormControl>
+                        <Card width="100%" minW="200px" maxW="200px" bg={`${riskLevelColor}.50`} borderColor={`${riskLevelColor}.300`} borderWidth="2px">
+                          <CardBody>
+                            <VStack spacing={2} align="stretch">
+                              <Text fontSize="sm" fontWeight="bold" color="gray.600">
+                                Risk Score
+                              </Text>
+                              <Text fontSize="3xl" fontWeight="bold" color={`${riskLevelColor}.700`} textAlign="center">
+                                {calculatedRiskScore}
+                              </Text>
+                              <Badge colorScheme={riskLevelColor} size="lg" alignSelf="center" mt={2} minW="80px" justifyContent="center">
+                                {riskLevel}
+                              </Badge>
+                              <Text fontSize="xs" color="gray.500" textAlign="center" mt={1} minH="40px" lineHeight="1.4">
+                                {riskLevel === 'HIGH' && 'Unacceptable - treatment required'}
+                                {riskLevel === 'MEDIUM' && 'Warning - review frequently'}
+                                {riskLevel === 'LOW' && 'Acceptable - no treatment required'}
+                              </Text>
+                            </VStack>
+                          </CardBody>
+                        </Card>
+                      </VStack>
+                    </HStack>
 
-                  <FormControl>
-                    <FormLabel>Mitigation Description</FormLabel>
-                    <Textarea
-                      value={formData.mitigationDescription}
-                      onChange={(e) =>
-                        setFormData({ ...formData, mitigationDescription: e.target.value })
-                      }
-                      rows={4}
-                      placeholder="Describe the mitigation measures implemented..."
-                      isReadOnly={viewMode}
-                    />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel>Residual Risk Treatment Category</FormLabel>
-                    <Select
-                      value={formData.residualRiskTreatmentCategory}
-                      onChange={(e) =>
-                        setFormData({ ...formData, residualRiskTreatmentCategory: e.target.value })
-                      }
-                      placeholder="Select treatment category"
-                      isDisabled={viewMode}
-                    >
-                      {TREATMENT_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  </VStack>
-                </TabPanel>
-
-                {/* Tab 5: Controls Linkage */}
-                <TabPanel>
-                  <VStack spacing={4} align="stretch">
-                    <HStack justify="space-between">
-                      <FormLabel>Annex A Applicable Controls</FormLabel>
-                      <Button
-                        size="sm"
-                        leftIcon={loadingSuggestions ? <Spinner size="sm" /> : <Text>✨</Text>}
-                        onClick={getSuggestedControls}
-                        isLoading={loadingSuggestions}
-                        variant="outline"
-                        colorScheme="purple"
+                    <FormControl>
+                      <FormLabel>Initial Risk Treatment Category</FormLabel>
+                      <Select
+                        value={formData.initialRiskTreatmentCategory}
+                        onChange={(e) =>
+                          setFormData({ ...formData, initialRiskTreatmentCategory: e.target.value })
+                        }
+                        placeholder="Select treatment category"
                         isDisabled={viewMode}
                       >
-                        Get AI Suggestions
-                      </Button>
-                    </HStack>
+                        {TREATMENT_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </TabPanel>
 
-                    {suggestedControls.length > 0 && (
-                      <Alert status="info" borderRadius="md">
-                        <AlertIcon />
-                        <Box flex="1">
-                          <Text fontSize="sm" fontWeight="bold" mb={2}>
-                            Suggested Controls ({suggestedControls.length})
-                          </Text>
+                  {/* Tab 4: Additional Controls Assessment */}
+                  <TabPanel>
+                    <VStack spacing={6} align="stretch">
+                      <HStack justify="space-between">
+                        <Text fontSize="md" fontWeight="semibold" color="green.600">
+                          Additional Controls - Mitigated Assessment
+                        </Text>
+                        {mitigatedRiskScore !== null && (
+                          <Button size="sm" variant="outline" onClick={handleUnsetMitigatedScores}>
+                            Unset Mitigated Scores
+                          </Button>
+                        )}
+                      </HStack>
+                      {mitigatedRiskScore === null && (
+                        <Alert status="info" mb={4} borderRadius="md">
+                          <AlertIcon />
+                          Mitigated scores are not set. Adjust the sliders below to calculate them.
+                        </Alert>
+                      )}
+                      <HStack spacing={6} align="flex-start">
+                        {/* Left side: Sliders */}
+                        <VStack spacing={6} flex="1">
+                          <HStack spacing={4} width="100%" justify="space-around">
+                            <FormControl>
+                              <FormLabel textAlign="center" mb={2}>
+                                Mitigated Confidentiality (MC)
+                                <Tooltip label="Mitigated impact on confidentiality">
+                                  <IconButton
+                                    aria-label="Help"
+                                    icon={<Text fontSize="xs">?</Text>}
+                                    size="xs"
+                                    variant="ghost"
+                                    ml={1}
+                                  />
+                                </Tooltip>
+                              </FormLabel>
+                              <VStack spacing={3} align="center">
+                                <VStack spacing={1} align="center">
+                                  {formData.mitigatedConfidentialityScore !== null ? (
+                                    <>
+                                      <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedConfidentialityScore)}.600`} mb={1}>
+                                        {formData.mitigatedConfidentialityScore}
+                                      </Text>
+                                      <Badge colorScheme={getScoreLabelColor(formData.mitigatedConfidentialityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                        {getScoreLabel(formData.mitigatedConfidentialityScore)}
+                                      </Badge>
+                                    </>
+                                  ) : (
+                                    <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
+                                      Not Set
+                                    </Badge>
+                                  )}
+                                </VStack>
+                                <Box position="relative" height="200px" width="60px" mt={3}>
+                                  <Slider
+                                    orientation="vertical"
+                                    min={1}
+                                    max={5}
+                                    step={1}
+                                    value={formData.mitigatedConfidentialityScore || 1}
+                                    onChange={(val) =>
+                                      setFormData({
+                                        ...formData,
+                                        mitigatedConfidentialityScore: val || null,
+                                      })
+                                    }
+                                    isDisabled={viewMode}
+                                  >
+                                    <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      1
+                                    </SliderMark>
+                                    <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      3
+                                    </SliderMark>
+                                    <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      5
+                                    </SliderMark>
+                                    <SliderTrack>
+                                      <SliderFilledTrack />
+                                    </SliderTrack>
+                                    <SliderThumb
+                                      boxSize={6}
+                                      bg={formData.mitigatedConfidentialityScore !== null ? `${getScoreLabelColor(formData.mitigatedConfidentialityScore)}.500` : 'gray.400'}
+                                      borderWidth="2px"
+                                      borderColor="white"
+                                      boxShadow="md"
+                                    />
+                                  </Slider>
+                                </Box>
+                              </VStack>
+                            </FormControl>
+
+                            <FormControl>
+                              <FormLabel textAlign="center" mb={2}>
+                                Mitigated Integrity (MI)
+                                <Tooltip label="Mitigated impact on integrity">
+                                  <IconButton
+                                    aria-label="Help"
+                                    icon={<Text fontSize="xs">?</Text>}
+                                    size="xs"
+                                    variant="ghost"
+                                    ml={1}
+                                  />
+                                </Tooltip>
+                              </FormLabel>
+                              <VStack spacing={3} align="center">
+                                <VStack spacing={1} align="center">
+                                  {formData.mitigatedIntegrityScore !== null ? (
+                                    <>
+                                      <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedIntegrityScore)}.600`} mb={1}>
+                                        {formData.mitigatedIntegrityScore}
+                                      </Text>
+                                      <Badge colorScheme={getScoreLabelColor(formData.mitigatedIntegrityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                        {getScoreLabel(formData.mitigatedIntegrityScore)}
+                                      </Badge>
+                                    </>
+                                  ) : (
+                                    <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
+                                      Not Set
+                                    </Badge>
+                                  )}
+                                </VStack>
+                                <Box position="relative" height="200px" width="60px" mt={3}>
+                                  <Slider
+                                    orientation="vertical"
+                                    min={1}
+                                    max={5}
+                                    step={1}
+                                    value={formData.mitigatedIntegrityScore || 1}
+                                    onChange={(val) =>
+                                      setFormData({ ...formData, mitigatedIntegrityScore: val || null })
+                                    }
+                                    isDisabled={viewMode}
+                                  >
+                                    <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      1
+                                    </SliderMark>
+                                    <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      3
+                                    </SliderMark>
+                                    <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      5
+                                    </SliderMark>
+                                    <SliderTrack>
+                                      <SliderFilledTrack />
+                                    </SliderTrack>
+                                    <SliderThumb
+                                      boxSize={6}
+                                      bg={formData.mitigatedIntegrityScore !== null ? `${getScoreLabelColor(formData.mitigatedIntegrityScore)}.500` : 'gray.400'}
+                                      borderWidth="2px"
+                                      borderColor="white"
+                                      boxShadow="md"
+                                    />
+                                  </Slider>
+                                </Box>
+                              </VStack>
+                            </FormControl>
+
+                            <FormControl>
+                              <FormLabel textAlign="center" mb={2}>
+                                Mitigated Availability (MA)
+                                <Tooltip label="Mitigated impact on availability">
+                                  <IconButton
+                                    aria-label="Help"
+                                    icon={<Text fontSize="xs">?</Text>}
+                                    size="xs"
+                                    variant="ghost"
+                                    ml={1}
+                                  />
+                                </Tooltip>
+                              </FormLabel>
+                              <VStack spacing={3} align="center">
+                                <VStack spacing={1} align="center">
+                                  {formData.mitigatedAvailabilityScore !== null ? (
+                                    <>
+                                      <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedAvailabilityScore)}.600`} mb={1}>
+                                        {formData.mitigatedAvailabilityScore}
+                                      </Text>
+                                      <Badge colorScheme={getScoreLabelColor(formData.mitigatedAvailabilityScore)} fontSize="sm" px={3} py={1} minW="80px">
+                                        {getScoreLabel(formData.mitigatedAvailabilityScore)}
+                                      </Badge>
+                                    </>
+                                  ) : (
+                                    <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
+                                      Not Set
+                                    </Badge>
+                                  )}
+                                </VStack>
+                                <Box position="relative" height="200px" width="60px" mt={3}>
+                                  <Slider
+                                    orientation="vertical"
+                                    min={1}
+                                    max={5}
+                                    step={1}
+                                    value={formData.mitigatedAvailabilityScore || 1}
+                                    onChange={(val) =>
+                                      setFormData({ ...formData, mitigatedAvailabilityScore: val || null })
+                                    }
+                                    isDisabled={viewMode}
+                                  >
+                                    <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      1
+                                    </SliderMark>
+                                    <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      3
+                                    </SliderMark>
+                                    <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      5
+                                    </SliderMark>
+                                    <SliderTrack>
+                                      <SliderFilledTrack />
+                                    </SliderTrack>
+                                    <SliderThumb
+                                      boxSize={6}
+                                      bg={formData.mitigatedAvailabilityScore !== null ? `${getScoreLabelColor(formData.mitigatedAvailabilityScore)}.500` : 'gray.400'}
+                                      borderWidth="2px"
+                                      borderColor="white"
+                                      boxShadow="md"
+                                    />
+                                  </Slider>
+                                </Box>
+                              </VStack>
+                            </FormControl>
+
+                            <FormControl>
+                              <FormLabel textAlign="center" mb={2}>
+                                Mitigated Likelihood (ML)
+                                <Tooltip label="Mitigated likelihood of risk occurring">
+                                  <IconButton
+                                    aria-label="Help"
+                                    icon={<Text fontSize="xs">?</Text>}
+                                    size="xs"
+                                    variant="ghost"
+                                    ml={1}
+                                  />
+                                </Tooltip>
+                              </FormLabel>
+                              <VStack spacing={3} align="center">
+                                <VStack spacing={1} align="center">
+                                  {formData.mitigatedLikelihood !== null ? (
+                                    <>
+                                      <Text fontSize="lg" fontWeight="bold" color={`${getScoreLabelColor(formData.mitigatedLikelihood)}.600`} mb={1}>
+                                        {formData.mitigatedLikelihood}
+                                      </Text>
+                                      <Badge colorScheme={getScoreLabelColor(formData.mitigatedLikelihood)} fontSize="sm" px={3} py={1} minW="80px">
+                                        {getScoreLabel(formData.mitigatedLikelihood)}
+                                      </Badge>
+                                    </>
+                                  ) : (
+                                    <Badge colorScheme="gray" fontSize="sm" px={3} py={1} minW="80px">
+                                      Not Set
+                                    </Badge>
+                                  )}
+                                </VStack>
+                                <Box position="relative" height="200px" width="60px" mt={3}>
+                                  <Slider
+                                    orientation="vertical"
+                                    min={1}
+                                    max={5}
+                                    step={1}
+                                    value={formData.mitigatedLikelihood || 1}
+                                    onChange={(val) =>
+                                      setFormData({ ...formData, mitigatedLikelihood: val || null })
+                                    }
+                                    isDisabled={viewMode}
+                                  >
+                                    <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      1
+                                    </SliderMark>
+                                    <SliderMark value={3} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      3
+                                    </SliderMark>
+                                    <SliderMark value={5} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
+                                      5
+                                    </SliderMark>
+                                    <SliderTrack>
+                                      <SliderFilledTrack />
+                                    </SliderTrack>
+                                    <SliderThumb
+                                      boxSize={6}
+                                      bg={formData.mitigatedLikelihood !== null ? `${getScoreLabelColor(formData.mitigatedLikelihood)}.500` : 'gray.400'}
+                                      borderWidth="2px"
+                                      borderColor="white"
+                                      boxShadow="md"
+                                    />
+                                  </Slider>
+                                </Box>
+                              </VStack>
+                            </FormControl>
+                          </HStack>
+                        </VStack>
+
+                        {/* Right side: Mitigated Risk and Risk Score Cards */}
+                        <VStack spacing={4} minW="200px">
+                          <Card
+                            width="100%"
+                            minW="200px"
+                            maxW="200px"
+                            bg={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.50` : 'gray.50'}
+                            borderColor={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.300` : 'gray.300'}
+                            borderWidth="2px"
+                            borderStyle={mitigatedRisk === null ? 'dashed' : 'solid'}
+                          >
+                            <CardBody>
+                              <VStack spacing={2} align="stretch">
+                                <Text fontSize="sm" fontWeight="bold" color="gray.600">
+                                  Mitigated Risk (MC + MI + MA)
+                                </Text>
+                                <Text fontSize="3xl" fontWeight="bold" color={mitigatedRisk !== null ? `${mitigatedRiskLevelColor}.700` : 'gray.500'} textAlign="center">
+                                  {mitigatedRisk !== null ? mitigatedRisk : 'N/A'}
+                                </Text>
+                              </VStack>
+                            </CardBody>
+                          </Card>
+
+                          <Card
+                            width="100%"
+                            minW="200px"
+                            maxW="200px"
+                            bg={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.50` : 'gray.50'}
+                            borderColor={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.300` : 'gray.300'}
+                            borderWidth="2px"
+                            borderStyle={mitigatedRiskScore === null ? 'dashed' : 'solid'}
+                          >
+                            <CardBody>
+                              <VStack spacing={2} align="stretch">
+                                <Text fontSize="sm" fontWeight="bold" color="gray.600">
+                                  Mitigated Risk Score
+                                </Text>
+                                <Text fontSize="3xl" fontWeight="bold" color={mitigatedRiskScore !== null ? `${mitigatedRiskLevelColor}.700` : 'gray.500'} textAlign="center">
+                                  {mitigatedRiskScore !== null ? mitigatedRiskScore : 'N/A'}
+                                </Text>
+                                {mitigatedRiskLevel ? (
+                                  <>
+                                    <Badge colorScheme={mitigatedRiskLevelColor} size="lg" alignSelf="center" mt={2} minW="80px" justifyContent="center">
+                                      {mitigatedRiskLevel}
+                                    </Badge>
+                                    <Text fontSize="xs" color="gray.500" textAlign="center" mt={1} minH="40px" lineHeight="1.4">
+                                      {mitigatedRiskLevel === 'HIGH' && 'Unacceptable - treatment required'}
+                                      {mitigatedRiskLevel === 'MEDIUM' && 'Warning - review frequently'}
+                                      {mitigatedRiskLevel === 'LOW' && 'Acceptable - no treatment required'}
+                                    </Text>
+                                  </>
+                                ) : (
+                                  <Text fontSize="xs" color="gray.400" textAlign="center" mt={1} fontStyle="italic" minH="32px">
+                                    Set mitigated scores to calculate
+                                  </Text>
+                                )}
+                              </VStack>
+                            </CardBody>
+                          </Card>
+                        </VStack>
+                      </HStack>
+
+                      <FormControl>
+                        <Checkbox
+                          isChecked={formData.mitigationImplemented}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setFormData((prev) => ({ ...prev, mitigationImplemented: checked }));
+                          }}
+                          isDisabled={viewMode}
+                        >
+                          Mitigation Implemented
+                        </Checkbox>
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Mitigation Description</FormLabel>
+                        <Textarea
+                          value={formData.mitigationDescription}
+                          onChange={(e) =>
+                            setFormData({ ...formData, mitigationDescription: e.target.value })
+                          }
+                          rows={4}
+                          placeholder="Describe the mitigation measures implemented..."
+                          isReadOnly={viewMode}
+                        />
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Residual Risk Treatment Category</FormLabel>
+                        <Select
+                          value={formData.residualRiskTreatmentCategory}
+                          onChange={(e) =>
+                            setFormData({ ...formData, residualRiskTreatmentCategory: e.target.value })
+                          }
+                          placeholder="Select treatment category"
+                          isDisabled={viewMode}
+                        >
+                          {TREATMENT_CATEGORIES.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </VStack>
+                  </TabPanel>
+
+                  {/* Tab 5: Controls Linkage */}
+                  <TabPanel>
+                    <VStack spacing={4} align="stretch">
+                      <HStack justify="space-between">
+                        <FormLabel>Annex A Applicable Controls</FormLabel>
+                        <Button
+                          size="sm"
+                          leftIcon={loadingSuggestions ? <Spinner size="sm" /> : <Text>✨</Text>}
+                          onClick={getSuggestedControls}
+                          isLoading={loadingSuggestions}
+                          variant="outline"
+                          colorScheme="purple"
+                          isDisabled={viewMode}
+                        >
+                          Get AI Suggestions
+                        </Button>
+                      </HStack>
+
+                      {suggestedControls.length > 0 && (
+                        <Alert status="info" borderRadius="md">
+                          <AlertIcon />
+                          <Box flex="1">
+                            <Text fontSize="sm" fontWeight="bold" mb={2}>
+                              Suggested Controls ({suggestedControls.length})
+                            </Text>
+                            <HStack spacing={2} flexWrap="wrap">
+                              {suggestedControls.map((controlId) => {
+                                const control = controls.find((c) => c.id === controlId);
+                                if (!control) return null;
+                                const isSelected = selectedControlIds.includes(controlId);
+                                return (
+                                  <Tag
+                                    key={controlId}
+                                    colorScheme={isSelected ? 'blue' : 'gray'}
+                                    cursor="pointer"
+                                    onClick={() => {
+                                      if (isSelected) {
+                                        setSelectedControlIds(selectedControlIds.filter((id) => id !== controlId));
+                                      } else {
+                                        setSelectedControlIds([...selectedControlIds, controlId]);
+                                      }
+                                    }}
+                                  >
+                                    <TagLabel>{control.code}: {control.title}</TagLabel>
+                                  </Tag>
+                                );
+                              })}
+                            </HStack>
+                          </Box>
+                        </Alert>
+                      )}
+
+                      <FormControl>
+                        <FormLabel>Search and Select Controls</FormLabel>
+                        <InputGroup>
+                          <InputLeftElement pointerEvents="none">
+                            <SearchIcon color="gray.300" />
+                          </InputLeftElement>
+                          <Input
+                            placeholder="Search by control code or title..."
+                            value={controlSearchTerm}
+                            onChange={(e) => setControlSearchTerm(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && controlSearchTerm.trim()) {
+                                // Try to find and add control by code
+                                const found = controls.find(
+                                  (c) =>
+                                    c.code.toLowerCase() === controlSearchTerm.trim().toLowerCase() ||
+                                    c.code.toLowerCase().includes(controlSearchTerm.trim().toLowerCase())
+                                );
+                                if (found && !selectedControlIds.includes(found.id)) {
+                                  setSelectedControlIds([...selectedControlIds, found.id]);
+                                  setControlSearchTerm('');
+                                }
+                              }
+                            }}
+                          />
+                        </InputGroup>
+                      </FormControl>
+
+                      {controlSearchTerm && (
+                        <Box
+                          borderWidth="1px"
+                          borderRadius="md"
+                          p={2}
+                          maxH="200px"
+                          overflowY="auto"
+                          bg="white"
+                        >
+                          {controls
+                            .filter(
+                              (c) =>
+                                !selectedControlIds.includes(c.id) &&
+                                (c.code.toLowerCase().includes(controlSearchTerm.toLowerCase()) ||
+                                  c.title.toLowerCase().includes(controlSearchTerm.toLowerCase()))
+                            )
+                            .slice(0, 10)
+                            .map((control) => (
+                              <Box
+                                key={control.id}
+                                p={2}
+                                _hover={{ bg: 'gray.100', cursor: 'pointer' }}
+                                onClick={() => {
+                                  setSelectedControlIds([...selectedControlIds, control.id]);
+                                  setControlSearchTerm('');
+                                }}
+                              >
+                                <Text fontWeight="medium">{control.code}</Text>
+                                <Text fontSize="sm" color="gray.600">
+                                  {control.title}
+                                </Text>
+                              </Box>
+                            ))}
+                        </Box>
+                      )}
+
+                      {selectedControlIds.length > 0 && (
+                        <Box>
+                          <FormLabel mb={2}>Selected Controls ({selectedControlIds.length})</FormLabel>
                           <HStack spacing={2} flexWrap="wrap">
-                            {suggestedControls.map((controlId) => {
+                            {selectedControlIds.map((controlId) => {
                               const control = controls.find((c) => c.id === controlId);
                               if (!control) return null;
-                              const isSelected = selectedControlIds.includes(controlId);
                               return (
-                                <Tag
-                                  key={controlId}
-                                  colorScheme={isSelected ? 'blue' : 'gray'}
-                                  cursor="pointer"
-                                  onClick={() => {
-                                    if (isSelected) {
+                                <Tag key={controlId} colorScheme="blue" size="md">
+                                  <TagLabel>
+                                    {control.code}: {control.title}
+                                  </TagLabel>
+                                  <TagCloseButton
+                                    onClick={() => {
                                       setSelectedControlIds(selectedControlIds.filter((id) => id !== controlId));
-                                    } else {
-                                      setSelectedControlIds([...selectedControlIds, controlId]);
-                                    }
-                                  }}
-                                >
-                                  <TagLabel>{control.code}: {control.title}</TagLabel>
+                                    }}
+                                  />
                                 </Tag>
                               );
                             })}
                           </HStack>
                         </Box>
-                      </Alert>
-                    )}
+                      )}
+                    </VStack>
+                  </TabPanel>
+                </TabPanels>
+              </Tabs>
 
-                    <FormControl>
-                      <FormLabel>Search and Select Controls</FormLabel>
-                      <InputGroup>
-                        <InputLeftElement pointerEvents="none">
-                          <SearchIcon color="gray.300" />
-                        </InputLeftElement>
-                        <Input
-                          placeholder="Search by control code or title..."
-                          value={controlSearchTerm}
-                          onChange={(e) => setControlSearchTerm(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && controlSearchTerm.trim()) {
-                              // Try to find and add control by code
-                              const found = controls.find(
-                                (c) =>
-                                  c.code.toLowerCase() === controlSearchTerm.trim().toLowerCase() ||
-                                  c.code.toLowerCase().includes(controlSearchTerm.trim().toLowerCase())
-                              );
-                              if (found && !selectedControlIds.includes(found.id)) {
-                                setSelectedControlIds([...selectedControlIds, found.id]);
-                                setControlSearchTerm('');
-                              }
-                            }
-                          }}
-                        />
-                      </InputGroup>
-                    </FormControl>
+              {/* Similar Risks Panel - shown when viewing existing risk */}
+              {showSimilarRisks && risk && (
+                <Box mt={4} pt={4} borderTopWidth="1px" borderColor="gray.200">
+                  <SimilarRisksPanel
+                    similarRisks={similarRisks}
+                    onViewRisk={handleViewSimilarRisk}
+                    onSelectRisk={handleSelectSimilarRisk}
+                    selectedRiskIds={selectedSimilarRiskIds}
+                    onBulkDelete={handleBulkDeleteSimilarRisks}
+                    loading={similarRisksLoading}
+                    threshold={70}
+                    progress={similarityProgress.total > 0 ? similarityProgress : undefined}
+                  />
+                </Box>
+              )}
+            </ModalBody>
 
-                    {controlSearchTerm && (
-                      <Box
-                        borderWidth="1px"
-                        borderRadius="md"
-                        p={2}
-                        maxH="200px"
-                        overflowY="auto"
-                        bg="white"
-                      >
-                        {controls
-                          .filter(
-                            (c) =>
-                              !selectedControlIds.includes(c.id) &&
-                              (c.code.toLowerCase().includes(controlSearchTerm.toLowerCase()) ||
-                                c.title.toLowerCase().includes(controlSearchTerm.toLowerCase()))
-                          )
-                          .slice(0, 10)
-                          .map((control) => (
-                            <Box
-                              key={control.id}
-                              p={2}
-                              _hover={{ bg: 'gray.100', cursor: 'pointer' }}
-                              onClick={() => {
-                                setSelectedControlIds([...selectedControlIds, control.id]);
-                                setControlSearchTerm('');
-                              }}
-                            >
-                              <Text fontWeight="medium">{control.code}</Text>
-                              <Text fontSize="sm" color="gray.600">
-                                {control.title}
-                              </Text>
-                            </Box>
-                          ))}
-                      </Box>
-                    )}
-
-                    {selectedControlIds.length > 0 && (
-                      <Box>
-                        <FormLabel mb={2}>Selected Controls ({selectedControlIds.length})</FormLabel>
-                        <HStack spacing={2} flexWrap="wrap">
-                          {selectedControlIds.map((controlId) => {
-                            const control = controls.find((c) => c.id === controlId);
-                            if (!control) return null;
-                            return (
-                              <Tag key={controlId} colorScheme="blue" size="md">
-                                <TagLabel>
-                                  {control.code}: {control.title}
-                                </TagLabel>
-                                <TagCloseButton
-                                  onClick={() => {
-                                    setSelectedControlIds(selectedControlIds.filter((id) => id !== controlId));
-                                  }}
-                                />
-                              </Tag>
-                            );
-                          })}
-                        </HStack>
-                      </Box>
-                    )}
-                  </VStack>
-                </TabPanel>
-              </TabPanels>
-            </Tabs>
-          </ModalBody>
-
-          <ModalFooter flexShrink={0}>
-            <Button variant="ghost" mr={3} onClick={handleCloseAttempt}>
-              {viewMode ? 'Close' : 'Cancel'}
-            </Button>
-            {!viewMode && (
-              <Button colorScheme="blue" type="submit" isLoading={loading}>
-                {isDuplicateMode ? 'Create' : risk ? 'Update' : 'Create'}
+            <ModalFooter flexShrink={0}>
+              <Button variant="ghost" mr={3} onClick={handleCloseAttempt}>
+                {viewMode ? 'Close' : 'Cancel'}
               </Button>
-            )}
-          </ModalFooter>
-        </form>
-      </ModalContent>
-    </Modal>
 
-    {/* Unsaved Changes Dialog */}
-    <AlertDialog
-      isOpen={showUnsavedDialog}
-      leastDestructiveRef={useRef(null)}
-      onClose={() => setShowUnsavedDialog(false)}
-    >
-      <AlertDialogOverlay>
-        <AlertDialogContent>
-          <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            Unsaved Changes
-          </AlertDialogHeader>
-          <AlertDialogBody>
-            You have unsaved changes. Are you sure you want to close without saving?
-          </AlertDialogBody>
-          <AlertDialogFooter>
-            <Button onClick={() => setShowUnsavedDialog(false)}>
-              Continue Editing
-            </Button>
-            <Button colorScheme="red" onClick={handleConfirmClose} ml={3}>
-              Discard Changes
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialogOverlay>
-    </AlertDialog>
+              {/* Delete button on the left side (destructive action) */}
+              {!isDuplicateMode && risk && onDelete && (
+                <Button
+                  leftIcon={<DeleteIcon />}
+                  onClick={() => {
+                    onDelete(risk);
+                    onClose();
+                  }}
+                  colorScheme="red"
+                  variant="outline"
+                  mr="auto"
+                >
+                  Delete
+                </Button>
+              )}
+
+              {/* Find Similar Risks button - only show when viewing existing risk */}
+              {!viewMode && !isDuplicateMode && risk && (
+                <Button
+                  variant="outline"
+                  mr={3}
+                  onClick={handleFindSimilarRisks}
+                  isLoading={similarRisksLoading}
+                >
+                  Find Similar Risks
+                </Button>
+              )}
+
+              {/* Duplicate button */}
+              {!isDuplicateMode && risk && onDuplicate && (
+                <Button
+                  leftIcon={<CopyIcon />}
+                  onClick={() => {
+                    onDuplicate(risk);
+                  }}
+                  colorScheme="blue"
+                  variant="outline"
+                  mr={3}
+                >
+                  Duplicate
+                </Button>
+              )}
+
+              {/* Primary action button (Update/Create) */}
+              {!viewMode && (
+                <Button colorScheme="blue" type="submit" isLoading={loading}>
+                  {isDuplicateMode ? 'Create' : risk ? 'Update' : 'Create'}
+                </Button>
+              )}
+            </ModalFooter>
+          </form>
+        </ModalContent>
+      </Modal>
+
+      {/* Unsaved Changes Dialog */}
+      <AlertDialog
+        isOpen={showUnsavedDialog}
+        leastDestructiveRef={useRef(null)}
+        onClose={() => setShowUnsavedDialog(false)}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Unsaved Changes
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              You have unsaved changes. Are you sure you want to close without saving?
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button onClick={() => setShowUnsavedDialog(false)}>
+                Continue Editing
+              </Button>
+              <Button colorScheme="red" onClick={handleConfirmClose} ml={3}>
+                Discard Changes
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </>
   );
 }

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Heading,
@@ -36,14 +37,29 @@ import {
   PopoverTrigger,
   PopoverContent,
   PopoverBody,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  FormControl,
+  FormLabel,
 } from '@chakra-ui/react';
+import { HamburgerIcon } from '@chakra-ui/icons';
 import { SearchIcon, ChevronUpIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import { DeleteIcon, DownloadIcon, EditIcon, CopyIcon } from '@chakra-ui/icons';
 import api from '../services/api';
 import { RiskFormModal } from '../components/RiskFormModal';
 import { useAuth } from '../contexts/AuthContext';
 import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
-import { formatBoolean } from '../utils/tableUtils';
+import { formatBoolean, generateCSV } from '../utils/tableUtils';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface Risk {
   id: string;
@@ -129,6 +145,7 @@ const TREATMENT_CATEGORIES = ['RETAIN', 'MODIFY', 'SHARE', 'AVOID'];
 export function RisksPage() {
   const toast = useToast();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [risks, setRisks] = useState<Risk[]>([]);
   const [loading, setLoading] = useState(true);
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -138,8 +155,13 @@ export function RisksPage() {
   const [selectedRiskIds, setSelectedRiskIds] = useState<Set<string>>(new Set());
   const [isDuplicateMode, setIsDuplicateMode] = useState(false);
   const [viewMode, setViewMode] = useState(false);
+  const [totalRisksCount, setTotalRisksCount] = useState<number>(0); // Total without filters
+  const [savedViews, setSavedViews] = useState<Array<{ name: string; filters: typeof filters }>>([]);
   const { isOpen: isBulkDeleteOpen, onOpen: onBulkDeleteOpen, onClose: onBulkDeleteClose } = useDisclosure();
+  const { isOpen: isSaveViewOpen, onOpen: onSaveViewOpen, onClose: onSaveViewClose } = useDisclosure();
+  const [viewName, setViewName] = useState('');
   const cancelRef = useRef(null);
+  const viewRiskProcessedRef = useRef<string | null>(null);
 
   // Filters and pagination
   const [filters, setFilters] = useState({
@@ -158,36 +180,146 @@ export function RisksPage() {
     page: 1,
     limit: 20,
   });
+
+  // Separate search state for immediate UI updates (must be declared before useDebounce)
+  const [searchInput, setSearchInput] = useState(filters.search);
+
+  // Debounced search to reduce API calls
+  const debouncedSearch = useDebounce(searchInput, 300);
+
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
     total: 0,
     totalPages: 0,
   });
-  
-  // Column visibility state
-  const [visibleColumns, setVisibleColumns] = useState({
-    title: true,
-    riskCategory: true,
-    riskNature: true,
-    archived: true,
-    owner: true,
-    cia: true,
-    likelihood: true,
-    initialScore: true,
-    treatment: true,
-    mitigatedCIA: true,
-    mitigatedLikelihood: true,
-    mitigatedScore: true,
-    residualTreatment: true,
-    controls: true,
-  });
+
+  // Column visibility state with localStorage persistence
+  const getInitialVisibleColumns = () => {
+    const saved = localStorage.getItem('risks-visible-columns');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // If parsing fails, use defaults
+      }
+    }
+    return {
+      title: true,
+      riskCategory: true,
+      riskNature: true,
+      archived: true,
+      owner: true,
+      cia: true,
+      likelihood: true,
+      initialScore: true,
+      treatment: true,
+      mitigatedCIA: true,
+      mitigatedLikelihood: true,
+      mitigatedScore: true,
+      residualTreatment: true,
+      controls: true,
+    };
+  };
+
+  const [visibleColumns, setVisibleColumns] = useState(getInitialVisibleColumns);
+
+  // Persist column visibility to localStorage
+  const updateVisibleColumns = (newColumns: typeof visibleColumns) => {
+    setVisibleColumns(newColumns);
+    localStorage.setItem('risks-visible-columns', JSON.stringify(newColumns));
+  };
+
+  // Load saved views from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('risks-saved-views');
+    if (saved) {
+      try {
+        setSavedViews(JSON.parse(saved));
+      } catch (e) {
+        console.error('Error loading saved views:', e);
+      }
+    }
+  }, []);
+
+  // Save views to localStorage when they change
+  useEffect(() => {
+    if (savedViews.length > 0) {
+      localStorage.setItem('risks-saved-views', JSON.stringify(savedViews));
+    }
+  }, [savedViews]);
+
+  // Sync debounced search with filters
+  useEffect(() => {
+    if (debouncedSearch !== filters.search) {
+      setFilters(prev => ({ ...prev, search: debouncedSearch, page: 1 }));
+    }
+  }, [debouncedSearch]);
+
+  // Sync search input with filters.search when it changes externally
+  useEffect(() => {
+    setSearchInput(filters.search);
+  }, [filters.search]);
 
   useEffect(() => {
     fetchRisks();
     // Clear selections when filters change
     setSelectedRiskIds(new Set());
   }, [filters]);
+
+  // Handle view query parameter - open risk in view mode
+  useEffect(() => {
+    const viewRiskId = searchParams.get('view');
+    if (viewRiskId && viewRiskProcessedRef.current !== viewRiskId) {
+      // First check if risk is in current list
+      const risk = risks.find(r => r.id === viewRiskId);
+      if (risk) {
+        viewRiskProcessedRef.current = viewRiskId;
+        setSelectedRisk(risk);
+        setViewMode(true);
+        onOpen();
+        // Remove view parameter from URL
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('view');
+        setSearchParams(newSearchParams, { replace: true });
+      } else if (!loading) {
+        // Risk not in current page, fetch it directly
+        // Only fetch if we're not currently loading (to avoid duplicate requests)
+        viewRiskProcessedRef.current = viewRiskId;
+        const fetchRiskById = async () => {
+          try {
+            const response = await api.get(`/api/risks/${viewRiskId}`);
+            if (response.data) {
+              setSelectedRisk(response.data);
+              setViewMode(true);
+              onOpen();
+              // Remove view parameter from URL
+              const newSearchParams = new URLSearchParams(searchParams);
+              newSearchParams.delete('view');
+              setSearchParams(newSearchParams, { replace: true });
+            }
+          } catch (error: any) {
+            console.error('Error fetching risk for view:', error);
+            toast({
+              title: 'Error',
+              description: 'Risk not found',
+              status: 'error',
+              duration: 3000,
+              isClosable: true,
+            });
+            // Remove view parameter even on error
+            const newSearchParams = new URLSearchParams(searchParams);
+            newSearchParams.delete('view');
+            setSearchParams(newSearchParams, { replace: true });
+          }
+        };
+        fetchRiskById();
+      }
+    } else if (!viewRiskId && viewRiskProcessedRef.current) {
+      // Reset when view parameter is removed
+      viewRiskProcessedRef.current = null;
+    }
+  }, [searchParams, risks, loading, onOpen, setSearchParams, toast]);
 
   // Handle highlighting a risk when navigating from control detail
   useEffect(() => {
@@ -244,6 +376,20 @@ export function RisksPage() {
       if (response.data.pagination) {
         setPagination(response.data.pagination);
       }
+
+      // Fetch total count without filters for pagination display
+      const totalParams = new URLSearchParams();
+      totalParams.append('page', '1');
+      totalParams.append('limit', '1');
+      try {
+        const totalResponse = await api.get(`/api/risks?${totalParams.toString()}`);
+        if (totalResponse.data.pagination) {
+          setTotalRisksCount(totalResponse.data.pagination.total || 0);
+        }
+      } catch (e) {
+        // Ignore error, use current pagination total as fallback
+        setTotalRisksCount(response.data.pagination?.total || 0);
+      }
     } catch (error) {
       console.error('Error fetching risks:', error);
     } finally {
@@ -251,28 +397,28 @@ export function RisksPage() {
     }
   };
 
-  const handleEdit = (risk: Risk) => {
+  const handleEdit = useCallback((risk: Risk) => {
     setSelectedRisk(risk);
     setIsDuplicateMode(false);
     setViewMode(false);
     onOpen();
-  };
+  }, [onOpen]);
 
-  const handleView = (risk: Risk) => {
+  const handleView = useCallback((risk: Risk) => {
     setSelectedRisk(risk);
     setIsDuplicateMode(false);
     setViewMode(true);
     onOpen();
-  };
+  }, [onOpen]);
 
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     setSelectedRisk(null);
     setIsDuplicateMode(false);
     setViewMode(false);
     onOpen();
-  };
+  }, [onOpen]);
 
-  const handleDuplicate = (risk: Risk) => {
+  const handleDuplicate = useCallback((risk: Risk) => {
     // Create a copy of the risk without the id and with "Copy of" prefix
     // Copy ALL fields including text areas and dropdown selections
     const duplicatedRisk = {
@@ -301,21 +447,21 @@ export function RisksPage() {
     setSelectedRisk(duplicatedRisk as any);
     setIsDuplicateMode(true);
     onOpen();
-  };
+  }, [onOpen]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     onClose();
     setSelectedRisk(null);
     setIsDuplicateMode(false);
     setViewMode(false);
     fetchRisks();
     // Success toast will be shown by RiskFormModal
-  };
+  }, [onClose, fetchRisks]);
 
-  const handleDelete = (risk: Risk) => {
+  const handleDelete = useCallback((risk: Risk) => {
     setRiskToDelete(risk);
     onDeleteOpen();
-  };
+  }, [onDeleteOpen]);
 
   const confirmDelete = async () => {
     if (!riskToDelete) return;
@@ -389,6 +535,11 @@ export function RisksPage() {
   };
 
   const getRowBgColor = (risk: Risk): string => {
+    // Highlight selected rows
+    if (selectedRiskIds.has(risk.id)) {
+      return 'blue.100';
+    }
+    // Color by risk level
     const level = risk.mitigatedScore ? risk.mitigatedRiskLevel : risk.riskLevel;
     if (level === 'HIGH') return 'red.50';
     if (level === 'MEDIUM') return 'orange.50';
@@ -458,25 +609,86 @@ export function RisksPage() {
     }
   };
 
-  const [isExporting, setIsExporting] = useState(false);
+  // Saved views functions
+  const handleSaveView = useCallback(() => {
+    if (!viewName.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a name for this view',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+    const newView = { name: viewName.trim(), filters: { ...filters } };
+    setSavedViews([...savedViews, newView]);
+    setViewName('');
+    onSaveViewClose();
+    toast({
+      title: 'View Saved',
+      description: `Saved view "${newView.name}"`,
+      status: 'success',
+      duration: 3000,
+    });
+  }, [viewName, filters, savedViews, onSaveViewClose, toast]);
 
-  // Build columns dynamically based on visibleColumns
-  const buildColumns = (): Column<Risk>[] => {
+  const handleLoadView = useCallback((view: { name: string; filters: typeof filters }) => {
+    setFilters(view.filters);
+    setSearchInput(view.filters.search);
+    toast({
+      title: 'View Loaded',
+      description: `Loaded view "${view.name}"`,
+      status: 'success',
+      duration: 3000,
+    });
+  }, [toast]);
+
+  const handleDeleteView = useCallback((index: number) => {
+    const view = savedViews[index];
+    setSavedViews(savedViews.filter((_, i) => i !== index));
+    toast({
+      title: 'View Deleted',
+      description: `Deleted view "${view.name}"`,
+      status: 'success',
+      duration: 3000,
+    });
+  }, [savedViews, toast]);
+
+  // Build columns dynamically based on visibleColumns - memoized for performance
+  const buildColumns = useMemo((): Column<Risk>[] => {
     const cols: Column<Risk>[] = [];
-    
+
     if (visibleColumns.title) {
       cols.push({
         key: 'title',
         header: 'Title',
         sortable: true,
-        render: (risk) => <Text fontWeight="medium">{risk.title}</Text>,
+        sticky: true, // Make title column sticky
+        width: '300px',
+        minW: '300px',
+        render: (risk) => (
+          <Tooltip label={risk.title} placement="top-start">
+            <Text
+              fontWeight="medium"
+              fontSize="sm"
+              whiteSpace="normal"
+              noOfLines={2}
+              textOverflow="ellipsis"
+              overflow="hidden"
+              lineHeight="1.4"
+            >
+              {risk.title}
+            </Text>
+          </Tooltip>
+        ),
       });
     }
-    
+
     if (visibleColumns.riskCategory) {
       cols.push({
         key: 'riskCategory',
         header: 'Risk Category',
+        minW: '150px',
         render: (risk) =>
           risk.riskCategory ? (
             <Badge colorScheme="gray">{risk.riskCategory.replace(/_/g, ' ')}</Badge>
@@ -485,11 +697,12 @@ export function RisksPage() {
           ),
       });
     }
-    
+
     if (visibleColumns.riskNature) {
       cols.push({
         key: 'riskNature',
         header: 'Risk Nature',
+        minW: '120px',
         render: (risk) =>
           risk.riskNature ? (
             <Badge colorScheme={risk.riskNature === 'STATIC' ? 'blue' : 'purple'}>
@@ -500,7 +713,7 @@ export function RisksPage() {
           ),
       });
     }
-    
+
     if (visibleColumns.archived) {
       cols.push({
         key: 'archived',
@@ -513,19 +726,21 @@ export function RisksPage() {
           ),
       });
     }
-    
+
     if (visibleColumns.owner) {
       cols.push({
         key: 'owner',
         header: 'Owner',
+        minW: '150px',
         render: (risk) => <Text>{risk.owner ? risk.owner.displayName : 'N/A'}</Text>,
       });
     }
-    
+
     // Asset/Category is always visible
     cols.push({
       key: 'asset',
       header: 'Asset/Category',
+      minW: '200px',
       render: (risk) => (
         risk.asset ? (
           <Badge colorScheme="blue" as="a" href={`/assets/assets`} cursor="pointer">
@@ -540,11 +755,12 @@ export function RisksPage() {
         )
       ),
     });
-    
+
     // Interested Party is always visible
     cols.push({
       key: 'interestedParty',
       header: 'Interested Party',
+      minW: '200px',
       render: (risk) => (
         risk.interestedParty ? (
           <Badge colorScheme="teal" as="a" href={`/risks/interested-parties`} cursor="pointer">
@@ -556,7 +772,7 @@ export function RisksPage() {
         )
       ),
     });
-    
+
     if (visibleColumns.cia) {
       cols.push(
         {
@@ -581,12 +797,13 @@ export function RisksPage() {
         }
       );
     }
-    
+
     if (visibleColumns.initialScore) {
       cols.push({
         key: 'calculatedScore',
         header: 'Initial Score',
         sortable: true,
+        minW: '120px',
         render: (risk) => (
           <Box bg={`${getRiskLevelColor(risk.riskLevel)}.50`} px={3} py={2}>
             <VStack spacing={1} align="center">
@@ -613,19 +830,20 @@ export function RisksPage() {
         ),
       });
     }
-    
+
     if (visibleColumns.treatment) {
       cols.push({
         key: 'initialRiskTreatmentCategory',
         header: 'Treatment',
+        minW: '120px',
         render: (risk) =>
           risk.initialRiskTreatmentCategory ? (
             <Badge
               colorScheme={
                 risk.initialRiskTreatmentCategory === 'MODIFY' ? 'blue' :
-                risk.initialRiskTreatmentCategory === 'RETAIN' ? 'green' :
-                risk.initialRiskTreatmentCategory === 'SHARE' ? 'purple' :
-                'red'
+                  risk.initialRiskTreatmentCategory === 'RETAIN' ? 'green' :
+                    risk.initialRiskTreatmentCategory === 'SHARE' ? 'purple' :
+                      'red'
               }
               fontSize="sm"
               px={3}
@@ -639,7 +857,7 @@ export function RisksPage() {
           ),
       });
     }
-    
+
     if (visibleColumns.mitigatedCIA) {
       cols.push(
         {
@@ -684,7 +902,7 @@ export function RisksPage() {
         }
       );
     }
-    
+
     if (visibleColumns.mitigatedScore) {
       cols.push({
         key: 'mitigatedScore',
@@ -707,7 +925,7 @@ export function RisksPage() {
           ),
       });
     }
-    
+
     if (visibleColumns.residualTreatment) {
       cols.push({
         key: 'residualRiskTreatmentCategory',
@@ -720,11 +938,12 @@ export function RisksPage() {
           ),
       });
     }
-    
+
     if (visibleColumns.controls) {
       cols.push({
         key: 'controls',
         header: 'Controls',
+        minW: '200px',
         render: (risk) =>
           risk.riskControls.length > 0 ? (
             <HStack spacing={1} flexWrap="wrap">
@@ -754,9 +973,9 @@ export function RisksPage() {
           ),
       });
     }
-    
+
     return cols;
-  };
+  }, [visibleColumns, user]);
 
   const filterConfigs: FilterConfig[] = [
     {
@@ -812,30 +1031,8 @@ export function RisksPage() {
     },
   ];
 
-  const actions: ActionButton<Risk>[] = [
-    {
-      icon: <EditIcon />,
-      label: 'Edit',
-      onClick: handleEdit,
-      colorScheme: 'blue',
-    },
-    ...(isAdminOrEditor
-      ? [
-          {
-            icon: <CopyIcon />,
-            label: 'Duplicate risk',
-            onClick: handleDuplicate,
-            colorScheme: 'blue',
-          } as ActionButton<Risk>,
-          {
-            icon: <DeleteIcon />,
-            label: 'Delete risk',
-            onClick: handleDelete,
-            colorScheme: 'red',
-          } as ActionButton<Risk>,
-        ]
-      : []),
-  ];
+  // Actions moved to RiskFormModal
+  // const actions: ActionButton<Risk>[] = ...
 
   const paginationConfig: PaginationConfig = {
     mode: 'server',
@@ -888,13 +1085,13 @@ export function RisksPage() {
       const riskValue = risk.confidentialityScore + risk.integrityScore + risk.availabilityScore;
       const mitigatedRiskValue =
         risk.mitigatedConfidentialityScore !== null &&
-        risk.mitigatedIntegrityScore !== null &&
-        risk.mitigatedAvailabilityScore !== null
+          risk.mitigatedIntegrityScore !== null &&
+          risk.mitigatedAvailabilityScore !== null
           ? risk.mitigatedConfidentialityScore +
-            risk.mitigatedIntegrityScore +
-            risk.mitigatedAvailabilityScore
+          risk.mitigatedIntegrityScore +
+          risk.mitigatedAvailabilityScore
           : '';
-      const controls = risk.riskControls.map((rc) => rc.control.code).join('; ');
+      const controls = risk.riskControls.map((rc: { control: { code: string } }) => rc.control.code).join('; ');
 
       return [
         risk.title,
@@ -934,7 +1131,68 @@ export function RisksPage() {
     },
   };
 
-  const renderRow = (risk: Risk, index: number) => {
+  // Define handleExport after csvExportConfig is available
+  const handleExport = useCallback(async (format: 'CSV' | 'EXCEL' | 'PDF') => {
+    try {
+      // Get all filtered risks (not just current page)
+      const params = new URLSearchParams();
+      if (filters.riskCategory) params.append('riskCategory', filters.riskCategory);
+      if (filters.riskNature) params.append('riskNature', filters.riskNature);
+      if (filters.archived) params.append('archived', 'true');
+      if (filters.ownerId) params.append('ownerId', filters.ownerId);
+      if (filters.treatmentCategory) params.append('treatmentCategory', filters.treatmentCategory);
+      if (filters.mitigationImplemented) params.append('mitigationImplemented', filters.mitigationImplemented);
+      if (filters.riskLevel) params.append('riskLevel', filters.riskLevel);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.dateAddedFrom) params.append('dateAddedFrom', filters.dateAddedFrom);
+      if (filters.dateAddedTo) params.append('dateAddedTo', filters.dateAddedTo);
+      params.append('page', '1');
+      params.append('limit', '10000'); // Get all matching risks
+
+      const response = await api.get(`/api/risks?${params.toString()}`);
+      const allRisks = response.data.data || risks;
+
+      if (format === 'CSV') {
+        const rows = allRisks.map(csvExportConfig.getRowData);
+        generateCSV(csvExportConfig.headers, rows, `risks_export_${new Date().toISOString().split('T')[0]}.csv`);
+        toast({
+          title: 'Export Successful',
+          description: `Exported ${allRisks.length} risk(s) to CSV`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+      } else if (format === 'EXCEL') {
+        // For Excel, we'll use CSV for now (can be enhanced later with a library like ExcelJS)
+        toast({
+          title: 'Excel Export',
+          description: 'Excel export coming soon. Using CSV format for now.',
+          status: 'info',
+          duration: 3000,
+        });
+        const rows = allRisks.map(csvExportConfig.getRowData);
+        generateCSV(csvExportConfig.headers, rows, `risks_export_${new Date().toISOString().split('T')[0]}.csv`);
+      } else if (format === 'PDF') {
+        toast({
+          title: 'PDF Export',
+          description: 'PDF export coming soon.',
+          status: 'info',
+          duration: 3000,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Export Failed',
+        description: error.response?.data?.error || 'Failed to export risks',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  }, [filters, risks, csvExportConfig, toast]);
+
+  const renderRow = useCallback((risk: Risk, index: number) => {
+    const isAdminOrEditorLocal = user?.role === 'ADMIN' || user?.role === 'EDITOR';
     return (
       <Tr
         key={risk.id}
@@ -943,276 +1201,395 @@ export function RisksPage() {
         _hover={{ bg: getRowBgColor(risk), opacity: 0.9, cursor: 'pointer' }}
         cursor="pointer"
         onClick={() => handleEdit(risk)}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleEdit(risk);
+          } else if (e.key === 'ArrowDown' && index < risks.length - 1) {
+            e.preventDefault();
+            const nextRow = document.getElementById(`risk-${risks[index + 1].id}`);
+            nextRow?.focus();
+          } else if (e.key === 'ArrowUp' && index > 0) {
+            e.preventDefault();
+            const prevRow = document.getElementById(`risk-${risks[index - 1].id}`);
+            prevRow?.focus();
+          }
+        }}
       >
-        {isAdminOrEditor && (
-          <Td onClick={(e) => e.stopPropagation()}>
+        {isAdminOrEditorLocal && (
+          <Td
+            onClick={(e) => e.stopPropagation()}
+            position="sticky"
+            left={0}
+            zIndex={5}
+            bgColor={getRowBgColor(risk)}
+            boxShadow="2px 0 4px rgba(0,0,0,0.1)"
+            minW="50px"
+            w="50px"
+          >
             <Checkbox
               isChecked={selectedRiskIds.has(risk.id)}
               onChange={(e) => {
                 e.stopPropagation();
                 handleSelectRisk(risk.id, e.target.checked);
               }}
+              onKeyDown={(e) => {
+                if (e.key === ' ') {
+                  e.stopPropagation();
+                }
+              }}
             />
           </Td>
         )}
-        {buildColumns().map((column) => {
+        {buildColumns.map((column: Column<Risk>, colIndex: number) => {
           let cellContent: React.ReactNode;
           if (column.render) {
             cellContent = column.render(risk);
           } else {
             const value = (risk as any)[column.key];
-            cellContent = value === null || value === undefined || value === '' 
+            cellContent = value === null || value === undefined || value === ''
               ? <Text color="gray.400" fontSize="xs">—</Text>
               : String(value);
           }
-          return <Td key={column.key} onClick={column.key === 'asset' ? (e) => e.stopPropagation() : undefined}>{cellContent}</Td>;
+          const isSticky = column.sticky && colIndex === 0;
+          // Calculate sticky left position: checkbox (50px if admin/editor)
+          const stickyLeft = isSticky ? (isAdminOrEditorLocal ? '50px' : '0px') : undefined;
+          return (
+            <Td
+              key={column.key}
+              onClick={column.key === 'asset' ? (e) => e.stopPropagation() : undefined}
+              position={isSticky ? 'sticky' : 'relative'}
+              left={stickyLeft}
+              zIndex={isSticky ? 5 : 1}
+              bgColor={isSticky ? getRowBgColor(risk) : undefined}
+              boxShadow={isSticky ? '2px 0 4px rgba(0,0,0,0.1)' : undefined}
+            >
+              {cellContent}
+            </Td>
+          );
         })}
-        <Td onClick={(e) => e.stopPropagation()}>
-          <HStack spacing={2}>
-            {actions.map((action, idx) => (
-              <Tooltip key={idx} label={action.label}>
-                <IconButton
-                  aria-label={action.label}
-                  icon={action.icon}
-                  size="sm"
-                  colorScheme={action.colorScheme || 'blue'}
-                  variant="ghost"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    action.onClick(risk);
-                  }}
-                />
-              </Tooltip>
-            ))}
-          </HStack>
-        </Td>
       </Tr>
     );
-  };
+  }, [user, selectedRiskIds, getRowBgColor, handleEdit, handleSelectRisk, buildColumns, risks]);
 
+  // Calculate available height for table (100vh - header - filters - pagination - padding)
+  const tableHeight = useMemo(() => {
+    // Approximate heights: header ~80px, filters ~120px, pagination ~60px, padding ~80px
+    return 'calc(100vh - 340px)';
+  }, []);
 
   return (
-    <VStack spacing={6} align="stretch">
-      <HStack justify="space-between">
-        <Heading size="lg">Risks</Heading>
-        <HStack spacing={2}>
-          {selectedRiskIds.size > 0 && (
-            <Box
-              p={3}
-              bg="blue.50"
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="blue.200"
-              display="flex"
-              alignItems="center"
-              gap={3}
-            >
-              <Text fontSize="sm" fontWeight="medium" color="blue.700">
-                {selectedRiskIds.size} risk{selectedRiskIds.size !== 1 ? 's' : ''} selected
-              </Text>
-              <HStack spacing={2}>
-                <Button
-                  colorScheme="red"
-                  size="sm"
-                  onClick={onBulkDeleteOpen}
-                  isDisabled={!isAdminOrEditor}
+    <>
+      <Box
+        w="100vw"
+        ml="calc(-50vw + 50%)"
+        mr="calc(-50vw + 50%)"
+        bg="white"
+        height="100vh"
+        overflow="hidden"
+        position="relative"
+      >
+        <VStack spacing={4} align="stretch" height="100%" px={8} py={6}>
+          {/* Header Section - Fixed */}
+          <HStack justify="space-between">
+            <Heading size="lg">Risks</Heading>
+            <HStack spacing={2}>
+              {selectedRiskIds.size > 0 && (
+                <Box
+                  p={3}
+                  bg="blue.50"
+                  borderRadius="md"
+                  borderWidth="1px"
+                  borderColor="blue.200"
+                  display="flex"
+                  alignItems="center"
+                  gap={3}
                 >
-                  Delete Selected
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setSelectedRiskIds(new Set())}
-                >
-                  Clear Selection
-                </Button>
-              </HStack>
-            </Box>
-          )}
-          <Popover>
-            <PopoverTrigger>
-              <Button size="sm" variant="outline">
-                Columns
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent>
-              <PopoverBody>
-                <VStack align="stretch" spacing={2}>
-                  <Text fontWeight="bold" mb={2}>
-                    Show/Hide Columns
+                  <Text fontSize="sm" fontWeight="medium" color="blue.700">
+                    {selectedRiskIds.size} risk{selectedRiskIds.size !== 1 ? 's' : ''} selected
                   </Text>
-                  <Checkbox
-                    isChecked={visibleColumns.title}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, title: e.target.checked })
-                    }
-                  >
-                    Title
-                  </Checkbox>
-                  <Checkbox
-                    isChecked={visibleColumns.riskCategory}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, riskCategory: e.target.checked })
-                    }
-                  >
-                    Risk Category
-                  </Checkbox>
-                  <Checkbox
-                    isChecked={visibleColumns.riskNature}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, riskNature: e.target.checked })
-                    }
-                  >
-                    Risk Nature
-                  </Checkbox>
-                  <Checkbox
-                    isChecked={visibleColumns.archived}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, archived: e.target.checked })
-                    }
-                  >
-                    Archived
-                  </Checkbox>
-                  <Checkbox
-                    isChecked={visibleColumns.owner}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, owner: e.target.checked })
-                    }
-                  >
-                    Owner
-                  </Checkbox>
-                  <Checkbox
-                    isChecked={visibleColumns.cia}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, cia: e.target.checked })
-                    }
-                  >
-                    C, I, A, L
-                  </Checkbox>
-                  <Checkbox
-                    isChecked={visibleColumns.initialScore}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, initialScore: e.target.checked })
-                    }
-                  >
-                    Initial Score
-                  </Checkbox>
-                  <Checkbox
-                    isChecked={visibleColumns.treatment}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, treatment: e.target.checked })
-                    }
-                  >
-                    Treatment
-                  </Checkbox>
-                  <Checkbox
-                    isChecked={visibleColumns.mitigatedCIA}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, mitigatedCIA: e.target.checked })
-                    }
-                  >
-                    Mitigated C, I, A, L
-                  </Checkbox>
-                  <Checkbox
-                    isChecked={visibleColumns.mitigatedScore}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, mitigatedScore: e.target.checked })
-                    }
-                  >
-                    Mitigated Score
-                  </Checkbox>
-                  <Checkbox
-                    isChecked={visibleColumns.residualTreatment}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, residualTreatment: e.target.checked })
-                    }
-                  >
-                    Residual Treatment
-                  </Checkbox>
-                  <Checkbox
-                    isChecked={visibleColumns.controls}
-                    onChange={(e) =>
-                      setVisibleColumns({ ...visibleColumns, controls: e.target.checked })
-                    }
-                  >
-                    Controls
-                  </Checkbox>
-                </VStack>
-              </PopoverBody>
-            </PopoverContent>
-          </Popover>
-          <Button colorScheme="blue" onClick={handleCreate}>
-            Create Risk
-          </Button>
-        </HStack>
-      </HStack>
+                  <HStack spacing={2}>
+                    {isAdminOrEditor && (
+                      <>
+                        <Button
+                          colorScheme="red"
+                          size="sm"
+                          onClick={onBulkDeleteOpen}
+                        >
+                          Delete Selected
+                        </Button>
+                        <Menu>
+                          <MenuButton as={Button} size="sm" variant="outline" rightIcon={<HamburgerIcon />}>
+                            More Actions
+                          </MenuButton>
+                          <MenuList>
+                            <MenuItem
+                              onClick={() => {
+                                const selectedRisks = risks.filter(r => selectedRiskIds.has(r.id));
+                                const rows = selectedRisks.map(csvExportConfig.getRowData);
+                                generateCSV(csvExportConfig.headers, rows, `selected_risks_${new Date().toISOString().split('T')[0]}.csv`);
+                                toast({
+                                  title: 'Export Successful',
+                                  description: `Exported ${selectedRisks.length} selected risk(s) to CSV`,
+                                  status: 'success',
+                                  duration: 3000,
+                                  isClosable: true,
+                                });
+                              }}
+                            >
+                              Export Selected
+                            </MenuItem>
+                          </MenuList>
+                        </Menu>
+                      </>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedRiskIds(new Set())}
+                    >
+                      Clear Selection
+                    </Button>
+                  </HStack>
+                </Box>
+              )}
+              <Popover>
+                <PopoverTrigger>
+                  <Button size="sm" variant="outline">
+                    Columns
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent>
+                  <PopoverBody>
+                    <VStack align="stretch" spacing={2}>
+                      <Text fontWeight="bold" mb={2}>
+                        Show/Hide Columns
+                      </Text>
+                      <Checkbox
+                        isChecked={visibleColumns.title}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, title: e.target.checked })
+                        }
+                      >
+                        Title
+                      </Checkbox>
+                      <Checkbox
+                        isChecked={visibleColumns.riskCategory}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, riskCategory: e.target.checked })
+                        }
+                      >
+                        Risk Category
+                      </Checkbox>
+                      <Checkbox
+                        isChecked={visibleColumns.riskNature}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, riskNature: e.target.checked })
+                        }
+                      >
+                        Risk Nature
+                      </Checkbox>
+                      <Checkbox
+                        isChecked={visibleColumns.archived}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, archived: e.target.checked })
+                        }
+                      >
+                        Archived
+                      </Checkbox>
+                      <Checkbox
+                        isChecked={visibleColumns.owner}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, owner: e.target.checked })
+                        }
+                      >
+                        Owner
+                      </Checkbox>
+                      <Checkbox
+                        isChecked={visibleColumns.cia}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, cia: e.target.checked })
+                        }
+                      >
+                        C, I, A, L
+                      </Checkbox>
+                      <Checkbox
+                        isChecked={visibleColumns.initialScore}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, initialScore: e.target.checked })
+                        }
+                      >
+                        Initial Score
+                      </Checkbox>
+                      <Checkbox
+                        isChecked={visibleColumns.treatment}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, treatment: e.target.checked })
+                        }
+                      >
+                        Treatment
+                      </Checkbox>
+                      <Checkbox
+                        isChecked={visibleColumns.mitigatedCIA}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, mitigatedCIA: e.target.checked })
+                        }
+                      >
+                        Mitigated C, I, A, L
+                      </Checkbox>
+                      <Checkbox
+                        isChecked={visibleColumns.mitigatedScore}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, mitigatedScore: e.target.checked })
+                        }
+                      >
+                        Mitigated Score
+                      </Checkbox>
+                      <Checkbox
+                        isChecked={visibleColumns.residualTreatment}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, residualTreatment: e.target.checked })
+                        }
+                      >
+                        Residual Treatment
+                      </Checkbox>
+                      <Checkbox
+                        isChecked={visibleColumns.controls}
+                        onChange={(e) =>
+                          updateVisibleColumns({ ...visibleColumns, controls: e.target.checked })
+                        }
+                      >
+                        Controls
+                      </Checkbox>
+                    </VStack>
+                  </PopoverBody>
+                </PopoverContent>
+              </Popover>
+              {/* Export Menu */}
+              <Menu>
+                <MenuButton as={Button} size="sm" variant="outline" leftIcon={<DownloadIcon />}>
+                  Export
+                </MenuButton>
+                <MenuList>
+                  <MenuItem onClick={() => handleExport('CSV')}>Export as CSV</MenuItem>
+                  <MenuItem onClick={() => handleExport('EXCEL')}>Export as Excel</MenuItem>
+                  <MenuItem onClick={() => handleExport('PDF')}>Export as PDF</MenuItem>
+                </MenuList>
+              </Menu>
+              {/* Saved Views Menu */}
+              {savedViews.length > 0 && (
+                <Menu>
+                  <MenuButton as={Button} size="sm" variant="outline">
+                    Saved Views
+                  </MenuButton>
+                  <MenuList>
+                    {savedViews.map((view, index) => (
+                      <MenuItem key={index}>
+                        <HStack justify="space-between" w="100%">
+                          <Text onClick={() => handleLoadView(view)}>{view.name}</Text>
+                          <IconButton
+                            aria-label="Delete view"
+                            icon={<DeleteIcon />}
+                            size="xs"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteView(index);
+                            }}
+                          />
+                        </HStack>
+                      </MenuItem>
+                    ))}
+                  </MenuList>
+                </Menu>
+              )}
+              <Button size="sm" variant="outline" onClick={onSaveViewOpen}>
+                Save View
+              </Button>
+              <Button colorScheme="blue" onClick={handleCreate}>
+                Create Risk
+              </Button>
+            </HStack>
+          </HStack>
 
-      <DataTable
-        title=""
-        data={risks}
-        columns={buildColumns()}
-        loading={loading}
-        emptyMessage={
-          getActiveFilterCount() > 0
-            ? 'No risks match your current filters. Try adjusting your filters.'
-            : 'Get started by creating your first risk.'
-        }
-        filters={filterConfigs}
-        filterValues={{
-          search: filters.search,
-          riskCategory: filters.riskCategory,
-          riskNature: filters.riskNature,
-          archived: filters.archived ? 'true' : '',
-          treatmentCategory: filters.treatmentCategory,
-          riskLevel: filters.riskLevel,
-          mitigationImplemented: filters.mitigationImplemented,
-        }}
-        onFilterChange={(key, value) => {
-          if (key === 'archived') {
-            setFilters({ ...filters, archived: value === 'true', page: 1 });
-          } else {
-            setFilters({ ...filters, [key]: value, page: 1 });
-          }
-        }}
-        onClearFilters={() => {
-          setFilters({
-            riskCategory: '',
-            riskNature: '',
-            archived: false,
-            ownerId: '',
-            treatmentCategory: '',
-            mitigationImplemented: '',
-            riskLevel: '',
-            search: '',
-            dateAddedFrom: '',
-            dateAddedTo: '',
-            sortBy: 'calculatedScore',
-            sortOrder: 'desc',
-            page: 1,
-            limit: 20,
-          });
-        }}
-        showFiltersHeading={true}
-        sortConfig={sortConfig}
-        enableSelection={isAdminOrEditor}
-        selectedIds={selectedRiskIds}
-        onSelectAll={handleSelectAll}
-        onSelectRow={handleSelectRisk}
-        getRowId={(risk) => risk.id}
-        pagination={paginationConfig}
-        actions={actions}
-        csvExport={csvExportConfig}
-        onRowClick={handleEdit}
-        renderRow={renderRow}
-      />
+          {/* Scrollable Table Section */}
+          <Box flex="1" overflow="hidden" minHeight="0">
+            <DataTable
+              key={`risks-table-${Object.values(visibleColumns).join('-')}`}
+              title=""
+              data={risks}
+              columns={buildColumns}
+              loading={loading}
+              emptyMessage={
+                getActiveFilterCount() > 0
+                  ? 'No risks match your current filters. Try adjusting your filters.'
+                  : 'Get started by creating your first risk.'
+              }
+              filters={filterConfigs}
+              filterValues={{
+                search: searchInput,
+                riskCategory: filters.riskCategory,
+                riskNature: filters.riskNature,
+                archived: filters.archived ? 'true' : '',
+                treatmentCategory: filters.treatmentCategory,
+                riskLevel: filters.riskLevel,
+                mitigationImplemented: filters.mitigationImplemented,
+              }}
+              onFilterChange={(key, value) => {
+                if (key === 'search') {
+                  // Update search input immediately for UI responsiveness
+                  setSearchInput(value);
+                  // Actual filter update happens via debouncedSearch effect
+                } else if (key === 'archived') {
+                  setFilters({ ...filters, archived: value === 'true', page: 1 });
+                } else {
+                  setFilters({ ...filters, [key]: value, page: 1 });
+                }
+              }}
+              onClearFilters={() => {
+                setFilters({
+                  riskCategory: '',
+                  riskNature: '',
+                  archived: false,
+                  ownerId: '',
+                  treatmentCategory: '',
+                  mitigationImplemented: '',
+                  riskLevel: '',
+                  search: '',
+                  dateAddedFrom: '',
+                  dateAddedTo: '',
+                  sortBy: 'calculatedScore',
+                  sortOrder: 'desc',
+                  page: 1,
+                  limit: 20,
+                });
+              }}
+              showFiltersHeading={true}
+              sortConfig={sortConfig}
+              enableSelection={isAdminOrEditor}
+              selectedIds={selectedRiskIds}
+              onSelectAll={handleSelectAll}
+              onSelectRow={handleSelectRisk}
+              getRowId={(risk) => risk.id}
+              pagination={paginationConfig}
+              csvExport={csvExportConfig}
+              onRowClick={handleEdit}
+              renderRow={renderRow}
+              totalWithoutFilters={totalRisksCount}
+            />
+          </Box>
+        </VStack>
+      </Box>
 
-
-      <RiskFormModal 
-        isOpen={isOpen} 
-        onClose={handleClose} 
-        risk={selectedRisk} 
+      <RiskFormModal
+        isOpen={isOpen}
+        onClose={handleClose}
+        risk={selectedRisk}
         isDuplicateMode={isDuplicateMode}
         viewMode={viewMode}
+        onDuplicate={handleDuplicate}
+        onDelete={handleDelete}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -1272,6 +1649,38 @@ export function RisksPage() {
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
-    </VStack>
+
+      {/* Save View Modal */}
+      <Modal isOpen={isSaveViewOpen} onClose={onSaveViewClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Save Current View</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <FormControl>
+              <FormLabel>View Name</FormLabel>
+              <Input
+                placeholder="e.g., High Risks Only"
+                value={viewName}
+                onChange={(e) => setViewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveView();
+                  }
+                }}
+              />
+            </FormControl>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onSaveViewClose}>
+              Cancel
+            </Button>
+            <Button colorScheme="blue" onClick={handleSaveView}>
+              Save
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    </>
   );
 }
