@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
+import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -162,6 +163,7 @@ router.post(
 
           return prisma.acknowledgment.create({
             data: {
+              id: randomUUID(),
               userId: user.id,
               documentId: doc.id,
               documentVersion: doc.version,
@@ -238,6 +240,7 @@ router.post(
 
       const acknowledgment = await prisma.acknowledgment.create({
         data: {
+          id: randomUUID(),
           userId: user.id,
           documentId: document.id,
           documentVersion: document.version,

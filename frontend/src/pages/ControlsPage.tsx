@@ -45,11 +45,11 @@ interface Control {
   otherInformation: string | null;
   category: string | null;
   isStandardControl: boolean;
+  implemented: boolean;
   riskControls: Array<{
     risk: {
       id: string;
       title: string;
-      externalId: string | null;
     };
   }>;
   documentControls: Array<{
@@ -99,6 +99,7 @@ export function ControlsPage() {
   const [loading, setLoading] = useState(true);
   const [filterApplicable, setFilterApplicable] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState<string>('');
+  const [filterImplemented, setFilterImplemented] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortField, setSortField] = useState<SortField>('code');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -110,7 +111,7 @@ export function ControlsPage() {
 
   useEffect(() => {
     fetchControls();
-  }, [filterApplicable, filterCategory]);
+  }, [filterApplicable, filterCategory, filterImplemented]);
 
   const fetchControls = async () => {
     try {
@@ -124,6 +125,9 @@ export function ControlsPage() {
       }
       if (filterCategory !== '') {
         params.category = filterCategory;
+      }
+      if (filterImplemented !== '') {
+        params.implemented = filterImplemented === 'true';
       }
       const response = await api.get('/api/controls', { params });
       setControls(response.data.data);
@@ -417,6 +421,15 @@ export function ControlsPage() {
         { value: 'TECHNOLOGICAL', label: 'Technological' },
       ],
     },
+    {
+      key: 'implemented',
+      type: 'select',
+      placeholder: 'Filter by Implemented',
+      options: [
+        { value: 'true', label: 'Implemented' },
+        { value: 'false', label: 'Not Implemented' },
+      ],
+    },
   ];
 
   const actions: ActionButton<Control>[] = [
@@ -610,6 +623,7 @@ export function ControlsPage() {
           search: searchQuery,
           applicable: filterApplicable,
           category: filterCategory,
+          implemented: filterImplemented,
         }}
         onFilterChange={(key, value) => {
           if (key === 'search') {
@@ -618,12 +632,15 @@ export function ControlsPage() {
             setFilterApplicable(value);
           } else if (key === 'category') {
             setFilterCategory(value);
+          } else if (key === 'implemented') {
+            setFilterImplemented(value);
           }
           setPage(1);
         }}
         onClearFilters={() => {
           setFilterApplicable('');
           setFilterCategory('');
+          setFilterImplemented('');
           setSearchQuery('');
           setPage(1);
         }}

@@ -1,14 +1,15 @@
 import { Box, Heading, VStack, Text, Badge, Button } from '@chakra-ui/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { getDepartmentDisplayName } from '../types/risk';
 
 export function ProfilePage() {
-  const { user, logout } = useAuth();
+  const { user, logout, getUserDepartment } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate('/admin/login');
   };
 
   if (!user) {
@@ -19,7 +20,10 @@ export function ProfilePage() {
     ADMIN: 'red',
     EDITOR: 'blue',
     STAFF: 'gray',
+    CONTRIBUTOR: 'purple',
   };
+
+  const department = getUserDepartment();
 
   return (
     <VStack spacing={6} align="stretch">
@@ -57,6 +61,17 @@ export function ProfilePage() {
               {user.role}
             </Badge>
           </Box>
+
+          {department && (
+            <Box>
+              <Text fontSize="sm" color="gray.600" mb={2}>
+                Department
+              </Text>
+              <Badge colorScheme="teal" fontSize="md" p={2}>
+                {getDepartmentDisplayName(department)}
+              </Badge>
+            </Box>
+          )}
 
           <Button colorScheme="red" onClick={handleLogout} mt={4}>
             Sign Out

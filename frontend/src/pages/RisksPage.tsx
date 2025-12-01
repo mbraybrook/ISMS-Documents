@@ -56,6 +56,7 @@ import { SearchIcon, ChevronUpIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import { DeleteIcon, DownloadIcon, EditIcon, CopyIcon } from '@chakra-ui/icons';
 import api from '../services/api';
 import { RiskFormModal } from '../components/RiskFormModal';
+import { DepartmentRiskTable } from '../components/DepartmentRiskTable';
 import { useAuth } from '../contexts/AuthContext';
 import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
 import { formatBoolean, generateCSV } from '../utils/tableUtils';
@@ -63,7 +64,6 @@ import { useDebounce } from '../hooks/useDebounce';
 
 interface Risk {
   id: string;
-  externalId: string | null;
   title: string;
   description: string | null;
   dateAdded: string;
@@ -144,7 +144,8 @@ const TREATMENT_CATEGORIES = ['RETAIN', 'MODIFY', 'SHARE', 'AVOID'];
 
 export function RisksPage() {
   const toast = useToast();
-  const { user } = useAuth();
+  const { user, getEffectiveRole } = useAuth();
+  const effectiveRole = getEffectiveRole();
   const [searchParams, setSearchParams] = useSearchParams();
   const [risks, setRisks] = useState<Risk[]>([]);
   const [loading, setLoading] = useState(true);
@@ -360,12 +361,14 @@ export function RisksPage() {
       if (filters.archived) params.append('archived', 'true');
       if (filters.ownerId) params.append('ownerId', filters.ownerId);
       if (filters.treatmentCategory) params.append('treatmentCategory', filters.treatmentCategory);
-      if (filters.mitigationImplemented)
-        params.append('mitigationImplemented', filters.mitigationImplemented);
+      if (filters.mitigationImplemented !== '')
+        params.append('mitigationImplemented', filters.mitigationImplemented === 'true' ? 'true' : 'false');
       if (filters.riskLevel) params.append('riskLevel', filters.riskLevel);
       if (filters.search) params.append('search', filters.search);
       if (filters.dateAddedFrom) params.append('dateAddedFrom', filters.dateAddedFrom);
       if (filters.dateAddedTo) params.append('dateAddedTo', filters.dateAddedTo);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.department) params.append('department', filters.department);
       if (filters.sortBy) params.append('sortBy', filters.sortBy);
       if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
       params.append('page', filters.page.toString());
@@ -390,8 +393,15 @@ export function RisksPage() {
         // Ignore error, use current pagination total as fallback
         setTotalRisksCount(response.data.pagination?.total || 0);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching risks:', error);
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to fetch risks',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -424,7 +434,6 @@ export function RisksPage() {
     const duplicatedRisk = {
       ...risk,
       id: undefined,
-      externalId: undefined,
       title: `Copy of ${risk.title}`,
       description: risk.description || '',
       threatDescription: risk.threatDescription || '',
@@ -1029,6 +1038,31 @@ export function RisksPage() {
         { value: 'false', label: 'Not Implemented' },
       ],
     },
+    {
+      key: 'status',
+      type: 'select',
+      placeholder: 'Status',
+      options: [
+        { value: 'DRAFT', label: 'Draft' },
+        { value: 'PROPOSED', label: 'Proposed' },
+        { value: 'ACTIVE', label: 'Active' },
+        { value: 'REJECTED', label: 'Rejected' },
+        { value: 'ARCHIVED', label: 'Archived' },
+      ],
+    },
+    {
+      key: 'department',
+      type: 'select',
+      placeholder: 'Department',
+      options: [
+        { value: 'BUSINESS_STRATEGY', label: 'Business Strategy' },
+        { value: 'FINANCE', label: 'Finance' },
+        { value: 'HR', label: 'HR' },
+        { value: 'OPERATIONS', label: 'Operations' },
+        { value: 'PRODUCT', label: 'Product' },
+        { value: 'MARKETING', label: 'Marketing' },
+      ],
+    },
   ];
 
   // Actions moved to RiskFormModal
@@ -1141,7 +1175,8 @@ export function RisksPage() {
       if (filters.archived) params.append('archived', 'true');
       if (filters.ownerId) params.append('ownerId', filters.ownerId);
       if (filters.treatmentCategory) params.append('treatmentCategory', filters.treatmentCategory);
-      if (filters.mitigationImplemented) params.append('mitigationImplemented', filters.mitigationImplemented);
+      if (filters.mitigationImplemented !== '')
+        params.append('mitigationImplemented', filters.mitigationImplemented === 'true' ? 'true' : 'false');
       if (filters.riskLevel) params.append('riskLevel', filters.riskLevel);
       if (filters.search) params.append('search', filters.search);
       if (filters.dateAddedFrom) params.append('dateAddedFrom', filters.dateAddedFrom);
@@ -1278,6 +1313,11 @@ export function RisksPage() {
     // Approximate heights: header ~80px, filters ~120px, pagination ~60px, padding ~80px
     return 'calc(100vh - 340px)';
   }, []);
+
+  // For Contributors, show simplified DepartmentRiskTable
+  if (effectiveRole === 'CONTRIBUTOR') {
+    return <DepartmentRiskTable />;
+  }
 
   return (
     <>
@@ -1535,6 +1575,8 @@ export function RisksPage() {
                 treatmentCategory: filters.treatmentCategory,
                 riskLevel: filters.riskLevel,
                 mitigationImplemented: filters.mitigationImplemented,
+                status: filters.status,
+                department: filters.department,
               }}
               onFilterChange={(key, value) => {
                 if (key === 'search') {
@@ -1559,6 +1601,8 @@ export function RisksPage() {
                   search: '',
                   dateAddedFrom: '',
                   dateAddedTo: '',
+                  status: '',
+                  department: '',
                   sortBy: 'calculatedScore',
                   sortOrder: 'desc',
                   page: 1,

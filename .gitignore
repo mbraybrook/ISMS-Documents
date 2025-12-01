@@ -58,6 +58,7 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+cache/
 
 # Cursor/IDE specific
 .cursor/

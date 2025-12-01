@@ -129,13 +129,10 @@ async function parseRiskLinks(riskLinksStr: string | undefined): Promise<string[
   const parts = riskLinksStr.split(',').map(p => p.trim()).filter(p => p);
   
   for (const part of parts) {
-    // Try to find risk by externalId first
+    // Try to find risk by id
     const risk = await prisma.risk.findFirst({
       where: {
-        OR: [
-          { externalId: part },
-          { id: part },
-        ],
+        id: part,
       },
       select: { id: true },
     });

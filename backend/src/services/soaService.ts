@@ -26,7 +26,6 @@ export async function generateSoAData(): Promise<SoARow[]> {
           risk: {
             select: {
               id: true,
-              externalId: true,
               title: true,
             },
           },

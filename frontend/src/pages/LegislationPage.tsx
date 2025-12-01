@@ -55,7 +55,6 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface Risk {
   id: string;
-  externalId: string | null;
   title: string;
 }
 
@@ -425,8 +424,7 @@ export function LegislationPage() {
       .filter(
         (risk) =>
           !formData.riskIds.includes(risk.id) &&
-          (risk.externalId?.toLowerCase().includes(searchLower) ||
-            risk.title.toLowerCase().includes(searchLower))
+          risk.title.toLowerCase().includes(searchLower)
       )
       .slice(0, 10);
   }, [allRisks, riskSearchTerm, formData.riskIds]);
@@ -701,7 +699,7 @@ export function LegislationPage() {
                                         >
                                           <Link
                                             as={RouterLink}
-                                            to="/risks/risks"
+                                            to="/admin/risks/risks"
                                             onClick={() => {
                                               sessionStorage.setItem('highlightRiskId', lr.risk.id);
                                             }}
@@ -709,7 +707,7 @@ export function LegislationPage() {
                                           >
                                             <HStack spacing={2}>
                                               <Badge colorScheme="blue" fontSize="xs">
-                                                {lr.risk.externalId || 'Risk'}
+                                                Risk
                                               </Badge>
                                               <Text fontSize="sm" fontWeight="medium" color="blue.700" _hover={{ textDecoration: "underline" }}>
                                                 {lr.risk.title}
@@ -853,11 +851,6 @@ export function LegislationPage() {
                             borderColor="blue.200"
                           >
                             <HStack spacing={2}>
-                              {risk.externalId && (
-                                <Badge colorScheme="blue" fontSize="xs">
-                                  {risk.externalId}
-                                </Badge>
-                              )}
                               <Text fontSize="sm" fontWeight="medium">
                                 {risk.title}
                               </Text>
@@ -881,7 +874,6 @@ export function LegislationPage() {
                           return (
                             <Tag key={riskId} colorScheme="blue" size="md">
                               <TagLabel>
-                                {risk.externalId && `${risk.externalId}: `}
                                 {risk.title}
                               </TagLabel>
                               <TagCloseButton onClick={() => toggleRiskSelection(riskId)} />

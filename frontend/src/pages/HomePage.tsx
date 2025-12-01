@@ -52,7 +52,6 @@ interface DashboardData {
     withMitigationNotImplemented: Array<{
       id: string;
       title: string;
-      externalId: string | null;
       calculatedScore: number;
       mitigatedScore: number | null;
     }>;
@@ -186,7 +185,7 @@ export function HomePage() {
               boxShadow: 'md',
             }}
             transition="all 0.2s"
-            onClick={() => navigate('/documents/reviews')}
+            onClick={() => navigate('/admin/documents/reviews')}
           >
             <HStack spacing={2} mb={2}>
               <WarningIcon
@@ -223,7 +222,7 @@ export function HomePage() {
               boxShadow: 'md',
             }}
             transition="all 0.2s"
-            onClick={() => navigate('/risks/risks')}
+            onClick={() => navigate('/admin/risks/risks')}
           >
             <HStack spacing={2} mb={2}>
               <WarningIcon
@@ -263,7 +262,7 @@ export function HomePage() {
               boxShadow: 'md',
             }}
             transition="all 0.2s"
-            onClick={() => navigate('/documents/acknowledgments')}
+            onClick={() => navigate('/admin/documents/acknowledgments')}
           >
             <HStack spacing={2} mb={2}>
               <InfoIcon
@@ -321,7 +320,7 @@ export function HomePage() {
               boxShadow: 'md',
             }}
             transition="all 0.2s"
-            onClick={() => navigate('/risks/controls')}
+            onClick={() => navigate('/admin/risks/controls')}
           >
             <HStack spacing={2} mb={2}>
               <InfoIcon
@@ -472,7 +471,7 @@ export function HomePage() {
                       size="sm"
                       variant="outline"
                       rightIcon={<ArrowForwardIcon />}
-                      onClick={() => navigate('/risks/risks')}
+                      onClick={() => navigate('/admin/risks/risks')}
                     >
                       View All Risks
                     </Button>
@@ -481,7 +480,6 @@ export function HomePage() {
                     <Table variant="simple" size="sm">
                       <Thead>
                         <Tr>
-                          <Th>ID</Th>
                           <Th>Title</Th>
                           <Th>Total Score</Th>
                           <Th>Mitigated Score</Th>
@@ -497,15 +495,8 @@ export function HomePage() {
                                 key={risk.id}
                                 _hover={{ bg: 'gray.50' }}
                                 cursor="pointer"
-                                onClick={() => navigate('/risks/risks')}
+                                onClick={() => navigate('/admin/risks/risks')}
                               >
-                                <Td>
-                                  {risk.externalId || (
-                                    <Text color="gray.400" fontSize="xs">
-                                      —
-                                    </Text>
-                                  )}
-                                </Td>
                                 <Td>{risk.title}</Td>
                                 <Td>{risk.calculatedScore}</Td>
                                 <Td>
@@ -624,7 +615,7 @@ export function HomePage() {
                       size="sm"
                       variant="outline"
                       rightIcon={<ArrowForwardIcon />}
-                      onClick={() => navigate('/risks/controls')}
+                      onClick={() => navigate('/admin/risks/controls')}
                     >
                       View All Controls
                     </Button>
@@ -644,7 +635,7 @@ export function HomePage() {
                               key={control.id}
                               _hover={{ bg: 'gray.50' }}
                               cursor="pointer"
-                              onClick={() => navigate('/risks/controls')}
+                              onClick={() => navigate('/admin/risks/controls')}
                             >
                               <Td>
                                 <Badge colorScheme="blue">{control.code}</Badge>
@@ -696,7 +687,7 @@ export function HomePage() {
                 colorScheme="blue"
                 variant="outline"
                 rightIcon={<ArrowForwardIcon />}
-                onClick={() => navigate('/documents/reviews')}
+                onClick={() => navigate('/admin/documents/reviews')}
               >
                 View Review Dashboard
               </Button>
@@ -719,7 +710,7 @@ export function HomePage() {
                 colorScheme="blue"
                 variant="outline"
                 rightIcon={<ArrowForwardIcon />}
-                onClick={() => navigate('/documents/acknowledgments')}
+                onClick={() => navigate('/admin/documents/acknowledgments')}
               >
                 View Pending Acknowledgments
               </Button>

@@ -836,10 +836,23 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       if (payload.mitigatedRiskScore === null) payload.mitigatedRiskScore = undefined;
       if (payload.mitigatedLikelihood === null) payload.mitigatedLikelihood = undefined;
 
+      // Include test department in query params if testing as CONTRIBUTOR
+      const testDepartment = localStorage.getItem('departmentOverride');
+      const roleOverride = localStorage.getItem('roleOverride');
+      const isTestingAsContributor = roleOverride === 'CONTRIBUTOR' && testDepartment;
+      
       let response;
       let riskId: string;
       if (risk && !isDuplicateMode) {
-        response = await api.put(`/api/risks/${risk.id}`, payload);
+        const url = `/api/risks/${risk.id}`;
+        const config: any = {};
+        
+        // Add testDepartment as query param if testing
+        if (isTestingAsContributor) {
+          config.params = { testDepartment };
+        }
+        
+        response = await api.put(url, payload, config);
         riskId = risk.id;
         toast({
           title: 'Success',

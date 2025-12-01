@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { authService, AuthUser, msalInstance } from '../services/authService';
 import { config } from '../config';
 import axios from 'axios';
+import { Department } from '../types/risk';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -9,6 +10,12 @@ interface AuthContextType {
   login: () => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  roleOverride: 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR' | null;
+  setRoleOverride: (role: 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR' | null) => void;
+  getEffectiveRole: () => 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR' | null;
+  departmentOverride: Department | null;
+  setDepartmentOverride: (department: Department | null) => void;
+  getUserDepartment: () => Department | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -16,6 +23,22 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roleOverride, setRoleOverrideState] = useState<'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR' | null>(() => {
+    // Load from localStorage on init
+    const stored = localStorage.getItem('roleOverride');
+    if (stored && ['ADMIN', 'EDITOR', 'STAFF', 'CONTRIBUTOR'].includes(stored)) {
+      return stored as 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR';
+    }
+    return null;
+  });
+  const [departmentOverride, setDepartmentOverrideState] = useState<Department | null>(() => {
+    // Load from localStorage on init
+    const stored = localStorage.getItem('departmentOverride');
+    if (stored && ['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING'].includes(stored)) {
+      return stored as Department;
+    }
+    return null;
+  });
 
   useEffect(() => {
     const init = async () => {
@@ -113,6 +136,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await authService.logout();
     setUser(null);
+    // Clear role and department overrides on logout
+    setRoleOverrideState(null);
+    setDepartmentOverrideState(null);
+    localStorage.removeItem('roleOverride');
+    localStorage.removeItem('departmentOverride');
+  };
+
+  const setRoleOverride = (role: 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR' | null) => {
+    if (role) {
+      localStorage.setItem('roleOverride', role);
+    } else {
+      localStorage.removeItem('roleOverride');
+    }
+    setRoleOverrideState(role);
+    // Clear department override if switching away from CONTRIBUTOR
+    if (role !== 'CONTRIBUTOR') {
+      setDepartmentOverrideState(null);
+      localStorage.removeItem('departmentOverride');
+    }
+  };
+
+  const setDepartmentOverride = (department: Department | null) => {
+    if (department) {
+      localStorage.setItem('departmentOverride', department);
+    } else {
+      localStorage.removeItem('departmentOverride');
+    }
+    setDepartmentOverrideState(department);
+  };
+
+  const getEffectiveRole = (): 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR' | null => {
+    if (roleOverride) {
+      return roleOverride;
+    }
+    return user?.role as 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR' | null;
+  };
+
+  const getUserDepartment = (): Department | null => {
+    // If testing as CONTRIBUTOR, return the override department
+    const effectiveRole = getEffectiveRole();
+    if (effectiveRole === 'CONTRIBUTOR' && departmentOverride) {
+      return departmentOverride;
+    }
+    // Otherwise return the user's actual department
+    return (user as any)?.department || null;
   };
 
   return (
@@ -123,6 +191,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         isAuthenticated: !!user,
+        roleOverride,
+        setRoleOverride,
+        getEffectiveRole,
+        departmentOverride,
+        setDepartmentOverride,
+        getUserDepartment,
       }}
     >
       {children}

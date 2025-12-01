@@ -4,19 +4,25 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export function LoginPage() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user, getEffectiveRole } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/');
+    if (isAuthenticated && user) {
+      // Redirect based on effective role (includes override)
+      const effectiveRole = getEffectiveRole();
+      if (effectiveRole === 'STAFF' || effectiveRole === 'CONTRIBUTOR') {
+        navigate('/admin/staff');
+      } else {
+        navigate('/admin');
+      }
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, user, navigate, getEffectiveRole]);
 
   const handleLogin = async () => {
     try {
       await login();
-      navigate('/');
+      // Navigation will happen in useEffect when user is set
     } catch (error) {
       console.error('Login failed:', error);
     }

@@ -147,7 +147,6 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       select: {
         id: true,
         title: true,
-        externalId: true,
         calculatedScore: true,
         mitigatedScore: true,
         mitigationImplemented: true,
@@ -165,7 +164,6 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     const risksWithMitigationNotImplemented: Array<{
       id: string;
       title: string;
-      externalId: string | null;
       calculatedScore: number;
       mitigatedScore: number | null;
     }> = [];
@@ -188,7 +186,6 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
           risksWithMitigationNotImplemented.push({
             id: risk.id,
             title: risk.title,
-            externalId: risk.externalId,
             calculatedScore: risk.calculatedScore,
             mitigatedScore: risk.mitigatedScore,
           });
@@ -389,6 +386,136 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard data' });
+  }
+});
+
+// GET /api/dashboard/staff - staff-specific dashboard data
+router.get('/staff', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: req.user.email || '' },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
+
+    // Get pending acknowledgments count
+    const approvedDocuments = await prisma.document.findMany({
+      where: {
+        status: 'APPROVED',
+        requiresAcknowledgement: true,
+      },
+    });
+
+    const userAcknowledgments = await prisma.acknowledgment.findMany({
+      where: {
+        userId: user.id,
+      },
+      orderBy: {
+        acknowledgedAt: 'desc',
+      },
+    });
+
+    // Create a map of documentId -> latest acknowledgment version
+    const acknowledgmentMap = new Map<string, string>();
+    userAcknowledgments.forEach((ack) => {
+      const existing = acknowledgmentMap.get(ack.documentId);
+      if (!existing || ack.documentVersion > existing) {
+        acknowledgmentMap.set(ack.documentId, ack.documentVersion);
+      }
+    });
+
+    // Filter documents that need acknowledgment
+    const pendingDocuments = approvedDocuments.filter((doc) => {
+      const lastAcknowledgedVersion = acknowledgmentMap.get(doc.id);
+      return !lastAcknowledgedVersion || doc.version !== lastAcknowledgedVersion;
+    });
+
+    const pendingAcknowledgmentsCount = pendingDocuments.length;
+
+    // Get recently updated documents (APPROVED, sorted by lastChangedDate DESC, limit 10)
+    const recentlyUpdatedDocuments = await prisma.document.findMany({
+      where: {
+        status: 'APPROVED',
+        lastChangedDate: {
+          not: null,
+        },
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        lastChangedDate: 'desc',
+      },
+      take: 10,
+    });
+
+    // Check which documents the user has acknowledged
+    const recentlyUpdatedWithAckStatus = recentlyUpdatedDocuments.map((doc) => {
+      const lastAcknowledgedVersion = acknowledgmentMap.get(doc.id);
+      const isAcknowledged = lastAcknowledgedVersion === doc.version;
+      
+      return {
+        id: doc.id,
+        title: doc.title,
+        type: doc.type,
+        version: doc.version,
+        owner: doc.owner,
+        storageLocation: doc.storageLocation,
+        documentUrl: doc.documentUrl,
+        requiresAcknowledgement: doc.requiresAcknowledgement,
+        lastChangedDate: doc.lastChangedDate,
+        isAcknowledged,
+      };
+    });
+
+    // Review status counts
+    const overdueCount = await prisma.document.count({
+      where: {
+        nextReviewDate: {
+          lt: now,
+        },
+        status: { in: ['APPROVED', 'IN_REVIEW'] },
+      },
+    });
+
+    const upcomingCount = await prisma.document.count({
+      where: {
+        nextReviewDate: {
+          gte: now,
+          lte: thirtyDaysFromNow,
+        },
+        status: { in: ['APPROVED', 'IN_REVIEW'] },
+      },
+    });
+
+    res.json({
+      pendingAcknowledgmentsCount,
+      recentlyUpdatedDocuments: recentlyUpdatedWithAckStatus,
+      reviewStatus: {
+        overdueCount,
+        upcomingCount,
+      },
+      lastUpdated: now.toISOString(),
+    });
+  } catch (error) {
+    console.error('Error fetching staff dashboard data:', error);
+    res.status(500).json({ error: 'Failed to fetch staff dashboard data' });
   }
 });
 

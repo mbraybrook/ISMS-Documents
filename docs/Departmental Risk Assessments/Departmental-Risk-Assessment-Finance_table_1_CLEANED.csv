@@ -1,0 +1,7 @@
+Threat Description,Risk Description,Impact Score (1-5),Likelihood Score (1-5),Risk Score,Impact Categories,Existing Controls,Potential Additional Controls
+Accounting systems and platform,Robustness and reliance on Quickbooks,4,1,4,Availability,Multiple sign on to Quickbooks,
+Key personnel,Reliance on one member of staff who is retired and part time,4,4,16,Availability,Back up support available from RPGC,Recruitment process post funding
+Funding and capital adequacy,"On-going financial losses, delays to the investment process and a net liability balance sheet constrain new business opportunities",5,4,20,Integrity,Investment process with Infinium Partners is on-going,Evaluation and forecasting models are regularly reviewed Existing shareholder support
+Revenue and profitability,"Sales and new business volumes fall short of budget/forecast impacting margin, profitability, liquidity and capital",5,5,25,Integrity,Sales leads are actively pursued and monitored,Existing contracts and clients are carefully managed
+HMRC and other legislative bodies,"Outstanding liabilities to HMRC for PAYE, NIC and VAT",3,3,9,Integrity,Arrangements to pay are in place and regularly updated in correspondence with HMRC,
+Economic risks,"Economic conditions ""worsen"" putting pressure on commercial/financial margins, performance and profitability. Slow growth in the EV market",4,2,8,Integrity,Economic conditions and market growth assumptions are regularly reviewed and incorporated into all evaluation and forecasting models,
