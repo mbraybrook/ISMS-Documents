@@ -10,7 +10,13 @@ const router = Router();
 const validate = (req: any, res: Response, next: any) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+    console.error('Validation errors:', JSON.stringify(errors.array(), null, 2));
+    console.error('Request body:', JSON.stringify(req.body, null, 2));
+    return res.status(400).json({ 
+      error: 'Validation failed',
+      errors: errors.array(),
+      details: errors.array().map((e: any) => `${e.param}: ${e.msg}`).join(', ')
+    });
   }
   next();
 };
@@ -19,10 +25,12 @@ const validate = (req: any, res: Response, next: any) => {
 router.get(
   '/',
   authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
   [
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 1000 }),
     query('isApplicable').optional().isBoolean(),
+    query('implemented').optional().isBoolean(),
     query('category').optional().isIn(['ORGANIZATIONAL', 'PEOPLE', 'PHYSICAL', 'TECHNOLOGICAL']),
     query('selectionReason').optional().isIn(['RISK_ASSESSMENT', 'CONTRACTUAL_OBLIGATION', 'LEGAL_REQUIREMENT', 'BUSINESS_REQUIREMENT']),
   ],
@@ -33,6 +41,7 @@ router.get(
         page = '1',
         limit = '50',
         isApplicable,
+        implemented,
       } = req.query;
 
       const pageNum = parseInt(page as string, 10);
@@ -80,6 +89,23 @@ router.get(
         }
       }
       
+      // Add implemented filter if provided
+      if (implemented !== undefined) {
+        const implementedBool = implemented === 'true' || implemented === true;
+        // If we already have OR or AND, we need to wrap everything
+        if (where.OR || where.AND) {
+          const existingCondition = where.OR ? { OR: where.OR } : { AND: where.AND };
+          delete where.OR;
+          delete where.AND;
+          where.AND = [
+            existingCondition,
+            { implemented: implementedBool },
+          ];
+        } else {
+          where.implemented = implementedBool;
+        }
+      }
+      
       // Add category filter if provided (combines with above filters)
       if (req.query.category) {
         // If we already have OR or AND, we need to wrap everything
@@ -111,7 +137,6 @@ router.get(
                   select: {
                     id: true,
                     title: true,
-                    externalId: true,
                   },
                 },
               },
@@ -181,7 +206,6 @@ router.get(
                 select: {
                   id: true,
                   title: true,
-                  externalId: true,
                   calculatedScore: true,
                 },
               },
@@ -267,7 +291,10 @@ router.post(
     body('selectedForContractualObligation').optional().isBoolean(),
     body('selectedForLegalRequirement').optional().isBoolean(),
     body('selectedForBusinessRequirement').optional().isBoolean(),
-    body('justification').optional().isString(),
+    body('justification').optional().custom((value) => {
+      if (value === undefined || value === null || value === '') return true;
+      return typeof value === 'string';
+    }),
     body('controlText').optional().isString(),
     body('purpose').optional().isString(),
     body('guidance').optional().isString(),
@@ -292,8 +319,26 @@ router.post(
         });
       }
 
+      // Convert boolean fields explicitly
+      const createData: any = { ...req.body };
+      if (createData.selectedForContractualObligation !== undefined) {
+        createData.selectedForContractualObligation = createData.selectedForContractualObligation === true || createData.selectedForContractualObligation === 'true';
+      }
+      if (createData.selectedForLegalRequirement !== undefined) {
+        createData.selectedForLegalRequirement = createData.selectedForLegalRequirement === true || createData.selectedForLegalRequirement === 'true';
+      }
+      if (createData.selectedForBusinessRequirement !== undefined) {
+        createData.selectedForBusinessRequirement = createData.selectedForBusinessRequirement === true || createData.selectedForBusinessRequirement === 'true';
+      }
+      if (createData.implemented !== undefined) {
+        createData.implemented = createData.implemented === true || createData.implemented === 'true';
+      }
+      if (createData.isStandardControl !== undefined) {
+        createData.isStandardControl = createData.isStandardControl === true || createData.isStandardControl === 'true';
+      }
+
       const control = await prisma.control.create({
-        data: req.body,
+        data: createData,
       });
 
       res.status(201).json(control);
@@ -317,16 +362,20 @@ router.put(
     body('code').optional().notEmpty().trim(),
     body('title').optional().notEmpty().trim(),
     body('description').optional().isString(),
-    body('selectedForContractualObligation').optional().isBoolean(),
-    body('selectedForLegalRequirement').optional().isBoolean(),
-    body('selectedForBusinessRequirement').optional().isBoolean(),
-    body('justification').optional().isString(),
+    // Boolean fields - validation removed, handled in route handler
+    body('selectedForContractualObligation').optional(),
+    body('selectedForLegalRequirement').optional(),
+    body('selectedForBusinessRequirement').optional(),
+    body('justification').optional().custom((value) => {
+      if (value === undefined || value === null || value === '') return true;
+      return typeof value === 'string';
+    }),
     body('controlText').optional().isString(),
     body('purpose').optional().isString(),
     body('guidance').optional().isString(),
     body('otherInformation').optional().isString(),
     body('category').optional().isIn(['ORGANIZATIONAL', 'PEOPLE', 'PHYSICAL', 'TECHNOLOGICAL']),
-    body('implemented').optional().isBoolean(),
+    body('implemented').optional(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -345,20 +394,23 @@ router.put(
 
       // For standard controls, only allow updating specific fields
       if (existing.isStandardControl) {
-        const allowedFields = [
-          'selectedForContractualObligation',
-          'selectedForLegalRequirement',
-          'selectedForBusinessRequirement',
-          'justification',
-          'implemented'
-        ];
         const updateData: any = {};
         
-        // Only include allowed fields
-        for (const field of allowedFields) {
-          if (req.body[field] !== undefined) {
-            updateData[field] = req.body[field];
-          }
+        // Handle boolean fields with explicit conversion
+        if (req.body.selectedForContractualObligation !== undefined) {
+          updateData.selectedForContractualObligation = req.body.selectedForContractualObligation === true || req.body.selectedForContractualObligation === 'true';
+        }
+        if (req.body.selectedForLegalRequirement !== undefined) {
+          updateData.selectedForLegalRequirement = req.body.selectedForLegalRequirement === true || req.body.selectedForLegalRequirement === 'true';
+        }
+        if (req.body.selectedForBusinessRequirement !== undefined) {
+          updateData.selectedForBusinessRequirement = req.body.selectedForBusinessRequirement === true || req.body.selectedForBusinessRequirement === 'true';
+        }
+        if (req.body.implemented !== undefined) {
+          updateData.implemented = req.body.implemented === true || req.body.implemented === 'true';
+        }
+        if (req.body.justification !== undefined) {
+          updateData.justification = req.body.justification || null;
         }
 
         // Block attempts to modify standard control fields
@@ -392,6 +444,23 @@ router.put(
         const updateData: any = { ...req.body };
         // Remove Risk Assessment from update data - it's auto-computed
         delete updateData.selectedForRiskAssessment;
+        
+        // Convert boolean fields explicitly
+        if (updateData.selectedForContractualObligation !== undefined) {
+          updateData.selectedForContractualObligation = updateData.selectedForContractualObligation === true || updateData.selectedForContractualObligation === 'true';
+        }
+        if (updateData.selectedForLegalRequirement !== undefined) {
+          updateData.selectedForLegalRequirement = updateData.selectedForLegalRequirement === true || updateData.selectedForLegalRequirement === 'true';
+        }
+        if (updateData.selectedForBusinessRequirement !== undefined) {
+          updateData.selectedForBusinessRequirement = updateData.selectedForBusinessRequirement === true || updateData.selectedForBusinessRequirement === 'true';
+        }
+        if (updateData.implemented !== undefined) {
+          updateData.implemented = updateData.implemented === true || updateData.implemented === 'true';
+        }
+        if (updateData.isStandardControl !== undefined) {
+          updateData.isStandardControl = updateData.isStandardControl === true || updateData.isStandardControl === 'true';
+        }
 
         const control = await prisma.control.update({
           where: { id },

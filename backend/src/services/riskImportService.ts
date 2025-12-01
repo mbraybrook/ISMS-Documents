@@ -324,7 +324,6 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
         const risk = await prisma.risk.create({
           data: {
             id: riskId,
-            externalId: riskNumber || null,
             title: riskDescription || `Risk ${riskNumber}`,
             description: riskDescription || null,
             dateAdded: parseDate(row['Date Added']) || new Date(),

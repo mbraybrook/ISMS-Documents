@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { StaffOnlyRoute } from './components/StaffOnlyRoute'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -9,6 +10,8 @@ import { DocumentsPage } from './pages/DocumentsPage'
 import { AcknowledgmentPage } from './pages/AcknowledgmentPage'
 import { ReviewsPage } from './pages/ReviewsPage'
 import { RisksPage } from './pages/RisksPage'
+import { DepartmentRiskTable } from './components/DepartmentRiskTable'
+import { RiskReviewQueue } from './components/RiskReviewQueue'
 import { ControlsPage } from './pages/ControlsPage'
 import { SoAPage } from './pages/SoAPage'
 import { MassImportPage } from './pages/MassImportPage'
@@ -16,15 +19,53 @@ import { AssetsPage } from './pages/AssetsPage'
 import { AssetCategoriesPage } from './pages/AssetCategoriesPage'
 import { InterestedPartiesPage } from './pages/InterestedPartiesPage'
 import { LegislationPage } from './pages/LegislationPage'
+import { StaffHomePage } from './pages/StaffHomePage'
+import { StaffAcknowledgmentPage } from './pages/StaffAcknowledgmentPage'
+import { StaffDocumentsPage } from './pages/StaffDocumentsPage'
+import { UnauthorizedPage } from './pages/UnauthorizedPage'
+import { UsersPage } from './pages/UsersPage'
+import { TrustAuthProvider } from './contexts/TrustAuthContext'
+import { TrustCenterPage } from './pages/TrustCenterPage'
+import { TrustCenterLoginPage } from './pages/TrustCenterLoginPage'
+import { TrustCenterPrivatePage } from './pages/TrustCenterPrivatePage'
+import { TrustCenterAdminPage } from './pages/TrustCenterAdminPage'
 
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          {/* Trust Center routes - public-facing, separate auth context */}
           <Route
             path="/"
+            element={
+              <TrustAuthProvider>
+                <TrustCenterPage />
+              </TrustAuthProvider>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <TrustAuthProvider>
+                <TrustCenterLoginPage />
+              </TrustAuthProvider>
+            }
+          />
+          <Route
+            path="/private"
+            element={
+              <TrustAuthProvider>
+                <TrustCenterPrivatePage />
+              </TrustAuthProvider>
+            }
+          />
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          
+          {/* ISMS Admin routes - all under /admin prefix */}
+          <Route path="/admin/login" element={<LoginPage />} />
+          <Route
+            path="/admin"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -34,7 +75,7 @@ function App() {
             }
           />
           <Route
-            path="/documents/documents"
+            path="/admin/documents/documents"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -44,7 +85,7 @@ function App() {
             }
           />
           <Route
-            path="/documents/documents/import"
+            path="/admin/documents/documents/import"
             element={
               <ProtectedRoute requiredRole="EDITOR">
                 <Layout>
@@ -54,7 +95,7 @@ function App() {
             }
           />
           <Route
-            path="/documents/acknowledgments"
+            path="/admin/documents/acknowledgments"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -64,7 +105,7 @@ function App() {
             }
           />
           <Route
-            path="/documents/reviews"
+            path="/admin/documents/reviews"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -74,7 +115,7 @@ function App() {
             }
           />
           <Route
-            path="/risks/risks"
+            path="/admin/risks/risks"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -84,7 +125,27 @@ function App() {
             }
           />
           <Route
-            path="/risks/controls"
+            path="/admin/risks/department"
+            element={
+              <ProtectedRoute requiredRole="CONTRIBUTOR">
+                <Layout>
+                  <DepartmentRiskTable />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/risks/review"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <RiskReviewQueue />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/risks/controls"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -94,7 +155,7 @@ function App() {
             }
           />
           <Route
-            path="/soa"
+            path="/admin/soa"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -104,7 +165,7 @@ function App() {
             }
           />
           <Route
-            path="/assets/assets"
+            path="/admin/assets/assets"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -114,7 +175,7 @@ function App() {
             }
           />
           <Route
-            path="/assets/asset-categories"
+            path="/admin/assets/asset-categories"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -124,7 +185,7 @@ function App() {
             }
           />
           <Route
-            path="/risks/interested-parties"
+            path="/admin/risks/interested-parties"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -134,7 +195,7 @@ function App() {
             }
           />
           <Route
-            path="/risks/legislation"
+            path="/admin/risks/legislation"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -144,13 +205,64 @@ function App() {
             }
           />
           <Route
-            path="/profile"
+            path="/admin/profile"
             element={
               <ProtectedRoute>
                 <Layout>
                   <ProfilePage />
                 </Layout>
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute requiredRole="ADMIN">
+                <Layout>
+                  <UsersPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/trust"
+            element={
+              <ProtectedRoute requiredRole="EDITOR">
+                <Layout>
+                  <TrustCenterAdminPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          {/* Staff-only routes */}
+          <Route
+            path="/admin/staff"
+            element={
+              <StaffOnlyRoute>
+                <Layout>
+                  <StaffHomePage />
+                </Layout>
+              </StaffOnlyRoute>
+            }
+          />
+          <Route
+            path="/admin/staff/acknowledgments"
+            element={
+              <StaffOnlyRoute>
+                <Layout>
+                  <StaffAcknowledgmentPage />
+                </Layout>
+              </StaffOnlyRoute>
+            }
+          />
+          <Route
+            path="/admin/staff/documents"
+            element={
+              <StaffOnlyRoute>
+                <Layout>
+                  <StaffDocumentsPage />
+                </Layout>
+              </StaffOnlyRoute>
             }
           />
         </Routes>

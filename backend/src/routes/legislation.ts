@@ -57,7 +57,6 @@ router.get(
               risk: {
                 select: {
                   id: true,
-                  externalId: true,
                   title: true,
                   dateAdded: true,
                   calculatedScore: true,
@@ -329,7 +328,6 @@ router.post(
         },
         select: {
           id: true,
-          externalId: true,
           title: true,
           description: true,
           threatDescription: true,
@@ -343,7 +341,6 @@ router.post(
       for (const risk of allRisks) {
         let score = 0;
         const riskText = [
-          risk.externalId || '',
           risk.title || '',
           risk.description || '',
           risk.threatDescription || '',
@@ -351,11 +348,6 @@ router.post(
         ]
           .join(' ')
           .toLowerCase();
-
-        // Check if risk external ID appears in text
-        if (risk.externalId && combinedText.includes(risk.externalId.toLowerCase())) {
-          score += 10;
-        }
 
         // Check for keyword matches in title
         if (risk.title) {

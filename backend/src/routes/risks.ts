@@ -12,6 +12,8 @@ import {
   getRiskLevel,
   parseControlCodes,
   updateRiskControls,
+  calculateCIAFromWizard,
+  validateStatusTransition,
 } from '../services/riskService';
 import { importRisksFromCSV } from '../services/riskImportService';
 import { findSimilarRisksForRisk, checkSimilarityForNewRisk } from '../services/similarityService';
@@ -30,6 +32,7 @@ const validate = (req: any, res: Response, next: any) => {
 router.get(
   '/',
   authenticateToken,
+  requireRole('ADMIN', 'EDITOR', 'CONTRIBUTOR'),
   [
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
@@ -47,10 +50,26 @@ router.get(
     query('dateAddedTo').optional().isISO8601(),
     query('assetId').optional().isUUID(),
     query('assetCategoryId').optional().isUUID(),
+    query('view').optional().isIn(['department', 'inbox']),
+    query('status').optional().isIn(['DRAFT', 'PROPOSED', 'ACTIVE', 'REJECTED', 'ARCHIVED']),
+    query('department').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING']),
+    query('testDepartment').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING']),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
+      // Get user from database to check role and department
+      const user = await prisma.user.findUnique({
+        where: { email: req.user!.email },
+      });
+
+      if (!user) {
+        return res.status(403).json({ error: 'User not found' });
+      }
+
+      const userRole = user.role as string;
+      const userDepartment = user.department;
+
       const {
         page = '1',
         limit = '20',
@@ -68,6 +87,10 @@ router.get(
         dateAddedTo,
         assetId,
         assetCategoryId,
+        view,
+        status,
+        department,
+        testDepartment,
       } = req.query;
 
       const pageNum = parseInt(page as string, 10);
@@ -76,14 +99,71 @@ router.get(
 
       // Build where clause for filtering
       const where: any = {};
+
+      // Check if this is a test scenario: ADMIN user testing as CONTRIBUTOR with testDepartment
+      // This happens when view=department and testDepartment is provided
+      const isTestingAsContributor = testDepartment && userRole === 'ADMIN' && view === 'department';
+      
+      // Permission-based filtering
+      if (userRole === 'CONTRIBUTOR' || isTestingAsContributor) {
+        // Determine effective department
+        let effectiveDepartment: string | null = null;
+        
+        if (isTestingAsContributor && testDepartment) {
+          // ADMIN testing as CONTRIBUTOR - use test department
+          effectiveDepartment = testDepartment as string;
+        } else if (userRole === 'CONTRIBUTOR') {
+          // Real CONTRIBUTOR - use database department
+          effectiveDepartment = userDepartment;
+        }
+        
+        // Contributors can only see their department's risks
+        if (effectiveDepartment) {
+          where.department = effectiveDepartment;
+        } else {
+          return res.status(403).json({ error: 'Contributors must have a department assigned' });
+        }
+        // Contributors cannot see archived risks
+        where.archived = false;
+      } else {
+        // Editors/Admins: Global visibility - no department filter by default
+        // Only apply department filter if explicitly requested
+        if (department) {
+          where.department = department;
+        }
+        // Default to showing non-archived risks unless explicitly requested
+        if (archived !== undefined) {
+          where.archived = archived === 'true';
+        } else {
+          where.archived = false;
+        }
+      }
+
+      // Handle view parameter
+      if (view === 'inbox') {
+        // Review inbox: show only PROPOSED risks (for Editors/Admins)
+        if (userRole !== 'EDITOR' && userRole !== 'ADMIN') {
+          return res.status(403).json({ error: 'Only Editors and Admins can access the review inbox' });
+        }
+        where.status = 'PROPOSED';
+      } else if (view === 'department') {
+        // Department view: already handled above for Contributors
+        // For Editors/Admins, this is just a filter option
+      }
+
+      // Status filter
+      if (status) {
+        where.status = status;
+      } else if (userRole === 'CONTRIBUTOR') {
+        // Contributors see all non-archived statuses by default
+        // No status filter needed
+      } else {
+        // Editors/Admins: show all statuses except ARCHIVED by default (already handled by archived filter)
+        // If no status filter, show all (DRAFT, PROPOSED, ACTIVE, REJECTED)
+      }
+
       if (riskCategory) where.riskCategory = riskCategory;
       if (riskNature) where.riskNature = riskNature;
-      // Default to showing non-archived risks unless explicitly requested
-      if (archived !== undefined) {
-        where.archived = archived === 'true';
-      } else {
-        where.archived = false;
-      }
       if (ownerId) where.ownerUserId = ownerId;
       if (mitigationImplemented !== undefined) {
         where.mitigationImplemented = mitigationImplemented === 'true';
@@ -289,11 +369,10 @@ router.get(
 router.post(
   '/',
   authenticateToken,
-  requireRole('ADMIN', 'EDITOR'),
+  requireRole('ADMIN', 'EDITOR', 'CONTRIBUTOR'),
   [
     body('title').notEmpty().trim(),
     body('description').optional().isString(),
-    body('externalId').optional().isString(),
     body('dateAdded').optional().isISO8601().toDate(),
     body('riskCategory').optional().isIn(['INFORMATION_SECURITY', 'OPERATIONAL', 'FINANCIAL', 'COMPLIANCE', 'REPUTATIONAL', 'STRATEGIC', 'OTHER']),
     body('riskNature').optional().isIn(['STATIC', 'INSTANCE']),
@@ -307,11 +386,11 @@ router.post(
     body('assetCategoryId').optional().isUUID(),
     body('interestedPartyId').optional().isUUID(),
     body('threatDescription').optional().isString(),
-    body('confidentialityScore').isInt({ min: 1, max: 5 }),
-    body('integrityScore').isInt({ min: 1, max: 5 }),
-    body('availabilityScore').isInt({ min: 1, max: 5 }),
+    body('confidentialityScore').optional().isInt({ min: 1, max: 5 }),
+    body('integrityScore').optional().isInt({ min: 1, max: 5 }),
+    body('availabilityScore').optional().isInt({ min: 1, max: 5 }),
     body('riskScore').optional().isInt({ min: 1 }),
-    body('likelihood').isInt({ min: 1, max: 5 }),
+    body('likelihood').optional().isInt({ min: 1, max: 5 }),
     body('initialRiskTreatmentCategory').optional().isIn(['RETAIN', 'MODIFY', 'SHARE', 'AVOID']),
     body('mitigatedConfidentialityScore').optional().isInt({ min: 1, max: 5 }),
     body('mitigatedIntegrityScore').optional().isInt({ min: 1, max: 5 }),
@@ -322,14 +401,28 @@ router.post(
     body('mitigationDescription').optional().isString(),
     body('residualRiskTreatmentCategory').optional().isIn(['RETAIN', 'MODIFY', 'SHARE', 'AVOID']),
     body('annexAControlsRaw').optional().isString(),
+    body('wizardData').optional().isString(),
+    body('status').optional().isIn(['DRAFT', 'PROPOSED', 'ACTIVE', 'REJECTED', 'ARCHIVED']),
+    body('department').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING', null]),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
+      // Get user from database
+      const user = await prisma.user.findUnique({
+        where: { email: req.user!.email },
+      });
+
+      if (!user) {
+        return res.status(403).json({ error: 'User not found' });
+      }
+
+      const userRole = user.role as string;
+      const userDepartment = user.department;
+
       const {
         title,
         description,
-        externalId,
         dateAdded,
         riskCategory,
         riskNature,
@@ -358,7 +451,70 @@ router.post(
         mitigationDescription,
         residualRiskTreatmentCategory,
         annexAControlsRaw,
+        wizardData,
+        status,
+        department,
       } = req.body;
+
+      // Handle wizard data for Contributors
+      let finalConfidentialityScore = confidentialityScore ?? 1;
+      let finalIntegrityScore = integrityScore ?? 1;
+      let finalAvailabilityScore = availabilityScore ?? 1;
+      let finalLikelihood = likelihood ?? 1;
+      let finalStatus = status || 'DRAFT';
+      let finalDepartment = department;
+      let finalWizardData = wizardData;
+
+      if (wizardData) {
+        try {
+          const wizard = JSON.parse(wizardData);
+          const impactLevel = wizard.impact || wizard.impactLevel;
+          const wizardLikelihood = wizard.likelihood;
+
+          if (impactLevel) {
+            const cia = calculateCIAFromWizard(impactLevel);
+            finalConfidentialityScore = cia.c;
+            finalIntegrityScore = cia.i;
+            finalAvailabilityScore = cia.a;
+          }
+
+          if (wizardLikelihood) {
+            finalLikelihood = wizardLikelihood;
+          }
+        } catch (error) {
+          console.error('Error parsing wizardData:', error);
+          // Continue with defaults if wizardData is invalid
+        }
+      }
+
+      // For Contributors: force department and restrict status
+      if (userRole === 'CONTRIBUTOR') {
+        // For testing: Allow ADMIN users to use department from request body (test override)
+        // Verify the actual user in database is ADMIN (not just testing as Contributor)
+        const actualUser = await prisma.user.findUnique({
+          where: { email: req.user!.email },
+          select: { role: true },
+        });
+        
+        if (actualUser?.role === 'ADMIN' && department) {
+          // ADMIN testing as CONTRIBUTOR - use department from request (test override)
+          finalDepartment = department;
+        } else {
+          // Real CONTRIBUTOR - use department from database
+          if (!userDepartment) {
+            return res.status(403).json({ error: 'Contributors must have a department assigned' });
+          }
+          finalDepartment = userDepartment;
+        }
+        
+        // Contributors can only create DRAFT or PROPOSED risks
+        if (finalStatus !== 'DRAFT' && finalStatus !== 'PROPOSED') {
+          finalStatus = 'DRAFT';
+        }
+      }
+
+      // Automatically set ownerUserId from authenticated user
+      const finalOwnerUserId = ownerUserId || user.id;
 
       // Business logic validation: expiryDate only for INSTANCE, review dates only for STATIC
       if (riskNature === 'STATIC' && expiryDate) {
@@ -373,10 +529,10 @@ router.post(
       }
 
       const calculatedScore = calculateRiskScore(
-        confidentialityScore,
-        integrityScore,
-        availabilityScore,
-        likelihood
+        finalConfidentialityScore,
+        finalIntegrityScore,
+        finalAvailabilityScore,
+        finalLikelihood
       );
 
       const mitigatedScore = calculateMitigatedScore(
@@ -393,12 +549,29 @@ router.post(
         });
       }
 
+      // Handle missing interestedPartyId - get or create "Unspecified" party
+      let finalInterestedPartyId = interestedPartyId;
+      if (!finalInterestedPartyId) {
+        let unspecifiedParty = await prisma.interestedParty.findUnique({
+          where: { name: 'Unspecified' },
+        });
+        if (!unspecifiedParty) {
+          unspecifiedParty = await prisma.interestedParty.create({
+            data: {
+              id: randomUUID(),
+              name: 'Unspecified',
+              updatedAt: new Date(),
+            },
+          });
+        }
+        finalInterestedPartyId = unspecifiedParty.id;
+      }
+
       const risk = await prisma.risk.create({
         data: {
           id: randomUUID(),
           title,
           description,
-          externalId,
           dateAdded: dateAdded ? new Date(dateAdded) : undefined,
           riskCategory: riskCategory as any, // Type will be correct after TS server restart
           riskNature: riskNature as any, // Type will be correct after TS server restart
@@ -406,17 +579,20 @@ router.post(
           expiryDate: expiryDate ? new Date(expiryDate) : null,
           lastReviewDate: lastReviewDate ? new Date(lastReviewDate) : null,
           nextReviewDate: nextReviewDate ? new Date(nextReviewDate) : null,
-          ownerUserId,
+          ownerUserId: finalOwnerUserId,
+          department: finalDepartment,
+          status: finalStatus,
+          wizardData: finalWizardData,
           assetCategory, // Keep for backward compatibility
           assetId: assetId || null,
           assetCategoryId: assetCategoryId || null,
-          interestedPartyId,
+          interestedPartyId: finalInterestedPartyId,
           threatDescription,
-          confidentialityScore,
-          integrityScore,
-          availabilityScore,
+          confidentialityScore: finalConfidentialityScore,
+          integrityScore: finalIntegrityScore,
+          availabilityScore: finalAvailabilityScore,
           riskScore: riskScore ?? calculatedScore,
-          likelihood,
+          likelihood: finalLikelihood,
           calculatedScore,
           initialRiskTreatmentCategory,
           mitigatedConfidentialityScore,
@@ -482,12 +658,11 @@ router.post(
 router.put(
   '/:id',
   authenticateToken,
-  requireRole('ADMIN', 'EDITOR'),
+  requireRole('ADMIN', 'EDITOR', 'CONTRIBUTOR'),
   [
     param('id').isUUID(),
     body('title').optional().notEmpty().trim(),
     body('description').optional().isString(),
-    body('externalId').optional().isString(),
     body('dateAdded').optional().isISO8601().toDate(),
     body('riskCategory').optional().isIn(['INFORMATION_SECURITY', 'OPERATIONAL', 'FINANCIAL', 'COMPLIANCE', 'REPUTATIONAL', 'STRATEGIC', 'OTHER']),
     body('riskNature').optional().isIn(['STATIC', 'INSTANCE']),
@@ -516,17 +691,81 @@ router.put(
     body('mitigationDescription').optional().isString(),
     body('residualRiskTreatmentCategory').optional().isIn(['RETAIN', 'MODIFY', 'SHARE', 'AVOID']),
     body('annexAControlsRaw').optional().isString(),
+    body('status').optional().isIn(['DRAFT', 'PROPOSED', 'ACTIVE', 'REJECTED', 'ARCHIVED']),
+    body('department').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING', null]),
+    body('wizardData').optional().isString(),
+    body('rejectionReason').optional().isString(),
+    body('mergedIntoRiskId').optional().isUUID(),
+    query('testDepartment').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING']),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
+      // Get user from database
+      const user = await prisma.user.findUnique({
+        where: { email: req.user!.email },
+      });
+
+      if (!user) {
+        return res.status(403).json({ error: 'User not found' });
+      }
+
+      const userRole = user.role as string;
+      const userDepartment = user.department;
+
       const { id } = req.params;
       const updateData: any = { ...req.body };
 
-      // Get existing risk to check riskNature for validation
+      // Get existing risk to check permissions and riskNature for validation
       const existing = await prisma.risk.findUnique({ where: { id } });
       if (!existing) {
         return res.status(404).json({ error: 'Risk not found' });
+      }
+
+      // Check if this is a test scenario: ADMIN user testing as CONTRIBUTOR
+      // Check if testDepartment query parameter is provided (sent from frontend when testing)
+      const testDepartment = req.query.testDepartment as string | undefined;
+      const riskDepartment = (existing as any).department || null;
+      
+      // Determine if we're in test mode: ADMIN with testDepartment provided
+      const isTestingAsContributor = userRole === 'ADMIN' && testDepartment;
+      
+      // Permission checks for Contributors (real or testing)
+      if (userRole === 'CONTRIBUTOR' || isTestingAsContributor) {
+        let effectiveDepartment: string | null = null;
+        
+        if (isTestingAsContributor && testDepartment) {
+          // ADMIN testing as CONTRIBUTOR - use test department from query
+          effectiveDepartment = testDepartment;
+        } else if (userRole === 'CONTRIBUTOR') {
+          // Real CONTRIBUTOR - use database department
+          effectiveDepartment = userDepartment;
+        }
+        
+        // Contributors can only edit risks from their department
+        // For testing: check if risk's department matches test department
+        // For real Contributors: check if risk's department matches user's department
+        // Allow editing if department matches OR if risk has no department (for backward compatibility)
+        if (riskDepartment !== null && riskDepartment !== effectiveDepartment) {
+          return res.status(403).json({ 
+            error: 'You can only edit risks from your department',
+            details: { riskDepartment, effectiveDepartment, isTesting: isTestingAsContributor }
+          });
+        }
+
+        // Contributors can only edit DRAFT or PROPOSED risks
+        const currentStatus = (existing as any).status || 'DRAFT';
+        if (currentStatus !== 'DRAFT' && currentStatus !== 'PROPOSED') {
+          return res.status(403).json({ error: 'You can only edit risks in DRAFT or PROPOSED status' });
+        }
+
+        // Contributors cannot set status to ACTIVE
+        if (updateData.status === 'ACTIVE') {
+          return res.status(403).json({ error: 'Contributors cannot set risk status to ACTIVE' });
+        }
+
+        // Ensure department remains unchanged for Contributors (use effective department for testing)
+        updateData.department = effectiveDepartment;
       }
 
       // Determine riskNature (use updated value if provided, otherwise existing)
@@ -674,6 +913,148 @@ router.put(
       }
       console.error('Error updating risk:', error);
       res.status(500).json({ error: 'Failed to update risk' });
+    }
+  }
+);
+
+// PATCH /api/risks/:id/status - update risk status
+router.patch(
+  '/:id/status',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR', 'CONTRIBUTOR'),
+  [
+    param('id').isUUID(),
+    body('status').isIn(['DRAFT', 'PROPOSED', 'ACTIVE', 'REJECTED', 'ARCHIVED']),
+    body('rejectionReason').optional().isString(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      // Get user from database
+      const user = await prisma.user.findUnique({
+        where: { email: req.user!.email },
+      });
+
+      if (!user) {
+        return res.status(403).json({ error: 'User not found' });
+      }
+
+      const userRole = user.role as string;
+      const { id } = req.params;
+      const { status, rejectionReason } = req.body;
+
+      // Get existing risk
+      const existing = await prisma.risk.findUnique({ where: { id } });
+      if (!existing) {
+        return res.status(404).json({ error: 'Risk not found' });
+      }
+
+      const currentStatus = (existing as any).status || 'DRAFT';
+
+      // Validate status transition
+      if (!validateStatusTransition(currentStatus, status, userRole)) {
+        return res.status(403).json({
+          error: `Invalid status transition from ${currentStatus} to ${status} for role ${userRole}`,
+        });
+      }
+
+      // Prepare update data
+      const updateData: any = {
+        status,
+        updatedAt: new Date(),
+      };
+
+      // Store rejection reason if status is REJECTED
+      if (status === 'REJECTED' && rejectionReason) {
+        updateData.rejectionReason = rejectionReason;
+      }
+
+      // Update risk
+      const risk = await prisma.risk.update({
+        where: { id },
+        data: updateData,
+      });
+
+      // Fetch risk with relations
+      const riskWithRelations = await prisma.risk.findUnique({
+        where: { id: risk.id },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      res.json(riskWithRelations);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'Risk not found' });
+      }
+      console.error('Error updating risk status:', error);
+      res.status(500).json({ error: 'Failed to update risk status' });
+    }
+  }
+);
+
+// POST /api/risks/:id/merge - merge duplicate risk
+router.post(
+  '/:id/merge',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    param('id').isUUID(),
+    body('targetRiskId').isUUID(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { targetRiskId } = req.body;
+
+      // Get existing risk
+      const existing = await prisma.risk.findUnique({ where: { id } });
+      if (!existing) {
+        return res.status(404).json({ error: 'Risk not found' });
+      }
+
+      // Get target risk
+      const targetRisk = await prisma.risk.findUnique({ where: { id: targetRiskId } });
+      if (!targetRisk) {
+        return res.status(404).json({ error: 'Target risk not found' });
+      }
+
+      // Validate target risk is ACTIVE
+      const targetStatus = (targetRisk as any).status || 'DRAFT';
+      if (targetStatus !== 'ACTIVE') {
+        return res.status(400).json({ error: 'Target risk must be ACTIVE to merge' });
+      }
+
+      // Update current risk: set status to REJECTED, add rejection reason and mergedIntoRiskId
+      const updatedRisk = await prisma.risk.update({
+        where: { id },
+        data: {
+          status: 'REJECTED',
+          rejectionReason: 'Merged as duplicate',
+          mergedIntoRiskId: targetRiskId,
+          updatedAt: new Date(),
+        },
+      });
+
+      res.json({
+        message: 'Risk merged successfully',
+        mergedRisk: updatedRisk,
+        targetRisk: targetRisk,
+      });
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'Risk not found' });
+      }
+      console.error('Error merging risk:', error);
+      res.status(500).json({ error: 'Failed to merge risk' });
     }
   }
 );

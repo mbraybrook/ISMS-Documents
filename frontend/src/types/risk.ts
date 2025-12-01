@@ -1,7 +1,24 @@
+// Type definitions
+export type RiskStatus = 'DRAFT' | 'PROPOSED' | 'ACTIVE' | 'REJECTED' | 'ARCHIVED';
+export type Department = 'BUSINESS_STRATEGY' | 'FINANCE' | 'HR' | 'OPERATIONS' | 'PRODUCT' | 'MARKETING';
+
+// Helper to get display name for department
+export function getDepartmentDisplayName(dept: Department | null | undefined): string {
+  if (!dept) return 'Not assigned';
+  const displayNames: Record<Department, string> = {
+    BUSINESS_STRATEGY: 'Business Strategy',
+    FINANCE: 'Finance',
+    HR: 'HR',
+    OPERATIONS: 'Operations',
+    PRODUCT: 'Product',
+    MARKETING: 'Marketing',
+  };
+  return displayNames[dept] || dept;
+}
+
 // Risk interface matching the backend model
 export interface Risk {
   id: string;
-  externalId: string | null;
   title: string;
   description: string | null;
   dateAdded: string;
@@ -17,6 +34,11 @@ export interface Risk {
     email: string;
   } | null;
   ownerUserId: string | null;
+  department: string | null;
+  status: RiskStatus;
+  wizardData: string | null;
+  rejectionReason: string | null;
+  mergedIntoRiskId: string | null;
   assetCategory: string | null;
   assetId: string | null;
   assetCategoryId: string | null;
@@ -80,4 +102,5 @@ export interface SimilarRiskResult {
   score: number;
   fields: string[];
 }
+
 

@@ -164,9 +164,11 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       onClose();
     } catch (error: any) {
       console.error('Error saving control:', error);
+      console.error('Error response:', error.response?.data);
+      const errorMessage = error.response?.data?.details || error.response?.data?.error || error.response?.data?.errors?.[0]?.msg || 'Failed to save control';
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to save control',
+        description: errorMessage,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -206,18 +208,18 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="2xl">
+    <Modal isOpen={isOpen} onClose={onClose} size="6xl" scrollBehavior="inside">
       <ModalOverlay />
-      <ModalContent>
-        <form onSubmit={handleSubmit}>
-          <ModalHeader>
+      <ModalContent maxH="90vh" display="flex" flexDirection="column" overflow="hidden">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+          <ModalHeader flexShrink={0}>
             {control ? (isStandardControl ? 'View Standard Control' : 'Edit Control') : 'Create Control'}
             {isStandardControl && (
               <Badge colorScheme="green" ml={2}>ISO 27002 Standard</Badge>
             )}
           </ModalHeader>
           <ModalCloseButton />
-          <ModalBody>
+          <ModalBody overflowY="auto" flex="1" pb={6} minH={0}>
             <VStack spacing={4} align="stretch">
               {isStandardControl && control && (
                 <>
@@ -327,7 +329,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                               >
                                 <HStack spacing={2}>
                                   <Badge colorScheme="blue" fontSize="xs">
-                                    {riskControl.risk.externalId || 'Risk'}
+                                    Risk
                                   </Badge>
                                   <Box fontWeight="medium" color="blue.700" _hover={{ textDecoration: "underline" }}>
                                     {riskControl.risk.title}
@@ -454,7 +456,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                               >
                                 <HStack spacing={2}>
                                   <Badge colorScheme="blue" fontSize="xs">
-                                    {riskControl.risk.externalId || 'Risk'}
+                                    Risk
                                   </Badge>
                                   <Box fontWeight="medium" color="blue.700" _hover={{ textDecoration: "underline" }}>
                                     {riskControl.risk.title}
@@ -534,7 +536,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
             </VStack>
           </ModalBody>
 
-          <ModalFooter>
+          <ModalFooter flexShrink={0}>
             <HStack spacing={3}>
               {!isStandardControl && control && (
                 <Button

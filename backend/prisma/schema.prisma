@@ -129,6 +129,7 @@ model Document {
   DocumentControl         DocumentControl[]
   DocumentRisk            DocumentRisk[]
   ReviewTask              ReviewTask[]
+  TrustDocSetting          TrustDocSetting?
 
   @@index([nextReviewDate])
   @@index([ownerUserId])
@@ -216,13 +217,17 @@ model ReviewTask {
 
 model Risk {
   id                            String          @id
-  externalId                    String?
   title                         String
   description                   String?
   dateAdded                     DateTime        @default(now())
   riskCategory                  String?
   riskNature                    String?
   ownerUserId                   String?
+  department                    String?
+  status                        String          @default("DRAFT")
+  wizardData                    String?
+  rejectionReason               String?
+  mergedIntoRiskId              String?
   assetCategory                 String?
   assetId                       String?
   assetCategoryId               String?
@@ -271,8 +276,9 @@ model Risk {
   @@index([archived])
   @@index([riskNature])
   @@index([riskCategory])
-  @@index([externalId])
   @@index([calculatedScore])
+  @@index([department])
+  @@index([status])
 }
 
 model RiskControl {
@@ -315,6 +321,7 @@ model User {
   email          String           @unique
   entraObjectId  String           @unique
   role           String           @default("STAFF")
+  department     String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime
   Acknowledgment Acknowledgment[]
@@ -325,4 +332,82 @@ model User {
 
   @@index([entraObjectId])
   @@index([email])
+  @@index([department])
+}
+
+model ExternalUser {
+  id                  String          @id @default(uuid())
+  email               String          @unique
+  passwordHash        String
+  companyName         String
+  isApproved          Boolean         @default(false)
+  passwordResetToken  String?
+  passwordResetExpires DateTime?
+  tokenVersion        Int             @default(0)
+  termsAcceptedAt     DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  TrustDownload       TrustDownload[]
+  TrustAuditLog       TrustAuditLog[] @relation("PerformedByExternalUser")
+
+  @@index([email])
+  @@index([isApproved])
+}
+
+model TrustDocSetting {
+  id                String          @id @default(uuid())
+  documentId        String          @unique
+  visibilityLevel    String
+  category          String
+  sharePointUrl     String?
+  sharePointSiteId  String?
+  sharePointDriveId String?
+  sharePointItemId  String?
+  publicDescription String?
+  displayOrder      Int?
+  requiresNda       Boolean         @default(false)
+  maxFileSizeMB     Int?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  Document          Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  TrustDownload     TrustDownload[] @relation
+  TrustAuditLog     TrustAuditLog[] @relation
+
+  @@index([visibilityLevel])
+  @@index([category])
+  @@index([displayOrder])
+}
+
+model TrustDownload {
+  id            String        @id @default(uuid())
+  externalUserId String?
+  docId         String
+  downloadToken String?
+  termsAccepted Boolean       @default(false)
+  timestamp     DateTime       @default(now())
+  ExternalUser  ExternalUser?  @relation(fields: [externalUserId], references: [id], onDelete: Cascade)
+  TrustDocSetting TrustDocSetting? @relation(fields: [docId], references: [documentId], onDelete: Cascade)
+
+  @@index([externalUserId])
+  @@index([docId])
+  @@index([timestamp])
+}
+
+model TrustAuditLog {
+  id                      String        @id @default(uuid())
+  action                  String
+  performedByUserId      String?
+  performedByExternalUserId String?
+  targetUserId            String?
+  targetDocumentId        String?
+  details                 String?
+  ipAddress               String?
+  timestamp               DateTime      @default(now())
+  PerformedByExternalUser ExternalUser? @relation("PerformedByExternalUser", fields: [performedByExternalUserId], references: [id])
+  TrustDocSetting         TrustDocSetting? @relation(fields: [targetDocumentId], references: [documentId], onDelete: Cascade)
+
+  @@index([action])
+  @@index([timestamp])
+  @@index([performedByUserId])
+  @@index([targetDocumentId])
 }

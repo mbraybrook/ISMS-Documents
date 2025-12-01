@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
 import { getSharePointItem, generateSharePointUrl } from '../services/sharePointService';
 import { generateConfluenceUrl } from '../services/confluenceService';
+import { invalidateCache } from '../services/pdfCacheService';
 import { config } from '../config';
 
 const router = Router();
@@ -34,6 +35,16 @@ router.get(
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
+      // Get user role for filtering
+      let userRole: string | null = null;
+      if (req.user?.email) {
+        const user = await prisma.user.findUnique({
+          where: { email: req.user.email },
+          select: { role: true },
+        });
+        userRole = user?.role || null;
+      }
+
       const {
         type,
         status,
@@ -50,8 +61,15 @@ router.get(
 
       const where: any = {};
 
+      // STAFF and CONTRIBUTOR users can only see APPROVED documents
+      if (userRole === 'STAFF' || userRole === 'CONTRIBUTOR') {
+        where.status = 'APPROVED';
+      } else {
+        // ADMIN/EDITOR can see all documents, but respect status filter if provided
+        if (status) where.status = status;
+      }
+
       if (type) where.type = type;
-      if (status) where.status = status;
       if (ownerId) where.ownerUserId = ownerId as string;
 
       if (nextReviewFrom || nextReviewTo) {
@@ -137,6 +155,33 @@ router.get(
         await Promise.allSettled(urlPromises);
       }
 
+      // Add computed fields for review status
+      const now = new Date();
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(now.getDate() + 30);
+
+      const documentsWithComputedFields = documents.map((doc) => {
+        const docData: any = {
+          ...doc,
+          requiresAcknowledgement: doc.requiresAcknowledgement,
+          lastChangedDate: doc.lastChangedDate,
+          lastReviewDate: doc.lastReviewDate,
+          nextReviewDate: doc.nextReviewDate,
+        };
+
+        // Compute review status flags
+        if (doc.nextReviewDate && (doc.status === 'APPROVED' || doc.status === 'IN_REVIEW')) {
+          const nextReview = new Date(doc.nextReviewDate);
+          docData.isOverdueReview = nextReview < now;
+          docData.isUpcomingReview = nextReview >= now && nextReview <= thirtyDaysFromNow;
+        } else {
+          docData.isOverdueReview = false;
+          docData.isUpcomingReview = false;
+        }
+
+        return docData;
+      });
+
       // Log for debugging
       const sharePointDocs = documents.filter(d => d.storageLocation === 'SHAREPOINT');
       const sampleSharePointDoc = sharePointDocs[0];
@@ -146,6 +191,7 @@ router.get(
         total,
         page: pageNum,
         limit: limitNum,
+        userRole,
         sharePointDocsCount: sharePointDocs.length,
         sampleSharePointDoc: sampleSharePointDoc ? {
           id: sampleSharePointDoc.id,
@@ -160,7 +206,7 @@ router.get(
       });
 
       res.json({
-        data: documents,
+        data: documentsWithComputedFields,
         pagination: {
           page: pageNum,
           limit: limitNum,
@@ -183,6 +229,16 @@ router.get(
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
+      // Get user role for access control
+      let userRole: string | null = null;
+      if (req.user?.email) {
+        const user = await prisma.user.findUnique({
+          where: { email: req.user.email },
+          select: { role: true },
+        });
+        userRole = user?.role || null;
+      }
+
       const { id } = req.params;
 
       const document = await prisma.document.findUnique({
@@ -210,6 +266,11 @@ router.get(
 
       if (!document) {
         return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // STAFF and CONTRIBUTOR users can only see APPROVED documents
+      if ((userRole === 'STAFF' || userRole === 'CONTRIBUTOR') && document.status !== 'APPROVED') {
+        return res.status(403).json({ error: 'Access denied. Only approved documents are available.' });
       }
 
       res.json(document);
@@ -389,7 +450,14 @@ router.put(
       if (data.version && existingDocument.status === 'APPROVED' && data.version !== existingDocument.version) {
         // Version changed on approved document - set lastChangedDate and keep status as APPROVED
         data.lastChangedDate = new Date();
-        // Don't change status - keep it as APPROVED since approval happened outside platform
+        // Explicitly preserve APPROVED status - don't allow it to be changed when version updates
+        if (!('status' in data) || data.status !== 'APPROVED') {
+          data.status = 'APPROVED';
+        }
+        // For POLICY documents, ensure requiresAcknowledgement is true when version changes
+        if (existingDocument.type === 'POLICY') {
+          data.requiresAcknowledgement = true;
+        }
       }
 
       // Auto-set requiresAcknowledgement based on type if type is being changed
@@ -483,6 +551,11 @@ router.put(
             },
           },
         },
+      });
+
+      // Invalidate PDF cache when document is updated (version or content may have changed)
+      invalidateCache(id).catch((err) => {
+        console.error('[Document Update] Error invalidating PDF cache:', err);
       });
 
       res.json(document);

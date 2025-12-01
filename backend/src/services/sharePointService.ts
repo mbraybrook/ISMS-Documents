@@ -1,5 +1,9 @@
 import { Client } from '@microsoft/microsoft-graph-client';
+import { ClientSecretCredential } from '@azure/identity';
 import { config } from '../config';
+
+// Token cache for app-only authentication
+let cachedAppToken: { token: string; expiresAt: number } | null = null;
 
 /**
  * Create Microsoft Graph client with access token
@@ -308,6 +312,215 @@ export async function parseSharePointUrl(
   } catch (error) {
     console.error('Error parsing SharePoint URL:', error);
     return null;
+  }
+}
+
+/**
+ * Get app-only access token for Microsoft Graph API
+ * Uses Azure Client ID/Secret for authentication
+ * Implements token caching to avoid unnecessary token requests
+ */
+export async function getAppOnlyAccessToken(): Promise<string | null> {
+  try {
+    // Check if we have a valid cached token
+    if (cachedAppToken && cachedAppToken.expiresAt > Date.now() + 5 * 60 * 1000) {
+      // Token is still valid for at least 5 more minutes
+      return cachedAppToken.token;
+    }
+
+    if (!config.azure.appClientId || !config.azure.appClientSecret || !config.azure.tenantId) {
+      console.error('[SharePointService] Azure app-only auth not configured');
+      return null;
+    }
+
+    const credential = new ClientSecretCredential(
+      config.azure.tenantId,
+      config.azure.appClientId,
+      config.azure.appClientSecret
+    );
+
+    // Request token with Graph API scope
+    const tokenResponse = await credential.getToken(['https://graph.microsoft.com/.default']);
+
+    if (!tokenResponse || !tokenResponse.token) {
+      console.error('[SharePointService] Failed to get app-only token');
+      return null;
+    }
+
+    // Cache the token (expires in ~60-90 minutes, cache for slightly less)
+    const expiresIn = (tokenResponse.expiresOnTimestamp - Date.now()) / 1000;
+    cachedAppToken = {
+      token: tokenResponse.token,
+      expiresAt: tokenResponse.expiresOnTimestamp,
+    };
+
+    console.log('[SharePointService] App-only token obtained and cached', {
+      expiresIn: Math.round(expiresIn / 60),
+    });
+
+    return tokenResponse.token;
+  } catch (error: any) {
+    console.error('[SharePointService] Error getting app-only token:', error);
+    return null;
+  }
+}
+
+/**
+ * Parse SharePoint URL and extract siteId, driveId, itemId
+ * This is a wrapper around parseSharePointUrl that returns just the IDs
+ */
+export async function parseSharePointUrlToIds(
+  url: string,
+  accessToken?: string
+): Promise<{ siteId: string; driveId: string; itemId: string } | null> {
+  try {
+    // Use provided token or get app-only token
+    const token = accessToken || (await getAppOnlyAccessToken());
+    if (!token) {
+      console.error('[SharePointService] No access token available for URL parsing');
+      return null;
+    }
+
+    const parsed = await parseSharePointUrl(token, url);
+    if (!parsed) {
+      return null;
+    }
+
+    return {
+      siteId: parsed.siteId,
+      driveId: parsed.driveId,
+      itemId: parsed.itemId,
+    };
+  } catch (error) {
+    console.error('[SharePointService] Error parsing SharePoint URL to IDs:', error);
+    return null;
+  }
+}
+
+/**
+ * Custom error classes for SharePoint operations
+ */
+export class FileNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FileNotFoundError';
+  }
+}
+
+export class FileTooLargeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FileTooLargeError';
+  }
+}
+
+export class PermissionDeniedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PermissionDeniedError';
+  }
+}
+
+/**
+ * Download SharePoint file content
+ * Works with both delegated (user) and app-only tokens
+ */
+export async function downloadSharePointFile(
+  accessToken: string,
+  siteId: string,
+  driveId: string,
+  itemId: string,
+  maxSizeMB?: number
+): Promise<{ buffer: Buffer; mimeType: string; name: string; size: number }> {
+  try {
+    const client = createGraphClient(accessToken);
+
+    // First, get file metadata to check size
+    const item = await client
+      .api(`/sites/${siteId}/drives/${driveId}/items/${itemId}`)
+      .get();
+
+    const fileSize = item.size || 0;
+    const maxSizeBytes = (maxSizeMB || 50) * 1024 * 1024;
+
+    if (fileSize > maxSizeBytes) {
+      throw new FileTooLargeError(
+        `File size (${Math.round(fileSize / 1024 / 1024)}MB) exceeds maximum allowed size (${maxSizeMB || 50}MB)`
+      );
+    }
+
+    // Download file content with retry logic
+    let lastError: any = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await client
+          .api(`/sites/${siteId}/drives/${driveId}/items/${itemId}/content`)
+          .responseType('arraybuffer')
+          .get();
+
+        const buffer = Buffer.from(response);
+
+        return {
+          buffer,
+          mimeType: item.file?.mimeType || 'application/octet-stream',
+          name: item.name,
+          size: fileSize,
+        };
+      } catch (error: any) {
+        lastError = error;
+        // Check if it's a transient error (5xx) and retry
+        if (error.statusCode && error.statusCode >= 500 && attempt < 2) {
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+          console.warn(
+            `[SharePointService] Transient error on attempt ${attempt + 1}, retrying in ${delay}ms:`,
+            error.message
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        // For non-transient errors, throw immediately
+        throw error;
+      }
+    }
+
+    throw lastError;
+  } catch (error: any) {
+    // Handle specific error types
+    if (error.statusCode === 404) {
+      throw new FileNotFoundError('File not found in SharePoint');
+    }
+    if (error.statusCode === 403 || error.statusCode === 401) {
+      throw new PermissionDeniedError('Permission denied to access file');
+    }
+    if (error instanceof FileTooLargeError || error instanceof FileNotFoundError || error instanceof PermissionDeniedError) {
+      throw error;
+    }
+    // Generic error
+    console.error('[SharePointService] Error downloading file:', error);
+    throw new Error(`Failed to download file: ${error.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Verify if a SharePoint file exists and is accessible
+ */
+export async function verifySharePointFileAccess(
+  accessToken: string,
+  siteId: string,
+  driveId: string,
+  itemId: string
+): Promise<boolean> {
+  try {
+    const client = createGraphClient(accessToken);
+    await client.api(`/sites/${siteId}/drives/${driveId}/items/${itemId}`).get();
+    return true;
+  } catch (error: any) {
+    if (error.statusCode === 404 || error.statusCode === 403 || error.statusCode === 401) {
+      return false;
+    }
+    // For other errors, log and return false
+    console.error('[SharePointService] Error verifying file access:', error);
+    return false;
   }
 }
 

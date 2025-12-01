@@ -18,13 +18,50 @@ import assetsRouter from './routes/assets';
 import interestedPartiesRouter from './routes/interestedParties';
 import legislationRouter from './routes/legislation';
 import { dashboardRouter } from './routes/dashboard';
+import { trustRouter } from './routes/trust';
+import { trustAuthRouter } from './routes/trust/auth';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
+// CORS configuration - allow Trust Center subdomain
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // Get allowed origins from config
+    const allowedOrigins = config.cors.trustCenterOrigins || [];
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // For development, allow localhost
+      if (config.nodeEnv === 'development' && origin.includes('localhost')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
+  credentials: true,
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// CSP headers middleware for PDF downloads
+app.use((req, res, next) => {
+  // Only set CSP for trust center routes
+  if (req.path.startsWith('/api/trust')) {
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';");
+  }
+  next();
+});
 
 // Routes
 app.use('/api/health', healthRouter);
@@ -44,6 +81,8 @@ app.use('/api/assets', assetsRouter);
 app.use('/api/interested-parties', interestedPartiesRouter);
 app.use('/api/legislation', legislationRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/trust', trustAuthRouter);
+app.use('/api/trust', trustRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);

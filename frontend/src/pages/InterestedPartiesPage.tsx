@@ -66,6 +66,7 @@ import { SearchIcon, EditIcon, DeleteIcon, AddIcon, ChevronDownIcon, ChevronUpIc
 import { Link as RouterLink } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { generateCSV } from '../utils/tableUtils';
 
 interface InterestedParty {
   id: string;
@@ -103,6 +104,7 @@ export function InterestedPartiesPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useAlertDisclosure();
+  const { isOpen: isBulkDeleteOpen, onOpen: onBulkDeleteOpen, onClose: onBulkDeleteClose } = useAlertDisclosure();
   const [selectedParty, setSelectedParty] = useState<InterestedParty | null>(null);
   const [partyToDelete, setPartyToDelete] = useState<InterestedParty | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -404,6 +406,79 @@ export function InterestedPartiesPage() {
   const handleDelete = (party: InterestedParty) => {
     setPartyToDelete(party);
     onDeleteOpen();
+  };
+
+  const confirmBulkDelete = async () => {
+    if (selectedParties.size === 0) return;
+
+    try {
+      const deletePromises = Array.from(selectedParties).map((partyId) =>
+        api.delete(`/api/interested-parties/${partyId}`)
+      );
+      await Promise.all(deletePromises);
+      
+      const deletedCount = selectedParties.size;
+      toast({
+        title: 'Success',
+        description: `${deletedCount} interested part${deletedCount !== 1 ? 'ies' : 'y'} deleted successfully`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+      onBulkDeleteClose();
+      setSelectedParties(new Set());
+      fetchInterestedParties();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Failed to delete interested parties';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleBulkExport = () => {
+    const selectedPartiesList = filteredParties.filter(p => selectedParties.has(p.id));
+    
+    const headers = [
+      'Name',
+      'Group',
+      'Description',
+      'Date Added',
+      'Requirements',
+      'Addressed Through ISMS',
+      'How Addressed Through ISMS',
+      'Source Link',
+      'Key Products/Services',
+      'Our Obligations',
+      'Their Obligations',
+    ];
+
+    const rows = selectedPartiesList.map((party) => [
+      party.name,
+      party.group || '',
+      party.description || '',
+      party.dateAdded ? new Date(party.dateAdded).toISOString().split('T')[0] : '',
+      party.requirements || '',
+      party.addressedThroughISMS ? 'Yes' : 'No',
+      party.howAddressedThroughISMS || '',
+      party.sourceLink || '',
+      party.keyProductsServices || '',
+      party.ourObligations || '',
+      party.theirObligations || '',
+    ]);
+
+    generateCSV(headers, rows, `selected_interested_parties_${new Date().toISOString().split('T')[0]}.csv`);
+    toast({
+      title: 'Export Successful',
+      description: `Exported ${selectedPartiesList.length} selected interested part${selectedPartiesList.length !== 1 ? 'ies' : 'y'} to CSV`,
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+    });
   };
 
   const validateURL = (url: string): boolean => {
@@ -708,8 +783,56 @@ export function InterestedPartiesPage() {
           </VStack>
         </Center>
       ) : (
-        <Box overflowX="auto">
-          <Table variant="simple">
+        <>
+          {selectedParties.size > 0 && (
+            <Box
+              p={3}
+              bg="blue.50"
+              borderRadius="md"
+              borderWidth="1px"
+              borderColor="blue.200"
+              display="flex"
+              alignItems="center"
+              gap={3}
+              mb={4}
+            >
+              <Text fontSize="sm" fontWeight="medium" color="blue.700">
+                {selectedParties.size} interested part{selectedParties.size !== 1 ? 'ies' : 'y'} selected
+              </Text>
+              <HStack spacing={2}>
+                {canEdit && (
+                  <>
+                    <Button
+                      colorScheme="red"
+                      size="sm"
+                      onClick={onBulkDeleteOpen}
+                    >
+                      Delete Selected
+                    </Button>
+                    <Menu>
+                      <MenuButton as={Button} size="sm" variant="outline" rightIcon={<HamburgerIcon />}>
+                        More Actions
+                      </MenuButton>
+                      <MenuList>
+                        <MenuItem onClick={handleBulkExport}>
+                          Export Selected
+                        </MenuItem>
+                      </MenuList>
+                    </Menu>
+                  </>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedParties(new Set())}
+                >
+                  Clear Selection
+                </Button>
+              </HStack>
+            </Box>
+          )}
+          <Box overflowX="auto">
+            <Table variant="simple">
             <Thead>
               <Tr>
                 <Th w="40px">
@@ -822,7 +945,6 @@ export function InterestedPartiesPage() {
                       return (
                         <React.Fragment key={party.id}>
                           <Tr
-                            _hover={{ bg: 'blue.50' }}
                             transition="background-color 0.2s"
                             borderLeft="3px solid"
                             borderLeftColor="transparent"
@@ -880,7 +1002,7 @@ export function InterestedPartiesPage() {
                               >
                                 <Link
                                   as={RouterLink}
-                                  to="/risks/risks"
+                                  to="/admin/risks/risks"
                                   onClick={() => {
                                     sessionStorage.setItem('filterInterestedPartyId', party.id);
                                   }}
@@ -1112,7 +1234,8 @@ export function InterestedPartiesPage() {
               })()}
             </Tbody>
           </Table>
-        </Box>
+          </Box>
+        </>
       )}
 
       {/* Export Button */}
@@ -1475,6 +1598,32 @@ export function InterestedPartiesPage() {
         </AlertDialogOverlay>
       </AlertDialog>
 
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog
+        isOpen={isBulkDeleteOpen}
+        onClose={onBulkDeleteClose}
+        closeOnOverlayClick={false}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Delete Selected Interested Parties
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              Are you sure you want to delete {selectedParties.size} selected interested part{selectedParties.size !== 1 ? 'ies' : 'y'}? This action cannot be undone.
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button onClick={onBulkDeleteClose}>
+                Cancel
+              </Button>
+              <Button colorScheme="red" onClick={confirmBulkDelete} ml={3}>
+                Delete {selectedParties.size} Part{selectedParties.size !== 1 ? 'ies' : 'y'}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+
       {/* Risk Management Modal */}
       <Modal isOpen={isRiskModalOpen} onClose={() => setIsRiskModalOpen(false)} size="2xl">
         <ModalOverlay />
@@ -1515,11 +1664,6 @@ export function InterestedPartiesPage() {
                         }}
                       >
                         <HStack spacing={2}>
-                          {risk.externalId && (
-                            <Badge colorScheme="blue" fontSize="xs">
-                              {risk.externalId}
-                            </Badge>
-                          )}
                           <Text fontSize="sm">{risk.title}</Text>
                         </HStack>
                       </Checkbox>

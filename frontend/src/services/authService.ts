@@ -48,7 +48,8 @@ export interface AuthUser {
   id: string;
   email: string;
   displayName: string;
-  role: 'ADMIN' | 'EDITOR' | 'STAFF';
+  role: 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR';
+  department?: string | null;
 }
 
 let currentAccount: AccountInfo | null = null;

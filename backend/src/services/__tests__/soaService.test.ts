@@ -25,7 +25,6 @@ describe('soaService', () => {
             {
               risk: {
                 id: 'risk-1',
-                externalId: 'R001',
                 title: 'Test Risk',
               },
             },
@@ -76,5 +75,6 @@ describe('soaService', () => {
     });
   });
 });
+
 
 

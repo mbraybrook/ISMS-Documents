@@ -32,11 +32,12 @@ import {
   Input,
   Select,
 } from '@chakra-ui/react';
-import { SearchIcon, EditIcon, DeleteIcon, AddIcon, DownloadIcon, ChevronUpIcon, ChevronDownIcon, InfoIcon } from '@chakra-ui/icons';
+import { SearchIcon, EditIcon, DeleteIcon, AddIcon, DownloadIcon, ChevronUpIcon, ChevronDownIcon, InfoIcon, HamburgerIcon } from '@chakra-ui/icons';
+import { Menu, MenuButton, MenuList, MenuItem } from '@chakra-ui/react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
-import { formatBoolean } from '../utils/tableUtils';
+import { formatBoolean, generateCSV } from '../utils/tableUtils';
 
 interface Asset {
   id: string;
@@ -109,6 +110,7 @@ export function AssetsPage() {
   const initialFormDataRef = useRef<string>('');
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useAlertDisclosure();
+  const { isOpen: isBulkDeleteOpen, onOpen: onBulkDeleteOpen, onClose: onBulkDeleteClose } = useAlertDisclosure();
   const { isOpen: isImportModalOpen, onOpen: onImportModalOpen, onClose: onImportModalClose } = useDisclosure();
   const { isOpen: isUnsavedDialogOpen, onOpen: onUnsavedDialogOpen, onClose: onUnsavedDialogClose } = useAlertDisclosure();
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -324,6 +326,85 @@ export function AssetsPage() {
         isClosable: true,
       });
     }
+  };
+
+  const confirmBulkDelete = async () => {
+    if (selectedAssets.size === 0) return;
+
+    try {
+      const deletePromises = Array.from(selectedAssets).map((assetId) =>
+        api.delete(`/api/assets/${assetId}`)
+      );
+      await Promise.all(deletePromises);
+      
+      const deletedCount = selectedAssets.size;
+      toast({
+        title: 'Success',
+        description: `${deletedCount} asset${deletedCount !== 1 ? 's' : ''} deleted successfully`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+      onBulkDeleteClose();
+      setSelectedAssets(new Set());
+      fetchAssets();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Failed to delete assets';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleBulkExport = () => {
+    const selectedAssetsList = assets.filter(a => selectedAssets.has(a.id));
+    
+    const headers = [
+      'Date',
+      'Category',
+      'Sub-category',
+      'Owner',
+      'Primary User',
+      'Location',
+      'Manufacturer',
+      'Model',
+      'Serial No',
+      'CDE Impacting',
+      'Classification',
+      'Purpose',
+      'Notes',
+      'Cost',
+    ];
+
+    const rows = selectedAssetsList.map((asset) => [
+      asset.date.split('T')[0],
+      asset.category.name,
+      asset.assetSubCategory || '',
+      asset.owner,
+      asset.primaryUser || '',
+      asset.location || '',
+      asset.manufacturer || '',
+      asset.model || '',
+      asset.nameSerialNo || '',
+      asset.cdeImpacting ? 'Yes' : 'No',
+      asset.classification.name,
+      asset.purpose || '',
+      asset.notes || '',
+      asset.cost || '',
+    ]);
+
+    generateCSV(headers, rows, `selected_assets_${new Date().toISOString().split('T')[0]}.csv`);
+    toast({
+      title: 'Export Successful',
+      description: `Exported ${selectedAssetsList.length} selected asset${selectedAssetsList.length !== 1 ? 's' : ''} to CSV`,
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+    });
   };
 
   const handleImportClick = () => {
@@ -776,6 +857,54 @@ export function AssetsPage() {
         </HStack>
       </HStack>
 
+      {selectedAssets.size > 0 && (
+        <Box
+          p={3}
+          bg="blue.50"
+          borderRadius="md"
+          borderWidth="1px"
+          borderColor="blue.200"
+          display="flex"
+          alignItems="center"
+          gap={3}
+          mb={4}
+        >
+          <Text fontSize="sm" fontWeight="medium" color="blue.700">
+            {selectedAssets.size} asset{selectedAssets.size !== 1 ? 's' : ''} selected
+          </Text>
+          <HStack spacing={2}>
+            {canEdit && (
+              <>
+                <Button
+                  colorScheme="red"
+                  size="sm"
+                  onClick={onBulkDeleteOpen}
+                >
+                  Delete Selected
+                </Button>
+                <Menu>
+                  <MenuButton as={Button} size="sm" variant="outline" rightIcon={<HamburgerIcon />}>
+                    More Actions
+                  </MenuButton>
+                  <MenuList>
+                    <MenuItem onClick={handleBulkExport}>
+                      Export Selected
+                    </MenuItem>
+                  </MenuList>
+                </Menu>
+              </>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSelectedAssets(new Set())}
+            >
+              Clear Selection
+            </Button>
+          </HStack>
+        </Box>
+      )}
+
       <DataTable
         title=""
         data={assets}
@@ -1073,6 +1202,32 @@ export function AssetsPage() {
               <Button onClick={onDeleteClose}>Cancel</Button>
               <Button colorScheme="red" onClick={handleConfirmDelete} ml={3}>
                 Delete
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog
+        isOpen={isBulkDeleteOpen}
+        onClose={onBulkDeleteClose}
+        closeOnOverlayClick={false}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Delete Selected Assets
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              Are you sure you want to delete {selectedAssets.size} selected asset{selectedAssets.size !== 1 ? 's' : ''}? This action cannot be undone.
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button onClick={onBulkDeleteClose}>
+                Cancel
+              </Button>
+              <Button colorScheme="red" onClick={confirmBulkDelete} ml={3}>
+                Delete {selectedAssets.size} Asset{selectedAssets.size !== 1 ? 's' : ''}
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

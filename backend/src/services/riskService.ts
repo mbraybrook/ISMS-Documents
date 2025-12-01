@@ -141,3 +141,48 @@ export async function updateControlApplicability() {
   `;
 }
 
+/**
+ * Calculate CIA scores from wizard impact level (simplified CIA - all same value)
+ * @param impactLevel Impact level from wizard (1-5)
+ * @returns Object with c, i, a all set to the same impact level value
+ */
+export function calculateCIAFromWizard(impactLevel: number): { c: number; i: number; a: number } {
+  // Ensure impact level is within valid range
+  const clampedImpact = Math.max(1, Math.min(5, impactLevel));
+  return {
+    c: clampedImpact,
+    i: clampedImpact,
+    a: clampedImpact,
+  };
+}
+
+/**
+ * Validate status transition based on user role and current status
+ * @param currentStatus Current risk status
+ * @param newStatus Desired new status
+ * @param userRole User's role
+ * @returns true if transition is allowed, false otherwise
+ */
+export function validateStatusTransition(
+  currentStatus: string,
+  newStatus: string,
+  userRole: string
+): boolean {
+  // Contributors can only transition DRAFT -> PROPOSED
+  if (userRole === 'CONTRIBUTOR') {
+    return currentStatus === 'DRAFT' && newStatus === 'PROPOSED';
+  }
+
+  // Editors and Admins can transition PROPOSED -> ACTIVE or PROPOSED -> REJECTED
+  if (userRole === 'EDITOR' || userRole === 'ADMIN') {
+    if (currentStatus === 'PROPOSED') {
+      return newStatus === 'ACTIVE' || newStatus === 'REJECTED';
+    }
+    // Editors/Admins can also set any status (for flexibility)
+    return true;
+  }
+
+  // Staff cannot change status
+  return false;
+}
+

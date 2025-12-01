@@ -108,6 +108,34 @@ export const config = {
     model: process.env.LLM_MODEL || 'llama2',
     similarityThreshold: parseFloat(process.env.LLM_SIMILARITY_THRESHOLD || '70'),
   },
+  // Trust Center configuration
+  trustCenter: {
+    jwtSecret: process.env.TRUST_CENTER_JWT_SECRET || '',
+    jwtExpiry: process.env.TRUST_CENTER_JWT_EXPIRY || '24h',
+    maxFileSizeMB: parseInt(process.env.TRUST_CENTER_MAX_FILE_SIZE_MB || '50', 10),
+    downloadTokenExpiry: process.env.TRUST_CENTER_DOWNLOAD_TOKEN_EXPIRY || '1h',
+  },
+  // Azure app-only authentication for Trust Center
+  // Reuses the same Azure App Registration as user authentication
+  azure: {
+    appClientId: process.env.AZURE_APP_CLIENT_ID || process.env.AUTH_CLIENT_ID || '',
+    appClientSecret: process.env.AZURE_APP_CLIENT_SECRET || process.env.AUTH_CLIENT_SECRET || '',
+    tenantId: process.env.AZURE_TENANT_ID || process.env.AUTH_TENANT_ID || '',
+  },
+  // CORS configuration
+  cors: {
+    trustCenterOrigins: process.env.CORS_TRUST_CENTER_ORIGINS
+      ? process.env.CORS_TRUST_CENTER_ORIGINS.split(',').map((s) => s.trim())
+      : [],
+  },
+  // Email service configuration (optional)
+  email: {
+    smtpHost: process.env.EMAIL_SMTP_HOST || '',
+    smtpPort: parseInt(process.env.EMAIL_SMTP_PORT || '587', 10),
+    smtpUser: process.env.EMAIL_SMTP_USER || '',
+    smtpPass: process.env.EMAIL_SMTP_PASS || '',
+    from: process.env.EMAIL_FROM || '',
+  },
 };
 
 // Log config on startup to verify env vars are loaded (in development only)
