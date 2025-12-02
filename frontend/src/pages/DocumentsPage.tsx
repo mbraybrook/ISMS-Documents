@@ -24,7 +24,7 @@ import {
   Td,
   Checkbox,
 } from '@chakra-ui/react';
-import { BellIcon, WarningIcon, DeleteIcon, ViewIcon, ExternalLinkIcon, TimeIcon, EditIcon } from '@chakra-ui/icons';
+import { BellIcon, WarningIcon, DeleteIcon, ViewIcon, ExternalLinkIcon, TimeIcon, EditIcon, RepeatIcon } from '@chakra-ui/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -763,7 +763,7 @@ export function DocumentsPage() {
             colorScheme: 'blue',
           } as ActionButton<Document>,
           {
-            icon: <TimeIcon />,
+            icon: <RepeatIcon />,
             label: 'Supersede document',
             onClick: handleDelete,
             colorScheme: 'orange',

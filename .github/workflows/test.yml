@@ -68,6 +68,8 @@ jobs:
           files: ./backend/coverage/lcov.info
           flags: backend
           name: backend-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   frontend-tests:
     name: Frontend Tests
@@ -101,6 +103,8 @@ jobs:
           files: ./frontend/coverage/lcov.info
           flags: frontend
           name: frontend-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   e2e-tests:
     name: E2E Tests
