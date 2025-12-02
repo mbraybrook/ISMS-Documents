@@ -3,6 +3,7 @@ import { body, param, validationResult } from 'express-validator';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
+import { invalidateCache } from '../services/pdfCacheService';
 
 const router = Router();
 
@@ -408,6 +409,11 @@ router.put(
           lastReviewDate: completedDateObj,
           nextReviewDate: nextReviewDate,
         },
+      });
+
+      // Invalidate PDF cache (optional - review dates don't affect content, but good practice)
+      invalidateCache(reviewTask.documentId).catch((err) => {
+        console.error('[Review Complete] Error invalidating PDF cache:', err);
       });
 
       res.json(updatedReviewTask);

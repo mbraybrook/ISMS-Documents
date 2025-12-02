@@ -72,7 +72,13 @@ const getSharePointIds = async (trustSetting: any): Promise<{
 const validate = (req: Request, res: Response, next: any) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+    console.error('Validation errors:', JSON.stringify(errors.array(), null, 2));
+    console.error('Request body:', JSON.stringify(req.body, null, 2));
+    return res.status(400).json({
+      error: 'Validation failed',
+      errors: errors.array(),
+      details: errors.array().map((e: any) => `${e.param}: ${e.msg}`).join(', ')
+    });
   }
   next();
 };
@@ -294,6 +300,7 @@ router.get(
           id: true,
           title: true,
           version: true,
+          createdAt: true,
           updatedAt: true,
           sharePointSiteId: true,
           sharePointDriveId: true,
@@ -352,81 +359,84 @@ router.get(
         return res.status(500).json({ error: 'Failed to obtain access token' });
       }
 
-      // Download file
-      let fileData: { buffer: Buffer; mimeType: string; name: string; size: number };
-      try {
-        fileData = await downloadSharePointFile(
-          accessToken,
-          spIds.siteId,
-          spIds.driveId,
-          spIds.itemId,
-          trustSetting.maxFileSizeMB || config.trustCenter.maxFileSizeMB
-        );
-      } catch (error: any) {
-        if (error instanceof FileNotFoundError) {
-          return res.status(404).json({ error: 'File not found in SharePoint' });
-        }
-        if (error instanceof FileTooLargeError) {
-          return res.status(413).json({ error: error.message });
-        }
-        if (error instanceof PermissionDeniedError) {
-          return res.status(403).json({ error: 'Permission denied to access file' });
-        }
-        throw error;
-      }
-
-      let finalBuffer = fileData.buffer;
-      let finalFilename = fileData.name;
-      let finalMimeType = fileData.mimeType;
-      const isPdf = fileData.mimeType === 'application/pdf' || fileData.name.toLowerCase().endsWith('.pdf');
+      // Store variables for later use
+      const isPdf = false; // We'll determine this after cache check or download
       const needsWatermark = isPrivate && externalUser;
       const watermarkUserEmail = needsWatermark ? externalUser.email : undefined;
 
-      // Store original filename before any processing
-      let originalFilename = fileData.name;
-      
-      // Check cache first (for converted PDFs or watermarked PDFs)
+      // Check cache FIRST (before downloading from SharePoint)
+      // Always check for unwatermarked PDF - we'll apply watermark after retrieval if needed
       const cachedResult = await getCachedPdf(
         document.id,
         document.version,
         document.updatedAt,
-        needsWatermark,
-        watermarkUserEmail
+        false, // Always cache without watermark
+        undefined // No user email in cache key
       );
 
+      let finalBuffer: Buffer;
+      let finalFilename: string;
+      let finalMimeType: string;
+      let originalFilename: string;
+
       if (cachedResult) {
-        // Use cached PDF
+        // Cache HIT - use cached unwatermarked PDF
         finalBuffer = cachedResult.buffer;
-        // Use original filename from cache metadata
         originalFilename = cachedResult.originalFilename;
-        // Set final filename immediately from cached original
         finalFilename = getPdfFilename(originalFilename);
         finalMimeType = 'application/pdf';
-        console.log('[TRUST] Using cached PDF:', {
+        console.log('[TRUST] Cache HIT - using cached unwatermarked PDF:', {
           docId,
           version: document.version,
           size: finalBuffer.length,
           originalFilename,
           finalFilename,
+          needsWatermark,
+          skippedSharePointDownload: true,
         });
       } else {
-        // Not in cache, need to process
-        const wasOriginalPdf = isPdf;
-        let wasConverted = false;
-        let wasWatermarked = false;
+        // Cache MISS - download from SharePoint and process
+        console.log('[TRUST] Cache MISS - downloading from SharePoint');
+
+        // Download file from SharePoint
+        let fileData: { buffer: Buffer; mimeType: string; name: string; size: number };
+        try {
+          fileData = await downloadSharePointFile(
+            accessToken,
+            spIds.siteId,
+            spIds.driveId,
+            spIds.itemId,
+            trustSetting.maxFileSizeMB || config.trustCenter.maxFileSizeMB
+          );
+        } catch (error: any) {
+          if (error instanceof FileNotFoundError) {
+            return res.status(404).json({ error: 'File not found in SharePoint' });
+          }
+          if (error instanceof FileTooLargeError) {
+            return res.status(413).json({ error: error.message });
+          }
+          if (error instanceof PermissionDeniedError) {
+            return res.status(403).json({ error: 'Permission denied to access file' });
+          }
+          throw error;
+        }
+
+        finalBuffer = fileData.buffer;
+        finalFilename = fileData.name;
+        finalMimeType = fileData.mimeType;
+        const isPdfFile = fileData.mimeType === 'application/pdf' || fileData.name.toLowerCase().endsWith('.pdf');
+        originalFilename = fileData.name;
 
         // Convert non-PDF files to PDF
-        if (!isPdf && canConvertToPdf(fileData.mimeType, fileData.name)) {
+        if (!isPdfFile && canConvertToPdf(fileData.mimeType, fileData.name)) {
           try {
             console.log('[TRUST] Converting document to PDF:', {
               originalType: fileData.mimeType,
               originalName: fileData.name,
             });
             finalBuffer = await convertToPdf(fileData.buffer, fileData.mimeType, fileData.name);
-            // Update finalFilename to use PDF extension
             finalFilename = getPdfFilename(originalFilename);
             finalMimeType = 'application/pdf';
-            wasConverted = true;
             console.log('[TRUST] Conversion successful:', {
               pdfFilename: finalFilename,
               pdfSize: finalBuffer.length,
@@ -438,7 +448,7 @@ router.get(
               details: error.message,
             });
           }
-        } else if (!isPdf) {
+        } else if (!isPdfFile) {
           // File type cannot be converted
           console.warn('[TRUST] Unsupported file type for conversion:', {
             mimeType: fileData.mimeType,
@@ -452,39 +462,75 @@ router.get(
           finalFilename = getPdfFilename(originalFilename);
         }
 
-        // Apply watermark for private documents (now all files are PDF)
-        if (needsWatermark) {
-          try {
-            const validation = validatePdfForWatermarking(finalBuffer);
-            if (validation.valid) {
-              finalBuffer = await addWatermarkToPdf(
-                finalBuffer,
-                externalUser.email,
-                new Date(),
-                trustSetting.maxFileSizeMB || config.trustCenter.maxFileSizeMB
-              );
-              wasWatermarked = true;
-            } else {
-              console.warn('[TRUST] PDF validation failed, using original:', validation.reason);
-            }
-          } catch (error: any) {
-            console.error('[TRUST] Watermarking failed, using original PDF:', error);
-            // Continue with original PDF
-          }
-        }
-
-        // Cache the final PDF (if it was converted, watermarked, or is a non-original PDF)
-        // Always cache to speed up future downloads
+        // Cache the unwatermarked PDF for future requests
+        // Always cache without watermark - we'll apply watermark on-the-fly when serving
         await setCachedPdf(
           document.id,
           document.version,
           document.updatedAt,
-          finalBuffer,
+          finalBuffer, // Unwatermarked PDF
           fileData.mimeType,
           originalFilename,
-          needsWatermark,
-          watermarkUserEmail
+          false, // Always cache as unwatermarked
+          undefined // No user email in cache
         );
+      }
+
+      // Apply watermark AFTER cache retrieval (if needed for private documents)
+      // This ensures cached files are unwatermarked and watermarks are applied per-user
+      if (needsWatermark) {
+        try {
+          const originalSize = finalBuffer.length;
+          const originalBufferHash = crypto.createHash('sha256').update(finalBuffer).digest('hex').substring(0, 16);
+          
+          console.log('[TRUST] Applying watermark to PDF:', {
+            docId,
+            userEmail: externalUser.email,
+            originalPdfSize: originalSize,
+            originalBufferHash,
+          });
+          
+          const validation = validatePdfForWatermarking(finalBuffer);
+          if (validation.valid) {
+            const watermarkedBuffer = await addWatermarkToPdf(
+              finalBuffer,
+              externalUser.email,
+              new Date(), // Download date
+              trustSetting.maxFileSizeMB || config.trustCenter.maxFileSizeMB,
+              document.createdAt // Document issue/creation date
+            );
+            
+            const watermarkedBufferHash = crypto.createHash('sha256').update(watermarkedBuffer).digest('hex').substring(0, 16);
+            const buffersAreEqual = originalBufferHash === watermarkedBufferHash;
+            
+            console.log('[TRUST] Watermark process completed:', {
+              originalSize,
+              watermarkedSize: watermarkedBuffer.length,
+              sizeIncrease: watermarkedBuffer.length - originalSize,
+              originalBufferHash,
+              watermarkedBufferHash,
+              buffersAreEqual: buffersAreEqual ? 'WARNING: Buffers are identical!' : 'OK: Buffers differ',
+            });
+            
+            // Only update finalBuffer if it actually changed
+            if (!buffersAreEqual) {
+              finalBuffer = watermarkedBuffer;
+              console.log('[TRUST] Watermark applied successfully - using watermarked buffer');
+            } else {
+              console.warn('[TRUST] WARNING: Watermark function returned identical buffer - watermark may not have been applied!');
+            }
+          } else {
+            console.warn('[TRUST] PDF validation failed, cannot apply watermark:', validation.reason);
+          }
+        } catch (error: any) {
+          console.error('[TRUST] Watermarking failed:', {
+            error: error.message,
+            stack: error.stack,
+          });
+          // Continue with unwatermarked PDF - log error but don't fail the request
+        }
+      } else {
+        console.log('[TRUST] No watermark needed (public document or no external user)');
       }
 
       // Ensure filename is set correctly - always use original filename with PDF extension
@@ -495,12 +541,12 @@ router.get(
       console.log('[TRUST] Download:', {
         docId,
         originalFilename: originalFilename,
-        originalMimeType: fileData.mimeType,
         finalFilename,
         finalMimeType,
         size: finalBuffer.length,
-        wasConverted: !isPdf,
-        isWatermarked: isPrivate && externalUser,
+        isPrivate,
+        hasExternalUser: !!externalUser,
+        watermarkApplied: needsWatermark && finalBuffer.length > 0, // Approximate check
       });
 
       // Encode filename for Content-Disposition header (RFC 5987)
@@ -770,15 +816,15 @@ router.get(
         },
         trustSetting: doc.TrustDocSetting
           ? {
-              id: doc.TrustDocSetting.id,
-              visibilityLevel: doc.TrustDocSetting.visibilityLevel,
-              category: doc.TrustDocSetting.category,
-              sharePointUrl: doc.TrustDocSetting.sharePointUrl,
-              publicDescription: doc.TrustDocSetting.publicDescription,
-              displayOrder: doc.TrustDocSetting.displayOrder,
-              requiresNda: doc.TrustDocSetting.requiresNda,
-              maxFileSizeMB: doc.TrustDocSetting.maxFileSizeMB,
-            }
+            id: doc.TrustDocSetting.id,
+            visibilityLevel: doc.TrustDocSetting.visibilityLevel,
+            category: doc.TrustDocSetting.category,
+            sharePointUrl: doc.TrustDocSetting.sharePointUrl,
+            publicDescription: doc.TrustDocSetting.publicDescription,
+            displayOrder: doc.TrustDocSetting.displayOrder,
+            requiresNda: doc.TrustDocSetting.requiresNda,
+            maxFileSizeMB: doc.TrustDocSetting.maxFileSizeMB,
+          }
           : null,
       }));
 
@@ -799,11 +845,25 @@ router.put(
     param('docId').isString().notEmpty(),
     body('visibilityLevel').optional().isIn(['public', 'private']),
     body('category').optional().isIn(['certification', 'policy', 'report']),
-    body('sharePointUrl').optional().isString(),
-    body('publicDescription').optional().isString(),
-    body('displayOrder').optional().isInt(),
+    body('sharePointUrl').optional().custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      return typeof value === 'string';
+    }),
+    body('publicDescription').optional().custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      return typeof value === 'string';
+    }),
+    body('displayOrder').optional().custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      const num = Number(value);
+      return Number.isInteger(num) && num >= 0;
+    }),
     body('requiresNda').optional().isBoolean(),
-    body('maxFileSizeMB').optional().isInt(),
+    body('maxFileSizeMB').optional().custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      const num = Number(value);
+      return Number.isInteger(num) && num >= 0;
+    }),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -872,11 +932,12 @@ router.put(
       const updateData: any = {};
       if (visibilityLevel !== undefined) updateData.visibilityLevel = visibilityLevel;
       if (category !== undefined) updateData.category = category;
-      if (sharePointUrl !== undefined) updateData.sharePointUrl = sharePointUrl;
+      if (sharePointUrl !== undefined) updateData.sharePointUrl = sharePointUrl || null;
       if (sharePointSiteId !== undefined) updateData.sharePointSiteId = sharePointSiteId;
       if (sharePointDriveId !== undefined) updateData.sharePointDriveId = sharePointDriveId;
       if (sharePointItemId !== undefined) updateData.sharePointItemId = sharePointItemId;
-      if (publicDescription !== undefined) updateData.publicDescription = publicDescription;
+      // Normalize empty strings to null for publicDescription
+      if (publicDescription !== undefined) updateData.publicDescription = publicDescription === '' ? null : publicDescription;
       if (displayOrder !== undefined) updateData.displayOrder = displayOrder;
       if (requiresNda !== undefined) updateData.requiresNda = requiresNda;
       if (maxFileSizeMB !== undefined) updateData.maxFileSizeMB = maxFileSizeMB;
@@ -1019,6 +1080,98 @@ router.get(
     } catch (error: any) {
       console.error('[TRUST] Error fetching audit log:', error);
       res.status(500).json({ error: 'Failed to fetch audit log' });
+    }
+  }
+);
+
+// GET /api/trust/admin/settings
+router.get(
+  '/admin/settings',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      // Get or create global settings (singleton pattern)
+      let settings = await prisma.trustCenterSettings.findUnique({
+        where: { key: 'global' },
+      });
+
+      if (!settings) {
+        // Create default settings
+        settings = await prisma.trustCenterSettings.create({
+          data: {
+            key: 'global',
+            watermarkPrefix: 'Paythru Confidential',
+          },
+        });
+      }
+
+      res.json({
+        watermarkPrefix: settings.watermarkPrefix,
+      });
+    } catch (error: any) {
+      console.error('[TRUST] Error fetching settings:', error);
+      res.status(500).json({ error: 'Failed to fetch settings' });
+    }
+  }
+);
+
+// PUT /api/trust/admin/settings
+router.put(
+  '/admin/settings',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    body('watermarkPrefix').optional().isString().isLength({ min: 1, max: 100 }),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { watermarkPrefix } = req.body;
+      const internalUser = req.user;
+
+      // Get or create global settings
+      let settings = await prisma.trustCenterSettings.findUnique({
+        where: { key: 'global' },
+      });
+
+      if (settings) {
+        // Update existing settings
+        settings = await prisma.trustCenterSettings.update({
+          where: { id: settings.id },
+          data: {
+            watermarkPrefix: watermarkPrefix || settings.watermarkPrefix,
+          },
+        });
+      } else {
+        // Create new settings
+        settings = await prisma.trustCenterSettings.create({
+          data: {
+            key: 'global',
+            watermarkPrefix: watermarkPrefix || 'Paythru Confidential',
+          },
+        });
+      }
+
+      // Log action
+      await logTrustAction(
+        'TRUST_SETTINGS_UPDATED',
+        internalUser?.id,
+        undefined,
+        undefined,
+        undefined,
+        {
+          watermarkPrefix: settings.watermarkPrefix,
+        },
+        getIpAddress(req)
+      );
+
+      res.json({
+        watermarkPrefix: settings.watermarkPrefix,
+      });
+    } catch (error: any) {
+      console.error('[TRUST] Error updating settings:', error);
+      res.status(500).json({ error: 'Failed to update settings' });
     }
   }
 );

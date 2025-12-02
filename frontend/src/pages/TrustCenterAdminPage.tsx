@@ -51,6 +51,8 @@ export function TrustCenterAdminPage() {
   const [editingDoc, setEditingDoc] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<TrustDocSetting>>({});
   const [editingDocument, setEditingDocument] = useState<any>(null);
+  const [settings, setSettings] = useState<{ watermarkPrefix: string }>({ watermarkPrefix: 'Paythru Confidential' });
+  const [settingsLoading, setSettingsLoading] = useState(false);
 
   useEffect(() => {
     // Only load data if user is authenticated and has the right role
@@ -62,12 +64,14 @@ export function TrustCenterAdminPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [users, docs] = await Promise.all([
+      const [users, docs, settingsData] = await Promise.all([
         trustApi.getPendingRequests(),
         trustApi.getDocumentSettings(),
+        trustApi.getSettings().catch(() => ({ watermarkPrefix: 'Paythru Confidential' })), // Fallback on error
       ]);
       setPendingUsers(users);
       setDocuments(docs);
+      setSettings(settingsData);
     } catch (error: any) {
       console.error('Error loading admin data:', error);
       // Don't redirect on 401 - let ProtectedRoute handle it
@@ -84,6 +88,30 @@ export function TrustCenterAdminPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      setSettingsLoading(true);
+      const updated = await trustApi.updateSettings(settings);
+      setSettings(updated);
+      toast({
+        title: 'Settings updated',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to update settings',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setSettingsLoading(false);
     }
   };
 
@@ -149,7 +177,29 @@ export function TrustCenterAdminPage() {
 
   const handleSaveDoc = async (docId: string) => {
     try {
-      await trustApi.updateDocumentSettings(docId, editData);
+      // Only include fields that can be updated (exclude id, documentId, createdAt, updatedAt)
+      const allowedFields = ['visibilityLevel', 'category', 'sharePointUrl', 'publicDescription', 'displayOrder', 'requiresNda', 'maxFileSizeMB'];
+      const normalizedData: Partial<TrustDocSetting> = {};
+      
+      // Only copy allowed fields
+      allowedFields.forEach(field => {
+        const value = editData[field as keyof TrustDocSetting];
+        if (value !== undefined) {
+          // Normalize empty strings to null for string fields
+          if (field === 'publicDescription' && value === '') {
+            normalizedData[field as keyof TrustDocSetting] = null as any;
+          } else if (field === 'sharePointUrl' && value === '') {
+            // Skip empty sharePointUrl - don't send it
+          } else if (field === 'displayOrder' && (value === null || value === '')) {
+            // Skip null/empty displayOrder
+          } else {
+            normalizedData[field as keyof TrustDocSetting] = value;
+          }
+        }
+      });
+      
+      console.log('Sending document settings update:', { docId, normalizedData });
+      await trustApi.updateDocumentSettings(docId, normalizedData);
       toast({
         title: 'Settings updated',
         status: 'success',
@@ -162,9 +212,13 @@ export function TrustCenterAdminPage() {
       onClose();
       loadData();
     } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.details ||
+                          error.response?.data?.errors?.map((e: any) => `${e.param}: ${e.msg}`).join(', ') ||
+                          'Failed to update settings';
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to update settings',
+        description: errorMessage,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -241,6 +295,7 @@ export function TrustCenterAdminPage() {
         <TabList>
           <Tab>Pending Requests</Tab>
           <Tab>Document Management</Tab>
+          <Tab>Settings</Tab>
         </TabList>
 
         <TabPanels>
@@ -375,6 +430,33 @@ export function TrustCenterAdminPage() {
                   </Table>
                 </Box>
               )}
+            </VStack>
+          </TabPanel>
+
+          <TabPanel>
+            <VStack spacing={6} align="stretch" maxW="800px">
+              <Heading size="md">Trust Center Settings</Heading>
+              
+              <FormControl>
+                <FormLabel>Watermark Prefix</FormLabel>
+                <Input
+                  value={settings.watermarkPrefix}
+                  onChange={(e) => setSettings({ ...settings, watermarkPrefix: e.target.value })}
+                  placeholder="Paythru Confidential"
+                />
+                <Text fontSize="xs" color="gray.500" mt={1}>
+                  This text will appear in watermarks on private documents. Example: "Paythru Confidential - Prepared for user@example.com"
+                </Text>
+              </FormControl>
+
+              <Button
+                colorScheme="blue"
+                onClick={handleSaveSettings}
+                isLoading={settingsLoading}
+                loadingText="Saving..."
+              >
+                Save Settings
+              </Button>
             </VStack>
           </TabPanel>
         </TabPanels>

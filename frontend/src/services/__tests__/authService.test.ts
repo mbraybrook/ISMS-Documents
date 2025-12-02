@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { authService, msalInstance } from '../authService';
 
 // Mock MSAL
-vi.mock('@azure/msal-browser', () => ({
-  PublicClientApplication: vi.fn().mockImplementation(() => ({
+vi.mock('@azure/msal-browser', () => {
+  const mockMsalInstance = {
     initialize: vi.fn().mockResolvedValue(undefined),
     loginPopup: vi.fn(),
     loginRedirect: vi.fn(),
     logout: vi.fn(),
+    logoutPopup: vi.fn(),
     logoutRedirect: vi.fn(),
     acquireTokenSilent: vi.fn(),
     getAllAccounts: vi.fn().mockReturnValue([]),
@@ -15,16 +16,20 @@ vi.mock('@azure/msal-browser', () => ({
     handleRedirectPromise: vi.fn().mockResolvedValue(null),
     setActiveAccount: vi.fn(),
     getActiveAccount: vi.fn().mockReturnValue(null),
-  })),
-  InteractionType: {
-    Popup: 'popup',
-    Redirect: 'redirect',
-  },
-  BrowserCacheLocation: {
-    LocalStorage: 'localStorage',
-    SessionStorage: 'sessionStorage',
-  },
-}));
+  };
+  
+  return {
+    PublicClientApplication: vi.fn().mockImplementation(() => mockMsalInstance),
+    InteractionType: {
+      Popup: 'popup',
+      Redirect: 'redirect',
+    },
+    BrowserCacheLocation: {
+      LocalStorage: 'localStorage',
+      SessionStorage: 'sessionStorage',
+    },
+  };
+});
 
 describe('authService', () => {
   beforeEach(() => {
@@ -70,11 +75,18 @@ describe('authService', () => {
   });
 
   it('should handle logout', async () => {
-    vi.mocked(msalInstance.logout).mockResolvedValue(undefined);
+    const mockAccount = {
+      homeAccountId: 'test-account-id',
+      username: 'test@paythru.com',
+    };
+    
+    // Set up a current account first
+    vi.mocked(msalInstance.getActiveAccount).mockReturnValue(mockAccount as any);
+    vi.mocked(msalInstance.logoutPopup).mockResolvedValue(undefined);
 
     await authService.logout();
 
-    expect(msalInstance.logout).toHaveBeenCalled();
+    expect(msalInstance.logoutPopup).toHaveBeenCalled();
   });
 
   it('should get access token', async () => {
@@ -84,7 +96,14 @@ describe('authService', () => {
       username: 'test@paythru.com',
     };
 
-    vi.mocked(msalInstance.getActiveAccount).mockReturnValue(mockAccount as any);
+    // Set up account by simulating a login
+    vi.mocked(msalInstance.loginPopup).mockResolvedValue({
+      account: mockAccount,
+      accessToken: 'initial-token',
+    } as any);
+    await authService.login();
+
+    // Now test getting the access token
     vi.mocked(msalInstance.acquireTokenSilent).mockResolvedValue({
       accessToken: mockToken,
     } as any);
@@ -96,21 +115,31 @@ describe('authService', () => {
   });
 
   it('should return null if no account', async () => {
-    vi.mocked(msalInstance.getActiveAccount).mockReturnValue(null);
-    vi.mocked(msalInstance.getAllAccounts).mockReturnValue([]);
+    // Clear any existing account by calling logout first
+    vi.mocked(msalInstance.logoutPopup).mockResolvedValue(undefined);
+    await authService.logout();
+    
+    // Make sure acquireTokenSilent is not called when there's no account
+    vi.mocked(msalInstance.acquireTokenSilent).mockClear();
 
     const token = await authService.getAccessToken();
 
     expect(token).toBeNull();
+    expect(msalInstance.acquireTokenSilent).not.toHaveBeenCalled();
   });
 
-  it('should check if user is authenticated', () => {
+  it('should check if user is authenticated', async () => {
     const mockAccount = {
       homeAccountId: 'test-account-id',
       username: 'test@paythru.com',
     };
 
-    vi.mocked(msalInstance.getActiveAccount).mockReturnValue(mockAccount as any);
+    // Set up account by simulating a login
+    vi.mocked(msalInstance.loginPopup).mockResolvedValue({
+      account: mockAccount,
+      accessToken: 'initial-token',
+    } as any);
+    await authService.login();
 
     const isAuth = authService.isAuthenticated();
 

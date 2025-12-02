@@ -197,6 +197,10 @@ describe('Documents API', () => {
     });
 
     it('should handle errors gracefully', async () => {
+      // Suppress expected error log for this test
+      const originalError = console.error;
+      console.error = jest.fn();
+
       prisma.document.findMany.mockRejectedValue(new Error('Database error'));
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 
@@ -205,6 +209,9 @@ describe('Documents API', () => {
         .expect(500);
 
       expect(prisma.document.findMany).toHaveBeenCalled();
+      
+      // Restore console.error
+      console.error = originalError;
     });
   });
 

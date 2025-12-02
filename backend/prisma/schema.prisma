@@ -411,3 +411,13 @@ model TrustAuditLog {
   @@index([performedByUserId])
   @@index([targetDocumentId])
 }
+
+model TrustCenterSettings {
+  id                String   @id @default(uuid())
+  key               String   @unique
+  watermarkPrefix   String   @default("Paythru Confidential")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([key])
+}

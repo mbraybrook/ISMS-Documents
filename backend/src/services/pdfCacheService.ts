@@ -63,8 +63,20 @@ export async function getCachedPdf(
     const cacheKey = getCacheKey(documentId, version, updatedAt, isWatermarked, watermarkUserEmail);
     const { pdfPath, metaPath } = getCachePaths(cacheKey);
 
+    console.log('[PDFCache] Checking cache:', {
+      documentId,
+      version,
+      updatedAt: updatedAt.toISOString(),
+      isWatermarked,
+      watermarkUserEmail,
+      cacheKey,
+      pdfExists: fs.existsSync(pdfPath),
+      metaExists: fs.existsSync(metaPath),
+    });
+
     // Check if both PDF and metadata exist
     if (!fs.existsSync(pdfPath) || !fs.existsSync(metaPath)) {
+      console.log('[PDFCache] Cache miss - files do not exist');
       return null;
     }
 
@@ -73,16 +85,35 @@ export async function getCachedPdf(
     const metadata: CacheMetadata = JSON.parse(metaContent);
 
     // Verify metadata matches
-    if (
-      metadata.documentId !== documentId ||
-      metadata.version !== version ||
-      metadata.updatedAt !== updatedAt.toISOString() ||
-      metadata.isWatermarked !== isWatermarked ||
-      (isWatermarked && metadata.watermarkUserEmail !== watermarkUserEmail)
-    ) {
+    const updatedAtIso = updatedAt.toISOString();
+    const documentIdMatch = metadata.documentId === documentId;
+    const versionMatch = metadata.version === version;
+    const updatedAtMatch = metadata.updatedAt === updatedAtIso;
+    const isWatermarkedMatch = metadata.isWatermarked === isWatermarked;
+    // For watermarked documents, email must match; for non-watermarked, both should be undefined/empty
+    const emailMatch = isWatermarked
+      ? metadata.watermarkUserEmail === watermarkUserEmail
+      : !metadata.watermarkUserEmail && !watermarkUserEmail;
+
+    if (!documentIdMatch || !versionMatch || !updatedAtMatch || !isWatermarkedMatch || !emailMatch) {
       // Cache is stale, remove it
-      fs.unlinkSync(pdfPath);
-      fs.unlinkSync(metaPath);
+      console.log('[PDFCache] Cache miss - metadata mismatch:', {
+        documentIdMatch,
+        versionMatch,
+        updatedAtMatch,
+        updatedAtExpected: updatedAtIso,
+        updatedAtActual: metadata.updatedAt,
+        isWatermarkedMatch,
+        emailMatch,
+        emailExpected: watermarkUserEmail,
+        emailActual: metadata.watermarkUserEmail,
+      });
+      try {
+        if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+        if (fs.existsSync(metaPath)) fs.unlinkSync(metaPath);
+      } catch (error) {
+        // Ignore errors when removing stale cache
+      }
       return null;
     }
 
@@ -90,13 +121,28 @@ export async function getCachedPdf(
     const stats = fs.statSync(pdfPath);
     if (stats.size !== metadata.fileSize) {
       // File size mismatch, cache is invalid
-      fs.unlinkSync(pdfPath);
-      fs.unlinkSync(metaPath);
+      console.log('[PDFCache] Cache miss - file size mismatch:', {
+        expected: metadata.fileSize,
+        actual: stats.size,
+      });
+      try {
+        fs.unlinkSync(pdfPath);
+        fs.unlinkSync(metaPath);
+      } catch (error) {
+        // Ignore errors when removing invalid cache
+      }
       return null;
     }
 
     // Cache is valid, return PDF with original filename
-    console.log('[PDFCache] Cache hit:', { documentId, version, cacheKey });
+    console.log('[PDFCache] Cache hit:', {
+      documentId,
+      version,
+      cacheKey,
+      isWatermarked,
+      watermarkUserEmail,
+      size: stats.size,
+    });
     return {
       buffer: fs.readFileSync(pdfPath),
       originalFilename: metadata.originalFilename,
@@ -141,7 +187,15 @@ export async function setCachedPdf(
     };
     fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2));
 
-    console.log('[PDFCache] Cached PDF:', { documentId, version, cacheKey, size: pdfBuffer.length });
+    console.log('[PDFCache] Cached PDF:', {
+      documentId,
+      version,
+      cacheKey,
+      size: pdfBuffer.length,
+      isWatermarked,
+      watermarkUserEmail,
+      updatedAt: updatedAt.toISOString(),
+    });
   } catch (error: any) {
     console.error('[PDFCache] Error writing cache:', error);
     // Don't throw - caching is optional

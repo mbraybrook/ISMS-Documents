@@ -41,9 +41,10 @@ interface DocumentFormModalProps {
   onClose: () => void;
   document: any;
   readOnly?: boolean;
+  isReviewContext?: boolean; // Indicates if opened from review screen
 }
 
-export function DocumentFormModal({ isOpen, onClose, document, readOnly = false }: DocumentFormModalProps) {
+export function DocumentFormModal({ isOpen, onClose, document, readOnly = false, isReviewContext = false }: DocumentFormModalProps) {
   const { user } = useAuth();
   const toast = useToast();
   const [formData, setFormData] = useState({
@@ -161,6 +162,19 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
       if (document.storageLocation === 'SHAREPOINT' && document.sharePointSiteId && document.sharePointDriveId && document.sharePointItemId) {
         loadDocumentUrl(document);
       }
+      
+      // If opened from review context, set next review date to today + 1 year
+      let nextReviewDate = document.nextReviewDate
+        ? new Date(document.nextReviewDate).toISOString().split('T')[0]
+        : '';
+      
+      if (isReviewContext && !readOnly) {
+        const today = new Date();
+        const nextYear = new Date(today);
+        nextYear.setFullYear(today.getFullYear() + 1);
+        nextReviewDate = nextYear.toISOString().split('T')[0];
+      }
+      
       setFormData({
         title: document.title || '',
         type: document.type || 'POLICY',
@@ -176,9 +190,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
         lastReviewDate: document.lastReviewDate
           ? new Date(document.lastReviewDate).toISOString().split('T')[0]
           : '',
-        nextReviewDate: document.nextReviewDate
-          ? new Date(document.nextReviewDate).toISOString().split('T')[0]
-          : '',
+        nextReviewDate: nextReviewDate,
         requiresAcknowledgement: document.requiresAcknowledgement ?? (document.type === 'POLICY'),
       });
     } else {
@@ -204,7 +216,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
         requiresAcknowledgement: true, // Default to true for POLICY type
       });
     }
-  }, [document, user, isOpen]);
+  }, [document, user, isOpen, isReviewContext, readOnly]);
 
   const handleParseUrl = async () => {
     if (!sharePointUrl.trim()) {
@@ -666,16 +678,6 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
                   ) : (
                     // Edit/View mode: Show document link and replace option
                     <>
-                      {formData.sharePointItemId && (
-                        <FormControl>
-                          <FormLabel>SharePoint Item ID</FormLabel>
-                          <Input
-                            value={formData.sharePointItemId}
-                            isReadOnly
-                            bg="gray.50"
-                          />
-                        </FormControl>
-                      )}
                       {!showReplaceOptions ? (
                         <FormControl>
                           <FormLabel>SharePoint Document</FormLabel>
@@ -683,11 +685,23 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
                             {loadingUrl ? (
                               <Text fontSize="sm" color="gray.500">Loading document link...</Text>
                             ) : documentUrl ? (
-                              <Link href={documentUrl} isExternal color="blue.500" fontWeight="medium">
-                                Open in SharePoint
-                              </Link>
+                              <HStack spacing={2} align="center">
+                                <Link href={documentUrl} isExternal color="blue.500" fontWeight="medium">
+                                  Open in SharePoint
+                                </Link>
+                                {formData.sharePointItemId && (
+                                  <Text fontSize="xs" color="gray.500">
+                                    (ID: {formData.sharePointItemId})
+                                  </Text>
+                                )}
+                              </HStack>
                             ) : formData.sharePointItemId ? (
-                              <Text fontSize="sm" color="gray.500">Document link unavailable</Text>
+                              <VStack align="start" spacing={1}>
+                                <Text fontSize="sm" color="gray.500">Document link unavailable</Text>
+                                <Text fontSize="xs" color="gray.500">
+                                  Item ID: {formData.sharePointItemId}
+                                </Text>
+                              </VStack>
                             ) : (
                               <Text fontSize="sm" color="gray.500">No SharePoint document selected</Text>
                             )}
@@ -813,6 +827,11 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
                   }
                   isReadOnly={readOnly}
                 />
+                {isReviewContext && !readOnly && (
+                  <Text fontSize="xs" color="blue.600" mt={1}>
+                    Next review date set to 1 year from today. You can change this if needed.
+                  </Text>
+                )}
               </FormControl>
 
               <FormControl>

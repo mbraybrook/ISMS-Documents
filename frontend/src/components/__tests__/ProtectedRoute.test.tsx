@@ -8,9 +8,14 @@ import { ChakraProvider } from '@chakra-ui/react';
 // Mock auth service
 vi.mock('../../services/authService', () => ({
   authService: {
+    initialize: vi.fn().mockResolvedValue(undefined),
     getAccessToken: vi.fn(),
     login: vi.fn(),
     logout: vi.fn(),
+    isAuthenticated: vi.fn().mockReturnValue(false),
+  },
+  msalInstance: {
+    handleRedirectPromise: vi.fn().mockResolvedValue(null),
   },
 }));
 
