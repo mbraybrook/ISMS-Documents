@@ -252,12 +252,12 @@ router.get(
               email: true,
             },
           },
-          documentControls: {
+          DocumentControl: {
             include: {
               control: true,
             },
           },
-          documentRisks: {
+          DocumentRisk: {
             include: {
               risk: true,
             },

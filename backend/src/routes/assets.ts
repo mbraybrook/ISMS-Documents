@@ -8,6 +8,7 @@ import * as path from 'path';
 import multer from 'multer';
 import * as fs from 'fs';
 import * as os from 'os';
+import { csvUpload, handleMulterError } from '../lib/multerConfig';
 
 const router = Router();
 
@@ -375,40 +376,13 @@ router.delete(
   }
 );
 
-// Configure multer for file uploads (memory storage)
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only CSV files are allowed'));
-    }
-  },
-});
-
 // POST /api/assets/import - bulk import from CSV
 router.post(
   '/import',
   authenticateToken,
   requireRole('ADMIN', 'EDITOR'),
-  upload.single('file'),
-  (err: any, req: AuthRequest, res: Response, next: any) => {
-    // Handle multer errors
-    if (err) {
-      if (err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ error: 'File too large. Maximum size is 10MB.' });
-        }
-        return res.status(400).json({ error: `Upload error: ${err.message}` });
-      }
-      return res.status(400).json({ error: err.message || 'File upload error' });
-    }
-    next();
-  },
+  csvUpload.single('file'),
+  handleMulterError,
   async (req: AuthRequest, res: Response) => {
     try {
       let result;

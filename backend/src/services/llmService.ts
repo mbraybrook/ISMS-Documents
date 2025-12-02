@@ -33,7 +33,7 @@ async function generateEmbedding(text: string): Promise<number[] | null> {
     const data = await response.json();
     
     // Ollama returns { embedding: [...] }
-    const embedding = data.embedding;
+    const embedding = (data as any).embedding;
     
     if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
       console.error(`[Embedding Error] Model '${config.llm.model}' returned empty embeddings.`);
@@ -137,6 +137,13 @@ export async function calculateSimilarityScore(
       generateEmbedding(text1),
       generateEmbedding(text2),
     ]);
+
+    // Check if embeddings were generated successfully
+    if (!embedding1 || !embedding2) {
+      // Fallback to chat-based approach if embeddings failed
+      console.warn('Embedding generation failed, trying chat-based approach');
+      return calculateSimilarityScoreChat(risk1, risk2);
+    }
 
     // Calculate cosine similarity
     const cosineSim = cosineSimilarity(embedding1, embedding2);
@@ -277,7 +284,7 @@ Respond with ONLY a JSON object:
       throw new Error(`Ollama API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
     const content = data.message?.content || data.response || '';
 
     // Try to parse JSON from response
@@ -387,24 +394,27 @@ export async function findSimilarRisks(
     }
     
     // Filter out any null embeddings (shouldn't happen if we checked above, but be safe)
-    const validEmbeddings = existingEmbeddings.filter((e, i) => {
-      if (!e) {
+    // Filter out null embeddings and corresponding risks, keeping them in sync
+    const validPairs: Array<{ embedding: number[]; risk: typeof existingRisks[0] }> = [];
+    for (let i = 0; i < existingEmbeddings.length; i++) {
+      const embedding = existingEmbeddings[i];
+      if (embedding !== null) {
+        validPairs.push({
+          embedding: embedding,
+          risk: existingRisks[i],
+        });
+      } else {
         console.warn(`[Similarity] Skipping risk ${existingRisks[i].id} - embedding failed`);
-        return false;
       }
-      return true;
-    });
-    
-    const validRisks = existingRisks.filter((_, i) => existingEmbeddings[i] !== null);
+    }
 
     // Calculate similarities using embeddings
-    console.log(`[Similarity] Calculating cosine similarity for ${validRisks.length} risks...`);
-    const similarities = validEmbeddings.map((embedding, index) => {
+    console.log(`[Similarity] Calculating cosine similarity for ${validPairs.length} risks...`);
+    const similarities = validPairs.map(({ embedding, risk }) => {
       const cosineSim = cosineSimilarity(inputEmbedding, embedding);
       const score = mapToScore(cosineSim);
 
       // Determine matched fields
-      const risk = validRisks[index];
       const matchedFields: string[] = [];
       // Simple heuristic - could be improved
       if (riskText.toLowerCase().includes(risk.title.toLowerCase())) {

@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { config } from './config';
+import { log } from './lib/logger';
 import { healthRouter } from './routes/health';
 import { authRouter } from './routes/auth';
 import { documentsRouter } from './routes/documents';
@@ -21,10 +23,12 @@ import { dashboardRouter } from './routes/dashboard';
 import { trustRouter } from './routes/trust';
 import { trustAuthRouter } from './routes/trust/auth';
 import { errorHandler } from './middleware/errorHandler';
+import { globalLimiter } from './middleware/rateLimit';
 
 const app = express();
 
 // CORS configuration - allow Trust Center subdomain
+// Supports wildcard patterns like: https://trust.*.paythru.com
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -32,27 +36,65 @@ const corsOptions = {
       return callback(null, true);
     }
 
+    // For development, allow localhost
+    if (config.nodeEnv === 'development' && origin.includes('localhost')) {
+      return callback(null, true);
+    }
+
     // Get allowed origins from config
     const allowedOrigins = config.cors.trustCenterOrigins || [];
     
-    // Check if origin is in allowed list
+    // Check if origin is in allowed list (exact match)
     if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      // For development, allow localhost
-      if (config.nodeEnv === 'development' && origin.includes('localhost')) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+      return callback(null, true);
+    }
+
+    // Check for wildcard patterns (e.g., https://trust.*.paythru.com)
+    for (const pattern of allowedOrigins) {
+      if (pattern.includes('*')) {
+        // Convert wildcard pattern to regex
+        // Escape special regex characters except *
+        const regexPattern = pattern
+          .replace(/[.+?^${}()|[\]\\]/g, '\\$&') // Escape special chars
+          .replace(/\*/g, '[^.]*'); // Replace * with non-dot characters
+        const regex = new RegExp(`^${regexPattern}$`);
+        
+        if (regex.test(origin)) {
+          return callback(null, true);
+        }
       }
     }
+
+    // Origin not allowed
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
 };
 
 // Middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Allow embedding for PDFs
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin resources
+}));
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Global rate limiting - applies to all routes except health check
+// Specific routes (auth, downloads) have stricter limits applied on top
+app.use('/api', globalLimiter);
 
 // CSP headers middleware for PDF downloads
 app.use((req, res, next) => {
@@ -90,8 +132,8 @@ app.use(errorHandler);
 // Start server
 const PORT = config.port;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log('Auth config:', {
+  log.info(`Server running on port ${PORT}`);
+  log.info('Auth config loaded', {
     tenantId: config.auth.tenantId ? `${config.auth.tenantId.substring(0, 8)}...` : 'MISSING',
     clientId: config.auth.clientId ? `${config.auth.clientId.substring(0, 8)}...` : 'MISSING',
     hasClientSecret: !!config.auth.clientSecret,

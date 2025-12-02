@@ -8,6 +8,7 @@ import { config } from '../../config';
 import { loginLimiter, registerLimiter, passwordResetLimiter } from '../../middleware/rateLimit';
 import { logTrustAction } from '../../services/trustAuditService';
 import { authenticateTrustToken, TrustAuthRequest } from '../../middleware/trustAuth';
+import { log } from '../../lib/logger';
 
 const router = Router();
 
@@ -101,7 +102,7 @@ router.post(
         message: 'Registration successful. Awaiting approval.',
       });
     } catch (error: any) {
-      console.error('[TRUST_AUTH] Registration error:', error);
+      log.error('[TRUST_AUTH] Registration error', { error: error.message || String(error) });
       res.status(500).json({ error: 'Failed to register user' });
     }
   }
@@ -146,8 +147,13 @@ router.post(
       }
 
       // Generate JWT token
-      if (!config.trustCenter.jwtSecret) {
+      // Validate JWT secret
+      const jwtSecret = config.trustCenter.jwtSecret;
+      if (!jwtSecret || typeof jwtSecret !== 'string' || jwtSecret.trim().length === 0) {
         return res.status(500).json({ error: 'JWT secret not configured' });
+      }
+      if (jwtSecret.length < 32) {
+        return res.status(500).json({ error: 'JWT secret must be at least 32 characters long for security' });
       }
 
       const token = jwt.sign(
@@ -176,7 +182,7 @@ router.post(
         },
       });
     } catch (error: any) {
-      console.error('[TRUST_AUTH] Login error:', error);
+      log.error('[TRUST_AUTH] Login error', { error: error.message || String(error) });
       res.status(500).json({ error: 'Failed to login' });
     }
   }
@@ -189,7 +195,7 @@ router.post('/logout', async (req: any, res: Response) => {
     // For logout, we just return success (client should discard token)
     res.json({ message: 'Logged out successfully' });
   } catch (error: any) {
-    console.error('[TRUST_AUTH] Logout error:', error);
+    log.error('[TRUST_AUTH] Logout error', { error: error.message || String(error) });
     res.status(500).json({ error: 'Failed to logout' });
   }
 });
@@ -232,9 +238,8 @@ router.post(
 
         // TODO: Send email with reset link
         // For now, just log it (in production, send email)
-        console.log('[TRUST_AUTH] Password reset token generated:', {
+        log.info('[TRUST_AUTH] Password reset token generated', {
           email: user.email,
-          token: resetToken,
           // In production, don't log the token
         });
 
@@ -247,7 +252,7 @@ router.post(
         message: 'If the email exists, a password reset link has been sent.',
       });
     } catch (error: any) {
-      console.error('[TRUST_AUTH] Forgot password error:', error);
+      log.error('[TRUST_AUTH] Forgot password error', { error: error.message || String(error) });
       res.status(500).json({ error: 'Failed to process password reset request' });
     }
   }
@@ -308,7 +313,7 @@ router.post(
 
       res.json({ message: 'Password reset successfully' });
     } catch (error: any) {
-      console.error('[TRUST_AUTH] Reset password error:', error);
+      log.error('[TRUST_AUTH] Reset password error', { error: error.message || String(error) });
       res.status(500).json({ error: 'Failed to reset password' });
     }
   }
@@ -333,7 +338,7 @@ router.get('/me', authenticateTrustToken, async (req: TrustAuthRequest, res: Res
       termsAcceptedAt: user.termsAcceptedAt,
     });
   } catch (error: any) {
-    console.error('[TRUST_AUTH] Get me error:', error);
+    log.error('[TRUST_AUTH] Get me error', { error: error.message || String(error) });
     res.status(500).json({ error: 'Failed to get user profile' });
   }
 });

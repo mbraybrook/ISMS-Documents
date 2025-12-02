@@ -46,4 +46,19 @@ export const passwordResetLimiter = rateLimit({
   },
 });
 
+// Global rate limiter for all API routes
+// This provides basic DoS protection while allowing legitimate traffic
+// Specific routes (like login) have stricter limits applied on top of this
+export const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per 15 minutes per IP
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Skip rate limiting for health check endpoint
+  skip: (req) => {
+    return req.path === '/api/health';
+  },
+});
+
 
