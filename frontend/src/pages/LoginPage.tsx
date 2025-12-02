@@ -2,6 +2,7 @@ import { Box, Button, Heading, VStack, Text } from '@chakra-ui/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DataSensitivityFooter } from '../components/DataSensitivityFooter';
 
 export function LoginPage() {
   const { login, isAuthenticated, user, getEffectiveRole } = useAuth();
@@ -37,6 +38,7 @@ export function LoginPage() {
           Sign In
         </Button>
       </VStack>
+      <DataSensitivityFooter />
     </Box>
   );
 }

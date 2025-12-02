@@ -6,7 +6,7 @@ A web application that provides a "single pane of glass" over an organisation's 
 
 - **Frontend**: React + TypeScript + Vite + Chakra UI
 - **Backend**: Node.js + Express + TypeScript
-- **Database**: SQLite (dev) with Prisma ORM
+- **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: Entra ID / Microsoft Identity Platform (MSAL)
 
 ## Prerequisites
@@ -26,25 +26,49 @@ A web application that provides a "single pane of glass" over an organisation's 
 
 2. **Set up environment variables:**
    ```bash
+   cd backend
    cp .env.example .env
    # Edit .env with your configuration
    ```
+   
+   **Required environment variables:**
+   - `DATABASE_URL`: PostgreSQL connection string (format: `postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public`)
+   - `SEED_SCOPE`: Controls seed data (`"full"` for local dev, `"reference"` for staging, `"none"` for production)
+   
+   Example for local development:
+   ```bash
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/isms_db?schema=public
+   SEED_SCOPE=full
+   ```
 
 3. **Set up database:**
+   
+   **Option A: Using Docker Compose (Recommended)**
+   ```bash
+   # From root directory
+   docker compose up -d postgres
+   ```
+   
+   **Option B: Using local PostgreSQL**
+   - Install PostgreSQL locally
+   - Create database: `createdb isms_db`
+   - Update `DATABASE_URL` in `.env` to point to your local instance
+   
+   **Run migrations:**
    ```bash
    cd backend
    npm run db:generate
-   npm run db:migrate -- --name init
+   npm run db:migrate:deploy
    ```
    
-   Note: The `--name` flag is required for non-interactive use. For subsequent migrations, you can use:
+   **Seed database (optional):**
+   ```bash
+   npm run db:seed
+   ```
+   
+   Note: For development, you can also use:
    ```bash
    npm run db:migrate -- --name descriptive-migration-name
-   ```
-   
-   Or run interactively (will prompt for name):
-   ```bash
-   npm run db:migrate
    ```
 
 4. **Start development servers:**
@@ -119,8 +143,10 @@ A web application that provides a "single pane of glass" over an organisation's 
 ### Backend
 - `npm run dev --workspace=backend` - Start backend dev server
 - `npm run build --workspace=backend` - Build backend
-- `npm run db:migrate --workspace=backend` - Run database migrations
+- `npm run db:migrate --workspace=backend` - Run database migrations (development)
+- `npm run db:migrate:deploy --workspace=backend` - Deploy migrations (production/staging)
 - `npm run db:generate --workspace=backend` - Generate Prisma client
+- `npm run db:seed --workspace=backend` - Seed database with initial data
 - `npm run db:studio --workspace=backend` - Open Prisma Studio
 
 ### Frontend

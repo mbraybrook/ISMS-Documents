@@ -1,0 +1,191 @@
+[
+  {
+    "id": "82658652-edfa-4a7e-8bf0-392dfa02ec2b",
+    "name": "A.5.15",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:24.477Z",
+    "updatedAt": "2025-11-30T15:48:24.476Z"
+  },
+  {
+    "id": "a756be7f-eb0d-4027-815c-a380414daa25",
+    "name": "A.5.17",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:01.077Z",
+    "updatedAt": "2025-11-30T15:48:01.076Z"
+  },
+  {
+    "id": "0bdf68c9-f259-4c72-8ad9-5054b00375ec",
+    "name": "A.5.20",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:00.599Z",
+    "updatedAt": "2025-11-30T15:48:00.598Z"
+  },
+  {
+    "id": "b474667a-b84a-4f26-8e11-1404d9a98e9e",
+    "name": "A.5.22",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:25.400Z",
+    "updatedAt": "2025-11-30T15:48:25.399Z"
+  },
+  {
+    "id": "5d35a1fd-7b53-4d2a-9f62-e3aa8cd9b16f",
+    "name": "A.5.29",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:23.353Z",
+    "updatedAt": "2025-11-30T15:48:23.352Z"
+  },
+  {
+    "id": "f033c758-df6c-4ff7-8019-04d6706e894d",
+    "name": "A.5.3",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:01.469Z",
+    "updatedAt": "2025-11-30T15:48:01.468Z"
+  },
+  {
+    "id": "b0d4f4b6-e75b-4f14-86c8-b587b7301392",
+    "name": "A.5.32",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:00.368Z",
+    "updatedAt": "2025-11-30T15:48:00.367Z"
+  },
+  {
+    "id": "34f28070-d7ce-42e8-b80e-e818a27aa05d",
+    "name": "A.6.3",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:00.952Z",
+    "updatedAt": "2025-11-30T15:48:00.952Z"
+  },
+  {
+    "id": "2e7a83ec-256a-4b99-8957-89be04283063",
+    "name": "A.8.7",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:01.341Z",
+    "updatedAt": "2025-11-30T15:48:01.340Z"
+  },
+  {
+    "id": "dde14f1c-39e9-4f83-8ccf-029617295b3a",
+    "name": "Business Continuity",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:21.633Z",
+    "updatedAt": "2025-11-30T15:48:21.632Z"
+  },
+  {
+    "id": "2785c489-87de-43e6-811a-87e617a508ea",
+    "name": "Business Information",
+    "description": null,
+    "createdAt": "2025-11-28T14:13:03.052Z",
+    "updatedAt": "2025-11-28T14:13:03.052Z"
+  },
+  {
+    "id": "c4ab79f5-486d-43ce-8d0f-529057ef388a",
+    "name": "Cardholder Data",
+    "description": null,
+    "createdAt": "2025-11-28T14:13:02.898Z",
+    "updatedAt": "2025-11-28T14:13:02.898Z"
+  },
+  {
+    "id": "495c6d96-070f-4efb-bc07-8659bf7c2b33",
+    "name": "Compliance",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:21.052Z",
+    "updatedAt": "2025-11-30T15:48:21.051Z"
+  },
+  {
+    "id": "b93f5f01-730c-40b0-a31a-8d4989c6487c",
+    "name": "Domain",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:21.267Z",
+    "updatedAt": "2025-11-30T15:48:21.267Z"
+  },
+  {
+    "id": "fbca092e-490d-4af1-9520-f613d9871cdc",
+    "name": "Finance",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:20.085Z",
+    "updatedAt": "2025-11-30T15:48:20.084Z"
+  },
+  {
+    "id": "c4eabe94-74b8-4eea-ab4b-c7bfde64d33a",
+    "name": "Financial information",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:19.688Z",
+    "updatedAt": "2025-11-30T15:48:19.687Z"
+  },
+  {
+    "id": "498cb132-2f9c-4586-a624-03bb5ce6ce47",
+    "name": "Hardware",
+    "description": null,
+    "createdAt": "2025-11-28T14:13:02.755Z",
+    "updatedAt": "2025-11-28T14:13:02.755Z"
+  },
+  {
+    "id": "43205a56-c3eb-4789-8f97-c735fc018cc2",
+    "name": "Hosted Infrastructure",
+    "description": null,
+    "createdAt": "2025-11-28T14:13:02.826Z",
+    "updatedAt": "2025-11-28T14:13:02.826Z"
+  },
+  {
+    "id": "9a293528-fa52-4f21-b268-211f9b0842df",
+    "name": "Intellectual Property",
+    "description": null,
+    "createdAt": "2025-11-28T14:13:02.962Z",
+    "updatedAt": "2025-11-28T14:13:02.962Z"
+  },
+  {
+    "id": "703f9872-58d4-4fe4-938f-f23417237831",
+    "name": "Minipark server",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:19.831Z",
+    "updatedAt": "2025-11-30T15:48:19.830Z"
+  },
+  {
+    "id": "25827e46-5a36-47e7-b2df-9e18d7491cde",
+    "name": "Office",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:20.206Z",
+    "updatedAt": "2025-11-30T15:48:20.205Z"
+  },
+  {
+    "id": "9f4e60ee-335d-403b-b265-4e8ea7ac760c",
+    "name": "People",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:25.850Z",
+    "updatedAt": "2025-11-30T15:48:25.849Z"
+  },
+  {
+    "id": "f3cb3953-a04e-453f-8407-0fb0a7dd7242",
+    "name": "Personal Data",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:24.118Z",
+    "updatedAt": "2025-11-30T15:48:24.117Z"
+  },
+  {
+    "id": "ea0eaff4-9208-4659-b242-d810862d51a8",
+    "name": "Personnel",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:20.909Z",
+    "updatedAt": "2025-11-30T15:48:20.908Z"
+  },
+  {
+    "id": "49e6bf14-95e5-4215-b6b7-562364d30d18",
+    "name": "Remote working",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:21.482Z",
+    "updatedAt": "2025-11-30T15:48:21.481Z"
+  },
+  {
+    "id": "c187e6b4-46f3-42d2-a1ca-acbb3cd7df20",
+    "name": "Security",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:21.857Z",
+    "updatedAt": "2025-11-30T15:48:21.857Z"
+  },
+  {
+    "id": "76c3aed6-0108-495f-84c0-34da52c65b3d",
+    "name": "and disk encryption all configured and set to acceptable default levels. The user would need to proactively disable any of these elements and through both training and policy we discourage any such action.",
+    "description": null,
+    "createdAt": "2025-11-30T15:48:29.793Z",
+    "updatedAt": "2025-11-30T15:48:29.793Z"
+  }
+]

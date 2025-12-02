@@ -9,18 +9,22 @@ import {
   Text,
   Container,
   Divider,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { useTrustAuth } from '../contexts/TrustAuthContext';
 import { trustApi } from '../services/trustApi';
 import type { TrustCategoryGroup } from '../types/trust';
 import { TrustCategorySection } from '../components/TrustCategorySection';
+import { NDAAcceptanceModal } from '../components/NDAAcceptanceModal';
+import { DataSensitivityFooter } from '../components/DataSensitivityFooter';
 
 export function TrustCenterPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useTrustAuth();
+  const { isAuthenticated, hasAcceptedTerms } = useTrustAuth();
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<TrustCategoryGroup[]>([]);
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   useEffect(() => {
     const loadDocuments = async () => {
@@ -37,9 +41,19 @@ export function TrustCenterPage() {
     };
 
     loadDocuments();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, hasAcceptedTerms]);
+
+  useEffect(() => {
+    // Show NDA modal if user is authenticated but hasn't accepted terms
+    // Note: Documents requiring NDA are filtered out by the backend if terms aren't accepted,
+    // so we prompt authenticated users to accept terms to see all available documents
+    if (isAuthenticated && !hasAcceptedTerms && !loading) {
+      onOpen();
+    }
+  }, [isAuthenticated, hasAcceptedTerms, loading, onOpen]);
 
   return (
+    <>
     <Container maxW="container.xl" py={8}>
       <VStack spacing={8} align="stretch">
         <Box>
@@ -86,7 +100,11 @@ export function TrustCenterPage() {
           </VStack>
         )}
       </VStack>
+
+      <NDAAcceptanceModal isOpen={isOpen} onClose={onClose} />
     </Container>
+    <DataSensitivityFooter />
+    </>
   );
 }
 

@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { RoleSwitcher } from './RoleSwitcher'
+import { DataSensitivityFooter } from './DataSensitivityFooter'
 import api from '../services/api'
 
 interface LayoutProps {
@@ -193,6 +194,7 @@ export function Layout({ children }: LayoutProps) {
       <Container maxW="container.xl" py={8}>
         {children}
       </Container>
+      <DataSensitivityFooter />
     </Box>
   )
 }

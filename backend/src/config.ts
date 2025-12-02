@@ -44,51 +44,58 @@ dotenv.config(); // Current directory first (lowest priority)
 dotenv.config({ path: path.join(projectRoot, '.env') }); // Root .env (middle priority)
 dotenv.config({ path: path.join(backendDir, '.env') }); // Backend .env (highest priority - loaded last)
 
-// Default database path is always relative to backend directory
-const defaultDbPath = path.join(backendDir, 'prisma', 'dev.db');
-
-// If DATABASE_URL is set but uses relative path, resolve it properly
-let databaseUrl = process.env.DATABASE_URL;
+// DATABASE_URL must be in PostgreSQL format: postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public
+// Or: postgres://USER:PASSWORD@HOST:PORT/DB?schema=public
+const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
-  databaseUrl = `file:${defaultDbPath}`;
-} else if (databaseUrl.startsWith('file:')) {
-  const dbPath = databaseUrl.replace('file:', '');
-  
-  // Normalize the path - always resolve relative to backend directory
-  // Check specific patterns first before generic patterns
-  if (dbPath === './prisma/dev.db' || dbPath === 'prisma/dev.db') {
-    // Explicit prisma/dev.db path - resolve from backend directory
-    databaseUrl = `file:${defaultDbPath}`;
-  } else if (dbPath === './dev.db' || dbPath === 'dev.db') {
-    // Default relative path - use the correct location in prisma folder
-    databaseUrl = `file:${defaultDbPath}`;
-  } else if (dbPath.startsWith('./') || dbPath.startsWith('../')) {
-    // Always resolve relative paths from the backend directory
-    // This ensures we don't create nested prisma/prisma paths
-    const resolvedPath = path.resolve(backendDir, dbPath);
-    // Normalize to remove any double slashes or .. segments
-    databaseUrl = `file:${path.normalize(resolvedPath)}`;
-  } else if (!path.isAbsolute(dbPath)) {
-    // If it's a relative path without ./ or ../, resolve from backend directory
-    const resolvedPath = path.resolve(backendDir, dbPath);
-    databaseUrl = `file:${path.normalize(resolvedPath)}`;
+  throw new Error('DATABASE_URL environment variable is required. Format: postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public');
+}
+
+// Validate that it's a PostgreSQL connection string (not SQLite file: URL)
+if (databaseUrl.startsWith('file:')) {
+  throw new Error('SQLite file: URLs are not supported. Use PostgreSQL connection string format: postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public');
+}
+
+if (!databaseUrl.match(/^postgres(ql)?:\/\//)) {
+  throw new Error('DATABASE_URL must be a PostgreSQL connection string. Format: postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public');
+}
+
+// SEED_SCOPE: Controls what data is seeded
+// - "reference": seed only canonical/catalogue data (Asset Categories, base Controls, Legislation)
+// - "full": reference data + sample/demo Risks, Documents, links
+// - "none": do nothing (skip seeding)
+// Defaults by environment:
+// - Local dev: "full"
+// - Staging: "reference"
+// - Production: "none"
+const getDefaultSeedScope = (): 'reference' | 'full' | 'none' => {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  if (nodeEnv === 'production') {
+    return 'none';
+  } else if (nodeEnv === 'staging') {
+    return 'reference';
+  } else {
+    return 'full';
   }
-  // If it's already an absolute path, normalize it
-  else {
-    databaseUrl = `file:${path.normalize(dbPath)}`;
-  }
+};
+
+const seedScope = (process.env.SEED_SCOPE || getDefaultSeedScope()) as 'reference' | 'full' | 'none';
+if (!['reference', 'full', 'none'].includes(seedScope)) {
+  throw new Error(`Invalid SEED_SCOPE: ${seedScope}. Must be one of: "reference", "full", "none"`);
 }
 
 export const config = {
   port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   databaseUrl: databaseUrl,
+  seedScope: seedScope,
   // Auth configuration (to be used in Phase 2)
   auth: {
     tenantId: process.env.AUTH_TENANT_ID || '',
     clientId: process.env.AUTH_CLIENT_ID || '',
     clientSecret: process.env.AUTH_CLIENT_SECRET || '',
     redirectUri: process.env.AUTH_REDIRECT_URI || '',
+    allowedEmailDomain: process.env.AUTH_ALLOWED_EMAIL_DOMAIN || 'paythru.com',
   },
   // SharePoint configuration (to be used in Phase 9)
   sharePoint: {
@@ -145,22 +152,14 @@ if (config.nodeEnv === 'development') {
     clientId: config.auth.clientId ? `${config.auth.clientId.substring(0, 8)}...` : 'MISSING',
     hasClientSecret: !!config.auth.clientSecret,
     redirectUri: config.auth.redirectUri,
+    allowedEmailDomain: config.auth.allowedEmailDomain,
   });
   
-  // Log database location
-  const dbPath = config.databaseUrl.replace('file:', '');
-  const fs = require('fs');
-  // dbPath is already an absolute path from our resolution above
-  const resolvedPath = path.normalize(dbPath);
-  const dbExists = fs.existsSync(resolvedPath);
-  const dbSize = dbExists ? fs.statSync(resolvedPath).size : 0;
+  // Log database connection (mask password for security)
+  const dbUrlForLogging = config.databaseUrl.replace(/:([^:@]+)@/, ':****@');
   console.log('[CONFIG] Database:', {
-    url: config.databaseUrl,
-    resolvedPath: resolvedPath,
-    exists: dbExists,
-    size: dbSize,
-    sizeKB: Math.round(dbSize / 1024),
-    backendDir: backendDir,
+    url: dbUrlForLogging,
+    seedScope: config.seedScope,
   });
 }
 

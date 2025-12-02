@@ -66,3 +66,4 @@ CREATE INDEX "Risk_riskNature_idx" ON "Risk"("riskNature");
 CREATE INDEX "Risk_riskCategory_idx" ON "Risk"("riskCategory");
 CREATE INDEX "Risk_calculatedScore_idx" ON "Risk"("calculatedScore");
 
+

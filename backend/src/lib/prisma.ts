@@ -1,51 +1,17 @@
 import { PrismaClient } from '@prisma/client';
 import { config } from '../config';
-import path from 'path';
-import fs from 'fs';
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
-// Use the resolved database URL from config to ensure correct path resolution
-// This ensures the database path is correctly resolved regardless of where the process runs from
+// Use the database URL from config (PostgreSQL connection string)
 // Prisma reads DATABASE_URL from process.env, so we set it to the resolved value
-// IMPORTANT: This must be set before creating PrismaClient to ensure it uses the correct path
+// IMPORTANT: This must be set before creating PrismaClient to ensure it uses the correct connection
+process.env.DATABASE_URL = config.databaseUrl;
 
-// Extract the actual file path and normalize it
-const dbUrl = config.databaseUrl;
-const dbPath = dbUrl.replace(/^file:/, '');
-const normalizedPath = path.normalize(dbPath);
-const absoluteDbUrl = `file:${normalizedPath}`;
-
-// SAFEGUARD: Detect nested prisma/prisma paths (common configuration error)
-if (normalizedPath.includes('/prisma/prisma/') || normalizedPath.includes('\\prisma\\prisma\\')) {
-  console.error('[PRISMA] ERROR: Detected nested prisma/prisma path in database URL!');
-  console.error('[PRISMA] This usually happens when DATABASE_URL is not properly resolved.');
-  console.error('[PRISMA] Current path:', normalizedPath);
-  console.error('[PRISMA] SOLUTION: Always use npm run db:* commands (e.g., npm run db:migrate)');
-  console.error('[PRISMA] DO NOT run npx prisma commands directly!');
-  throw new Error('Invalid database path: nested prisma/prisma directory detected. Use npm run db:* commands instead of npx prisma.');
-}
-
-// Verify the database file exists (or can be created)
-const dbDir = path.dirname(normalizedPath);
-if (!fs.existsSync(dbDir)) {
-  console.warn(`[PRISMA] Database directory does not exist: ${dbDir}`);
-  try {
-    fs.mkdirSync(dbDir, { recursive: true });
-    console.log(`[PRISMA] Created database directory: ${dbDir}`);
-  } catch (error) {
-    console.error(`[PRISMA] Failed to create database directory: ${error}`);
-  }
-}
-
-// Set both process.env and use in PrismaClient initialization
-process.env.DATABASE_URL = absoluteDbUrl;
-
-// Log the database URL being used (in development)
+// Log the database connection (mask password for security)
 if (process.env.NODE_ENV === 'development') {
-  console.log('[PRISMA] Initializing with database URL:', absoluteDbUrl);
-  console.log('[PRISMA] Database file exists:', fs.existsSync(normalizedPath));
-  console.log('[PRISMA] Database directory exists:', fs.existsSync(dbDir));
+  const dbUrlForLogging = config.databaseUrl.replace(/:([^:@]+)@/, ':****@');
+  console.log('[PRISMA] Initializing with database URL:', dbUrlForLogging);
 }
 
 export const prisma =
@@ -53,7 +19,7 @@ export const prisma =
   new PrismaClient({
     datasources: {
       db: {
-        url: absoluteDbUrl,
+        url: config.databaseUrl,
       },
     },
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],

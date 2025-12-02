@@ -1,7 +1,9 @@
 import { Router, Response } from 'express';
+import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { retryDbOperation } from '../lib/dbRetry';
+import { config } from '../config';
 
 const router = Router();
 
@@ -19,6 +21,27 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
       console.warn('[AUTH] No email found in token payload, will use fallback:', {
         user: req.user,
         availableFields: Object.keys(req.user || {}),
+      });
+    }
+
+    // Validate email domain (defense-in-depth, also checked in middleware)
+    const allowedDomain = config.auth.allowedEmailDomain.toLowerCase();
+    if (email) {
+      const emailDomain = email.split('@')[1]?.toLowerCase();
+      if (!emailDomain || emailDomain !== allowedDomain) {
+        console.error('[AUTH] Email domain validation failed in sync endpoint:', {
+          email,
+          emailDomain,
+          allowedDomain,
+        });
+        return res.status(403).json({
+          error: `Access restricted to @${allowedDomain} email addresses`,
+        });
+      }
+    } else {
+      // If email is missing, reject the request
+      return res.status(403).json({
+        error: 'Email address is required for authentication',
       });
     }
 
@@ -40,9 +63,17 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
     }
 
     if (!user) {
-      // First user becomes admin, others default to STAFF
-      const userCount = await retryDbOperation(() => prisma.user.count());
-      const role = userCount === 0 ? 'ADMIN' : 'STAFF';
+      // First non-system user becomes admin, others default to STAFF
+      // Check if there are any ADMIN users (excluding system user)
+      const adminCount = await retryDbOperation(() =>
+        prisma.user.count({
+          where: {
+            role: 'ADMIN',
+            id: { not: '00000000-0000-0000-0000-000000000000' }, // Exclude system user
+          },
+        })
+      );
+      const role = adminCount === 0 ? 'ADMIN' : 'STAFF';
 
       // Ensure we have an email - if not, log a warning
       if (!email) {
@@ -54,13 +85,18 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
         });
       }
 
+      // Generate a UUID for the user ID (required in PostgreSQL)
+      const userId = randomUUID();
+
       user = await retryDbOperation(() =>
         prisma.user.create({
           data: {
+            id: userId,
             email: email || `user-${req.user.sub}@unknown.local`, // Fallback email if none provided
             displayName: name || email || 'Unknown User',
             entraObjectId: oid || req.user.sub,
             role: role as any,
+            updatedAt: new Date(),
           },
         })
       );

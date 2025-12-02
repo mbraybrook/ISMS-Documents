@@ -33,3 +33,4 @@ CREATE INDEX "LegislationRisk_riskId_idx" ON "LegislationRisk"("riskId");
 CREATE INDEX "LegislationRisk_legislationId_idx" ON "LegislationRisk"("legislationId");
 
 
+

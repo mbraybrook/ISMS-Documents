@@ -116,6 +116,34 @@ export interface AuthRequest extends Request {
   };
 }
 
+// Helper function to validate email domain
+function validateEmailDomain(email: string | undefined): { valid: boolean; error?: string } {
+  if (!email) {
+    return { valid: false, error: 'Email address is required' };
+  }
+
+  const allowedDomain = config.auth.allowedEmailDomain.toLowerCase();
+  const emailDomain = email.split('@')[1]?.toLowerCase();
+
+  if (!emailDomain) {
+    return { valid: false, error: 'Invalid email format' };
+  }
+
+  if (emailDomain !== allowedDomain) {
+    console.warn('[AUTH] Email domain validation failed:', {
+      email,
+      emailDomain,
+      allowedDomain,
+    });
+    return {
+      valid: false,
+      error: `Access restricted to @${allowedDomain} email addresses`,
+    };
+  }
+
+  return { valid: true };
+}
+
 export const authenticateToken = async (
   req: AuthRequest,
   res: Response,
@@ -270,6 +298,16 @@ export const authenticateToken = async (
         extractedName: name,
       });
       
+      // Validate email domain
+      const domainValidation = validateEmailDomain(email);
+      if (!domainValidation.valid) {
+        console.error('[AUTH] Email domain validation failed:', {
+          email,
+          error: domainValidation.error,
+        });
+        return res.status(403).json({ error: domainValidation.error });
+      }
+      
       // Attach user info to request
       req.user = {
         sub: decodedPayload.sub || '',
@@ -346,6 +384,16 @@ export const authenticateToken = async (
               : null)
             || email.split('@')[0] // Fallback to username part of email
             || '';
+          
+          // Validate email domain
+          const domainValidation = validateEmailDomain(email);
+          if (!domainValidation.valid) {
+            console.error('[AUTH] Email domain validation failed:', {
+              email,
+              error: domainValidation.error,
+            });
+            return res.status(403).json({ error: domainValidation.error });
+          }
           
           // Attach user info to request
           req.user = {

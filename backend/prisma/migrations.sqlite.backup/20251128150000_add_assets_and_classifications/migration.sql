@@ -64,3 +64,4 @@ CREATE INDEX "Asset_owner_idx" ON "Asset"("owner");
 CREATE INDEX "Asset_date_idx" ON "Asset"("date");
 
 
+
