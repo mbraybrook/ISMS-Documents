@@ -1,5 +1,6 @@
 import { config } from '../config';
 import axios, { AxiosInstance } from 'axios';
+import { log } from '../lib/logger';
 
 /**
  * Create Confluence API client
@@ -63,7 +64,7 @@ export async function getConfluencePage(
     if (error.response?.status === 404) {
       return null;
     }
-    console.error('Error fetching Confluence page:', error);
+    // Error logging handled by caller or service layer
     return null;
   }
 }
@@ -90,7 +91,7 @@ export async function searchConfluencePages(
     const response = await client.get('/content/search', { params });
     return (response.data.results || []) as ConfluencePage[];
   } catch (error) {
-    console.error('Error searching Confluence pages:', error);
+    log.error('Error searching Confluence pages', { error: error instanceof Error ? error.message : String(error) });
     return [];
   }
 }
@@ -113,7 +114,7 @@ export async function listConfluencePages(
 
     return (response.data.results || []) as ConfluencePage[];
   } catch (error) {
-    console.error('Error listing Confluence pages:', error);
+    log.error('Error listing Confluence pages', { error: error instanceof Error ? error.message : String(error) });
     return [];
   }
 }
@@ -138,7 +139,7 @@ export async function getConfluenceSpace(spaceKey: string): Promise<any> {
     const response = await client.get(`/space/${spaceKey}`);
     return response.data;
   } catch (error) {
-    console.error('Error fetching Confluence space:', error);
+    log.error('Error fetching Confluence space', { error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 }

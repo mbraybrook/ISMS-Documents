@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth';
 import { UserRole } from '../types/enums';
 import { prisma } from '../lib/prisma';
+import { log } from '../lib/logger';
 
 export const requireRole = (...allowedRoles: UserRole[]) => {
   return async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -28,7 +29,7 @@ export const requireRole = (...allowedRoles: UserRole[]) => {
       req.user = { ...req.user, role: user.role, department: user.department } as any;
       next();
     } catch (error) {
-      console.error('Authorization error:', error);
+      log.error('Authorization error', { error: error instanceof Error ? error.message : String(error) });
       return res.status(500).json({ error: 'Authorization error' });
     }
   };
@@ -62,7 +63,7 @@ export const requireDepartmentAccess = () => {
       req.user = { ...req.user, role: user.role, department: user.department } as any;
       next();
     } catch (error) {
-      console.error('Department access error:', error);
+      log.error('Department access error', { error: error instanceof Error ? error.message : String(error) });
       return res.status(500).json({ error: 'Department access error' });
     }
   };

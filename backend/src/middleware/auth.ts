@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
 import { config } from '../config';
+import { log } from '../lib/logger';
 
 // JWKS clients - try tenant-specific first, fallback to common endpoint
 // For tokens with sts.windows.net issuer, sometimes we need the common endpoint
@@ -35,9 +36,7 @@ function getKey(header: jwt.JwtHeader, callback: jwt.SigningKeyCallback, issuer?
     return callback(new Error('Token header missing kid (key ID)'));
   }
   
-  console.log('[AUTH] Fetching signing key for kid:', header.kid);
-  console.log('[AUTH] Token algorithm:', header.alg);
-  console.log('[AUTH] Token issuer:', issuer);
+  log.debug('[AUTH] Fetching signing key for kid', { kid: header.kid, algorithm: header.alg, issuer });
   
   // For sts.windows.net issuer, try v1.0 endpoint first, then common, then v2.0
   // For login.microsoftonline.com issuer, use tenant-specific v2.0 endpoint
@@ -65,11 +64,11 @@ function getKey(header: jwt.JwtHeader, callback: jwt.SigningKeyCallback, issuer?
     const { client, name } = tryEndpoints[attemptIndex];
     attemptIndex++;
     
-    console.log(`[AUTH] Trying ${name} endpoint (attempt ${attemptIndex}/${tryEndpoints.length})`);
+    log.debug(`[AUTH] Trying ${name} endpoint`, { attempt: attemptIndex, total: tryEndpoints.length });
     
     client.getSigningKey(header.kid, (err, key) => {
       if (err || !key) {
-        console.warn(`[AUTH] Failed to get key from ${name}:`, err?.message || 'key not found');
+        log.warn(`[AUTH] Failed to get key from ${name}`, { error: err?.message || 'key not found' });
         return tryNextEndpoint();
       }
       
@@ -94,16 +93,16 @@ function extractAndReturnKey(
   } else if ((key as any).rsaPublicKey) {
     signingKey = (key as any).rsaPublicKey;
   } else {
-    console.error('[AUTH] Unable to extract public key from signing key');
+    log.error('[AUTH] Unable to extract public key from signing key');
     return callback(new Error('Failed to extract public key'));
   }
   
   if (!signingKey) {
-    console.error('[AUTH] Public key is empty');
+    log.error('[AUTH] Public key is empty');
     return callback(new Error('Failed to extract public key'));
   }
   
-  console.log(`[AUTH] Successfully retrieved signing key from ${endpointName}, algorithm:`, algorithm);
+  log.debug(`[AUTH] Successfully retrieved signing key from ${endpointName}`, { algorithm });
   callback(null, signingKey);
 }
 
@@ -130,7 +129,7 @@ function validateEmailDomain(email: string | undefined): { valid: boolean; error
   }
 
   if (emailDomain !== allowedDomain) {
-    console.warn('[AUTH] Email domain validation failed:', {
+    log.warn('[AUTH] Email domain validation failed', {
       email,
       emailDomain,
       allowedDomain,
@@ -154,12 +153,11 @@ export const authenticateToken = async (
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
     if (!token) {
-      console.log('[AUTH] No token provided in request');
+      log.debug('[AUTH] No token provided in request');
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    console.log('[AUTH] Received token, starting validation...');
-    console.log('[AUTH] Token preview:', token.substring(0, 50) + '...');
+    log.debug('[AUTH] Received token, starting validation');
 
     // First, decode the token to check its audience
     const decodedToken = jwt.decode(token, { complete: true });
@@ -172,7 +170,7 @@ export const authenticateToken = async (
     const tokenIssuer = payload.iss;
     const tokenAlgorithm = (decodedToken.header as any)?.alg;
     
-    console.log('[AUTH] Token details:', {
+    log.debug('[AUTH] Token details', {
       algorithm: tokenAlgorithm,
       issuer: tokenIssuer,
       audience: tokenAudience,
@@ -208,7 +206,7 @@ export const authenticateToken = async (
       tokenIssuer.startsWith(`https://sts.windows.net/${config.auth.tenantId}/`);
     
     if (!issuerMatches) {
-      console.error('[AUTH] Token issuer mismatch:', {
+      log.error('[AUTH] Token issuer mismatch', {
         expected: expectedIssuers,
         actual: tokenIssuer,
         tenantId: config.auth.tenantId,
@@ -216,26 +214,26 @@ export const authenticateToken = async (
       return res.status(403).json({ error: 'Invalid token issuer' });
     }
     
-    console.log('[AUTH] Token issuer matches:', tokenIssuer);
+    log.debug('[AUTH] Token issuer matches', { issuer: tokenIssuer });
 
     // Check audience
-    console.log('[AUTH] Token audience:', tokenAudience);
+    log.debug('[AUTH] Token audience', { audience: tokenAudience });
     if (!validAudiences.includes(tokenAudience)) {
-      console.warn('[AUTH] Token audience not in expected list (but proceeding):', {
+      log.warn('[AUTH] Token audience not in expected list (but proceeding)', {
         expected: validAudiences,
         actual: tokenAudience,
       });
       // Still proceed if it's a valid Microsoft token (for User.Read scope)
       // The issuer check above ensures it's from the correct tenant
     } else {
-      console.log('[AUTH] Token audience matches expected list');
+      log.debug('[AUTH] Token audience matches expected list');
     }
 
     // For sts.windows.net tokens, signature verification often fails even with correct keys
     // This is a known issue with legacy tokens. We'll validate the token structure
     // and trust it if it's from the correct tenant and has valid claims
     if (tokenIssuer.includes('sts.windows.net')) {
-      console.log('[AUTH] Using relaxed validation for sts.windows.net token');
+      log.debug('[AUTH] Using relaxed validation for sts.windows.net token');
       
       // Decode and validate token structure without signature verification
       const decoded = jwt.decode(token, { complete: true });
@@ -259,14 +257,14 @@ export const authenticateToken = async (
       // Validate tenant matches
       const tokenTenantId = tokenIssuer.match(/\/([a-f0-9-]+)\/?$/i)?.[1];
       if (tokenTenantId !== config.auth.tenantId) {
-        console.error('[AUTH] Tenant ID mismatch:', {
+        log.error('[AUTH] Tenant ID mismatch', {
           tokenTenant: tokenTenantId,
           configTenant: config.auth.tenantId,
         });
         return res.status(403).json({ error: 'Invalid token tenant' });
       }
       
-      console.log('[AUTH] Token validated (relaxed mode for sts.windows.net)');
+      log.debug('[AUTH] Token validated (relaxed mode for sts.windows.net)');
       
       // Extract email from various possible fields in the token
       // Azure AD tokens can have email in different fields depending on token version
@@ -288,7 +286,7 @@ export const authenticateToken = async (
         || '';
       
       // Log available fields for debugging
-      console.log('[AUTH] Token payload fields:', {
+      log.debug('[AUTH] Token payload fields', {
         hasEmail: !!decodedPayload.email,
         hasPreferredUsername: !!decodedPayload.preferred_username,
         hasUpn: !!decodedPayload.upn,
@@ -301,7 +299,7 @@ export const authenticateToken = async (
       // Validate email domain
       const domainValidation = validateEmailDomain(email);
       if (!domainValidation.valid) {
-        console.error('[AUTH] Email domain validation failed:', {
+        log.error('[AUTH] Email domain validation failed', {
           email,
           error: domainValidation.error,
         });
@@ -341,9 +339,8 @@ export const authenticateToken = async (
       },
       (err, decoded) => {
         if (err) {
-          console.error('[AUTH] Token verification error:', {
-            error: err,
-            message: err.message,
+          log.error('[AUTH] Token verification error', {
+            error: err.message,
             name: err.name,
             tokenAudience,
             tokenIssuer,
@@ -361,7 +358,7 @@ export const authenticateToken = async (
         if (decoded && typeof decoded === 'object') {
           const decodedPayload = decoded as any;
           if (!validAudiences.includes(decodedPayload.aud)) {
-            console.warn('Token audience mismatch (but accepting token):', {
+            log.warn('Token audience mismatch (but accepting token)', {
               expected: validAudiences,
               actual: decodedPayload.aud,
             });
@@ -388,7 +385,7 @@ export const authenticateToken = async (
           // Validate email domain
           const domainValidation = validateEmailDomain(email);
           if (!domainValidation.valid) {
-            console.error('[AUTH] Email domain validation failed:', {
+            log.error('[AUTH] Email domain validation failed', {
               email,
               error: domainValidation.error,
             });
@@ -408,7 +405,7 @@ export const authenticateToken = async (
       }
     );
   } catch (error) {
-    console.error('Authentication error:', error);
+    log.error('Authentication error', { error: error instanceof Error ? error.message : String(error) });
     return res.status(500).json({ error: 'Authentication error' });
   }
 };

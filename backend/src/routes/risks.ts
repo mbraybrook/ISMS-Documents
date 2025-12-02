@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import multer from 'multer';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
+import { csvUpload, handleMulterError } from '../lib/multerConfig';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
 import {
@@ -332,7 +333,7 @@ router.get(
               control: true,
             },
           },
-          documentRisks: {
+          DocumentRisk: {
             include: {
               document: {
                 select: {
@@ -1389,40 +1390,13 @@ router.post(
   }
 );
 
-// Configure multer for file uploads (memory storage)
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only CSV files are allowed'));
-    }
-  },
-});
-
 // POST /api/risks/import - bulk import from CSV
 router.post(
   '/import',
   authenticateToken,
   requireRole('ADMIN', 'EDITOR'),
-  upload.single('file'),
-  (err: any, req: AuthRequest, res: Response, next: any) => {
-    // Handle multer errors
-    if (err) {
-      if (err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ error: 'File too large. Maximum size is 10MB.' });
-        }
-        return res.status(400).json({ error: `Upload error: ${err.message}` });
-      }
-      return res.status(400).json({ error: err.message || 'File upload error' });
-    }
-    next();
-  },
+  csvUpload.single('file'),
+  handleMulterError,
   async (req: AuthRequest, res: Response) => {
     try {
       let result;

@@ -2,6 +2,36 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { prisma } from '../lib/prisma';
+import { log } from '../lib/logger';
+
+// Minimum length for JWT secret (32 characters recommended for HS256)
+const MIN_JWT_SECRET_LENGTH = 32;
+
+/**
+ * Validates that JWT secret is configured and meets security requirements
+ */
+function validateJwtSecret(secret: string | undefined): { valid: boolean; error?: string } {
+  if (!secret) {
+    return { valid: false, error: 'JWT secret not configured' };
+  }
+  
+  if (typeof secret !== 'string') {
+    return { valid: false, error: 'JWT secret must be a string' };
+  }
+  
+  if (secret.trim().length === 0) {
+    return { valid: false, error: 'JWT secret cannot be empty' };
+  }
+  
+  if (secret.length < MIN_JWT_SECRET_LENGTH) {
+    return { 
+      valid: false, 
+      error: `JWT secret must be at least ${MIN_JWT_SECRET_LENGTH} characters long for security` 
+    };
+  }
+  
+  return { valid: true };
+}
 
 export interface TrustAuthRequest extends Request {
   externalUser?: {
@@ -26,8 +56,9 @@ export const authenticateTrustToken = async (
 
     const token = authHeader.substring(7);
 
-    if (!config.trustCenter.jwtSecret) {
-      console.error('[TRUST_AUTH] JWT secret not configured');
+    const secretValidation = validateJwtSecret(config.trustCenter.jwtSecret);
+    if (!secretValidation.valid) {
+      log.error('[TRUST_AUTH] JWT secret validation failed', { error: secretValidation.error });
       return res.status(500).json({ error: 'Authentication configuration error' });
     }
 
@@ -80,7 +111,7 @@ export const authenticateTrustToken = async (
 
     next();
   } catch (error) {
-    console.error('[TRUST_AUTH] Authentication error:', error);
+    log.error('[TRUST_AUTH] Authentication error', { error: error instanceof Error ? error.message : String(error) });
     return res.status(500).json({ error: 'Authentication error' });
   }
 };

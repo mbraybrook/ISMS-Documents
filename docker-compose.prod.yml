@@ -1,0 +1,137 @@
+# Production Docker Compose Configuration
+# Usage: docker compose -f docker-compose.prod.yml up -d
+#
+# Before running:
+# 1. Set up environment variables in backend/.env and frontend/.env
+# 2. Ensure PostgreSQL database is accessible
+# 3. Run database migrations: cd backend && npm run db:migrate:deploy
+# 4. Optionally seed reference data: SEED_SCOPE=reference npm run db:seed
+
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: isms-backend-prod
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      # Database URL - should be provided via .env file or environment
+      - DATABASE_URL=${DATABASE_URL}
+      # Seed scope - set to 'reference' for first-run, 'none' for subsequent deployments
+      - SEED_SCOPE=${SEED_SCOPE:-none}
+      # Auth configuration
+      - AUTH_TENANT_ID=${AUTH_TENANT_ID}
+      - AUTH_CLIENT_ID=${AUTH_CLIENT_ID}
+      - AUTH_CLIENT_SECRET=${AUTH_CLIENT_SECRET}
+      - AUTH_REDIRECT_URI=${AUTH_REDIRECT_URI}
+      - AUTH_ALLOWED_EMAIL_DOMAIN=${AUTH_ALLOWED_EMAIL_DOMAIN:-paythru.com}
+      # CORS configuration
+      - CORS_TRUST_CENTER_ORIGINS=${CORS_TRUST_CENTER_ORIGINS}
+      # Trust Center configuration
+      - TRUST_CENTER_JWT_SECRET=${TRUST_CENTER_JWT_SECRET}
+      - TRUST_CENTER_JWT_EXPIRY=${TRUST_CENTER_JWT_EXPIRY:-24h}
+      - TRUST_CENTER_MAX_FILE_SIZE_MB=${TRUST_CENTER_MAX_FILE_SIZE_MB:-50}
+      - TRUST_CENTER_DOWNLOAD_TOKEN_EXPIRY=${TRUST_CENTER_DOWNLOAD_TOKEN_EXPIRY:-1h}
+      # SharePoint (optional)
+      - SHAREPOINT_SITE_ID=${SHAREPOINT_SITE_ID:-}
+      - SHAREPOINT_DRIVE_ID=${SHAREPOINT_DRIVE_ID:-}
+      # Confluence (optional)
+      - CONFLUENCE_BASE_URL=${CONFLUENCE_BASE_URL:-}
+      - CONFLUENCE_USERNAME=${CONFLUENCE_USERNAME:-}
+      - CONFLUENCE_API_TOKEN=${CONFLUENCE_API_TOKEN:-}
+      # Azure app-only auth (optional, falls back to AUTH_* if not set)
+      - AZURE_APP_CLIENT_ID=${AZURE_APP_CLIENT_ID:-}
+      - AZURE_APP_CLIENT_SECRET=${AZURE_APP_CLIENT_SECRET:-}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID:-}
+      # LLM configuration (optional)
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_MODEL=${LLM_MODEL:-llama2}
+      - LLM_SIMILARITY_THRESHOLD=${LLM_SIMILARITY_THRESHOLD:-70}
+      # Email configuration (optional)
+      - EMAIL_SMTP_HOST=${EMAIL_SMTP_HOST:-}
+      - EMAIL_SMTP_PORT=${EMAIL_SMTP_PORT:-587}
+      - EMAIL_SMTP_USER=${EMAIL_SMTP_USER:-}
+      - EMAIL_SMTP_PASS=${EMAIL_SMTP_PASS:-}
+      - EMAIL_FROM=${EMAIL_FROM:-}
+    env_file:
+      - ./backend/.env
+    networks:
+      - isms-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        # Build-time environment variables for Vite
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+        VITE_AUTH_TENANT_ID: ${VITE_AUTH_TENANT_ID}
+        VITE_AUTH_CLIENT_ID: ${VITE_AUTH_CLIENT_ID}
+        VITE_AUTH_REDIRECT_URI: ${VITE_AUTH_REDIRECT_URI}
+    container_name: isms-frontend-prod
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - isms-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  isms-network:
+    driver: bridge
+
+# Note: PostgreSQL is expected to be managed separately (managed service, external container, etc.)
+# If you need to include PostgreSQL in this compose file, uncomment and configure:
+#
+#  postgres:
+#    image: postgres:15-alpine
+#    container_name: isms-postgres-prod
+#    restart: unless-stopped
+#    environment:
+#      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+#      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+#      POSTGRES_DB: ${POSTGRES_DB:-isms_db}
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#    networks:
+#      - isms-network
+#    healthcheck:
+#      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#
+# volumes:
+#   postgres_data:
+

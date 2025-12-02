@@ -1,5 +1,8 @@
 # ISMS Document Management and Compliance Application
 
+[![Tests](https://github.com/your-org/ISMS-Documentation/workflows/Tests/badge.svg)](https://github.com/your-org/ISMS-Documentation/actions)
+[![Coverage](https://codecov.io/gh/your-org/ISMS-Documentation/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/ISMS-Documentation)
+
 A web application that provides a "single pane of glass" over an organisation's ISMS documentation stored primarily in Microsoft SharePoint, with links to selected Confluence content.
 
 ## Architecture
@@ -108,6 +111,365 @@ A web application that provides a "single pane of glass" over an organisation's 
    - Backend API: http://localhost:4000
 
 **Note**: Use `docker compose` (without hyphen) for Docker Compose V2. For older installations, you may need `docker-compose` (with hyphen).
+
+## Production Deployment
+
+### Prerequisites
+
+- Node.js 18+ (LTS recommended) for build tools
+- Docker and Docker Compose (for containerized deployment)
+- PostgreSQL 15+ database (managed service or self-hosted)
+- Azure App Registration configured with production redirect URIs
+- Domain configured with SSL/TLS certificates
+- Reverse proxy (nginx, traefik, or cloud load balancer) recommended
+
+### Infrastructure Requirements
+
+1. **Database**: PostgreSQL 15+ with:
+   - Persistent storage
+   - Backup strategy configured
+   - Connection pooling enabled (recommended: 10-20 connections)
+
+2. **Application Servers**: 
+   - Backend: Node.js 18+ runtime
+   - Frontend: Static file serving (nginx or CDN)
+
+3. **Network**:
+   - Backend API accessible from frontend
+   - Database accessible from backend
+   - HTTPS/SSL termination (reverse proxy or load balancer)
+
+### Step 1: Environment Configuration
+
+1. **Backend Environment Variables**:
+   ```bash
+   cd backend
+   cp .env.example .env
+   # Edit .env with production values
+   ```
+
+   **Required variables for production**:
+   - `DATABASE_URL`: PostgreSQL connection string
+   - `NODE_ENV=production`
+   - `SEED_SCOPE=reference` (for first-run) or `none` (subsequent deployments)
+   - `AUTH_TENANT_ID`, `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`
+   - `AUTH_REDIRECT_URI`: Production URL (e.g., `https://trust.paythru.com`)
+   - `CORS_TRUST_CENTER_ORIGINS`: Comma-separated origins or wildcard pattern
+     - Example: `https://trust.paythru.com,https://trust.*.paythru.com`
+     - Wildcard support: `https://trust.*.paythru.com` matches all subdomains
+   - `TRUST_CENTER_JWT_SECRET`: Strong random secret (minimum 32 characters)
+     - Generate: `openssl rand -base64 32`
+
+   See `backend/.env.example` for complete list of variables.
+
+2. **Frontend Environment Variables**:
+   ```bash
+   cd frontend
+   cp .env.example .env
+   # Edit .env with production values
+   ```
+
+   **Required variables**:
+   - `VITE_API_URL`: Backend API URL (e.g., `https://api.trust.paythru.com`)
+   - `VITE_AUTH_TENANT_ID`: Must match backend `AUTH_TENANT_ID`
+   - `VITE_AUTH_CLIENT_ID`: Must match backend `AUTH_CLIENT_ID`
+   - `VITE_AUTH_REDIRECT_URI`: Production URL (e.g., `https://trust.paythru.com`)
+
+   **Important**: Frontend environment variables are baked into the build at build time. They cannot be changed after the build without rebuilding.
+
+### Step 2: Database Setup
+
+1. **Create Database**:
+   ```sql
+   CREATE DATABASE isms_production;
+   ```
+
+2. **Run Migrations**:
+   ```bash
+   cd backend
+   npm install
+   npm run db:generate
+   npm run db:migrate:deploy
+   ```
+
+3. **Seed Reference Data (First Run Only)**:
+   ```bash
+   # Seed catalog/reference data (classifications, controls, legislation, etc.)
+   SEED_SCOPE=reference npm run db:seed
+   ```
+
+   **Note**: 
+   - Use `SEED_SCOPE=reference` for first-run production to populate catalog data
+   - Use `SEED_SCOPE=none` for subsequent deployments (default in production)
+
+### Step 3: Build Production Images
+
+#### Option A: Using Docker Compose (Recommended)
+
+```bash
+# Build production images
+docker compose -f docker-compose.prod.yml build
+
+# Or build specific service
+docker compose -f docker-compose.prod.yml build backend
+docker compose -f docker-compose.prod.yml build frontend
+```
+
+#### Option B: Manual Docker Build
+
+**Backend**:
+```bash
+cd backend
+docker build -f Dockerfile.prod -t isms-backend:latest .
+```
+
+**Frontend**:
+```bash
+cd frontend
+docker build -f Dockerfile.prod \
+  --build-arg VITE_API_URL=https://api.trust.paythru.com \
+  --build-arg VITE_AUTH_TENANT_ID=your-tenant-id \
+  --build-arg VITE_AUTH_CLIENT_ID=your-client-id \
+  --build-arg VITE_AUTH_REDIRECT_URI=https://trust.paythru.com \
+  -t isms-frontend:latest .
+```
+
+### Step 4: Deploy with Docker Compose
+
+1. **Ensure environment variables are set** in `backend/.env` and `frontend/.env`
+
+2. **Start services**:
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d
+   ```
+
+3. **Check logs**:
+   ```bash
+   docker compose -f docker-compose.prod.yml logs -f
+   ```
+
+4. **Verify health**:
+   ```bash
+   # Backend health check
+   curl http://localhost:4000/api/health
+   
+   # Frontend health check
+   curl http://localhost:3000/health
+   ```
+
+### Step 5: Configure Reverse Proxy
+
+The application expects a reverse proxy (nginx, traefik, or cloud load balancer) for:
+- SSL/TLS termination
+- Routing `/api/*` to backend
+- Routing all other requests to frontend
+- Security headers
+
+**Example nginx configuration**:
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name trust.paythru.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    # Backend API
+    location /api {
+        proxy_pass http://localhost:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Frontend
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+### Step 6: Azure App Registration Configuration
+
+1. **Add Production Redirect URIs**:
+   - Go to Azure Portal → App Registrations → Your App
+   - Authentication → Add platform → Single-page application
+   - Add redirect URI: `https://trust.paythru.com` (or your production domain)
+   - Add any subdomain redirect URIs if needed
+
+2. **Verify API Permissions**:
+   - Microsoft Graph → Delegated permissions:
+     - `Sites.Read.All` or `Sites.ReadWrite.All`
+     - `Files.Read.All` or `Files.ReadWrite.All`
+     - `User.Read`
+   - Ensure admin consent is granted
+
+3. **Client Secret**:
+   - Ensure client secret is valid and not expired
+   - Update `AUTH_CLIENT_SECRET` in backend `.env` if rotated
+
+### Step 7: Domain Configuration
+
+The application supports wildcard CORS patterns. Configure `CORS_TRUST_CENTER_ORIGINS` in `backend/.env`:
+
+**Option 1: Explicit domains**:
+```
+CORS_TRUST_CENTER_ORIGINS=https://trust.paythru.com,https://trust.staging.paythru.com
+```
+
+**Option 2: Wildcard pattern**:
+```
+CORS_TRUST_CENTER_ORIGINS=https://trust.*.paythru.com
+```
+
+This will allow all subdomains matching `trust.*.paythru.com` (e.g., `trust.staging.paythru.com`, `trust.dev.paythru.com`).
+
+### Production Build Process
+
+#### Backend Build
+
+The backend uses a multi-stage Docker build:
+
+1. **Builder stage**:
+   - Installs all dependencies (including dev dependencies)
+   - Generates Prisma Client
+   - Compiles TypeScript to JavaScript
+
+2. **Production stage**:
+   - Installs only production dependencies
+   - Copies built files and Prisma Client
+   - Runs as non-root user for security
+   - Starts with `npm start` (runs `node dist/index.js`)
+
+**Build command**:
+```bash
+cd backend
+docker build -f Dockerfile.prod -t isms-backend:latest .
+```
+
+#### Frontend Build
+
+The frontend uses a multi-stage Docker build:
+
+1. **Builder stage**:
+   - Installs dependencies
+   - Builds with Vite (environment variables baked in)
+   - Outputs optimized static files
+
+2. **Production stage**:
+   - Uses nginx to serve static files
+   - Includes security headers
+   - Enables gzip compression
+   - Configures caching for static assets
+
+**Build command**:
+```bash
+cd frontend
+docker build -f Dockerfile.prod \
+  --build-arg VITE_API_URL=https://api.trust.paythru.com \
+  --build-arg VITE_AUTH_TENANT_ID=your-tenant-id \
+  --build-arg VITE_AUTH_CLIENT_ID=your-client-id \
+  --build-arg VITE_AUTH_REDIRECT_URI=https://trust.paythru.com \
+  -t isms-frontend:latest .
+```
+
+**Important**: Frontend environment variables must be provided at build time. They cannot be changed after the build.
+
+### Deployment Checklist
+
+Before deploying to production:
+
+- [ ] Database created and accessible
+- [ ] Database migrations run successfully
+- [ ] Reference data seeded (first-run only)
+- [ ] Backend `.env` configured with all required variables
+- [ ] Frontend `.env` configured with all required variables
+- [ ] `TRUST_CENTER_JWT_SECRET` is strong and secure (32+ characters)
+- [ ] `CORS_TRUST_CENTER_ORIGINS` configured for production domains
+- [ ] Azure App Registration has production redirect URIs
+- [ ] Azure App Registration permissions granted and consented
+- [ ] Client secret is valid and not expired
+- [ ] SSL/TLS certificates configured
+- [ ] Reverse proxy configured
+- [ ] Health check endpoints accessible
+- [ ] Logging and monitoring configured
+- [ ] Backup strategy in place
+
+### Post-Deployment Verification
+
+1. **Health Checks**:
+   ```bash
+   # Backend
+   curl https://trust.paythru.com/api/health
+   
+   # Frontend
+   curl https://trust.paythru.com/health
+   ```
+
+2. **Authentication**:
+   - Verify login flow works
+   - Check user sync from Azure AD
+   - Verify role assignment
+
+3. **API Endpoints**:
+   - Test key endpoints (documents, risks, controls)
+   - Verify permissions and authorization
+
+4. **Database**:
+   - Verify connection pooling
+   - Check query performance
+   - Monitor connection count
+
+### Troubleshooting
+
+**Backend won't start**:
+- Check database connectivity
+- Verify `DATABASE_URL` format
+- Check Prisma Client generation
+- Review logs: `docker compose -f docker-compose.prod.yml logs backend`
+
+**Frontend shows API errors**:
+- Verify `VITE_API_URL` matches backend URL
+- Check CORS configuration
+- Verify reverse proxy routing
+
+**CORS errors**:
+- Verify `CORS_TRUST_CENTER_ORIGINS` includes exact origin
+- Check wildcard pattern syntax
+- Ensure origin includes protocol (https://)
+
+**Database connection errors**:
+- Verify `DATABASE_URL` format: `postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public`
+- Check network connectivity
+- Verify database credentials
+- Check firewall rules
+
+### Rollback Procedure
+
+1. **Stop current deployment**:
+   ```bash
+   docker compose -f docker-compose.prod.yml down
+   ```
+
+2. **Restore previous images** (if using image tags):
+   ```bash
+   docker compose -f docker-compose.prod.yml pull
+   docker compose -f docker-compose.prod.yml up -d
+   ```
+
+3. **Database rollback** (if needed):
+   - Restore from backup
+   - Or revert specific migrations (not recommended in production)
 
 ## Project Structure
 

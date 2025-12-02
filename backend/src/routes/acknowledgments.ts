@@ -277,14 +277,14 @@ router.get(
       // Get all acknowledgments
       const allAcknowledgments = await prisma.acknowledgment.findMany({
         include: {
-          user: {
+          User: {
             select: {
               id: true,
               displayName: true,
               email: true,
             },
           },
-          document: {
+          Document: {
             select: {
               id: true,
               title: true,
@@ -314,9 +314,9 @@ router.get(
           acknowledgedCount,
           percentage: Math.round(percentage * 100) / 100,
           acknowledgedUsers: docAcks.map((ack) => ({
-            userId: ack.user.id,
-            displayName: ack.user.displayName,
-            email: ack.user.email,
+            userId: ack.User.id,
+            displayName: ack.User.displayName,
+            email: ack.User.email,
             acknowledgedAt: ack.acknowledgedAt,
           })),
         };
