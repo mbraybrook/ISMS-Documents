@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { body, query, param, validationResult } from 'express-validator';
+import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -367,6 +368,11 @@ router.post(
           console.error('[Document Creation] Error generating Confluence URL:', error);
           // Continue without URL - it can be generated later
         }
+      }
+
+      // Generate UUID for document ID (required in PostgreSQL)
+      if (!data.id) {
+        data.id = randomUUID();
       }
 
       const document = await prisma.document.create({
