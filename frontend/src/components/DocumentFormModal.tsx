@@ -70,9 +70,14 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
   const [showReplaceOptions, setShowReplaceOptions] = useState(false);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
   const [loadingUrl, setLoadingUrl] = useState(false);
+  const [users, setUsers] = useState<Array<{ id: string; displayName: string; email: string; role: string }>>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose } = useDisclosure();
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
+
+  // Check if user can edit owner (Admin or Editor only)
+  const canEditOwner = user?.role === 'ADMIN' || user?.role === 'EDITOR';
 
   // Handle Escape key
   useEffect(() => {
@@ -84,6 +89,46 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
+
+  // Fetch users when modal opens (only for Admin/Editor)
+  useEffect(() => {
+    if (isOpen && canEditOwner) {
+      fetchUsers();
+    }
+  }, [isOpen, canEditOwner]);
+
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const response = await api.get('/api/users');
+      const allUsers = response.data.data || [];
+      // Filter to only Admin and Editor roles for owner assignment
+      const adminEditorUsers = allUsers.filter((u: any) => u.role === 'ADMIN' || u.role === 'EDITOR');
+      
+      // If editing a document, include the current owner even if they're not Admin/Editor
+      // This handles edge cases where a document might have a non-Admin/Editor owner
+      if (document?.ownerUserId) {
+        const currentOwner = allUsers.find((u: any) => u.id === document.ownerUserId);
+        if (currentOwner && !adminEditorUsers.find((u: any) => u.id === currentOwner.id)) {
+          adminEditorUsers.push(currentOwner);
+        }
+      }
+      
+      setUsers(adminEditorUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load users for owner selection',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+        position: 'top-right',
+      });
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) {
@@ -529,6 +574,27 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
                 </Select>
               </FormControl>
 
+              {canEditOwner && (
+                <FormControl isRequired>
+                  <FormLabel>Owner</FormLabel>
+                  <Select
+                    value={formData.ownerUserId}
+                    onChange={(e) => setFormData({ ...formData, ownerUserId: e.target.value })}
+                    isDisabled={readOnly || loadingUsers}
+                    placeholder={loadingUsers ? 'Loading users...' : 'Select owner'}
+                  >
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.displayName} ({u.email}) - {u.role}
+                      </option>
+                    ))}
+                  </Select>
+                  <Text fontSize="xs" color="gray.500" mt={1}>
+                    Only Admin and Editor roles can be assigned as document owners
+                  </Text>
+                </FormControl>
+              )}
+
               {formData.storageLocation === 'SHAREPOINT' && (
                 <>
                   {!document ? (
@@ -569,14 +635,32 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false 
                       </FormControl>
                       <FormControl>
                         <FormLabel>Or Browse SharePoint</FormLabel>
-                        <Button
-                          onClick={() => setBrowserOpen(true)}
-                          colorScheme="blue"
-                          variant="outline"
-                          width="100%"
-                        >
-                          Browse SharePoint Files
-                        </Button>
+                        <VStack align="stretch" spacing={2}>
+                          <Button
+                            onClick={() => setBrowserOpen(true)}
+                            colorScheme="blue"
+                            variant="outline"
+                            width="100%"
+                          >
+                            Browse SharePoint Files
+                          </Button>
+                          {formData.sharePointItemId && (
+                            <Box
+                              p={3}
+                              bg="green.50"
+                              borderRadius="md"
+                              borderWidth="1px"
+                              borderColor="green.200"
+                            >
+                              <Text fontSize="sm" fontWeight="medium" color="green.800">
+                                Selected: {formData.title || 'SharePoint File'}
+                              </Text>
+                              <Text fontSize="xs" color="green.600" mt={1}>
+                                Item ID: {formData.sharePointItemId}
+                              </Text>
+                            </Box>
+                          )}
+                        </VStack>
                       </FormControl>
                     </>
                   ) : (

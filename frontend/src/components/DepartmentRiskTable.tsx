@@ -447,6 +447,7 @@ export function DepartmentRiskTable() {
           }}
           showFiltersHeading={true}
           sortConfig={sortConfig}
+          getRowId={(risk) => risk.id}
           pagination={paginationConfig}
           onRowClick={handleEdit}
         />
