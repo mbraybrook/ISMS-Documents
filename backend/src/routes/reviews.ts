@@ -52,7 +52,7 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
       },
     });
 
-    // Overdue reviews
+    // Overdue reviews (review tasks that are overdue)
     const overdueReviews = await prisma.reviewTask.findMany({
       where: {
         dueDate: {
@@ -67,6 +67,14 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
             title: true,
             version: true,
             type: true,
+            nextReviewDate: true,
+            owner: {
+              select: {
+                id: true,
+                displayName: true,
+                email: true,
+              },
+            },
           },
         },
         reviewer: {
@@ -200,6 +208,50 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
       },
     });
 
+    // Create unified overdue items list
+    // Combine overdue reviews (with assigned tasks) and overdue documents (without tasks)
+    const overdueItems = [
+      // Overdue reviews with assigned tasks
+      ...overdueReviews.map((review) => ({
+        type: 'REVIEW_TASK' as const,
+        id: review.id,
+        documentId: review.documentId,
+        document: review.document,
+        dueDate: review.dueDate,
+        reviewDate: review.dueDate, // Use dueDate as the review date
+        reviewer: review.reviewer,
+        status: review.status,
+        hasAssignedTask: true,
+        daysOverdue: Math.ceil((now.getTime() - new Date(review.dueDate).getTime()) / (1000 * 60 * 60 * 24)),
+      })),
+      // Overdue documents without assigned tasks
+      ...overdueDocuments.map((doc) => ({
+        type: 'DOCUMENT' as const,
+        id: doc.id,
+        documentId: doc.id,
+        document: {
+          id: doc.id,
+          title: doc.title,
+          version: doc.version,
+          type: doc.type,
+          nextReviewDate: doc.nextReviewDate,
+          owner: doc.owner,
+        },
+        dueDate: doc.nextReviewDate,
+        reviewDate: doc.nextReviewDate,
+        reviewer: null,
+        status: null,
+        hasAssignedTask: false,
+        daysOverdue: doc.nextReviewDate ? Math.ceil((now.getTime() - new Date(doc.nextReviewDate).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+      })),
+    ].sort((a, b) => {
+      // Sort by days overdue (most overdue first), then by review date
+      if (a.daysOverdue !== b.daysOverdue) {
+        return b.daysOverdue - a.daysOverdue;
+      }
+      return new Date(a.reviewDate).getTime() - new Date(b.reviewDate).getTime();
+    });
+
     res.json({
       upcomingReviews,
       overdueReviews,
@@ -208,6 +260,7 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
       upcomingDocuments,
       overdueDocuments,
       needsReviewDate,
+      overdueItems, // New unified overdue items
     });
   } catch (error) {
     console.error('Error fetching review dashboard:', error);
@@ -304,11 +357,26 @@ router.put(
       const { id } = req.params;
       const { completedDate, changeNotes } = req.body;
 
-      const reviewTask = await prisma.reviewTask.update({
+      const completedDateObj = completedDate ? new Date(completedDate) : new Date();
+
+      // Get the review task with document info
+      const reviewTask = await prisma.reviewTask.findUnique({
+        where: { id },
+        include: {
+          document: true,
+        },
+      });
+
+      if (!reviewTask) {
+        return res.status(404).json({ error: 'Review task not found' });
+      }
+
+      // Update review task
+      const updatedReviewTask = await prisma.reviewTask.update({
         where: { id },
         data: {
           status: 'COMPLETED',
-          completedDate: completedDate ? new Date(completedDate) : new Date(),
+          completedDate: completedDateObj,
           changeNotes,
         },
         include: {
@@ -329,7 +397,20 @@ router.put(
         },
       });
 
-      res.json(reviewTask);
+      // Automatically update document review dates
+      // Set lastReviewDate to completion date and nextReviewDate to completion date + 1 year
+      const nextReviewDate = new Date(completedDateObj);
+      nextReviewDate.setFullYear(nextReviewDate.getFullYear() + 1);
+
+      await prisma.document.update({
+        where: { id: reviewTask.documentId },
+        data: {
+          lastReviewDate: completedDateObj,
+          nextReviewDate: nextReviewDate,
+        },
+      });
+
+      res.json(updatedReviewTask);
     } catch (error: any) {
       if (error.code === 'P2025') {
         return res.status(404).json({ error: 'Review task not found' });
@@ -370,6 +451,50 @@ router.get(
     } catch (error) {
       console.error('Error fetching review history:', error);
       res.status(500).json({ error: 'Failed to fetch review history' });
+    }
+  }
+);
+
+// POST /api/reviews/bulk-set-review-date - bulk set review dates for documents
+router.post(
+  '/bulk-set-review-date',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    body('documentIds').isArray().notEmpty(),
+    body('documentIds.*').isUUID(),
+    body('reviewDate').optional().isISO8601(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { documentIds, reviewDate } = req.body;
+
+      // If reviewDate is provided, use it; otherwise default to today + 1 year
+      const reviewDateObj = reviewDate ? new Date(reviewDate) : (() => {
+        const date = new Date();
+        date.setFullYear(date.getFullYear() + 1);
+        return date;
+      })();
+
+      // Update all documents
+      const result = await prisma.document.updateMany({
+        where: {
+          id: { in: documentIds },
+        },
+        data: {
+          nextReviewDate: reviewDateObj,
+        },
+      });
+
+      res.json({
+        success: true,
+        updated: result.count,
+        reviewDate: reviewDateObj.toISOString(),
+      });
+    } catch (error) {
+      console.error('Error bulk setting review dates:', error);
+      res.status(500).json({ error: 'Failed to bulk set review dates' });
     }
   }
 );

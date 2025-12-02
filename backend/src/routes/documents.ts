@@ -452,6 +452,27 @@ router.put(
         }
       }
 
+      // Automatically set nextReviewDate to current date + 1 year if:
+      // 1. The document doesn't currently have a nextReviewDate, OR
+      // 2. The user is updating the document but not explicitly setting nextReviewDate
+      // This ensures documents always have a review date scheduled after updates
+      if (!existingDocument.nextReviewDate) {
+        // Document has no review date - set it to 1 year from today
+        if (!('nextReviewDate' in data) || data.nextReviewDate === null || data.nextReviewDate === '') {
+          const today = new Date();
+          const nextYear = new Date(today);
+          nextYear.setFullYear(today.getFullYear() + 1);
+          data.nextReviewDate = nextYear;
+        }
+      } else if (!('nextReviewDate' in data)) {
+        // Document has a review date but user isn't changing it - update it to 1 year from today
+        // This ensures the review date is refreshed when the document is updated
+        const today = new Date();
+        const nextYear = new Date(today);
+        nextYear.setFullYear(today.getFullYear() + 1);
+        data.nextReviewDate = nextYear;
+      }
+
       // Handle version change on APPROVED document
       if (data.version && existingDocument.status === 'APPROVED' && data.version !== existingDocument.version) {
         // Version changed on approved document - set lastChangedDate and keep status as APPROVED
