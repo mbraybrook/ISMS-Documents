@@ -4,27 +4,31 @@ import { similarityApi } from '../api';
 import { authService } from '../authService';
 
 // Mock axios
-vi.mock('axios', () => ({
-  default: {
-    create: vi.fn(() => ({
-      get: vi.fn(),
-      post: vi.fn(),
-      interceptors: {
-        request: {
-          use: vi.fn(),
-        },
-        response: {
-          use: vi.fn(),
-        },
+vi.mock('axios', () => {
+  const mockAxiosInstance = {
+    get: vi.fn(),
+    post: vi.fn(),
+    interceptors: {
+      request: {
+        use: vi.fn(),
       },
-    })),
-  },
-}));
+      response: {
+        use: vi.fn(),
+      },
+    },
+  };
+  
+  return {
+    default: {
+      create: vi.fn(() => mockAxiosInstance),
+    },
+  };
+});
 
 // Mock auth service
 vi.mock('../authService', () => ({
   authService: {
-    getAccessToken: vi.fn(),
+    getAccessToken: vi.fn().mockResolvedValue('mock-token'),
   },
 }));
 
@@ -56,21 +60,20 @@ describe('API interceptors', () => {
   });
 
   it('should call similarity API', async () => {
-    const mockAxiosInstance = {
-      get: vi.fn().mockResolvedValue({ data: [] }),
-      post: vi.fn().mockResolvedValue({ data: [] }),
-      interceptors: {
-        request: { use: vi.fn() },
-        response: { use: vi.fn() },
-      },
-    };
-
-    vi.mocked(axios.create).mockReturnValue(mockAxiosInstance as any);
+    const mockResponse = { similarRisks: [] };
+    // Get the mocked axios instance
+    const mockAxiosInstance = vi.mocked(axios.create)();
+    vi.mocked(mockAxiosInstance.post).mockResolvedValue({ data: mockResponse });
 
     // Test similarity API call
-    await similarityApi.findSimilarRisks('risk-id');
+    const result = await similarityApi.findSimilarRisks('risk-id');
 
-    expect(mockAxiosInstance.get).toHaveBeenCalled();
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/api/risks/risk-id/similar',
+      {},
+      { params: {} }
+    );
+    expect(result).toEqual(mockResponse);
   });
 });
 

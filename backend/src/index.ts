@@ -43,7 +43,7 @@ const corsOptions = {
 
     // Get allowed origins from config
     const allowedOrigins = config.cors.trustCenterOrigins || [];
-    
+
     // Check if origin is in allowed list (exact match)
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
@@ -58,7 +58,7 @@ const corsOptions = {
           .replace(/[.+?^${}()|[\]\\]/g, '\\$&') // Escape special chars
           .replace(/\*/g, '[^.]*'); // Replace * with non-dot characters
         const regex = new RegExp(`^${regexPattern}$`);
-        
+
         if (regex.test(origin)) {
           return callback(null, true);
         }
@@ -69,6 +69,7 @@ const corsOptions = {
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
+  exposedHeaders: ['Content-Disposition'],
 };
 
 // Middleware

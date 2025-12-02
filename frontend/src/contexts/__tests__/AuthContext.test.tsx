@@ -7,9 +7,14 @@ import axios from 'axios';
 // Mock auth service
 vi.mock('../../services/authService', () => ({
   authService: {
+    initialize: vi.fn().mockResolvedValue(undefined),
     getAccessToken: vi.fn(),
     login: vi.fn(),
     logout: vi.fn(),
+    isAuthenticated: vi.fn().mockReturnValue(false),
+  },
+  msalInstance: {
+    handleRedirectPromise: vi.fn().mockResolvedValue(null),
   },
 }));
 
@@ -103,7 +108,9 @@ describe('AuthContext', () => {
       role: 'ADMIN',
     };
 
+    vi.mocked(authService.initialize).mockResolvedValue(undefined);
     vi.mocked(authService.getAccessToken).mockResolvedValue(mockToken);
+    vi.mocked(authService.isAuthenticated).mockReturnValue(true);
     vi.mocked(axios.post).mockResolvedValue({ data: mockUser });
 
     const { result } = renderHook(() => useAuth(), {
@@ -114,7 +121,7 @@ describe('AuthContext', () => {
 
     // Wait for sync to complete
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 200));
     });
 
     // User should be synced

@@ -106,19 +106,19 @@ router.get(
       // This ensures URLs are stored and returned in the response
       const accessToken = req.headers['x-graph-token'] as string;
       const documentsNeedingUrls = documents.filter(
-        doc => !doc.documentUrl && 
-        ((doc.storageLocation === 'SHAREPOINT' && doc.sharePointSiteId && doc.sharePointDriveId && doc.sharePointItemId) ||
-         (doc.storageLocation === 'CONFLUENCE' && doc.confluenceSpaceKey && doc.confluencePageId))
+        doc => !doc.documentUrl &&
+          ((doc.storageLocation === 'SHAREPOINT' && doc.sharePointSiteId && doc.sharePointDriveId && doc.sharePointItemId) ||
+            (doc.storageLocation === 'CONFLUENCE' && doc.confluenceSpaceKey && doc.confluencePageId))
       );
 
       if (documentsNeedingUrls.length > 0) {
         console.log(`[DOCUMENTS] Generating URLs for ${documentsNeedingUrls.length} documents missing documentUrl`);
-        
+
         // Generate URLs and update documents array and database
         const urlPromises = documentsNeedingUrls.map(async (doc) => {
           try {
             let url: string | null = null;
-            
+
             if (doc.storageLocation === 'SHAREPOINT' && doc.sharePointSiteId && doc.sharePointDriveId && doc.sharePointItemId) {
               url = await generateSharePointUrl(
                 doc.sharePointSiteId,
@@ -135,14 +135,14 @@ router.get(
                 );
               }
             }
-            
+
             if (url) {
               // Update database
               await prisma.document.update({
                 where: { id: doc.id },
                 data: { documentUrl: url },
               });
-              
+
               // Update the document in the array so it's returned with the URL
               doc.documentUrl = url;
               console.log(`[DOCUMENTS] Stored URL for document ${doc.id}: ${url}`);
@@ -151,7 +151,7 @@ router.get(
             console.error(`[DOCUMENTS] Error generating URL for document ${doc.id}:`, error);
           }
         });
-        
+
         // Wait for all URL generations to complete (with timeout to avoid blocking too long)
         await Promise.allSettled(urlPromises);
       }
@@ -501,9 +501,9 @@ router.put(
 
       // Determine the storage location (use new value if provided, otherwise existing)
       const storageLocation = data.storageLocation || existingDocument.storageLocation;
-      
+
       // Check if SharePoint IDs have changed and regenerate URL if needed
-      const sharePointIdsChanged = 
+      const sharePointIdsChanged =
         data.sharePointSiteId !== undefined && data.sharePointSiteId !== existingDocument.sharePointSiteId ||
         data.sharePointDriveId !== undefined && data.sharePointDriveId !== existingDocument.sharePointDriveId ||
         data.sharePointItemId !== undefined && data.sharePointItemId !== existingDocument.sharePointItemId ||
@@ -520,7 +520,7 @@ router.put(
         const siteId = data.sharePointSiteId !== undefined ? data.sharePointSiteId : existingDocument.sharePointSiteId;
         const driveId = data.sharePointDriveId !== undefined ? data.sharePointDriveId : existingDocument.sharePointDriveId;
         const itemId = data.sharePointItemId !== undefined ? data.sharePointItemId : existingDocument.sharePointItemId;
-        
+
         if (siteId && driveId && itemId) {
           try {
             const accessToken = req.headers['x-graph-token'] as string;
@@ -545,7 +545,7 @@ router.put(
       } else if (confluenceIdsChanged && storageLocation === 'CONFLUENCE') {
         const spaceKey = data.confluenceSpaceKey !== undefined ? data.confluenceSpaceKey : existingDocument.confluenceSpaceKey;
         const pageId = data.confluencePageId !== undefined ? data.confluencePageId : existingDocument.confluencePageId;
-        
+
         if (spaceKey && pageId) {
           try {
             if (config.confluence.baseUrl) {
@@ -634,27 +634,27 @@ router.post(
       const defaultType = defaults.type || 'OTHER';
       const defaultStatus = defaults.status || 'DRAFT';
       const defaultVersion = defaults.version || '1.0';
-      
+
       // Look up the user in the database using the email from the token
       // The req.user object has email/oid from the token, but we need the database user ID
       let ownerUserId = defaults.ownerUserId;
-      
+
       if (!ownerUserId && req.user?.email) {
         const user = await prisma.user.findUnique({
           where: { email: req.user.email },
         });
-        
+
         if (user) {
           ownerUserId = user.id;
         } else {
           console.warn('[Bulk Import] User not found in database:', req.user.email);
         }
       }
-      
+
       if (!ownerUserId) {
         return res.status(400).json({
           error: 'Owner user ID is required. User must be authenticated and exist in the database, or ownerUserId must be provided in defaults.',
-          details: req.user?.email 
+          details: req.user?.email
             ? `User with email ${req.user.email} not found in database`
             : 'No user email found in authentication token',
         });
@@ -719,13 +719,13 @@ router.post(
               sharePointItemId: itemId,
               updatedAt: new Date(),
             };
-            
+
             // Update document URL if available from SharePoint item
             if (sharePointItem.webUrl) {
               updateData.documentUrl = sharePointItem.webUrl;
               console.log('[Bulk Import] Updated document URL:', sharePointItem.webUrl);
             }
-            
+
             const document = await prisma.document.update({
               where: { id: existing.id },
               data: updateData,
@@ -739,7 +739,12 @@ router.post(
                 },
               },
             });
-            
+
+            // Invalidate PDF cache when document is updated
+            invalidateCache(existing.id).catch((err) => {
+              console.error('[Bulk Import] Error invalidating PDF cache:', err);
+            });
+
             results.push({
               itemId,
               name: sharePointItem.name,
@@ -761,13 +766,13 @@ router.post(
             sharePointDriveId: driveId,
             sharePointItemId: itemId,
           };
-          
+
           // Store document URL if available from SharePoint item
           if (sharePointItem.webUrl) {
             createData.documentUrl = sharePointItem.webUrl;
             console.log('[Bulk Import] Generated document URL:', sharePointItem.webUrl);
           }
-          
+
           const document = await prisma.document.create({
             data: createData,
             include: {
@@ -843,7 +848,7 @@ router.delete(
           await tx.documentRisk.deleteMany({
             where: { documentId: id },
           });
-          
+
           // Finally delete the document
           document = await tx.document.delete({
             where: { id },
@@ -864,12 +869,12 @@ router.delete(
         return res.status(404).json({ error: 'Document not found' });
       }
       if (error.code === 'P2034') {
-        return res.status(408).json({ 
+        return res.status(408).json({
           error: 'Delete operation timed out. The document may have too many related records.',
         });
       }
       console.error('Error deleting document:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to delete document',
         details: error.message,
       });

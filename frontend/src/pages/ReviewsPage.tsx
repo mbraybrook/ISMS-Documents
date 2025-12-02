@@ -1106,6 +1106,7 @@ export function ReviewsPage() {
         }}
         document={selectedDocumentForEdit}
         readOnly={false}
+        isReviewContext={true}
       />
 
       {/* Bulk Set Review Date Modal */}

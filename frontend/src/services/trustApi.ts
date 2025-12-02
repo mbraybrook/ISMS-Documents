@@ -263,6 +263,16 @@ export const trustApi = {
     return response.data;
   },
 
+  async getSettings(): Promise<{ watermarkPrefix: string }> {
+    const response = await apiInternal.get('/api/trust/admin/settings');
+    return response.data;
+  },
+
+  async updateSettings(settings: { watermarkPrefix: string }): Promise<{ watermarkPrefix: string }> {
+    const response = await apiInternal.put('/api/trust/admin/settings', settings);
+    return response.data;
+  },
+
   // Token helpers
   getToken,
   isTokenExpired,

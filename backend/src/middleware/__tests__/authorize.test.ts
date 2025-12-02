@@ -4,6 +4,17 @@ import { AuthRequest } from '../auth';
 import { createMockRequest, createMockResponse, createMockNext, mockUsers } from '../../lib/test-helpers';
 import { prisma } from '../../lib/prisma';
 
+// Mock logger to suppress expected error logs in tests
+jest.mock('../../lib/logger', () => ({
+  log: {
+    error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+    log: jest.fn(),
+  },
+}));
+
 // Mock Prisma
 jest.mock('../../lib/prisma', () => ({
   prisma: {

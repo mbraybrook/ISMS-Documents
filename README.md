@@ -1,8 +1,5 @@
 # ISMS Document Management and Compliance Application
 
-[![Tests](https://github.com/mbraybrook/ISMS-Documentation/workflows/Tests/badge.svg)](https://github.com/mbraybrook/ISMS-Documentation/actions)
-[![Coverage](https://codecov.io/gh/mbraybrook/ISMS-Documentation/branch/main/graph/badge.svg)](https://codecov.io/gh/mbraybrook/ISMS-Documentation)
-
 A web application that provides a "single pane of glass" over an organisation's ISMS documentation stored primarily in Microsoft SharePoint, with links to selected Confluence content.
 
 ## Architecture
