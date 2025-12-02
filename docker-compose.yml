@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: isms_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -8,13 +24,16 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=4000
-      - DATABASE_URL=file:./dev.db
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/isms_db?schema=public
+      - SEED_SCOPE=full
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - ./backend/dev.db:/app/dev.db
-    command: npm run dev
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm start"
     working_dir: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   frontend:
     build:
@@ -29,4 +48,7 @@ services:
     working_dir: /app
     depends_on:
       - backend
+
+volumes:
+  postgres_data:
 

@@ -24,3 +24,4 @@ export function TrustCategorySection({ category, documents }: TrustCategorySecti
   );
 }
 
+

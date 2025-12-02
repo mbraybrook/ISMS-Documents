@@ -17,6 +17,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useTrustAuth } from '../contexts/TrustAuthContext';
 import { trustApi } from '../services/trustApi';
+import { DataSensitivityFooter } from '../components/DataSensitivityFooter';
 
 export function TrustCenterLoginPage() {
   const navigate = useNavigate();
@@ -45,7 +46,7 @@ export function TrustCenterLoginPage() {
           duration: 3000,
           isClosable: true,
         });
-        navigate('/private');
+        navigate('/');
       } else {
         await trustApi.register(formData.email, formData.password, formData.companyName);
         toast({
@@ -76,102 +77,105 @@ export function TrustCenterLoginPage() {
   };
 
   return (
-    <Container maxW="md" py={8}>
-      <VStack spacing={6} align="stretch">
-        <Box textAlign="center">
-          <Heading size="lg" mb={2}>
-            {isLogin ? 'Login' : 'Register'}
-          </Heading>
-          <Text color="gray.600">
-            {isLogin ? 'Access your private documents' : 'Create a new account'}
-          </Text>
-        </Box>
+    <>
+      <Container maxW="md" py={8}>
+        <VStack spacing={6} align="stretch">
+          <Box textAlign="center">
+            <Heading size="lg" mb={2}>
+              {isLogin ? 'Login' : 'Register'}
+            </Heading>
+            <Text color="gray.600">
+              {isLogin ? 'Access your private documents' : 'Create a new account'}
+            </Text>
+          </Box>
 
-        <form onSubmit={handleSubmit}>
-          <VStack spacing={4}>
-            <FormControl isInvalid={!!errors.email}>
-              <FormLabel>Email</FormLabel>
-              <Input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-              />
-              {errors.email && <FormErrorMessage>{errors.email}</FormErrorMessage>}
-            </FormControl>
-
-            <FormControl isInvalid={!!errors.password}>
-              <FormLabel>Password</FormLabel>
-              <Input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-              />
-              {errors.password && <FormErrorMessage>{errors.password}</FormErrorMessage>}
-            </FormControl>
-
-            {!isLogin && (
-              <FormControl isInvalid={!!errors.companyName}>
-                <FormLabel>Company Name</FormLabel>
+          <form onSubmit={handleSubmit}>
+            <VStack spacing={4}>
+              <FormControl isInvalid={!!errors.email}>
+                <FormLabel>Email</FormLabel>
                 <Input
-                  type="text"
-                  value={formData.companyName}
-                  onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
                 />
-                {errors.companyName && <FormErrorMessage>{errors.companyName}</FormErrorMessage>}
+                {errors.email && <FormErrorMessage>{errors.email}</FormErrorMessage>}
               </FormControl>
-            )}
 
-            {isLogin && (
-              <HStack justify="flex-end" w="100%">
-                <Link
-                  color="blue.500"
-                  onClick={() => {
-                    // TODO: Implement forgot password flow
-                    toast({
-                      title: 'Forgot Password',
-                      description: 'Please contact support to reset your password.',
-                      status: 'info',
-                      duration: 5000,
-                      isClosable: true,
-                    });
-                  }}
-                >
-                  Forgot password?
-                </Link>
-              </HStack>
-            )}
+              <FormControl isInvalid={!!errors.password}>
+                <FormLabel>Password</FormLabel>
+                <Input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                />
+                {errors.password && <FormErrorMessage>{errors.password}</FormErrorMessage>}
+              </FormControl>
 
-            <Button
-              type="submit"
-              colorScheme="blue"
-              width="100%"
-              isLoading={loading}
-              loadingText={isLogin ? 'Logging in...' : 'Registering...'}
-            >
-              {isLogin ? 'Login' : 'Register'}
-            </Button>
-          </VStack>
-        </form>
+              {!isLogin && (
+                <FormControl isInvalid={!!errors.companyName}>
+                  <FormLabel>Company Name</FormLabel>
+                  <Input
+                    type="text"
+                    value={formData.companyName}
+                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                    required
+                  />
+                  {errors.companyName && <FormErrorMessage>{errors.companyName}</FormErrorMessage>}
+                </FormControl>
+              )}
 
-        <HStack justify="center">
-          <Text>
-            {isLogin ? "Don't have an account? " : 'Already have an account? '}
-            <Link color="blue.500" onClick={() => setIsLogin(!isLogin)}>
-              {isLogin ? 'Register' : 'Login'}
+              {isLogin && (
+                <HStack justify="flex-end" w="100%">
+                  <Link
+                    color="blue.500"
+                    onClick={() => {
+                      // TODO: Implement forgot password flow
+                      toast({
+                        title: 'Forgot Password',
+                        description: 'Please contact support to reset your password.',
+                        status: 'info',
+                        duration: 5000,
+                        isClosable: true,
+                      });
+                    }}
+                  >
+                    Forgot password?
+                  </Link>
+                </HStack>
+              )}
+
+              <Button
+                type="submit"
+                colorScheme="blue"
+                width="100%"
+                isLoading={loading}
+                loadingText={isLogin ? 'Logging in...' : 'Registering...'}
+              >
+                {isLogin ? 'Login' : 'Register'}
+              </Button>
+            </VStack>
+          </form>
+
+          <HStack justify="center">
+            <Text>
+              {isLogin ? "Don't have an account? " : 'Already have an account? '}
+              <Link color="blue.500" onClick={() => setIsLogin(!isLogin)}>
+                {isLogin ? 'Register' : 'Login'}
+              </Link>
+            </Text>
+          </HStack>
+
+          <HStack justify="center">
+            <Link color="blue.500" onClick={() => navigate('/')}>
+              Back to Trust Center
             </Link>
-          </Text>
-        </HStack>
-
-        <HStack justify="center">
-          <Link color="blue.500" onClick={() => navigate('/')}>
-            Back to Trust Center
-          </Link>
-        </HStack>
-      </VStack>
-    </Container>
+          </HStack>
+        </VStack>
+      </Container>
+      <DataSensitivityFooter />
+    </>
   );
 }
 

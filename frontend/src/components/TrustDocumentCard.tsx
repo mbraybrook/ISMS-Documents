@@ -1,4 +1,4 @@
-import { Box, Card, CardBody, Heading, Text, Button, Badge, HStack, VStack, Spinner } from '@chakra-ui/react';
+import { Box, Card, CardBody, Heading, Text, Button, Badge, HStack, VStack, Spinner, Flex } from '@chakra-ui/react';
 import { DownloadIcon, LockIcon } from '@chakra-ui/icons';
 import { trustApi } from '../services/trustApi';
 import { useToast } from '@chakra-ui/react';
@@ -10,7 +10,7 @@ interface TrustDocumentCardProps {
   onDownload?: () => void;
 }
 
-export function TrustDocumentCard({ document, onDownload }: TrustDocumentCardProps) {
+function TrustDocumentCard({ document, onDownload }: TrustDocumentCardProps) {
   const toast = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -81,7 +81,8 @@ export function TrustDocumentCard({ document, onDownload }: TrustDocumentCardPro
               <HStack spacing={2}>
                 <Heading size="md">{document.title}</Heading>
                 {isPrivate && (
-                  <Badge colorScheme="purple" leftIcon={<LockIcon />}>
+                  <Badge colorScheme="purple" display="inline-flex" alignItems="center" gap={1}>
+                    <LockIcon boxSize={3} />
                     Private
                   </Badge>
                 )}
@@ -124,4 +125,6 @@ export function TrustDocumentCard({ document, onDownload }: TrustDocumentCardPro
     </Card>
   );
 }
+
+export { TrustDocumentCard };
 

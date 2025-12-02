@@ -12,3 +12,4 @@ ALTER TABLE "InterestedParty" ADD COLUMN "theirObligations" TEXT;
 UPDATE "InterestedParty" SET "dateAdded" = "createdAt" WHERE "dateAdded" IS NULL;
 
 
+

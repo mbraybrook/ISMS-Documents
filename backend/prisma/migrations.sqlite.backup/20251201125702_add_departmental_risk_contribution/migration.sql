@@ -77,3 +77,4 @@ PRAGMA foreign_keys=ON;
 CREATE INDEX "Risk_department_idx" ON "Risk"("department");
 CREATE INDEX "Risk_status_idx" ON "Risk"("status");
 
+

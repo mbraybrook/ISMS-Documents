@@ -27,7 +27,6 @@ import { UsersPage } from './pages/UsersPage'
 import { TrustAuthProvider } from './contexts/TrustAuthContext'
 import { TrustCenterPage } from './pages/TrustCenterPage'
 import { TrustCenterLoginPage } from './pages/TrustCenterLoginPage'
-import { TrustCenterPrivatePage } from './pages/TrustCenterPrivatePage'
 import { TrustCenterAdminPage } from './pages/TrustCenterAdminPage'
 
 function App() {
@@ -49,14 +48,6 @@ function App() {
             element={
               <TrustAuthProvider>
                 <TrustCenterLoginPage />
-              </TrustAuthProvider>
-            }
-          />
-          <Route
-            path="/private"
-            element={
-              <TrustAuthProvider>
-                <TrustCenterPrivatePage />
               </TrustAuthProvider>
             }
           />
