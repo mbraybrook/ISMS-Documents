@@ -474,6 +474,7 @@ export function SupplierReviewModal({
                     <option value="CERTIFIED">Certified</option>
                     <option value="NOT_CERTIFIED">Not Certified</option>
                     <option value="IN_PROGRESS">In Progress</option>
+                    <option value="NOT_APPLICABLE">Not Applicable</option>
                   </Select>
                 </FormControl>
                 <FormControl>
@@ -486,6 +487,7 @@ export function SupplierReviewModal({
                     <option value="CERTIFIED">Certified</option>
                     <option value="NOT_CERTIFIED">Not Certified</option>
                     <option value="IN_PROGRESS">In Progress</option>
+                    <option value="NOT_APPLICABLE">Not Applicable</option>
                   </Select>
                 </FormControl>
                 <FormControl>
@@ -498,6 +500,7 @@ export function SupplierReviewModal({
                     <option value="CERTIFIED">Certified</option>
                     <option value="NOT_CERTIFIED">Not Certified</option>
                     <option value="IN_PROGRESS">In Progress</option>
+                    <option value="NOT_APPLICABLE">Not Applicable</option>
                   </Select>
                 </FormControl>
                 <FormControl>

@@ -507,6 +507,7 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
                   <option value="CERTIFIED">Certified</option>
                   <option value="NOT_CERTIFIED">Not Certified</option>
                   <option value="IN_PROGRESS">In Progress</option>
+                  <option value="NOT_APPLICABLE">Not Applicable</option>
                 </Select>
               </FormControl>
 
@@ -520,6 +521,7 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
                   <option value="CERTIFIED">Certified</option>
                   <option value="NOT_CERTIFIED">Not Certified</option>
                   <option value="IN_PROGRESS">In Progress</option>
+                  <option value="NOT_APPLICABLE">Not Applicable</option>
                 </Select>
               </FormControl>
 
@@ -533,6 +535,7 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
                   <option value="CERTIFIED">Certified</option>
                   <option value="NOT_CERTIFIED">Not Certified</option>
                   <option value="IN_PROGRESS">In Progress</option>
+                  <option value="NOT_APPLICABLE">Not Applicable</option>
                 </Select>
               </FormControl>
 

@@ -48,7 +48,7 @@ export function Layout({ children }: LayoutProps) {
                 <>
                   {/* Role Switcher for Admin users */}
                   <RoleSwitcher />
-                  
+
                   {effectiveRole === 'STAFF' ? (
                     // Simplified navigation for STAFF users
                     <>
@@ -81,39 +81,39 @@ export function Layout({ children }: LayoutProps) {
                   ) : (
                     // Full navigation for ADMIN/EDITOR
                     <>
+                      {/* Documents Menu */}
                       <Menu>
-                        <MenuButton 
-                          as={Button} 
-                          rightIcon={<ChevronDownIcon />} 
-                          size="sm" 
-                          variant="ghost" 
+                        <MenuButton
+                          as={Button}
+                          rightIcon={<ChevronDownIcon />}
+                          size="sm"
+                          variant="ghost"
                           fontSize="sm"
                         >
                           <Box as="span" mr={2}>
-                            Document Management
+                            Documents
                           </Box>
                         </MenuButton>
                         <MenuList>
                           <MenuItem as={RouterLink} to="/admin/documents/documents">
-                            Documents
+                            Library
                           </MenuItem>
                           <MenuItem as={RouterLink} to="/admin/documents/acknowledgments">
-                            Acknowledgment
+                            Acknowledgments
                           </MenuItem>
                           <MenuItem as={RouterLink} to="/admin/documents/reviews">
                             Reviews
                           </MenuItem>
-                          <MenuItem as={RouterLink} to="/admin/trust">
-                            Trust Center
-                          </MenuItem>
                         </MenuList>
                       </Menu>
+
+                      {/* Risk Management Menu */}
                       <Menu>
-                        <MenuButton 
-                          as={Button} 
-                          rightIcon={<ChevronDownIcon />} 
-                          size="sm" 
-                          variant="ghost" 
+                        <MenuButton
+                          as={Button}
+                          rightIcon={<ChevronDownIcon />}
+                          size="sm"
+                          variant="ghost"
                           fontSize="sm"
                         >
                           <Box as="span" mr={2}>
@@ -122,7 +122,7 @@ export function Layout({ children }: LayoutProps) {
                         </MenuButton>
                         <MenuList>
                           <MenuItem as={RouterLink} to="/admin/risks/risks">
-                            Risks
+                            Risk Register
                           </MenuItem>
                           <MenuItem as={RouterLink} to="/admin/risks/review">
                             Review Inbox
@@ -135,24 +135,23 @@ export function Layout({ children }: LayoutProps) {
                           <MenuItem as={RouterLink} to="/admin/risks/controls">
                             Controls
                           </MenuItem>
-                          <MenuItem as={RouterLink} to="/admin/risks/interested-parties">
-                            Interested Parties
-                          </MenuItem>
-                          <MenuItem as={RouterLink} to="/admin/risks/legislation">
-                            Legislation
+                          <MenuItem as={RouterLink} to="/admin/soa">
+                            Statement of Applicability
                           </MenuItem>
                         </MenuList>
                       </Menu>
+
+                      {/* Organization Menu */}
                       <Menu>
-                        <MenuButton 
-                          as={Button} 
-                          rightIcon={<ChevronDownIcon />} 
-                          size="sm" 
-                          variant="ghost" 
+                        <MenuButton
+                          as={Button}
+                          rightIcon={<ChevronDownIcon />}
+                          size="sm"
+                          variant="ghost"
                           fontSize="sm"
                         >
                           <Box as="span" mr={2}>
-                            Asset Management
+                            Organization
                           </Box>
                         </MenuButton>
                         <MenuList>
@@ -162,19 +161,42 @@ export function Layout({ children }: LayoutProps) {
                           <MenuItem as={RouterLink} to="/admin/assets/asset-categories">
                             Asset Categories
                           </MenuItem>
+                          <MenuItem as={RouterLink} to="/admin/suppliers">
+                            Suppliers
+                          </MenuItem>
+                          <MenuItem as={RouterLink} to="/admin/risks/interested-parties">
+                            Interested Parties
+                          </MenuItem>
+                          <MenuItem as={RouterLink} to="/admin/risks/legislation">
+                            Legislation
+                          </MenuItem>
                         </MenuList>
                       </Menu>
-                      <Link as={RouterLink} to="/admin/soa" fontSize="sm">
-                        SoA Export
-                      </Link>
-                      <Link as={RouterLink} to="/admin/suppliers" fontSize="sm">
-                        Suppliers
-                      </Link>
-                      {effectiveRole === 'ADMIN' && (
-                        <Link as={RouterLink} to="/admin/users" fontSize="sm">
-                          User Management
-                        </Link>
-                      )}
+
+                      {/* System Menu */}
+                      <Menu>
+                        <MenuButton
+                          as={Button}
+                          rightIcon={<ChevronDownIcon />}
+                          size="sm"
+                          variant="ghost"
+                          fontSize="sm"
+                        >
+                          <Box as="span" mr={2}>
+                            System
+                          </Box>
+                        </MenuButton>
+                        <MenuList>
+                          <MenuItem as={RouterLink} to="/admin/trust">
+                            Trust Center
+                          </MenuItem>
+                          {effectiveRole === 'ADMIN' && (
+                            <MenuItem as={RouterLink} to="/admin/users">
+                              User Management
+                            </MenuItem>
+                          )}
+                        </MenuList>
+                      </Menu>
                     </>
                   )}
                   <Text fontSize="sm" color="gray.600">
