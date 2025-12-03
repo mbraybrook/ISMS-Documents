@@ -469,16 +469,16 @@ router.put(
     }).withMessage('pciStatus must be UNKNOWN, PASS, FAIL, or NOT_APPLICABLE'),
     body('iso27001Status').optional().custom((value) => {
       if (value === null || value === undefined) return true;
-      return ['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS'].includes(value);
-    }).withMessage('iso27001Status must be UNKNOWN, CERTIFIED, NOT_CERTIFIED, or IN_PROGRESS'),
+      return ['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS', 'NOT_APPLICABLE'].includes(value);
+    }).withMessage('iso27001Status must be UNKNOWN, CERTIFIED, NOT_CERTIFIED, IN_PROGRESS, or NOT_APPLICABLE'),
     body('iso22301Status').optional().custom((value) => {
       if (value === null || value === undefined) return true;
-      return ['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS'].includes(value);
-    }).withMessage('iso22301Status must be UNKNOWN, CERTIFIED, NOT_CERTIFIED, or IN_PROGRESS'),
+      return ['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS', 'NOT_APPLICABLE'].includes(value);
+    }).withMessage('iso22301Status must be UNKNOWN, CERTIFIED, NOT_CERTIFIED, IN_PROGRESS, or NOT_APPLICABLE'),
     body('iso9001Status').optional().custom((value) => {
       if (value === null || value === undefined) return true;
-      return ['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS'].includes(value);
-    }).withMessage('iso9001Status must be UNKNOWN, CERTIFIED, NOT_CERTIFIED, or IN_PROGRESS'),
+      return ['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS', 'NOT_APPLICABLE'].includes(value);
+    }).withMessage('iso9001Status must be UNKNOWN, CERTIFIED, NOT_CERTIFIED, IN_PROGRESS, or NOT_APPLICABLE'),
     body('gdprStatus').optional().custom((value) => {
       if (value === null || value === undefined) return true;
       return ['UNKNOWN', 'ADEQUATE', 'HIGH_RISK', 'NOT_APPLICABLE'].includes(value);

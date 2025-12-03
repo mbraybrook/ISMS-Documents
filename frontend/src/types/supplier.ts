@@ -6,7 +6,7 @@ export type CiaImpact = 'LOW' | 'MEDIUM' | 'HIGH';
 export type RiskRating = 'LOW' | 'MEDIUM' | 'HIGH';
 export type Criticality = 'LOW' | 'MEDIUM' | 'HIGH';
 export type PciStatus = 'UNKNOWN' | 'PASS' | 'FAIL' | 'NOT_APPLICABLE';
-export type IsoStatus = 'UNKNOWN' | 'CERTIFIED' | 'NOT_CERTIFIED' | 'IN_PROGRESS';
+export type IsoStatus = 'UNKNOWN' | 'CERTIFIED' | 'NOT_CERTIFIED' | 'IN_PROGRESS' | 'NOT_APPLICABLE';
 export type GdprStatus = 'UNKNOWN' | 'ADEQUATE' | 'HIGH_RISK' | 'NOT_APPLICABLE';
 export type PerformanceRating = 'GOOD' | 'CAUTION' | 'BAD';
 export type AssessmentStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
@@ -82,6 +82,7 @@ export function getIsoStatusDisplayName(status: IsoStatus | null | undefined): s
     CERTIFIED: 'Certified',
     NOT_CERTIFIED: 'Not Certified',
     IN_PROGRESS: 'In Progress',
+    NOT_APPLICABLE: 'Not Applicable',
   };
   return displayNames[status] || status;
 }

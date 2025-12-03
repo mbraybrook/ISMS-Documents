@@ -254,9 +254,9 @@ router.post(
     }),
     // Compliance fields
     body('pciStatus').optional().isIn(['UNKNOWN', 'PASS', 'FAIL', 'NOT_APPLICABLE']),
-    body('iso27001Status').optional().isIn(['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS']),
-    body('iso22301Status').optional().isIn(['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS']),
-    body('iso9001Status').optional().isIn(['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS']),
+    body('iso27001Status').optional().isIn(['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS', 'NOT_APPLICABLE']),
+    body('iso22301Status').optional().isIn(['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS', 'NOT_APPLICABLE']),
+    body('iso9001Status').optional().isIn(['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS', 'NOT_APPLICABLE']),
     body('gdprStatus').optional().isIn(['UNKNOWN', 'ADEQUATE', 'HIGH_RISK', 'NOT_APPLICABLE']),
     body('complianceEvidenceLinks').optional().custom((value) => {
       if (value === null || value === undefined) return true;
