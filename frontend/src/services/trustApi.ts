@@ -273,6 +273,18 @@ export const trustApi = {
     return response.data;
   },
 
+  // Suppliers - public endpoint (no auth required)
+  async getSuppliers(): Promise<Array<{
+    id: string;
+    displayName: string;
+    description: string;
+    category: string;
+    complianceSummary: string | null;
+  }>> {
+    const response = await axios.get(`${API_URL}/suppliers`);
+    return response.data.suppliers;
+  },
+
   // Token helpers
   getToken,
   isTokenExpired,

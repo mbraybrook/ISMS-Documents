@@ -1,2 +1,0 @@
--- This is a workaround script to create the schema directly
--- Run this with: psql postgresql://postgres:postgres@localhost:5433/isms_db -f create_schema.sql

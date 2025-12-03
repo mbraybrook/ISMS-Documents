@@ -10,3 +10,21 @@ body {
   min-height: 100vh;
 }
 
+/* Remove visual debugging artifacts in production */
+:not(.chakra-ui-focus):not([data-focus-visible-added]) {
+  outline: none !important;
+}
+
+/* Prevent React DevTools and accessibility testing tool highlights */
+[data-react-devtools-highlight],
+[data-testid] {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Only show focus outlines for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid var(--chakra-colors-blue-500);
+  outline-offset: 2px;
+}
+
