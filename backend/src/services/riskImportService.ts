@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import { randomUUID } from 'crypto';
 import { prisma } from '../lib/prisma';
 import { calculateRiskScore, calculateMitigatedScore, parseControlCodes, updateRiskControls } from './riskService';
+import { computeAndStoreEmbedding } from './embeddingService';
+import { ConcurrencyLimiter } from '../utils/concurrencyLimiter';
 
 interface CSVRow {
   '#': string;
@@ -189,6 +191,10 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
     errors: [],
   };
   
+  // Concurrency limiter for embedding computation (2-4 concurrent)
+  const embeddingLimiter = new ConcurrencyLimiter(3);
+  const embeddingPromises: Promise<void>[] = [];
+  
   try {
     let rows: CSVRow[];
     if (Buffer.isBuffer(csvFilePathOrContent)) {
@@ -369,6 +375,17 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
           }
         }
         
+        // Compute embedding with concurrency limit (best-effort, non-blocking)
+        const title = riskDescription || `Risk ${riskNumber}`;
+        const threatDescription = (row['Threat Description'] || '').trim() || null;
+        const description = riskDescription || null;
+        
+        embeddingPromises.push(
+          embeddingLimiter.execute(async () => {
+            await computeAndStoreEmbedding(riskId, title, threatDescription, description);
+          })
+        );
+        
         result.success++;
       } catch (error: any) {
         result.errors.push({
@@ -378,6 +395,9 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
         result.failed++;
       }
     }
+    
+    // Wait for all embedding computations to complete (best-effort)
+    await Promise.allSettled(embeddingPromises);
     
     return result;
   } catch (error: any) {

@@ -6,9 +6,37 @@ export interface SimilarityResult {
 }
 
 /**
+ * Normalize and combine risk text for embedding generation
+ * Truncates to maxEmbeddingTextLength and normalizes case
+ */
+export function normalizeRiskText(
+  title: string,
+  threatDescription?: string | null,
+  description?: string | null,
+): string {
+  const parts = [
+    title || '',
+    threatDescription || '',
+    description || '',
+  ]
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => t.length > 0);
+
+  let combined = parts.join('\n\n');
+  const maxLen = config.llm.maxEmbeddingTextLength;
+  if (combined.length > maxLen) {
+    combined = combined.slice(0, maxLen);
+  }
+  return combined;
+}
+
+/**
  * Generate embedding for text using Ollama
  */
-async function generateEmbedding(text: string): Promise<number[] | null> {
+export async function generateEmbedding(text: string): Promise<number[] | null> {
+  const normalized = text.trim();
+  if (!normalized) return null;
+
   try {
     // Ollama embeddings API format
     const response = await fetch(`${config.llm.baseUrl}/api/embeddings`, {
@@ -17,15 +45,15 @@ async function generateEmbedding(text: string): Promise<number[] | null> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: config.llm.model,
-        prompt: text, // Ollama uses 'prompt' not 'input'
+        model: config.llm.embeddingModel,
+        prompt: normalized, // Ollama uses 'prompt' not 'input'
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[Embedding Error] HTTP ${response.status}: ${errorText}`);
-      console.error(`[Embedding Error] Model '${config.llm.model}' may not support embeddings.`);
+      console.error(`[Embedding Error] Model '${config.llm.embeddingModel}' may not support embeddings.`);
       console.error(`[Embedding Error] Try installing an embedding model: ollama pull nomic-embed-text`);
       return null;
     }
@@ -36,19 +64,17 @@ async function generateEmbedding(text: string): Promise<number[] | null> {
     const embedding = (data as any).embedding;
     
     if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
-      console.error(`[Embedding Error] Model '${config.llm.model}' returned empty embeddings.`);
+      console.error(`[Embedding Error] Model '${config.llm.embeddingModel}' returned empty embeddings.`);
       console.error(`[Embedding Error] This model does not support embeddings. Install an embedding model:`);
       console.error(`[Embedding Error]   ollama pull nomic-embed-text`);
-      console.error(`[Embedding Error] Then set LLM_MODEL=nomic-embed-text in your .env file`);
+      console.error(`[Embedding Error] Then set LLM_EMBEDDING_MODEL=nomic-embed-text in your .env file`);
       return null;
     }
-    
-    console.log(`[Embedding] Generated embedding of length ${embedding.length} for text: "${text.substring(0, 50)}..."`);
     
     return embedding;
   } catch (error: any) {
     console.error('[Embedding Error] Failed to generate embedding:', error.message);
-    console.error(`[Embedding Error] Make sure Ollama is running and model '${config.llm.model}' supports embeddings`);
+    console.error(`[Embedding Error] Make sure Ollama is running and model '${config.llm.embeddingModel}' supports embeddings`);
     return null;
   }
 }
@@ -56,7 +82,7 @@ async function generateEmbedding(text: string): Promise<number[] | null> {
 /**
  * Calculate cosine similarity between two vectors
  */
-function cosineSimilarity(vec1: number[], vec2: number[]): number {
+export function cosineSimilarity(vec1: number[], vec2: number[]): number {
   if (vec1.length !== vec2.length) {
     throw new Error('Vectors must have the same length');
   }
@@ -85,7 +111,7 @@ function cosineSimilarity(vec1: number[], vec2: number[]): number {
  * We map directly: 0 → 0%, 1 → 100%
  * If somehow we get negative values (shouldn't happen with normalized embeddings), we clamp to 0
  */
-function mapToScore(cosineSimilarity: number): number {
+export function mapToScore(cosineSimilarity: number): number {
   // Clamp to [0, 1] range (embeddings should never be negative, but handle edge cases)
   const clamped = Math.max(0, Math.min(1, cosineSimilarity));
   // Map directly to 0-100
@@ -123,26 +149,30 @@ function calculateTextSimilarity(text1: string, text2: string): number {
 
 /**
  * Calculate similarity score between two risks using embeddings
+ * Note: This function does NOT call chat fallback - that decision belongs to the caller
  */
 export async function calculateSimilarityScore(
-  risk1: { title: string; threatDescription?: string | null; description?: string | null },
-  risk2: { title: string; threatDescription?: string | null; description?: string | null }
-): Promise<SimilarityResult> {
+  risk1: { title: string; threatDescription?: string | null; description?: string | null; embedding?: number[] | null },
+  risk2: { title: string; threatDescription?: string | null; description?: string | null; embedding?: number[] | null }
+): Promise<SimilarityResult | null> {
   try {
-    const text1 = combineRiskText(risk1.title, risk1.threatDescription, risk1.description);
-    const text2 = combineRiskText(risk2.title, risk2.threatDescription, risk2.description);
+    // Use stored embeddings if available, otherwise generate
+    let embedding1: number[] | null = risk1.embedding || null;
+    let embedding2: number[] | null = risk2.embedding || null;
 
-    // Generate embeddings
-    const [embedding1, embedding2] = await Promise.all([
-      generateEmbedding(text1),
-      generateEmbedding(text2),
-    ]);
+    if (!embedding1) {
+      const text1 = normalizeRiskText(risk1.title, risk1.threatDescription, risk1.description);
+      embedding1 = await generateEmbedding(text1);
+    }
 
-    // Check if embeddings were generated successfully
+    if (!embedding2) {
+      const text2 = normalizeRiskText(risk2.title, risk2.threatDescription, risk2.description);
+      embedding2 = await generateEmbedding(text2);
+    }
+
+    // If embeddings failed, return null (caller decides on fallback)
     if (!embedding1 || !embedding2) {
-      // Fallback to chat-based approach if embeddings failed
-      console.warn('Embedding generation failed, trying chat-based approach');
-      return calculateSimilarityScoreChat(risk1, risk2);
+      return null;
     }
 
     // Calculate cosine similarity
@@ -166,16 +196,16 @@ export async function calculateSimilarityScore(
       matchedFields,
     };
   } catch (error: any) {
-    // Fallback to chat-based approach if embeddings fail
-    console.warn('Embedding approach failed, trying chat-based approach:', error.message);
-    return calculateSimilarityScoreChat(risk1, risk2);
+    console.error('[Similarity] Error calculating similarity score:', error.message);
+    return null;
   }
 }
 
 /**
- * Calculate similarity score using chat-based approach (fallback)
+ * Calculate similarity score using chat-based approach
+ * This should only be called by similarityService for small candidate sets
  */
-async function calculateSimilarityScoreChat(
+export async function calculateSimilarityScoreChat(
   risk1: { title: string; threatDescription?: string | null; description?: string | null },
   risk2: { title: string; threatDescription?: string | null; description?: string | null }
 ): Promise<SimilarityResult> {
@@ -269,7 +299,7 @@ Respond with ONLY a JSON object:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: config.llm.model,
+        model: config.llm.chatModel,
         messages: [
           {
             role: 'user',
@@ -312,6 +342,7 @@ Respond with ONLY a JSON object:
         }
         
         console.log(`[Similarity Chat] LLM score: ${parsed.score || 0} -> adjusted: ${Math.round(score)}, reasoning: ${parsed.reasoning || 'N/A'}`);
+        console.log(`[Similarity Chat] Chat fallback used - this should be rare`);
         return {
           score: Math.round(score),
           matchedFields: parsed.matchedFields || [],
@@ -342,175 +373,55 @@ Respond with ONLY a JSON object:
 }
 
 /**
- * Find similar risks by comparing a risk text against multiple risks
+ * Find similar risks by comparing a risk text against multiple risks with stored embeddings
+ * Note: This function does NOT call chat fallback - that decision belongs to the caller
  */
 export async function findSimilarRisks(
   riskText: string,
-  existingRisks: Array<{ id: string; title: string; threatDescription?: string | null; description?: string | null }>
+  existingRisks: Array<{ id: string; title: string; threatDescription?: string | null; description?: string | null; embedding: number[] | null }>
 ): Promise<Array<{ riskId: string; score: number; matchedFields: string[] }>> {
   if (existingRisks.length === 0) {
     return [];
   }
 
   try {
-    // Try embeddings approach first (much faster and more accurate)
+    // Generate embedding for input text once
     const inputEmbedding = await generateEmbedding(riskText);
     
-    // If embeddings failed (model doesn't support them), provide helpful error and fall back
+    // If input embedding failed, return empty array (caller decides on fallback)
     if (!inputEmbedding) {
-      console.error('[Similarity] Embeddings not available - model does not support embeddings');
-      console.error('[Similarity] For better performance and accuracy, use an embedding model:');
-      console.error('[Similarity]   1. Run: ollama pull nomic-embed-text');
-      console.error('[Similarity]   2. Set LLM_MODEL=nomic-embed-text in .env');
-      console.error('[Similarity] Falling back to slow chat-based approach...');
-      return findSimilarRisksChat(riskText, existingRisks);
+      return [];
     }
 
-    // Generate embeddings for all existing risks in batches for progress tracking
-    // Process in batches of 50 to allow progress updates
-    const BATCH_SIZE = 50;
-    const totalRisks = existingRisks.length;
-    console.log(`[Similarity] Comparing against ${totalRisks} risks using embeddings (processing in batches of ${BATCH_SIZE})...`);
-    
-    const existingEmbeddings: (number[] | null)[] = [];
-    for (let i = 0; i < existingRisks.length; i += BATCH_SIZE) {
-      const batch = existingRisks.slice(i, i + BATCH_SIZE);
-      const batchEmbeddings = await Promise.all(
-        batch.map((risk) =>
-          generateEmbedding(combineRiskText(risk.title, risk.threatDescription, risk.description))
-        )
-      );
-      existingEmbeddings.push(...batchEmbeddings);
-      const progress = Math.min(100, Math.round(((i + batch.length) / totalRisks) * 100));
-      console.log(`[Similarity Progress] ${progress}% - Processed ${i + batch.length} of ${totalRisks} risks`);
-    }
+    // Calculate similarities using stored embeddings
+    const results: Array<{ riskId: string; score: number; matchedFields: string[] }> = [];
 
-    // Check if any embeddings failed
-    const hasValidEmbeddings = existingEmbeddings.some(e => e !== null);
-    if (!hasValidEmbeddings) {
-      console.error('[Similarity] Embeddings not available for comparison risks');
-      console.error('[Similarity] Falling back to slow chat-based approach');
-      return findSimilarRisksChat(riskText, existingRisks);
-    }
-    
-    // Filter out any null embeddings (shouldn't happen if we checked above, but be safe)
-    // Filter out null embeddings and corresponding risks, keeping them in sync
-    const validPairs: Array<{ embedding: number[]; risk: typeof existingRisks[0] }> = [];
-    for (let i = 0; i < existingEmbeddings.length; i++) {
-      const embedding = existingEmbeddings[i];
-      if (embedding !== null) {
-        validPairs.push({
-          embedding: embedding,
-          risk: existingRisks[i],
-        });
-      } else {
-        console.warn(`[Similarity] Skipping risk ${existingRisks[i].id} - embedding failed`);
-      }
-    }
+    for (const risk of existingRisks) {
+      // Skip risks without embeddings
+      if (!risk.embedding) continue;
 
-    // Calculate similarities using embeddings
-    console.log(`[Similarity] Calculating cosine similarity for ${validPairs.length} risks...`);
-    const similarities = validPairs.map(({ embedding, risk }) => {
-      const cosineSim = cosineSimilarity(inputEmbedding, embedding);
+      const cosineSim = cosineSimilarity(inputEmbedding, risk.embedding);
       const score = mapToScore(cosineSim);
 
       // Determine matched fields
       const matchedFields: string[] = [];
-      // Simple heuristic - could be improved
       if (riskText.toLowerCase().includes(risk.title.toLowerCase())) {
         matchedFields.push('title');
       }
 
-      // Debug logging
-      const riskTextForComparison = combineRiskText(risk.title, risk.threatDescription, risk.description);
-      const isIdentical = riskText.trim().toLowerCase() === riskTextForComparison.trim().toLowerCase();
-      
-      console.log(`[Similarity] Risk "${risk.title.substring(0, 50)}...": cosine=${cosineSim.toFixed(3)}, score=${Math.round(score)}${isIdentical ? ' [IDENTICAL]' : ''}`);
-      
-      if (isIdentical && cosineSim < 0.95) {
-        console.warn(`[Similarity Warning] Identical text but cosine=${cosineSim.toFixed(3)} (expected ~1.0)`);
-      }
-
-      return {
+      results.push({
         riskId: risk.id,
         score: Math.round(score),
         matchedFields,
-      };
-    });
+      });
+    }
 
     // Sort by score descending
-    return similarities.sort((a, b) => b.score - a.score);
+    return results.sort((a, b) => b.score - a.score);
   } catch (error: any) {
-    console.error('Error finding similar risks:', error);
-    // Fall back to chat-based approach on error
-    console.log('[Similarity] Error with embeddings, falling back to chat-based approach');
-    return findSimilarRisksChat(riskText, existingRisks);
+    console.error('[Similarity] Error finding similar risks:', error);
+    return [];
   }
 }
 
-/**
- * Find similar risks using chat-based approach (fallback when embeddings aren't available)
- * This parses the riskText back into components for better comparison
- * Note: This is slower than embeddings, so we limit to first 50 risks
- */
-async function findSimilarRisksChat(
-  riskText: string,
-  existingRisks: Array<{ id: string; title: string; threatDescription?: string | null; description?: string | null }>
-): Promise<Array<{ riskId: string; score: number; matchedFields: string[] }>> {
-  // Chat-based is slow (sequential LLM calls), so limit to 50 for performance
-  // If you need to compare all risks, use an embedding model instead
-  const risksToCompare = existingRisks.slice(0, 50);
-  if (existingRisks.length > 50) {
-    console.warn(`[Similarity Chat] Limiting to first 50 of ${existingRisks.length} risks (chat-based is slow). Use embeddings to compare all risks.`);
-  }
-  
-  // Parse riskText back into components (it was created with combineRiskText)
-  // Format: "Title: ... Threat: ... Description: ..."
-  const parseRiskText = (text: string) => {
-    const titleMatch = text.match(/Title:\s*(.+?)(?:\s+Threat:|$)/);
-    const threatMatch = text.match(/Threat:\s*(.+?)(?:\s+Description:|$)/);
-    const descMatch = text.match(/Description:\s*(.+)$/);
-    
-    return {
-      title: titleMatch ? titleMatch[1].trim() : text.split(' ').slice(0, 10).join(' '), // Fallback to first words
-      threatDescription: threatMatch ? threatMatch[1].trim() : null,
-      description: descMatch ? descMatch[1].trim() : null,
-    };
-  };
-  
-  const sourceRisk = parseRiskText(riskText);
-  
-  // Compare against each risk
-  const comparisons = await Promise.all(
-    risksToCompare.map(async (risk) => {
-      // Use the chat-based similarity calculation
-      const result = await calculateSimilarityScoreChat(
-        sourceRisk,
-        { title: risk.title, threatDescription: risk.threatDescription || null, description: risk.description || null }
-      );
-      
-      const matchedFields: string[] = [];
-      if (sourceRisk.title.toLowerCase().includes(risk.title.toLowerCase()) || 
-          risk.title.toLowerCase().includes(sourceRisk.title.toLowerCase())) {
-        matchedFields.push('title');
-      }
-      if (sourceRisk.threatDescription && risk.threatDescription) {
-        matchedFields.push('threatDescription');
-      }
-      if (sourceRisk.description && risk.description) {
-        matchedFields.push('description');
-      }
-      
-      console.log(`[Similarity Chat] Risk "${risk.title.substring(0, 50)}...": score=${result.score}`);
-      
-      return {
-        riskId: risk.id,
-        score: result.score,
-        matchedFields,
-      };
-    })
-  );
-  
-  return comparisons.sort((a, b) => b.score - a.score);
-}
 

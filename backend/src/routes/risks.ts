@@ -18,6 +18,7 @@ import {
 } from '../services/riskService';
 import { importRisksFromCSV } from '../services/riskImportService';
 import { findSimilarRisksForRisk, checkSimilarityForNewRisk } from '../services/similarityService';
+import { computeAndStoreEmbedding } from '../services/embeddingService';
 
 const router = Router();
 
@@ -616,6 +617,12 @@ router.post(
         await updateRiskControls(risk.id, controlCodes);
       }
 
+      // Compute and store embedding as best-effort side effect (after DB write, non-blocking)
+      // Risk creation succeeds even if embedding fails
+      computeAndStoreEmbedding(risk.id, title, threatDescription, description).catch((error) => {
+        console.error(`[Risk Create] Failed to compute embedding for risk ${risk.id}:`, error.message);
+      });
+
       // Fetch risk with controls and owner
       const riskWithControls = await prisma.risk.findUnique({
         where: { id: risk.id },
@@ -867,6 +874,24 @@ router.put(
       if (updateData.annexAControlsRaw !== undefined) {
         const controlCodes = parseControlCodes(updateData.annexAControlsRaw);
         await updateRiskControls(risk.id, controlCodes);
+      }
+
+      // Recompute embedding if title, threatDescription, or description changed
+      // This is a best-effort side effect (after DB write, non-blocking)
+      // Risk update succeeds even if embedding fails
+      const textFieldsChanged = 
+        updateData.title !== undefined || 
+        updateData.threatDescription !== undefined || 
+        updateData.description !== undefined;
+      
+      if (textFieldsChanged) {
+        const finalTitle = updateData.title ?? existing.title;
+        const finalThreatDescription = updateData.threatDescription !== undefined ? updateData.threatDescription : existing.threatDescription;
+        const finalDescription = updateData.description !== undefined ? updateData.description : existing.description;
+        
+        computeAndStoreEmbedding(risk.id, finalTitle, finalThreatDescription, finalDescription).catch((error) => {
+          console.error(`[Risk Update] Failed to compute embedding for risk ${risk.id}:`, error.message);
+        });
       }
 
       // Fetch risk with controls and owner

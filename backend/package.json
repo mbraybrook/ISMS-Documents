@@ -20,6 +20,7 @@
     "db:studio": "./scripts/run-prisma.sh studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:status": "./scripts/run-prisma.sh migrate status",
+    "backfill-embeddings": "tsx scripts/backfill-embeddings.ts",
     "postinstall": "node scripts/setup-prisma-env.js"
   },
   "prisma": {
