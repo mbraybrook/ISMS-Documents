@@ -19,6 +19,8 @@ import { AssetsPage } from './pages/AssetsPage'
 import { AssetCategoriesPage } from './pages/AssetCategoriesPage'
 import { InterestedPartiesPage } from './pages/InterestedPartiesPage'
 import { LegislationPage } from './pages/LegislationPage'
+import { SuppliersPage } from './pages/SuppliersPage'
+import { SupplierDetailPage } from './pages/SupplierDetailPage'
 import { StaffHomePage } from './pages/StaffHomePage'
 import { StaffAcknowledgmentPage } from './pages/StaffAcknowledgmentPage'
 import { StaffDocumentsPage } from './pages/StaffDocumentsPage'
@@ -191,6 +193,26 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <LegislationPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/suppliers"
+            element={
+              <ProtectedRoute requiredRole="EDITOR">
+                <Layout>
+                  <SuppliersPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/suppliers/:id"
+            element={
+              <ProtectedRoute requiredRole="EDITOR">
+                <Layout>
+                  <SupplierDetailPage />
                 </Layout>
               </ProtectedRoute>
             }

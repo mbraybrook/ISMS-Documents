@@ -345,6 +345,19 @@ router.get(
               },
             },
           },
+          supplierRisks: {
+            include: {
+              supplier: {
+                select: {
+                  id: true,
+                  name: true,
+                  supplierType: true,
+                  criticality: true,
+                  status: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -406,6 +419,7 @@ router.post(
     body('wizardData').optional().isString(),
     body('status').optional().isIn(['DRAFT', 'PROPOSED', 'ACTIVE', 'REJECTED', 'ARCHIVED']),
     body('department').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING', null]),
+    body('isSupplierRisk').optional().isBoolean(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -456,6 +470,7 @@ router.post(
         wizardData,
         status,
         department,
+        isSupplierRisk,
       } = req.body;
 
       // Handle wizard data for Contributors
@@ -607,6 +622,7 @@ router.post(
           mitigationDescription,
           residualRiskTreatmentCategory,
           annexAControlsRaw,
+          isSupplierRisk: isSupplierRisk ?? false,
           updatedAt: new Date(),
         } as any, // Temporary: TypeScript types need server restart to pick up new Prisma schema
       });
@@ -704,6 +720,7 @@ router.put(
     body('wizardData').optional().isString(),
     body('rejectionReason').optional().isString(),
     body('mergedIntoRiskId').optional().isUUID(),
+    body('isSupplierRisk').optional().isBoolean(),
     query('testDepartment').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING']),
   ],
   validate,
@@ -1523,6 +1540,120 @@ router.post(
     } catch (error: any) {
       console.error('Error finding similar risks:', error);
       res.status(500).json({ error: error.message || 'Failed to find similar risks' });
+    }
+  }
+);
+
+// GET /api/risks/:id/suppliers - List suppliers linked to this risk
+router.get(
+  '/:id/suppliers',
+  authenticateToken,
+  [param('id').isUUID()],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const links = await prisma.supplierRiskLink.findMany({
+        where: { riskId: req.params.id },
+        include: {
+          supplier: {
+            select: {
+              id: true,
+              name: true,
+              supplierType: true,
+              criticality: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      res.json(links.map((link) => link.supplier));
+    } catch (error) {
+      console.error('Error fetching risk suppliers:', error);
+      res.status(500).json({ error: 'Failed to fetch risk suppliers' });
+    }
+  }
+);
+
+// POST /api/risks/:id/suppliers - Link supplier to risk
+router.post(
+  '/:id/suppliers',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    param('id').isUUID(),
+    body('supplierId').isUUID(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      // Verify risk exists
+      const risk = await prisma.risk.findUnique({
+        where: { id: req.params.id },
+      });
+
+      if (!risk) {
+        return res.status(404).json({ error: 'Risk not found' });
+      }
+
+      // Verify supplier exists
+      const supplier = await prisma.supplier.findUnique({
+        where: { id: req.body.supplierId },
+      });
+
+      if (!supplier) {
+        return res.status(404).json({ error: 'Supplier not found' });
+      }
+
+      // Check if link already exists
+      const existingLink = await prisma.supplierRiskLink.findUnique({
+        where: {
+          supplierId_riskId: {
+            supplierId: req.body.supplierId,
+            riskId: req.params.id,
+          },
+        },
+      });
+
+      if (existingLink) {
+        return res.status(400).json({ error: 'Supplier is already linked to this risk' });
+      }
+
+      // Create link
+      await prisma.supplierRiskLink.create({
+        data: {
+          supplierId: req.body.supplierId,
+          riskId: req.params.id,
+        },
+      });
+
+      // Optionally mark risk as supplier risk
+      if (!risk.isSupplierRisk) {
+        await prisma.risk.update({
+          where: { id: req.params.id },
+          data: { isSupplierRisk: true },
+        });
+      }
+
+      // Return the linked supplier
+      const linkedSupplier = await prisma.supplier.findUnique({
+        where: { id: req.body.supplierId },
+        select: {
+          id: true,
+          name: true,
+          supplierType: true,
+          criticality: true,
+          status: true,
+        },
+      });
+
+      res.status(201).json(linkedSupplier);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return res.status(400).json({ error: 'Supplier is already linked to this risk' });
+      }
+      console.error('Error linking supplier to risk:', error);
+      res.status(500).json({ error: 'Failed to link supplier to risk' });
     }
   }
 );

@@ -50,11 +50,19 @@ import {
   Tab,
   TabPanel,
   Progress,
+  useDisclosure,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
 } from '@chakra-ui/react';
-import { SearchIcon, DeleteIcon, CopyIcon } from '@chakra-ui/icons';
+import { SearchIcon, DeleteIcon, CopyIcon, AddIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
-import { similarityApi } from '../services/api';
+import { similarityApi, supplierApi } from '../services/api';
 import { SimilarRisk } from '../types/risk';
 import { SimilarRisksPanel } from './SimilarRisksPanel';
 import { SimilarityAlert } from './SimilarityAlert';
@@ -144,8 +152,17 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
     mitigationImplemented: false,
     mitigationDescription: '',
     residualRiskTreatmentCategory: '',
+    isSupplierRisk: false,
   });
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const [linkedSuppliers, setLinkedSuppliers] = useState<any[]>([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const { isOpen: isSupplierModalOpen, onOpen: onSupplierModalOpen, onClose: onSupplierModalClose } = useDisclosure();
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
+  const [availableSuppliers, setAvailableSuppliers] = useState<any[]>([]);
+  const [searchingSuppliers, setSearchingSuppliers] = useState(false);
+  const [linkingSupplier, setLinkingSupplier] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -528,6 +545,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           mitigationImplemented: risk.mitigationImplemented || false,
           mitigationDescription: risk.mitigationDescription || '',
           residualRiskTreatmentCategory: risk.residualRiskTreatmentCategory || '',
+          isSupplierRisk: risk.isSupplierRisk || false,
         };
         setFormData(initialData);
         // Load existing control associations
@@ -535,6 +553,10 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           setSelectedControlIds(risk.riskControls.map((rc: any) => rc.control.id));
         } else {
           setSelectedControlIds([]);
+        }
+        // Fetch linked suppliers
+        if (risk.id) {
+          fetchLinkedSuppliers(risk.id);
         }
         // If risk has an asset, fetch it to show in the search and set its category
         if (risk.assetId && risk.asset) {
@@ -577,9 +599,11 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           mitigationImplemented: false,
           mitigationDescription: '',
           residualRiskTreatmentCategory: '',
+          isSupplierRisk: false,
         };
         setFormData(initialData);
         setSelectedControlIds([]);
+        setLinkedSuppliers([]);
       }
       const initialControlIds = risk && risk.riskControls && risk.riskControls.length > 0
         ? risk.riskControls.map((rc: any) => rc.control.id).sort()
@@ -702,6 +726,94 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       setAssetCategories(response.data || []);
     } catch (error) {
       console.error('Error fetching asset categories:', error);
+    }
+  };
+
+  const fetchLinkedSuppliers = async (riskId: string) => {
+    try {
+      setLoadingSuppliers(true);
+      const suppliers = await api.get(`/api/risks/${riskId}/suppliers`);
+      setLinkedSuppliers(suppliers.data);
+    } catch (error: any) {
+      console.error('Error fetching linked suppliers:', error);
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  };
+
+  const searchSuppliers = async () => {
+    if (!supplierSearchTerm.trim()) {
+      setAvailableSuppliers([]);
+      return;
+    }
+
+    try {
+      setSearchingSuppliers(true);
+      const response = await supplierApi.getSuppliers({ search: supplierSearchTerm });
+      // Filter out suppliers already linked
+      const linkedSupplierIds = new Set(linkedSuppliers.map((s) => s.id));
+      setAvailableSuppliers(response.filter((s: any) => !linkedSupplierIds.has(s.id)));
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to search suppliers',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setSearchingSuppliers(false);
+    }
+  };
+
+  const handleLinkSupplier = async (supplierId: string) => {
+    if (!risk?.id) return;
+    try {
+      setLinkingSupplier(true);
+      await api.post(`/api/risks/${risk.id}/suppliers`, { supplierId });
+      toast({
+        title: 'Success',
+        description: 'Supplier linked successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      onSupplierModalClose();
+      setSupplierSearchTerm('');
+      setAvailableSuppliers([]);
+      fetchLinkedSuppliers(risk.id);
+      // Auto-check isSupplierRisk if not already checked
+      if (!formData.isSupplierRisk) {
+        setFormData({ ...formData, isSupplierRisk: true });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to link supplier',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLinkingSupplier(false);
+    }
+  };
+
+  const handleUnlinkSupplier = async (supplierId: string) => {
+    if (!risk?.id) return;
+    try {
+      await api.delete(`/api/suppliers/${supplierId}/risks/${risk.id}`);
+      toast({
+        title: 'Success',
+        description: 'Supplier unlinked successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      fetchLinkedSuppliers(risk.id);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to unlink supplier',
+        status: 'error',
+        duration: 3000,
+      });
     }
   };
 
@@ -1336,6 +1448,95 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                           Archived risks are hidden by default. Instance risks are typically archived when they expire.
                         </Text>
                       </FormControl>
+
+                      <FormControl>
+                        <Checkbox
+                          isChecked={formData.isSupplierRisk}
+                          onChange={(e) => setFormData({ ...formData, isSupplierRisk: e.target.checked })}
+                          isDisabled={viewMode}
+                        >
+                          Supplier Risk
+                        </Checkbox>
+                        <Text fontSize="xs" color="gray.500" mt={1}>
+                          Mark this risk as related to supplier management
+                        </Text>
+                      </FormControl>
+
+                      {risk && (
+                        <>
+                          <Divider />
+                          <Box>
+                            <HStack justify="space-between" mb={2}>
+                              <FormLabel fontWeight="bold" color="blue.600">
+                                Linked Suppliers ({linkedSuppliers.length})
+                              </FormLabel>
+                              {!viewMode && (
+                                <Button
+                                  leftIcon={<AddIcon />}
+                                  size="sm"
+                                  colorScheme="blue"
+                                  variant="outline"
+                                  onClick={onSupplierModalOpen}
+                                >
+                                  Link Supplier
+                                </Button>
+                              )}
+                            </HStack>
+                            {loadingSuppliers ? (
+                              <Text color="gray.500">Loading suppliers...</Text>
+                            ) : linkedSuppliers.length === 0 ? (
+                              <Text color="gray.500" fontStyle="italic">
+                                No suppliers linked to this risk
+                              </Text>
+                            ) : (
+                              <VStack align="stretch" spacing={2}>
+                                {linkedSuppliers.map((supplier) => (
+                                  <Box
+                                    key={supplier.id}
+                                    p={2}
+                                    bg="white"
+                                    borderRadius="md"
+                                    border="1px"
+                                    borderColor="blue.200"
+                                    _hover={{ bg: "blue.100", borderColor: "blue.400" }}
+                                  >
+                                    <HStack justify="space-between">
+                                      <Link
+                                        to={`/admin/suppliers/${supplier.id}`}
+                                        style={{ textDecoration: 'none', flex: 1 }}
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          navigate(`/admin/suppliers/${supplier.id}`);
+                                          onClose();
+                                        }}
+                                      >
+                                        <HStack spacing={2}>
+                                          <Badge colorScheme="purple" fontSize="xs">
+                                            Supplier
+                                          </Badge>
+                                          <Box fontWeight="medium" color="blue.700" _hover={{ textDecoration: "underline" }}>
+                                            {supplier.name}
+                                          </Box>
+                                        </HStack>
+                                      </Link>
+                                      {!viewMode && (
+                                        <IconButton
+                                          aria-label="Unlink supplier"
+                                          icon={<DeleteIcon />}
+                                          size="xs"
+                                          colorScheme="red"
+                                          variant="ghost"
+                                          onClick={() => handleUnlinkSupplier(supplier.id)}
+                                        />
+                                      )}
+                                    </HStack>
+                                  </Box>
+                                ))}
+                              </VStack>
+                            )}
+                          </Box>
+                        </>
+                      )}
                     </VStack>
                   </TabPanel>
 
@@ -2248,6 +2449,75 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
+
+      {/* Link Supplier Modal */}
+      {risk && (
+        <Modal isOpen={isSupplierModalOpen} onClose={onSupplierModalClose} size="xl">
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Link Supplier to Risk</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4} align="stretch">
+                <Input
+                  placeholder="Search suppliers by name..."
+                  value={supplierSearchTerm}
+                  onChange={(e) => setSupplierSearchTerm(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      searchSuppliers();
+                    }
+                  }}
+                />
+                <Button onClick={searchSuppliers} isLoading={searchingSuppliers} size="sm">
+                  Search
+                </Button>
+
+                {availableSuppliers.length > 0 && (
+                  <Box maxH="400px" overflowY="auto">
+                    <Table variant="simple" size="sm">
+                      <Thead>
+                        <Tr>
+                          <Th>Name</Th>
+                          <Th>Type</Th>
+                          <Th>Actions</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {availableSuppliers.map((supplier) => (
+                          <Tr key={supplier.id}>
+                            <Td>{supplier.name}</Td>
+                            <Td>{supplier.supplierType?.replace(/_/g, ' ')}</Td>
+                            <Td>
+                              <Button
+                                size="xs"
+                                colorScheme="blue"
+                                onClick={() => handleLinkSupplier(supplier.id)}
+                                isLoading={linkingSupplier}
+                              >
+                                Link
+                              </Button>
+                            </Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </Box>
+                )}
+
+                {supplierSearchTerm && availableSuppliers.length === 0 && !searchingSuppliers && (
+                  <Text color="gray.500" fontStyle="italic">
+                    No suppliers found
+                  </Text>
+                )}
+              </VStack>
+            </ModalBody>
+            <ModalFooter>
+              <Button onClick={onSupplierModalClose}>Close</Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+      )}
     </>
   );
 }

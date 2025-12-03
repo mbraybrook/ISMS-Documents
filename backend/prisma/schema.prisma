@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres:postgres@localhost:5432/isms_db?schema=public"
 }
 
 model Acknowledgment {
@@ -93,6 +93,7 @@ model Control {
   updatedAt                        DateTime
   documentControls                 DocumentControl[]
   riskControls                     RiskControl[]
+  supplierControls                 SupplierControlLink[]
 
   @@index([selectedForBusinessRequirement])
   @@index([selectedForLegalRequirement])
@@ -198,7 +199,8 @@ model Legislation {
 
 model ReviewTask {
   id             String    @id
-  documentId     String
+  documentId     String?
+  supplierId     String?
   reviewerUserId String
   dueDate        DateTime
   completedDate  DateTime?
@@ -207,12 +209,14 @@ model ReviewTask {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime
   reviewer       User      @relation(fields: [reviewerUserId], references: [id])
-  document       Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document       Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  supplier       Supplier? @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([dueDate])
   @@index([reviewerUserId])
   @@index([documentId])
+  @@index([supplierId])
 }
 
 model Risk {
@@ -264,6 +268,8 @@ model Risk {
   owner                         User?             @relation("RiskOwner", fields: [ownerUserId], references: [id])
   riskControls                  RiskControl[]
   legislationRisks              LegislationRisk[]
+  isSupplierRisk                Boolean  @default(false)
+  supplierRisks                  SupplierRiskLink[]
 
   @@index([interestedPartyId])
   @@index([assetCategoryId])
@@ -330,6 +336,14 @@ model User {
   ReviewTask     ReviewTask[]
   ownedRisks     Risk[]           @relation("RiskOwner")
   SoAExport      SoAExport[]
+  supplierRelationshipOwner Supplier[] @relation("SupplierRelationshipOwner")
+  supplierCreatedBy         Supplier[] @relation("SupplierCreatedBy")
+  supplierUpdatedBy         Supplier[] @relation("SupplierUpdatedBy")
+  riskAssessmentsAssessedBy    SupplierRiskAssessment[] @relation("RiskAssessmentAssessedBy")
+  riskAssessmentsApprovedBy    SupplierRiskAssessment[] @relation("RiskAssessmentApprovedBy")
+  criticalityAssessmentsAssessedBy SupplierCriticalityAssessment[] @relation("CriticalityAssessmentAssessedBy")
+  criticalityAssessmentsApprovedBy SupplierCriticalityAssessment[] @relation("CriticalityAssessmentApprovedBy")
+  supplierComplianceReviewsReviewedBy SupplierComplianceReview[] @relation("SupplierComplianceReviewReviewedBy")
 
   @@index([entraObjectId])
   @@index([email])
@@ -421,4 +435,225 @@ model TrustCenterSettings {
   updatedAt       DateTime @updatedAt
 
   @@index([key])
+}
+
+model SupplierRiskAssessment {
+  id                String   @id @default(uuid())
+  supplierId        String
+  ciaImpact         String
+  supplierType      String
+  riskRating        String
+  rationale         String?
+  assessedByUserId  String
+  assessedAt        DateTime @default(now())
+  approvedByUserId   String?
+  approvedAt         DateTime?
+  status             String   @default("DRAFT")
+  rejectionReason    String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  supplier           Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  assessedBy         User     @relation("RiskAssessmentAssessedBy", fields: [assessedByUserId], references: [id])
+  approvedBy         User?    @relation("RiskAssessmentApprovedBy", fields: [approvedByUserId], references: [id])
+  currentSupplier    Supplier? @relation("CurrentRiskAssessment")
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([assessedByUserId])
+  @@index([approvedByUserId])
+}
+
+model SupplierCriticalityAssessment {
+  id                   String   @id @default(uuid())
+  supplierId           String
+  criticality          String
+  rationale            String?
+  supportingEvidenceLinks Json?
+  assessedByUserId     String
+  assessedAt           DateTime @default(now())
+  approvedByUserId      String?
+  approvedAt           DateTime?
+  status               String   @default("DRAFT")
+  rejectionReason      String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  supplier             Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  assessedBy           User     @relation("CriticalityAssessmentAssessedBy", fields: [assessedByUserId], references: [id])
+  approvedBy           User?    @relation("CriticalityAssessmentApprovedBy", fields: [approvedByUserId], references: [id])
+  currentSupplier      Supplier? @relation("CurrentCriticalityAssessment")
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([assessedByUserId])
+  @@index([approvedByUserId])
+}
+
+model SupplierRiskLink {
+  supplierId String
+  riskId     String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  risk       Risk     @relation(fields: [riskId], references: [id], onDelete: Cascade)
+
+  @@id([supplierId, riskId])
+  @@index([riskId])
+  @@index([supplierId])
+}
+
+model SupplierControlLink {
+  supplierId String
+  controlId  String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  control    Control  @relation(fields: [controlId], references: [id], onDelete: Cascade)
+
+  @@id([supplierId, controlId])
+  @@index([controlId])
+  @@index([supplierId])
+}
+
+model SupplierComplianceReview {
+  id                    String   @id @default(uuid())
+  supplierId            String
+  reviewType            String
+  plannedAt             DateTime
+  completedAt           DateTime?
+  reviewedByUserId      String?
+  checksPerformed        String?
+  outcome                String?
+  updatedPerformanceRating String?
+  notes                 String?
+  evidenceLinks         Json?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  supplier              Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  reviewedBy            User?     @relation("SupplierComplianceReviewReviewedBy", fields: [reviewedByUserId], references: [id])
+
+  @@index([supplierId])
+  @@index([reviewType])
+  @@index([plannedAt])
+  @@index([completedAt])
+  @@index([outcome])
+}
+
+model SupplierCertificate {
+  id                String   @id @default(uuid())
+  supplierId        String
+  certificateType   String
+  certificateNumber String?
+  issuer            String?
+  issueDate         DateTime?
+  expiryDate        DateTime
+  evidenceLink      String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  supplier          Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([certificateType])
+  @@index([expiryDate])
+}
+
+model SupplierExitPlan {
+  id                        String   @id @default(uuid())
+  supplierId                String   @unique
+  reason                    String?
+  startDate                 DateTime?
+  targetEndDate             DateTime?
+  completedAt               DateTime?
+  status                    String   @default("PLANNED") // PLANNED, IN_PROGRESS, COMPLETED, CANCELLED
+  impactAssessment          Json?    // { notes: string, scopeOfServices: string, dependencies: string[], stakeholders: string[], completed: boolean }
+  dataAndIpr                Json?    // { notes: string, dataInventory: string, exportDetails: string, integrityValidation: string, iprTransfer: string, deletionConfirmation: string, completed: boolean }
+  replacementServiceAnalysis Json?   // { notes: string, alternativeProviders: string[], securityComplianceChecks: string, pocNotes: string, tcoAnalysis: string, completed: boolean }
+  contractClosure            Json?    // { notes: string, obligationsMet: string[], handoverDocs: string[], ticketClosure: string[], serviceCessationEvidence: string[], completed: boolean }
+  lessonsLearned            Json?    // { notes: string, findings: string[], completed: boolean }
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  supplier                  Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([startDate])
+  @@index([targetEndDate])
+  @@index([completedAt])
+}
+
+model Supplier {
+  id                        String   @id @default(uuid())
+  name                      String
+  tradingName               String?
+  status                    String   @default("ACTIVE")
+  supplierType              String
+  serviceSubType            String?
+  serviceDescription        String?
+  processesCardholderData   Boolean  @default(false)
+  processesPersonalData     Boolean  @default(false)
+  hostingRegions            Json?
+  customerFacingImpact      Boolean  @default(false)
+  ciaImpact                 String?
+  overallRiskRating         String?
+  criticality               String?
+  riskRationale             String?
+  criticalityRationale      String?
+  lastRiskAssessmentAt      DateTime?
+  lastCriticalityAssessmentAt DateTime?
+  pciStatus                 String?
+  iso27001Status            String?
+  iso22301Status            String?
+  iso9001Status             String?
+  gdprStatus                String?
+  lastComplianceReviewAt    DateTime?
+  complianceEvidenceLinks   Json?
+  relationshipOwnerUserId   String?
+  primaryContacts           Json?
+  contractReferences        Json?
+  dataProcessingAgreementRef String?
+  contractStartDate         DateTime?
+  contractEndDate           DateTime?
+  autoRenewal               Boolean  @default(false)
+  performanceRating          String?
+  performanceNotes           String?
+  createdAt                 DateTime  @default(now())
+  createdByUserId           String?
+  updatedAt                 DateTime  @updatedAt
+  updatedByUserId           String?
+  relationshipOwner         User?    @relation("SupplierRelationshipOwner", fields: [relationshipOwnerUserId], references: [id])
+  createdBy                 User?    @relation("SupplierCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy                 User?    @relation("SupplierUpdatedBy", fields: [updatedByUserId], references: [id])
+  lifecycleState            String   @default("DRAFT")
+  cisoExemptionGranted      Boolean  @default(false)
+  currentRiskAssessmentId    String? @unique
+  currentCriticalityAssessmentId String? @unique
+  riskAssessments            SupplierRiskAssessment[]
+  criticalityAssessments     SupplierCriticalityAssessment[]
+  currentRiskAssessment      SupplierRiskAssessment? @relation("CurrentRiskAssessment", fields: [currentRiskAssessmentId], references: [id])
+  currentCriticalityAssessment SupplierCriticalityAssessment? @relation("CurrentCriticalityAssessment", fields: [currentCriticalityAssessmentId], references: [id])
+  nextReviewAt               DateTime?
+  lastReviewAt               DateTime?
+  supplierRisks               SupplierRiskLink[]
+  supplierControls            SupplierControlLink[]
+  complianceReviews           SupplierComplianceReview[]
+  certificates                SupplierCertificate[]
+  reviewTasks                 ReviewTask[]
+  exitPlan                    SupplierExitPlan?
+  showInTrustCenter           Boolean  @default(false)
+  trustCenterDisplayName      String?
+  trustCenterDescription      String?
+  trustCenterCategory         String?
+  trustCenterComplianceSummary String?
+
+  @@index([status])
+  @@index([nextReviewAt])
+  @@index([lastReviewAt])
+  @@index([supplierType])
+  @@index([criticality])
+  @@index([pciStatus])
+  @@index([iso27001Status])
+  @@index([performanceRating])
+  @@index([relationshipOwnerUserId])
+  @@index([name])
+  @@index([lifecycleState])
+  @@index([currentRiskAssessmentId])
+  @@index([currentCriticalityAssessmentId])
+  @@index([showInTrustCenter])
+  @@index([trustCenterCategory])
 }

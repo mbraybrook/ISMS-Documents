@@ -167,6 +167,9 @@ export function Layout({ children }: LayoutProps) {
                       <Link as={RouterLink} to="/admin/soa" fontSize="sm">
                         SoA Export
                       </Link>
+                      <Link as={RouterLink} to="/admin/suppliers" fontSize="sm">
+                        Suppliers
+                      </Link>
                       {effectiveRole === 'ADMIN' && (
                         <Link as={RouterLink} to="/admin/users" fontSize="sm">
                           User Management

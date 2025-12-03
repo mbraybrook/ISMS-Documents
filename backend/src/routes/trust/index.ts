@@ -1176,5 +1176,53 @@ router.put(
   }
 );
 
+// GET /api/trust/suppliers - Get suppliers visible in Trust Center
+router.get(
+  '/suppliers',
+  conditionalTrustAuth,
+  async (req: Request, res: Response) => {
+    try {
+      // Only return suppliers that are marked for Trust Center display and are Active/Approved
+      const suppliers = await prisma.supplier.findMany({
+        where: {
+          showInTrustCenter: true,
+          status: 'ACTIVE',
+          lifecycleState: 'APPROVED',
+        },
+        select: {
+          id: true,
+          trustCenterDisplayName: true,
+          trustCenterDescription: true,
+          trustCenterCategory: true,
+          trustCenterComplianceSummary: true,
+          // Exclude internal fields like risk ratings, performance rating, contacts, etc.
+        },
+        orderBy: [
+          { trustCenterCategory: 'asc' },
+          { trustCenterDisplayName: 'asc' },
+        ],
+      });
+
+      // Filter out any suppliers without required display fields
+      const validSuppliers = suppliers.filter(
+        (s) => s.trustCenterDisplayName && s.trustCenterDescription
+      );
+
+      res.json({
+        suppliers: validSuppliers.map((s) => ({
+          id: s.id,
+          displayName: s.trustCenterDisplayName,
+          description: s.trustCenterDescription,
+          category: s.trustCenterCategory || 'OTHER',
+          complianceSummary: s.trustCenterComplianceSummary || null,
+        })),
+      });
+    } catch (error: any) {
+      console.error('[TRUST] Error fetching suppliers:', error);
+      res.status(500).json({ error: 'Failed to fetch suppliers' });
+    }
+  }
+);
+
 export { router as trustRouter };
 
