@@ -129,7 +129,7 @@ model Document {
   DocumentControl         DocumentControl[]
   DocumentRisk            DocumentRisk[]
   ReviewTask              ReviewTask[]
-  TrustDocSetting          TrustDocSetting?
+  TrustDocSetting         TrustDocSetting?
 
   @@index([nextReviewDate])
   @@index([ownerUserId])
@@ -160,8 +160,8 @@ model DocumentRisk {
 }
 
 model InterestedParty {
-  id                      String   @id
-  name                    String   @unique
+  id                      String    @id
+  name                    String    @unique
   group                   String?
   description             String?
   dateAdded               DateTime?
@@ -172,7 +172,7 @@ model InterestedParty {
   keyProductsServices     String?
   ourObligations          String?
   theirObligations        String?
-  createdAt               DateTime @default(now())
+  createdAt               DateTime  @default(now())
   updatedAt               DateTime
   risks                   Risk[]
 
@@ -181,16 +181,16 @@ model InterestedParty {
 }
 
 model Legislation {
-  id                    String          @id
-  dateAdded             DateTime?
-  interestedParty       String?
+  id                       String            @id
+  dateAdded                DateTime?
+  interestedParty          String?
   actRegulationRequirement String
-  description           String?
-  riskOfNonCompliance   String?
-  howComplianceAchieved String?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime
-  risks                 LegislationRisk[]
+  description              String?
+  riskOfNonCompliance      String?
+  howComplianceAchieved    String?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime
+  risks                    LegislationRisk[]
 
   @@index([actRegulationRequirement])
   @@index([interestedParty])
@@ -216,15 +216,15 @@ model ReviewTask {
 }
 
 model Risk {
-  id                            String          @id
+  id                            String            @id
   title                         String
   description                   String?
-  dateAdded                     DateTime        @default(now())
+  dateAdded                     DateTime          @default(now())
   riskCategory                  String?
   riskNature                    String?
   ownerUserId                   String?
   department                    String?
-  status                        String          @default("DRAFT")
+  status                        String            @default("DRAFT")
   wizardData                    String?
   rejectionReason               String?
   mergedIntoRiskId              String?
@@ -233,15 +233,15 @@ model Risk {
   assetCategoryId               String?
   interestedPartyId             String
   threatDescription             String?
-  archived                      Boolean         @default(false)
+  archived                      Boolean           @default(false)
   expiryDate                    DateTime?
   lastReviewDate                DateTime?
   nextReviewDate                DateTime?
-  confidentialityScore          Int             @default(1)
-  integrityScore                Int             @default(1)
-  availabilityScore             Int             @default(1)
+  confidentialityScore          Int               @default(1)
+  integrityScore                Int               @default(1)
+  availabilityScore             Int               @default(1)
   riskScore                     Int?
-  likelihood                    Int             @default(1)
+  likelihood                    Int               @default(1)
   calculatedScore               Int
   initialRiskTreatmentCategory  String?
   mitigatedConfidentialityScore Int?
@@ -250,17 +250,18 @@ model Risk {
   mitigatedRiskScore            Int?
   mitigatedLikelihood           Int?
   mitigatedScore                Int?
-  mitigationImplemented         Boolean         @default(false)
+  mitigationImplemented         Boolean           @default(false)
   mitigationDescription         String?
   residualRiskTreatmentCategory String?
   annexAControlsRaw             String?
-  createdAt                     DateTime        @default(now())
+  embedding                     Json?
+  createdAt                     DateTime          @default(now())
   updatedAt                     DateTime
   DocumentRisk                  DocumentRisk[]
-  interestedParty               InterestedParty @relation(fields: [interestedPartyId], references: [id])
-  linkedAssetCategory           AssetCategory?  @relation(fields: [assetCategoryId], references: [id])
-  asset                         Asset?          @relation(fields: [assetId], references: [id])
-  owner                         User?           @relation("RiskOwner", fields: [ownerUserId], references: [id])
+  interestedParty               InterestedParty   @relation(fields: [interestedPartyId], references: [id])
+  linkedAssetCategory           AssetCategory?    @relation(fields: [assetCategoryId], references: [id])
+  asset                         Asset?            @relation(fields: [assetId], references: [id])
+  owner                         User?             @relation("RiskOwner", fields: [ownerUserId], references: [id])
   riskControls                  RiskControl[]
   legislationRisks              LegislationRisk[]
 
@@ -325,9 +326,9 @@ model User {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime
   Acknowledgment Acknowledgment[]
-  Document       Document[]     @relation("DocumentOwner")
+  Document       Document[]       @relation("DocumentOwner")
   ReviewTask     ReviewTask[]
-  ownedRisks     Risk[]         @relation("RiskOwner")
+  ownedRisks     Risk[]           @relation("RiskOwner")
   SoAExport      SoAExport[]
 
   @@index([entraObjectId])
@@ -336,19 +337,19 @@ model User {
 }
 
 model ExternalUser {
-  id                  String          @id @default(uuid())
-  email               String          @unique
-  passwordHash        String
-  companyName         String
-  isApproved          Boolean         @default(false)
-  passwordResetToken  String?
+  id                   String          @id @default(uuid())
+  email                String          @unique
+  passwordHash         String
+  companyName          String
+  isApproved           Boolean         @default(false)
+  passwordResetToken   String?
   passwordResetExpires DateTime?
-  tokenVersion        Int             @default(0)
-  termsAcceptedAt     DateTime?
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  TrustDownload       TrustDownload[]
-  TrustAuditLog       TrustAuditLog[] @relation("PerformedByExternalUser")
+  tokenVersion         Int             @default(0)
+  termsAcceptedAt      DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  TrustDownload        TrustDownload[]
+  TrustAuditLog        TrustAuditLog[] @relation("PerformedByExternalUser")
 
   @@index([email])
   @@index([isApproved])
@@ -357,7 +358,7 @@ model ExternalUser {
 model TrustDocSetting {
   id                String          @id @default(uuid())
   documentId        String          @unique
-  visibilityLevel    String
+  visibilityLevel   String
   category          String
   sharePointUrl     String?
   sharePointSiteId  String?
@@ -379,13 +380,13 @@ model TrustDocSetting {
 }
 
 model TrustDownload {
-  id            String        @id @default(uuid())
-  externalUserId String?
-  docId         String
-  downloadToken String?
-  termsAccepted Boolean       @default(false)
-  timestamp     DateTime       @default(now())
-  ExternalUser  ExternalUser?  @relation(fields: [externalUserId], references: [id], onDelete: Cascade)
+  id              String           @id @default(uuid())
+  externalUserId  String?
+  docId           String
+  downloadToken   String?
+  termsAccepted   Boolean          @default(false)
+  timestamp       DateTime         @default(now())
+  ExternalUser    ExternalUser?    @relation(fields: [externalUserId], references: [id], onDelete: Cascade)
   TrustDocSetting TrustDocSetting? @relation(fields: [docId], references: [documentId], onDelete: Cascade)
 
   @@index([externalUserId])
@@ -394,17 +395,17 @@ model TrustDownload {
 }
 
 model TrustAuditLog {
-  id                      String        @id @default(uuid())
-  action                  String
-  performedByUserId      String?
+  id                        String           @id @default(uuid())
+  action                    String
+  performedByUserId         String?
   performedByExternalUserId String?
-  targetUserId            String?
-  targetDocumentId        String?
-  details                 String?
-  ipAddress               String?
-  timestamp               DateTime      @default(now())
-  PerformedByExternalUser ExternalUser? @relation("PerformedByExternalUser", fields: [performedByExternalUserId], references: [id])
-  TrustDocSetting         TrustDocSetting? @relation(fields: [targetDocumentId], references: [documentId], onDelete: Cascade)
+  targetUserId              String?
+  targetDocumentId          String?
+  details                   String?
+  ipAddress                 String?
+  timestamp                 DateTime         @default(now())
+  PerformedByExternalUser   ExternalUser?    @relation("PerformedByExternalUser", fields: [performedByExternalUserId], references: [id])
+  TrustDocSetting           TrustDocSetting? @relation(fields: [targetDocumentId], references: [documentId], onDelete: Cascade)
 
   @@index([action])
   @@index([timestamp])
@@ -413,11 +414,11 @@ model TrustAuditLog {
 }
 
 model TrustCenterSettings {
-  id                String   @id @default(uuid())
-  key               String   @unique
-  watermarkPrefix   String   @default("Paythru Confidential")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String   @id @default(uuid())
+  key             String   @unique
+  watermarkPrefix String   @default("Paythru Confidential")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([key])
 }

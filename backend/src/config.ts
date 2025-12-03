@@ -112,8 +112,10 @@ export const config = {
   llm: {
     provider: process.env.LLM_PROVIDER || 'ollama',
     baseUrl: process.env.LLM_BASE_URL || 'http://localhost:11434',
-    model: process.env.LLM_MODEL || 'llama2',
+    embeddingModel: process.env.LLM_EMBEDDING_MODEL || 'nomic-embed-text',
+    chatModel: process.env.LLM_CHAT_MODEL || 'llama2',
     similarityThreshold: parseFloat(process.env.LLM_SIMILARITY_THRESHOLD || '70'),
+    maxEmbeddingTextLength: parseInt(process.env.LLM_MAX_EMBEDDING_TEXT_LENGTH || '1024', 10),
   },
   // Trust Center configuration
   trustCenter: {

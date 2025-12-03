@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { config } from '../config';
-import { calculateSimilarityScore, findSimilarRisks } from './llmService';
+import { findSimilarRisks, calculateSimilarityScoreChat, normalizeRiskText } from './llmService';
+import { computeAndStoreEmbedding } from './embeddingService';
 
 export interface SimilarRiskResult {
   risk: any; // Risk with relations
@@ -24,7 +25,7 @@ function combineRiskText(risk: { title: string; threatDescription?: string | nul
  */
 export async function findSimilarRisksForRisk(riskId: string, limit: number = 10): Promise<SimilarRiskResult[]> {
   try {
-    // Fetch the risk
+    // Fetch the risk with embedding field (explicit select)
     const risk = await prisma.risk.findUnique({
       where: { id: riskId },
       select: {
@@ -32,6 +33,7 @@ export async function findSimilarRisksForRisk(riskId: string, limit: number = 10
         title: true,
         threatDescription: true,
         description: true,
+        embedding: true,
       },
     });
 
@@ -39,7 +41,20 @@ export async function findSimilarRisksForRisk(riskId: string, limit: number = 10
       throw new Error(`Risk not found: ${riskId}`);
     }
 
-    // Get all non-archived risks (excluding current risk)
+    // If risk has no embedding, compute once, persist, and reuse
+    if (!risk.embedding) {
+      const embedding = await computeAndStoreEmbedding(
+        risk.id,
+        risk.title,
+        risk.threatDescription,
+        risk.description,
+      );
+      if (embedding) {
+        risk.embedding = embedding as any;
+      }
+    }
+
+    // Get all non-archived risks (excluding current risk) with embedding field
     const allRisks = await prisma.risk.findMany({
       where: {
         archived: false,
@@ -50,6 +65,7 @@ export async function findSimilarRisksForRisk(riskId: string, limit: number = 10
         title: true,
         threatDescription: true,
         description: true,
+        embedding: true, // Explicit select for embedding
         riskCategory: true,
         calculatedScore: true,
         ownerUserId: true,
@@ -88,17 +104,19 @@ export async function findSimilarRisksForRisk(riskId: string, limit: number = 10
       return [];
     }
 
-    // Use the batch similarity approach for better performance
-    const riskText = combineRiskText(risk);
-    const similarityResults = await findSimilarRisks(
-      riskText,
-      allRisks.map((r) => ({
-        id: r.id,
-        title: r.title,
-        threatDescription: r.threatDescription,
-        description: r.description,
-      }))
-    );
+    // Use normalizeRiskText for input
+    const riskText = normalizeRiskText(risk.title, risk.threatDescription, risk.description);
+    
+    // Prepare risks with embeddings for findSimilarRisks
+    const risksWithEmbeddings = allRisks.map((r) => ({
+      id: r.id,
+      title: r.title,
+      threatDescription: r.threatDescription,
+      description: r.description,
+      embedding: (r.embedding as number[] | null) || null,
+    }));
+
+    const similarityResults = await findSimilarRisks(riskText, risksWithEmbeddings);
 
     // Map results to include full risk data
     const results: SimilarRiskResult[] = similarityResults
@@ -156,7 +174,7 @@ export async function checkSimilarityForNewRisk(
       return [];
     }
 
-    // Get all non-archived risks (excluding the risk being edited if provided)
+    // Get all non-archived risks (excluding the risk being edited if provided) with embedding field
     const where: any = {
       archived: false,
     };
@@ -171,6 +189,7 @@ export async function checkSimilarityForNewRisk(
         title: true,
         threatDescription: true,
         description: true,
+        embedding: true, // Explicit select for embedding
         riskCategory: true,
         calculatedScore: true,
         ownerUserId: true,
@@ -210,20 +229,51 @@ export async function checkSimilarityForNewRisk(
       return [];
     }
 
-    // Use batch similarity approach
-    const riskText = combineRiskText(riskData);
-    const similarityResults = await findSimilarRisks(
-      riskText,
-      allRisks.map((r) => ({
-        id: r.id,
-        title: r.title,
-        threatDescription: r.threatDescription,
-        description: r.description,
-      }))
+    // Cheap exact title prefilter before LLM calls
+    const normalizedTitle = riskData.title.trim().toLowerCase();
+    const exactMatches = allRisks.filter(
+      (r) => r.title.trim().toLowerCase() === normalizedTitle,
     );
 
+    if (exactMatches.length > 0) {
+      return exactMatches.slice(0, limit).map((r) => {
+        // Transform AssetCategory to category for frontend compatibility
+        const transformedRisk = {
+          ...r,
+          asset: r.asset
+            ? {
+                ...r.asset,
+                category: r.asset.AssetCategory || null,
+              }
+            : null,
+        };
+        if (transformedRisk.asset && 'AssetCategory' in transformedRisk.asset) {
+          delete (transformedRisk.asset as any).AssetCategory;
+        }
+        return {
+          risk: transformedRisk,
+          score: 95,
+          fields: ['title'],
+        };
+      });
+    }
+
+    // Use normalizeRiskText for input
+    const riskText = normalizeRiskText(riskData.title, riskData.threatDescription, riskData.description);
+    
+    // Prepare risks with embeddings for findSimilarRisks
+    const risksWithEmbeddings = allRisks.map((r) => ({
+      id: r.id,
+      title: r.title,
+      threatDescription: r.threatDescription,
+      description: r.description,
+      embedding: (r.embedding as number[] | null) || null,
+    }));
+
+    const similarityResults = await findSimilarRisks(riskText, risksWithEmbeddings);
+
     // Map results to include full risk data
-    const results: SimilarRiskResult[] = similarityResults
+    let results: SimilarRiskResult[] = similarityResults
       .map((result) => {
         const fullRisk = allRisks.find((r) => r.id === result.riskId);
         if (!fullRisk) return null;
@@ -249,10 +299,52 @@ export async function checkSimilarityForNewRisk(
           fields: result.matchedFields,
         };
       })
-      .filter((r): r is SimilarRiskResult => r !== null && r.score >= config.llm.similarityThreshold)
-      .slice(0, limit);
+      .filter((r): r is SimilarRiskResult => r !== null && r.score >= config.llm.similarityThreshold);
 
-    return results;
+    // Chat fallback for borderline scores (65-85) - only similarityService decides when to use this
+    const borderlineResults = results.filter((r) => r.score >= 65 && r.score <= 85);
+    const maxChatCalls = 10; // Hard per-request cap
+    const chatCandidates = borderlineResults.slice(0, maxChatCalls);
+
+    if (chatCandidates.length > 0) {
+      console.log(`[Similarity] Refining ${chatCandidates.length} borderline scores with chat fallback`);
+      
+      const refinedResults = await Promise.all(
+        chatCandidates.map(async (result) => {
+          try {
+            const chatResult = await calculateSimilarityScoreChat(
+              {
+                title: riskData.title,
+                threatDescription: riskData.threatDescription || null,
+                description: riskData.description || null,
+              },
+              {
+                title: result.risk.title,
+                threatDescription: result.risk.threatDescription || null,
+                description: result.risk.description || null,
+              },
+            );
+            return {
+              ...result,
+              score: chatResult.score,
+            };
+          } catch (error: any) {
+            console.error(`[Similarity] Chat fallback failed for risk ${result.risk.id}:`, error.message);
+            return result; // Keep original score
+          }
+        }),
+      );
+
+      // Replace borderline results with refined scores
+      const nonBorderlineResults = results.filter((r) => r.score < 65 || r.score > 85);
+      results = [...nonBorderlineResults, ...refinedResults].sort((a, b) => b.score - a.score);
+    }
+
+    if (chatCandidates.length >= maxChatCalls) {
+      console.log(`[Similarity] Chat fallback cap reached (${maxChatCalls} calls) - operator may need to tune thresholds`);
+    }
+
+    return results.slice(0, limit);
   } catch (error: any) {
     console.error('Error checking similarity for new risk:', error);
     // Gracefully degrade - return empty array
