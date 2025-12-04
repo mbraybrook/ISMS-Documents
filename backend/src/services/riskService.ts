@@ -127,7 +127,6 @@ export async function updateRiskControls(riskId: string, controlCodes: string[])
 export async function updateControlApplicability() {
   // Optimize: Use a single raw SQL query to update all controls at once
   // This sets selectedForRiskAssessment to true if the control is referenced in RiskControl, false otherwise
-  // SQLite syntax used here matches the project's database
   await prisma.$executeRaw`
     UPDATE Control
     SET selectedForRiskAssessment = (

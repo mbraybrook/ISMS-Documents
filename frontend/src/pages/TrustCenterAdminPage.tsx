@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Heading,
@@ -53,6 +53,9 @@ export function TrustCenterAdminPage() {
   const [editingDocument, setEditingDocument] = useState<any>(null);
   const [settings, setSettings] = useState<{ watermarkPrefix: string }>({ watermarkPrefix: 'Paythru Confidential' });
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const [tabIndex, setTabIndex] = useState(0); // 0 = Document Management, 1 = Pending Requests, 2 = Settings
+  const documentListRef = useRef<HTMLDivElement>(null);
+  const savedScrollPosition = useRef<number>(0);
 
   useEffect(() => {
     // Only load data if user is authenticated and has the right role
@@ -61,7 +64,7 @@ export function TrustCenterAdminPage() {
     }
   }, [user]);
 
-  const loadData = async () => {
+  const loadData = async (preserveScroll = false) => {
     try {
       setLoading(true);
       const [users, docs, settingsData] = await Promise.all([
@@ -72,6 +75,16 @@ export function TrustCenterAdminPage() {
       setPendingUsers(users);
       setDocuments(docs);
       setSettings(settingsData);
+      
+      // Restore scroll position if requested and we're on the document management tab
+      if (preserveScroll && tabIndex === 0 && documentListRef.current) {
+        // Use setTimeout to ensure DOM has updated
+        setTimeout(() => {
+          if (documentListRef.current) {
+            documentListRef.current.scrollTop = savedScrollPosition.current;
+          }
+        }, 0);
+      }
     } catch (error: any) {
       console.error('Error loading admin data:', error);
       // Don't redirect on 401 - let ProtectedRoute handle it
@@ -177,6 +190,11 @@ export function TrustCenterAdminPage() {
 
   const handleSaveDoc = async (docId: string) => {
     try {
+      // Save current scroll position if on document management tab
+      if (tabIndex === 0 && documentListRef.current) {
+        savedScrollPosition.current = documentListRef.current.scrollTop;
+      }
+      
       // Only include fields that can be updated (exclude id, documentId, createdAt, updatedAt)
       const allowedFields = ['visibilityLevel', 'category', 'sharePointUrl', 'publicDescription', 'displayOrder', 'requiresNda', 'maxFileSizeMB'];
       const normalizedData: Partial<TrustDocSetting> = {};
@@ -210,7 +228,8 @@ export function TrustCenterAdminPage() {
       setEditingDocument(null);
       setEditData({});
       onClose();
-      loadData();
+      // Preserve tab index and scroll position
+      loadData(true);
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || 
                           error.response?.data?.details ||
@@ -291,68 +310,21 @@ export function TrustCenterAdminPage() {
         Trust Center Administration
       </Heading>
 
-      <Tabs>
+      <Tabs index={tabIndex} onChange={setTabIndex}>
         <TabList>
-          <Tab>Pending Requests</Tab>
           <Tab>Document Management</Tab>
+          <Tab>Pending Requests</Tab>
           <Tab>Settings</Tab>
         </TabList>
 
         <TabPanels>
           <TabPanel>
             <VStack spacing={4} align="stretch">
-              <Heading size="md">Pending Access Requests</Heading>
-              {pendingUsers.length === 0 ? (
-                <Text color="gray.500">No pending requests</Text>
-              ) : (
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th>Email</Th>
-                      <Th>Company</Th>
-                      <Th>Registered</Th>
-                      <Th>Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {pendingUsers.map((user) => (
-                      <Tr key={user.id}>
-                        <Td>{user.email}</Td>
-                        <Td>{user.companyName}</Td>
-                        <Td>{new Date(user.createdAt || '').toLocaleDateString()}</Td>
-                        <Td>
-                          <HStack spacing={2}>
-                            <Button
-                              size="sm"
-                              colorScheme="green"
-                              onClick={() => handleApproveUser(user.id)}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              colorScheme="red"
-                              onClick={() => handleDenyUser(user.id)}
-                            >
-                              Deny
-                            </Button>
-                          </HStack>
-                        </Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              )}
-            </VStack>
-          </TabPanel>
-
-          <TabPanel>
-            <VStack spacing={4} align="stretch">
               <Heading size="md">Trust Center Document Management</Heading>
               {documents.length === 0 ? (
                 <Text color="gray.500">No documents found</Text>
               ) : (
-                <Box overflowX="auto">
+                <Box overflowX="auto" ref={documentListRef} maxH="calc(100vh - 300px)" overflowY="auto">
                   <Table variant="simple" size="sm">
                     <Thead>
                       <Tr>
@@ -429,6 +401,53 @@ export function TrustCenterAdminPage() {
                     </Tbody>
                   </Table>
                 </Box>
+              )}
+            </VStack>
+          </TabPanel>
+
+          <TabPanel>
+            <VStack spacing={4} align="stretch">
+              <Heading size="md">Pending Access Requests</Heading>
+              {pendingUsers.length === 0 ? (
+                <Text color="gray.500">No pending requests</Text>
+              ) : (
+                <Table variant="simple">
+                  <Thead>
+                    <Tr>
+                      <Th>Email</Th>
+                      <Th>Company</Th>
+                      <Th>Registered</Th>
+                      <Th>Actions</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {pendingUsers.map((user) => (
+                      <Tr key={user.id}>
+                        <Td>{user.email}</Td>
+                        <Td>{user.companyName}</Td>
+                        <Td>{new Date(user.createdAt || '').toLocaleDateString()}</Td>
+                        <Td>
+                          <HStack spacing={2}>
+                            <Button
+                              size="sm"
+                              colorScheme="green"
+                              onClick={() => handleApproveUser(user.id)}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              colorScheme="red"
+                              onClick={() => handleDenyUser(user.id)}
+                            >
+                              Deny
+                            </Button>
+                          </HStack>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
               )}
             </VStack>
           </TabPanel>

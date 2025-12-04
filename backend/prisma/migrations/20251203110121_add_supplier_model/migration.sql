@@ -83,3 +83,4 @@ ALTER TABLE "Supplier" ADD CONSTRAINT "Supplier_createdByUserId_fkey" FOREIGN KE
 -- AddForeignKey
 ALTER TABLE "Supplier" ADD CONSTRAINT "Supplier_updatedByUserId_fkey" FOREIGN KEY ("updatedByUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+

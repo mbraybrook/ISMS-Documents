@@ -1,6 +1,6 @@
 /**
  * Utility functions for retrying database operations with exponential backoff
- * Handles transient connection errors, especially common with SQLite
+ * Handles transient connection errors
  */
 
 interface RetryOptions {
@@ -33,8 +33,6 @@ function isRetryableError(error: any): boolean {
     'timeout',
     'connection',
     'connectorerror',
-    'database is locked',
-    'sqlite_busy',
     'econnreset',
     'econnrefused',
   ];
@@ -105,6 +103,7 @@ export async function retryDbOperation<T>(
   );
   throw lastError;
 }
+
 
 
 

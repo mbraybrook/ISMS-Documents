@@ -1,7 +1,6 @@
 /**
  * Type definitions for enum-like values
- * Since SQLite doesn't support enums, we use string types with these type definitions
- * to maintain type safety in TypeScript
+ * We use string types with these type definitions to maintain type safety in TypeScript
  */
 
 export type UserRole = 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR';

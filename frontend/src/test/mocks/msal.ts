@@ -86,3 +86,4 @@ vi.mock('@azure/msal-browser', () => ({
 
 export default mockMsalInstance;
 
+

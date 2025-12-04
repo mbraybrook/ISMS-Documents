@@ -130,3 +130,4 @@ ALTER TABLE "SupplierComplianceReview" ADD CONSTRAINT "SupplierComplianceReview_
 -- AddForeignKey
 ALTER TABLE "SupplierCertificate" ADD CONSTRAINT "SupplierCertificate_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "Supplier"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+

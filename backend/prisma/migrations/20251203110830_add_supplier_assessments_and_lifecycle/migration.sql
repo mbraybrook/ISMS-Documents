@@ -106,3 +106,4 @@ ALTER TABLE "Supplier" ADD CONSTRAINT "Supplier_currentRiskAssessmentId_fkey" FO
 -- AddForeignKey
 ALTER TABLE "Supplier" ADD CONSTRAINT "Supplier_currentCriticalityAssessmentId_fkey" FOREIGN KEY ("currentCriticalityAssessmentId") REFERENCES "SupplierCriticalityAssessment"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+
