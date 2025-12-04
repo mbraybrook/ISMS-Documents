@@ -1,51 +1,10 @@
 import dotenv from 'dotenv';
-import path from 'path';
 
-// Determine the project root and backend directory
-// Use require.main to find the backend directory more reliably
-const findBackendDir = (): string => {
-  const fs = require('fs');
-  
-  // Try to find backend directory by looking for package.json with prisma folder
-  let searchDir = process.cwd();
-  
-  // If we're in a subdirectory, search upwards
-  for (let i = 0; i < 5; i++) {
-    const packageJsonPath = path.join(searchDir, 'package.json');
-    const prismaPath = path.join(searchDir, 'prisma');
-    
-    if (fs.existsSync(packageJsonPath) && fs.existsSync(prismaPath)) {
-      return searchDir;
-    }
-    
-    const parentDir = path.resolve(searchDir, '..');
-    if (parentDir === searchDir) break; // Reached filesystem root
-    searchDir = parentDir;
-  }
-  
-  // Fallback: assume current directory or look for backend subdirectory
-  const backendPath = path.join(process.cwd(), 'backend');
-  if (fs.existsSync(path.join(backendPath, 'package.json'))) {
-    return backendPath;
-  }
-  
-  return process.cwd();
-};
+// Load .env file from current directory (standard behavior)
+// Environment variables from docker-compose.yml or system will override
+dotenv.config();
 
-const backendDir = findBackendDir();
-const projectRoot = path.resolve(backendDir, '..');
-
-// Load environment variables in order of precedence:
-// 1. Backend .env (highest priority - most specific)
-// 2. Root .env (lower priority - project-wide defaults)
-// 3. Current directory .env (lowest priority - fallback)
-// Note: Later calls to dotenv.config() override earlier ones, so we load in reverse order
-dotenv.config(); // Current directory first (lowest priority)
-dotenv.config({ path: path.join(projectRoot, '.env') }); // Root .env (middle priority)
-dotenv.config({ path: path.join(backendDir, '.env') }); // Backend .env (highest priority - loaded last)
-
-// DATABASE_URL must be in PostgreSQL format: postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public
-// Or: postgres://USER:PASSWORD@HOST:PORT/DB?schema=public
+// DATABASE_URL must be in PostgreSQL format
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   throw new Error('DATABASE_URL environment variable is required. Format: postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public');
@@ -89,7 +48,7 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   databaseUrl: databaseUrl,
   seedScope: seedScope,
-  // Auth configuration (to be used in Phase 2)
+  // Auth configuration
   auth: {
     tenantId: process.env.AUTH_TENANT_ID || '',
     clientId: process.env.AUTH_CLIENT_ID || '',
@@ -97,12 +56,12 @@ export const config = {
     redirectUri: process.env.AUTH_REDIRECT_URI || '',
     allowedEmailDomain: process.env.AUTH_ALLOWED_EMAIL_DOMAIN || 'paythru.com',
   },
-  // SharePoint configuration (to be used in Phase 9)
+  // SharePoint configuration
   sharePoint: {
     siteId: process.env.SHAREPOINT_SITE_ID || '',
     driveId: process.env.SHAREPOINT_DRIVE_ID || '',
   },
-  // Confluence configuration (to be used in Phase 9)
+  // Confluence configuration
   confluence: {
     baseUrl: process.env.CONFLUENCE_BASE_URL || '',
     username: process.env.CONFLUENCE_USERNAME || '',

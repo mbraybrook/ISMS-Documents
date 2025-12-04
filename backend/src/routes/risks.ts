@@ -172,7 +172,6 @@ router.get(
       }
       
       // Handle search query - search in title and description
-      // Note: SQLite doesn't support case-insensitive mode, so we'll do case-insensitive filtering in the application
       if (search) {
         const searchLower = (search as string).toLowerCase();
         where.OR = [

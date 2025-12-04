@@ -57,6 +57,7 @@ import {
   Tr,
   Th,
   Td,
+  Divider,
 } from '@chakra-ui/react';
 import { SearchIcon, DeleteIcon, CopyIcon, AddIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
