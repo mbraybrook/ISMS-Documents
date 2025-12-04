@@ -1,4 +1,5 @@
 import { promisify } from 'util';
+import { exec } from 'child_process';
 import { config } from '../config';
 import { PDFDocument } from 'pdf-lib';
 
@@ -15,6 +16,28 @@ declare module 'libreoffice-convert' {
 // Lazy load libreoffice-convert to handle cases where it's not available
 let libre: any = null;
 let libreConvert: any = null;
+
+/**
+ * Ensure Xvfb is running on display :99
+ * This is a safety check - Xvfb should be started by the container startup script
+ */
+async function ensureXvfbRunning(): Promise<void> {
+  try {
+    // Try to start Xvfb if not already running
+    // If it's already running, this will fail silently which is fine
+    console.log('[DocumentConversion] Ensuring Xvfb is running on display :99...');
+    exec('Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &', (error) => {
+      if (error && !error.message.includes('already in use')) {
+        console.warn('[DocumentConversion] Xvfb startup warning:', error.message);
+      }
+    });
+    // Give Xvfb a moment to start (or verify it's running)
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    console.log('[DocumentConversion] Xvfb should be ready');
+  } catch (error: any) {
+    console.warn('[DocumentConversion] Xvfb check failed, continuing anyway:', error.message);
+  }
+}
 
 function getLibreConvert() {
   if (!libre) {
@@ -273,8 +296,15 @@ export async function convertToPdf(
       );
     }
 
+    // Ensure Xvfb is running before conversion
+    await ensureXvfbRunning();
+
     // Convert to PDF using LibreOffice
+    // Note: Font substitution is configured via registrymodifications.xcu in Dockerfile
+    // This ensures Aptos and other Microsoft fonts are replaced with Liberation/DejaVu fonts
     const convert = getLibreConvert();
+    // Pass undefined for filter options - libreoffice-convert library doesn't support
+    // filter options in object format, and font embedding/substitution is handled via config
     let pdfBuffer = await convert(buffer, '.pdf', undefined);
 
     // Remove hyperlinks from the converted PDF

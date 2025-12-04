@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<oor:component-data xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema" oor:name="Common" oor:package="org.openoffice.Office">
+  <node oor:name="Font">
+    <node oor:name="Substitution">
+      <prop oor:name="ReplaceTable" oor:type="oor:string-list">
+        <value>Liberation Sans,Aptos,Aptos-Light,Aptos-Bold,Aptos-BoldItalic,Aptos-Italic</value>
+        <value>Liberation Sans,Aptos Display,Aptos Display Light,Aptos Display Bold</value>
+        <value>Liberation Serif,Aptos Text,Aptos Text Light,Aptos Text Bold</value>
+        <value>DejaVu Sans,Calibri</value>
+        <value>DejaVu Sans,Cambria</value>
+        <value>Liberation Serif,Times New Roman</value>
+        <value>Liberation Sans,Arial</value>
+      </prop>
+    </node>
+  </node>
+</oor:component-data>
+

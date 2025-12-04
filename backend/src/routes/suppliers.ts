@@ -298,7 +298,10 @@ router.post(
     body('tradingName').optional().isString(),
     body('status').optional().isIn(['ACTIVE', 'IN_ONBOARDING', 'IN_EXIT', 'INACTIVE']),
     body('supplierType').isIn(['SERVICE_PROVIDER', 'CONNECTED_ENTITY', 'PCI_SERVICE_PROVIDER']),
-    body('serviceSubType').optional().isIn(['CLOUD_VENDOR', 'SAAS', 'OTHER']),
+    body('serviceSubType').optional({ nullable: true }).custom((value) => {
+      if (value === null || value === undefined) return true;
+      return value === 'SAAS';
+    }).withMessage('serviceSubType must be SAAS or null'),
     body('serviceDescription').optional().isString(),
     body('processesCardholderData').optional().isBoolean(),
     body('processesPersonalData').optional().isBoolean(),
@@ -435,7 +438,10 @@ router.put(
     body('tradingName').optional().isString(),
     body('status').optional().isIn(['ACTIVE', 'IN_ONBOARDING', 'IN_EXIT', 'INACTIVE']),
     body('supplierType').optional().isIn(['SERVICE_PROVIDER', 'CONNECTED_ENTITY', 'PCI_SERVICE_PROVIDER']),
-    body('serviceSubType').optional().isIn(['CLOUD_VENDOR', 'SAAS', 'OTHER']),
+    body('serviceSubType').optional({ nullable: true }).custom((value) => {
+      if (value === null || value === undefined) return true;
+      return value === 'SAAS';
+    }).withMessage('serviceSubType must be SAAS or null'),
     body('serviceDescription').optional().isString(),
     body('processesCardholderData').optional().isBoolean(),
     body('processesPersonalData').optional().isBoolean(),

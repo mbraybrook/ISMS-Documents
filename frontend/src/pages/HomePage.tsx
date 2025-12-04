@@ -39,6 +39,7 @@ interface DashboardData {
     upcoming: any[];
     missingReviewDate: any[];
     overdueReviewTasks: any[];
+    upcomingReviewTasks?: any[];
     byStatus: Record<string, number>;
   };
   risks: {
@@ -670,7 +671,7 @@ export function HomePage() {
               <Stat p={4} bg="yellow.50" borderRadius="md" boxShadow="sm">
                 <StatLabel>Upcoming Reviews</StatLabel>
                 <StatNumber color="yellow.600">
-                  {dashboardData.documents.upcoming.length}
+                  {(dashboardData.documents.upcoming.length || 0) + (dashboardData.documents.upcomingReviewTasks?.length || 0)}
                 </StatNumber>
               </Stat>
 
@@ -687,7 +688,10 @@ export function HomePage() {
                 colorScheme="blue"
                 variant="outline"
                 rightIcon={<ArrowForwardIcon />}
-                onClick={() => navigate('/admin/documents/reviews')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/admin/documents/reviews');
+                }}
               >
                 View Review Dashboard
               </Button>

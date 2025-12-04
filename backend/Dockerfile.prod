@@ -24,6 +24,21 @@ RUN npm run build
 # Production stage
 FROM node:18-alpine
 
+# Install LibreOffice for document conversion with comprehensive fonts
+# Xvfb is needed for headless LibreOffice operation
+RUN apk add --no-cache libreoffice \
+    xvfb \
+    ttf-dejavu \
+    ttf-liberation \
+    font-noto \
+    font-noto-extra \
+    ttf-opensans \
+    && fc-cache -f -v \
+    && mkdir -p /usr/share/fonts/truetype
+
+# Create LibreOffice user config directory for root user
+RUN mkdir -p /root/.config/libreoffice/4/user
+
 WORKDIR /app
 
 # Copy package files
@@ -40,14 +55,33 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 # Copy scripts needed at runtime
 COPY scripts ./scripts
 
+# Copy LibreOffice font configuration
+COPY libreoffice-font-config/registrymodifications.xcu /root/.config/libreoffice/4/user/registrymodifications.xcu
+
+# Copy and make startup script executable
+COPY scripts/start-xvfb.sh /usr/local/bin/start-xvfb.sh
+RUN chmod +x /usr/local/bin/start-xvfb.sh
+
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Change ownership
-RUN chown -R nodejs:nodejs /app
+# Change ownership (including LibreOffice config and scripts)
+RUN chown -R nodejs:nodejs /app && \
+    mkdir -p /home/nodejs/.config/libreoffice/4/user && \
+    cp /root/.config/libreoffice/4/user/registrymodifications.xcu /home/nodejs/.config/libreoffice/4/user/ && \
+    chown -R nodejs:nodejs /home/nodejs/.config && \
+    chmod +x /usr/local/bin/start-xvfb.sh
 
 USER nodejs
+
+# Set LibreOffice environment variables for headless operation
+ENV SAL_USE_VCLPLUGIN=gen \
+    OOO_FORCE_DESKTOP=gnome \
+    HOME=/home/nodejs \
+    DISPLAY=:99 \
+    JAVA_HOME="" \
+    SAL_DISABLE_OPENCL=1
 
 EXPOSE 4000
 
@@ -55,7 +89,7 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:4000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start the application
-CMD ["npm", "start"]
+# Start the application (Xvfb will be started by the app if needed)
+CMD ["sh", "-c", "start-xvfb.sh && npm start"]
 
 
