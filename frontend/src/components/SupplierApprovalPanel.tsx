@@ -265,18 +265,6 @@ export function SupplierApprovalPanel({
                     {assessment.rationale}
                   </Text>
                 )}
-                {assessment.supportingEvidenceLinks && assessment.supportingEvidenceLinks.length > 0 && (
-                  <Box>
-                    <Text fontSize="sm" fontWeight="bold" mb={1}>
-                      Evidence Links:
-                    </Text>
-                    {assessment.supportingEvidenceLinks.map((link, idx) => (
-                      <Text key={idx} fontSize="xs" color="blue.500" as="a" href={link} target="_blank" rel="noopener noreferrer">
-                        {link}
-                      </Text>
-                    ))}
-                  </Box>
-                )}
                 <Text fontSize="xs" color="gray.500">
                   Assessed by {assessment.assessedBy.displayName} on{' '}
                   {new Date(assessment.assessedAt).toLocaleString()}

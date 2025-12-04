@@ -317,18 +317,6 @@ export function SupplierAssessmentTimeline({
                         {item.data.rationale}
                       </Text>
                     )}
-                    {item.data.supportingEvidenceLinks && item.data.supportingEvidenceLinks.length > 0 && (
-                      <Box>
-                        <Text fontSize="sm" fontWeight="bold" mb={1}>
-                          Evidence Links:
-                        </Text>
-                        {item.data.supportingEvidenceLinks.map((link: string, idx: number) => (
-                          <Text key={idx} fontSize="xs" color="blue.500" as="a" href={link} target="_blank" rel="noopener noreferrer">
-                            {link}
-                          </Text>
-                        ))}
-                      </Box>
-                    )}
                   </VStack>
                 )}
 

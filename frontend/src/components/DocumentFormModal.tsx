@@ -404,10 +404,11 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   };
 
   const handleFileSelect = (item: any) => {
+    const selectedSiteId = item.siteId || formData.sharePointSiteId || '';
     setFormData({
       ...formData,
-      sharePointSiteId: item.siteId || formData.sharePointSiteId || '', // Will be populated from config if not set
-      sharePointDriveId: item.driveId || formData.sharePointDriveId || '', // Will be populated from config if not set
+      sharePointSiteId: selectedSiteId,
+      sharePointDriveId: item.driveId || formData.sharePointDriveId || '',
       sharePointItemId: item.id,
       title: item.name || formData.title,
     });
@@ -416,7 +417,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     // Reload document URL if in edit mode
     if (document) {
       loadDocumentUrl({
-        sharePointSiteId: item.siteId || formData.sharePointSiteId,
+        sharePointSiteId: selectedSiteId,
         sharePointDriveId: item.driveId || formData.sharePointDriveId,
         sharePointItemId: item.id,
       });
@@ -877,8 +878,9 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
           isOpen={browserOpen}
           onClose={() => setBrowserOpen(false)}
           onSelect={handleFileSelect}
-          siteId={formData.sharePointSiteId || undefined}
+          defaultSiteId={formData.sharePointSiteId || undefined}
           driveId={formData.sharePointDriveId || undefined}
+          allowSiteSelection={true}
         />
       </ModalContent>
 

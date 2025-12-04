@@ -256,6 +256,7 @@ model Risk {
   mitigatedScore                Int?
   mitigationImplemented         Boolean           @default(false)
   mitigationDescription         String?
+  existingControlsDescription   String?
   residualRiskTreatmentCategory String?
   annexAControlsRaw             String?
   embedding                     Json?
@@ -468,7 +469,6 @@ model SupplierCriticalityAssessment {
   supplierId           String
   criticality          String
   rationale            String?
-  supportingEvidenceLinks Json?
   assessedByUserId     String
   assessedAt           DateTime @default(now())
   approvedByUserId      String?

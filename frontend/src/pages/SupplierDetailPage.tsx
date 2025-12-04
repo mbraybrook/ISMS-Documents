@@ -89,6 +89,8 @@ export function SupplierDetailPage() {
   const { isOpen: isReviewModalOpen, onOpen: onReviewModalOpen, onClose: onReviewModalClose } = useDisclosure();
   const { isOpen: isEvidenceBrowserOpen, onOpen: onEvidenceBrowserOpen, onClose: onEvidenceBrowserClose } = useDisclosure();
   const { isOpen: isCertificateEvidenceBrowserOpen, onOpen: onCertificateEvidenceBrowserOpen, onClose: onCertificateEvidenceBrowserClose } = useDisclosure();
+  const { isOpen: isContractBrowserOpen, onOpen: onContractBrowserOpen, onClose: onContractBrowserClose } = useDisclosure();
+  const [editingContractIndex, setEditingContractIndex] = useState<number | null>(null);
   const [editingEvidenceIndex, setEditingEvidenceIndex] = useState<number | null>(null);
   const [editingCertificateId, setEditingCertificateId] = useState<string | null>(null);
   const isNew = id === 'new';
@@ -378,6 +380,20 @@ export function SupplierDetailPage() {
   const removeContractReference = (index: number) => {
     const newRefs = formData.contractReferences.filter((_, i) => i !== index);
     setFormData({ ...formData, contractReferences: newRefs });
+  };
+
+  const handleContractFileSelect = (item: any) => {
+    if (editingContractIndex !== null) {
+      updateContractReference(editingContractIndex, item.webUrl);
+    } else {
+      // Add new contract reference
+      setFormData({
+        ...formData,
+        contractReferences: [...formData.contractReferences, item.webUrl],
+      });
+    }
+    onContractBrowserClose();
+    setEditingContractIndex(null);
   };
 
   const addContact = () => {
@@ -1612,22 +1628,44 @@ export function SupplierDetailPage() {
                             value={ref}
                             onChange={(e) => updateContractReference(index, e.target.value)}
                             isReadOnly={!isEditing}
-                            placeholder="Contract reference or ID"
+                            placeholder="Contract reference, ID, or SharePoint URL"
                           />
                           {isEditing && (
-                            <IconButton
-                              aria-label="Remove reference"
-                              icon={<DeleteIcon />}
-                              onClick={() => removeContractReference(index)}
-                              size="sm"
-                            />
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setEditingContractIndex(index);
+                                  onContractBrowserOpen();
+                                }}
+                              >
+                                Browse SharePoint
+                              </Button>
+                              <IconButton
+                                aria-label="Remove reference"
+                                icon={<DeleteIcon />}
+                                onClick={() => removeContractReference(index)}
+                                size="sm"
+                              />
+                            </>
                           )}
                         </HStack>
                       ))}
                       {isEditing && (
-                        <Button leftIcon={<AddIcon />} size="sm" onClick={addContractReference}>
-                          Add Contract Reference
-                        </Button>
+                        <HStack>
+                          <Button leftIcon={<AddIcon />} size="sm" onClick={addContractReference}>
+                            Add Contract Reference
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setEditingContractIndex(null);
+                              onContractBrowserOpen();
+                            }}
+                          >
+                            Browse SharePoint
+                          </Button>
+                        </HStack>
                       )}
                     </VStack>
                   </FormControl>
@@ -1834,7 +1872,6 @@ export function SupplierDetailPage() {
                                 data: {
                                   criticality: assessment.criticality,
                                   rationale: assessment.rationale,
-                                  supportingEvidenceLinks: assessment.supportingEvidenceLinks,
                                   rejectionReason: assessment.rejectionReason,
                                 },
                               });
@@ -2012,6 +2049,16 @@ export function SupplierDetailPage() {
           onCertificateEvidenceBrowserClose();
           setEditingCertificateId(null);
         }}
+      />
+
+      {/* SharePoint File Browser for Contract References */}
+      <SharePointFileBrowser
+        isOpen={isContractBrowserOpen}
+        onClose={() => {
+          onContractBrowserClose();
+          setEditingContractIndex(null);
+        }}
+        onSelect={handleContractFileSelect}
       />
     </Box>
   );

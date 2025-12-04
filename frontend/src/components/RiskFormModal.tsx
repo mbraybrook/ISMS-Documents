@@ -152,6 +152,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
     mitigatedLikelihood: null as number | null,
     mitigationImplemented: false,
     mitigationDescription: '',
+    existingControlsDescription: '',
     residualRiskTreatmentCategory: '',
     isSupplierRisk: false,
   });
@@ -330,7 +331,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   };
 
   const handleViewSimilarRisk = (riskId: string) => {
-    window.open(`/risks/risks?view=${riskId}`, '_blank');
+    window.open(`/admin/risks/risks?view=${riskId}`, '_blank');
   };
 
   const handleUseAsTemplate = async (riskId: string) => {
@@ -368,6 +369,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         mitigatedLikelihood: templateRisk.mitigatedLikelihood || null,
         mitigationImplemented: templateRisk.mitigationImplemented || false,
         mitigationDescription: templateRisk.mitigationDescription || '',
+        existingControlsDescription: templateRisk.existingControlsDescription || '',
         residualRiskTreatmentCategory: templateRisk.residualRiskTreatmentCategory || '',
       });
 
@@ -545,6 +547,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           mitigatedLikelihood: risk.mitigatedLikelihood || null,
           mitigationImplemented: risk.mitigationImplemented || false,
           mitigationDescription: risk.mitigationDescription || '',
+          existingControlsDescription: risk.existingControlsDescription || '',
           residualRiskTreatmentCategory: risk.residualRiskTreatmentCategory || '',
           isSupplierRisk: risk.isSupplierRisk || false,
         };
@@ -599,6 +602,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           mitigatedLikelihood: null,
           mitigationImplemented: false,
           mitigationDescription: '',
+          existingControlsDescription: '',
           residualRiskTreatmentCategory: '',
           isSupplierRisk: false,
         };
@@ -940,6 +944,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       if (payload.threatDescription === '') payload.threatDescription = undefined;
       if (payload.initialRiskTreatmentCategory === '') payload.initialRiskTreatmentCategory = undefined;
       if (payload.mitigationDescription === '') payload.mitigationDescription = undefined;
+      if (payload.existingControlsDescription === '') payload.existingControlsDescription = undefined;
       if (payload.residualRiskTreatmentCategory === '') payload.residualRiskTreatmentCategory = undefined;
 
       // Remove null values for optional fields
@@ -1094,7 +1099,19 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                         />
                       )}
                       <FormControl isRequired isInvalid={!!errors.title}>
-                        <FormLabel>Title</FormLabel>
+                        <FormLabel>
+                          Title
+                          <Tooltip label="A brief, descriptive title that identifies the risk (e.g., 'Unauthorized Access to Customer Data')">
+                            <IconButton
+                              aria-label="Info"
+                              icon={<Text fontSize="xs">?</Text>}
+                              size="xs"
+                              variant="ghost"
+                              ml={1}
+                              verticalAlign="middle"
+                            />
+                          </Tooltip>
+                        </FormLabel>
                         <Input
                           value={formData.title}
                           onChange={(e) => {
@@ -1109,6 +1126,16 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                       <FormControl>
                         <FormLabel>
                           Threat Description
+                          <Tooltip label="Describe the specific threat or event that could cause harm to the organization (e.g., 'Malicious actor gains unauthorized access to systems')">
+                            <IconButton
+                              aria-label="Info"
+                              icon={<Text fontSize="xs">?</Text>}
+                              size="xs"
+                              variant="ghost"
+                              ml={1}
+                              verticalAlign="middle"
+                            />
+                          </Tooltip>
                           {formData.threatDescription.length > 0 && (
                             <Text as="span" fontSize="xs" color="gray.500" ml={2}>
                               ({formData.threatDescription.length} characters)
@@ -1127,7 +1154,19 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                       </FormControl>
 
                       <FormControl>
-                        <FormLabel>Risk Description</FormLabel>
+                        <FormLabel>
+                          Risk Description
+                          <Tooltip label="Provide a detailed description of the risk, including its potential impact on the organization, assets, or operations">
+                            <IconButton
+                              aria-label="Info"
+                              icon={<Text fontSize="xs">?</Text>}
+                              size="xs"
+                              variant="ghost"
+                              ml={1}
+                              verticalAlign="middle"
+                            />
+                          </Tooltip>
+                        </FormLabel>
                         <Textarea
                           value={formData.description}
                           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -1787,6 +1826,31 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                     </HStack>
 
                     <FormControl>
+                      <FormLabel>
+                        Existing Controls Description
+                        <Tooltip label="Describe the controls that are already in place to mitigate this risk before any additional mitigation measures are implemented">
+                          <IconButton
+                            aria-label="Info"
+                            icon={<Text fontSize="xs">?</Text>}
+                            size="xs"
+                            variant="ghost"
+                            ml={1}
+                            verticalAlign="middle"
+                          />
+                        </Tooltip>
+                      </FormLabel>
+                      <Textarea
+                        value={formData.existingControlsDescription}
+                        onChange={(e) =>
+                          setFormData({ ...formData, existingControlsDescription: e.target.value })
+                        }
+                        placeholder="Describe the existing controls that are in place to mitigate this risk..."
+                        rows={4}
+                        isDisabled={viewMode}
+                      />
+                    </FormControl>
+
+                    <FormControl>
                       <FormLabel>Initial Risk Treatment Category</FormLabel>
                       <Select
                         value={formData.initialRiskTreatmentCategory}
@@ -2173,7 +2237,19 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                       </FormControl>
 
                       <FormControl>
-                        <FormLabel>Mitigation Description</FormLabel>
+                        <FormLabel>
+                          Mitigation Description
+                          <Tooltip label="Describe the additional mitigation measures or controls that have been implemented to reduce the risk after the initial assessment">
+                            <IconButton
+                              aria-label="Info"
+                              icon={<Text fontSize="xs">?</Text>}
+                              size="xs"
+                              variant="ghost"
+                              ml={1}
+                              verticalAlign="middle"
+                            />
+                          </Tooltip>
+                        </FormLabel>
                         <Textarea
                           value={formData.mitigationDescription}
                           onChange={(e) =>

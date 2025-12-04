@@ -209,7 +209,6 @@ export function RisksPage() {
       title: true,
       riskCategory: true,
       riskNature: true,
-      archived: true,
       owner: true,
       cia: true,
       likelihood: true,
@@ -723,19 +722,6 @@ export function RisksPage() {
       });
     }
 
-    if (visibleColumns.archived) {
-      cols.push({
-        key: 'archived',
-        header: 'Archived',
-        render: (risk) =>
-          risk.archived ? (
-            <Badge colorScheme="gray">Archived</Badge>
-          ) : (
-            <Text fontSize="xs" color="gray.400">—</Text>
-          ),
-      });
-    }
-
     if (visibleColumns.owner) {
       cols.push({
         key: 'owner',
@@ -1093,7 +1079,6 @@ export function RisksPage() {
       'Title',
       'Risk Category',
       'Risk Nature',
-      'Archived',
       'Owner',
       'C',
       'I',
@@ -1131,7 +1116,6 @@ export function RisksPage() {
         risk.title,
         risk.riskCategory || '',
         risk.riskNature || '',
-        formatBoolean(risk.archived),
         risk.owner?.displayName || '',
         risk.confidentialityScore,
         risk.integrityScore,
@@ -1429,14 +1413,6 @@ export function RisksPage() {
                         }
                       >
                         Risk Nature
-                      </Checkbox>
-                      <Checkbox
-                        isChecked={visibleColumns.archived}
-                        onChange={(e) =>
-                          updateVisibleColumns({ ...visibleColumns, archived: e.target.checked })
-                        }
-                      >
-                        Archived
                       </Checkbox>
                       <Checkbox
                         isChecked={visibleColumns.owner}

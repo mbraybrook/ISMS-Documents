@@ -301,5 +301,24 @@ export const supplierApi = {
   },
 };
 
+// SharePoint API functions
+export const sharePointApi = {
+  /**
+   * Get all SharePoint sites the user has access to
+   */
+  getSites: async (): Promise<Array<{ id: string; displayName: string; name: string; webUrl: string }>> => {
+    const graphToken = await authService.getGraphAccessToken();
+    if (!graphToken) {
+      throw new Error('Unable to get Graph access token');
+    }
+    const response = await api.get('/api/sharepoint/sites', {
+      headers: {
+        'x-graph-token': graphToken,
+      },
+    });
+    return response.data.sites || [];
+  },
+};
+
 export default api;
 
