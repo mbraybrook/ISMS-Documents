@@ -15,6 +15,16 @@ services:
       timeout: 5s
       retries: 5
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Optional: Pull the embedding model on startup
+    # This can take a while, so you might want to do it manually
+    # command: sh -c "ollama serve & sleep 5 && ollama pull nomic-embed-text && wait"
+
   backend:
     build:
       context: ./backend
@@ -30,6 +40,8 @@ services:
       - PORT=4000
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/isms_db?schema=public
       - SEED_SCOPE=full
+      - LLM_BASE_URL=http://ollama:11434  # Use service name instead of localhost
+      - LLM_EMBEDDING_MODEL=nomic-embed-text
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -38,6 +50,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      ollama:
+        condition: service_started
 
   frontend:
     build:
@@ -55,4 +69,5 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:
 

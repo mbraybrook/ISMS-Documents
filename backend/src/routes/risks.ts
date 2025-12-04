@@ -464,6 +464,7 @@ router.post(
         mitigatedLikelihood,
         mitigationImplemented,
         mitigationDescription,
+        existingControlsDescription,
         residualRiskTreatmentCategory,
         annexAControlsRaw,
         wizardData,
@@ -619,6 +620,7 @@ router.post(
           mitigatedScore,
           mitigationImplemented: mitigationImplemented ?? false,
           mitigationDescription,
+          existingControlsDescription,
           residualRiskTreatmentCategory,
           annexAControlsRaw,
           isSupplierRisk: isSupplierRisk ?? false,
@@ -712,6 +714,7 @@ router.put(
     body('mitigatedLikelihood').optional().isInt({ min: 1, max: 5 }),
     body('mitigationImplemented').optional().isBoolean(),
     body('mitigationDescription').optional().isString(),
+    body('existingControlsDescription').optional().isString(),
     body('residualRiskTreatmentCategory').optional().isIn(['RETAIN', 'MODIFY', 'SHARE', 'AVOID']),
     body('annexAControlsRaw').optional().isString(),
     body('status').optional().isIn(['DRAFT', 'PROPOSED', 'ACTIVE', 'REJECTED', 'ARCHIVED']),
@@ -879,6 +882,44 @@ router.put(
 
           updateData.mitigatedScore = calculateMitigatedScore(mc, mi, ma, ml);
         }
+      }
+
+      // Transform ownerUserId to Prisma relation syntax
+      if (updateData.ownerUserId !== undefined) {
+        if (updateData.ownerUserId === null || updateData.ownerUserId === '') {
+          updateData.owner = { disconnect: true };
+        } else {
+          updateData.owner = { connect: { id: updateData.ownerUserId } };
+        }
+        delete updateData.ownerUserId;
+      }
+
+      // Transform assetId to Prisma relation syntax if needed
+      if (updateData.assetId !== undefined) {
+        if (updateData.assetId === null || updateData.assetId === '') {
+          updateData.asset = { disconnect: true };
+        } else {
+          updateData.asset = { connect: { id: updateData.assetId } };
+        }
+        // Remove assetId since we're using relation syntax
+        delete updateData.assetId;
+      }
+
+      // Transform assetCategoryId to Prisma relation syntax if needed
+      if (updateData.assetCategoryId !== undefined) {
+        if (updateData.assetCategoryId === null || updateData.assetCategoryId === '') {
+          updateData.linkedAssetCategory = { disconnect: true };
+        } else {
+          updateData.linkedAssetCategory = { connect: { id: updateData.assetCategoryId } };
+        }
+        // Remove assetCategoryId since we're using relation syntax
+        delete updateData.assetCategoryId;
+      }
+
+      // Transform interestedPartyId to Prisma relation syntax if needed
+      if (updateData.interestedPartyId !== undefined) {
+        updateData.interestedParty = { connect: { id: updateData.interestedPartyId } };
+        delete updateData.interestedPartyId;
       }
 
       const risk = await prisma.risk.update({

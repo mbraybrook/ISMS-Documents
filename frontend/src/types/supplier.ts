@@ -171,7 +171,6 @@ export interface SupplierCriticalityAssessment {
   supplierId: string;
   criticality: Criticality;
   rationale: string | null;
-  supportingEvidenceLinks: string[] | null;
   assessedByUserId: string;
   assessedAt: string;
   approvedByUserId: string | null;

@@ -10,6 +10,7 @@ import {
   getDefaultDrive,
   listDrives,
   getSharePointSite,
+  listUserSites,
 } from '../services/sharePointService';
 import { config } from '../config';
 
@@ -514,6 +515,47 @@ router.get(
       res.status(500).json({
         error: 'Failed to verify configuration',
         details: error.message,
+      });
+    }
+  }
+);
+
+// GET /api/sharepoint/sites - list all SharePoint sites the user has access to
+router.get(
+  '/sites',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const accessToken = req.headers['x-graph-token'] as string;
+
+      if (!accessToken) {
+        return res.status(400).json({
+          error:
+            'Access token required. Please provide x-graph-token header with Microsoft Graph access token.',
+        });
+      }
+
+      const sites = await listUserSites(accessToken);
+
+      // Format sites for frontend
+      const formattedSites = sites.map((site: any) => ({
+        id: site.id,
+        displayName: site.displayName || site.name,
+        name: site.name,
+        webUrl: site.webUrl,
+      }));
+
+      res.json({ sites: formattedSites });
+    } catch (error: any) {
+      console.error('Error listing SharePoint sites:', error);
+      res.status(500).json({
+        error: 'Failed to list SharePoint sites',
+        details: error.message || 'Unknown error',
       });
     }
   }

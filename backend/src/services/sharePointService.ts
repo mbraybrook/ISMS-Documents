@@ -238,6 +238,29 @@ export async function listDrives(
 }
 
 /**
+ * List all SharePoint sites the user has access to
+ */
+export async function listUserSites(accessToken: string): Promise<any[]> {
+  try {
+    const client = createGraphClient(accessToken);
+    // Use search to get all sites the user has access to
+    const response = await client.api('/sites?search=*').get();
+    return response.value || [];
+  } catch (error: any) {
+    console.error('Error listing user sites:', error);
+    // If search fails, try without search parameter
+    try {
+      const client = createGraphClient(accessToken);
+      const response = await client.api('/sites').get();
+      return response.value || [];
+    } catch (fallbackError) {
+      console.error('Error listing user sites (fallback):', fallbackError);
+      return [];
+    }
+  }
+}
+
+/**
  * Parse SharePoint web URL and extract Site ID, Drive ID, and Item ID
  * Supports various SharePoint URL formats:
  * - Direct file URLs: https://contoso.sharepoint.com/sites/SiteName/Shared%20Documents/file.docx

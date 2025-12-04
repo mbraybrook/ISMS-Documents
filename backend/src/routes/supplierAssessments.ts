@@ -551,11 +551,6 @@ router.post(
     param('supplierId').isUUID(),
     body('criticality').isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('rationale').optional().isString(),
-    body('supportingEvidenceLinks').optional().custom((value) => {
-      if (value === null || value === undefined) return true;
-      if (Array.isArray(value)) return true;
-      return false;
-    }).withMessage('supportingEvidenceLinks must be an array or null'),
     body('status').optional().isIn(['DRAFT', 'SUBMITTED']),
   ],
   validate,
@@ -583,9 +578,6 @@ router.post(
           supplierId: req.params.supplierId,
           criticality: req.body.criticality,
           rationale: req.body.rationale || null,
-          supportingEvidenceLinks: req.body.supportingEvidenceLinks && Array.isArray(req.body.supportingEvidenceLinks) && req.body.supportingEvidenceLinks.length > 0
-            ? JSON.parse(JSON.stringify(req.body.supportingEvidenceLinks))
-            : null,
           assessedByUserId: user.id,
           status: req.body.status || 'DRAFT',
         },
@@ -725,7 +717,6 @@ router.put(
     param('id').isUUID(),
     body('criticality').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('rationale').optional().isString(),
-    body('supportingEvidenceLinks').optional().isArray(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -745,11 +736,6 @@ router.put(
       const updateData: any = {};
       if (req.body.criticality !== undefined) updateData.criticality = req.body.criticality;
       if (req.body.rationale !== undefined) updateData.rationale = req.body.rationale || null;
-      if (req.body.supportingEvidenceLinks !== undefined) {
-        updateData.supportingEvidenceLinks = req.body.supportingEvidenceLinks
-          ? JSON.parse(JSON.stringify(req.body.supportingEvidenceLinks))
-          : null;
-      }
 
       const updated = await prisma.supplierCriticalityAssessment.update({
         where: { id: req.params.id },

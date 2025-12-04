@@ -22,11 +22,13 @@ import {
   AlertIcon,
   useToast,
   Box,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supplierApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { SharePointFileBrowser } from './SharePointFileBrowser';
 import {
   SupplierType,
   CiaImpact,
@@ -70,7 +72,6 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
   const [step3Data, setStep3Data] = useState({
     criticality: null as Criticality | null,
     rationale: '',
-    supportingEvidenceLinks: [] as string[],
   });
 
   const [step4Data, setStep4Data] = useState({
@@ -83,6 +84,7 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
   });
 
   const [newEvidenceLink, setNewEvidenceLink] = useState('');
+  const { isOpen: isSharePointBrowserOpen, onOpen: onSharePointBrowserOpen, onClose: onSharePointBrowserClose } = useDisclosure();
 
   useEffect(() => {
     if (!isOpen) {
@@ -106,7 +108,6 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
       setStep3Data({
         criticality: null,
         rationale: '',
-        supportingEvidenceLinks: [],
       });
       setStep4Data({
         pciStatus: null,
@@ -205,14 +206,9 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
         // Create criticality assessment (non-blocking - continue even if it fails)
         if (step3Data.criticality) {
           try {
-            const evidenceLinks = step3Data.supportingEvidenceLinks && step3Data.supportingEvidenceLinks.length > 0 
-              ? step3Data.supportingEvidenceLinks.filter((link: string) => link.trim()) 
-              : undefined;
-            
             await supplierApi.createCriticalityAssessment(supplier.id, {
               criticality: step3Data.criticality,
               rationale: step3Data.rationale || null,
-              ...(evidenceLinks !== undefined && { supportingEvidenceLinks: evidenceLinks }),
               status: 'DRAFT',
             });
           } catch (assessmentError: any) {
@@ -261,35 +257,21 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
     }
   };
 
-  const addEvidenceLink = (step: 'step3' | 'step4') => {
+  const addEvidenceLink = (step: 'step4') => {
     if (newEvidenceLink.trim()) {
-      if (step === 'step3') {
-        setStep3Data({
-          ...step3Data,
-          supportingEvidenceLinks: [...step3Data.supportingEvidenceLinks, newEvidenceLink.trim()],
-        });
-      } else {
-        setStep4Data({
-          ...step4Data,
-          complianceEvidenceLinks: [...step4Data.complianceEvidenceLinks, newEvidenceLink.trim()],
-        });
-      }
+      setStep4Data({
+        ...step4Data,
+        complianceEvidenceLinks: [...step4Data.complianceEvidenceLinks, newEvidenceLink.trim()],
+      });
       setNewEvidenceLink('');
     }
   };
 
-  const removeEvidenceLink = (index: number, step: 'step3' | 'step4') => {
-    if (step === 'step3') {
-      setStep3Data({
-        ...step3Data,
-        supportingEvidenceLinks: step3Data.supportingEvidenceLinks.filter((_, i) => i !== index),
-      });
-    } else {
-      setStep4Data({
-        ...step4Data,
-        complianceEvidenceLinks: step4Data.complianceEvidenceLinks.filter((_, i) => i !== index),
-      });
-    }
+  const removeEvidenceLink = (index: number, step: 'step4') => {
+    setStep4Data({
+      ...step4Data,
+      complianceEvidenceLinks: step4Data.complianceEvidenceLinks.filter((_, i) => i !== index),
+    });
   };
 
   const progress = (currentStep / 5) * 100;
@@ -448,37 +430,6 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
                   rows={4}
                 />
               </FormControl>
-
-              <FormControl>
-                <FormLabel>Supporting Evidence Links</FormLabel>
-                <HStack>
-                  <Input
-                    value={newEvidenceLink}
-                    onChange={(e) => setNewEvidenceLink(e.target.value)}
-                    placeholder="Enter evidence URL"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        addEvidenceLink('step3');
-                      }
-                    }}
-                  />
-                  <Button onClick={() => addEvidenceLink('step3')}>Add</Button>
-                </HStack>
-                {step3Data.supportingEvidenceLinks.length > 0 && (
-                  <VStack align="stretch" mt={2}>
-                    {step3Data.supportingEvidenceLinks.map((link, idx) => (
-                      <HStack key={idx} justify="space-between" p={2} bg="gray.50" borderRadius="md">
-                        <Text fontSize="sm" isTruncated flex="1">
-                          {link}
-                        </Text>
-                        <Button size="xs" onClick={() => removeEvidenceLink(idx, 'step3')}>
-                          Remove
-                        </Button>
-                      </HStack>
-                    ))}
-                  </VStack>
-                )}
-              </FormControl>
             </VStack>
           )}
 
@@ -566,6 +517,9 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
                     }}
                   />
                   <Button onClick={() => addEvidenceLink('step4')}>Add</Button>
+                  <Button onClick={onSharePointBrowserOpen} variant="outline">
+                    Browse SharePoint
+                  </Button>
                 </HStack>
                 {step4Data.complianceEvidenceLinks.length > 0 && (
                   <VStack align="stretch" mt={2}>
@@ -651,6 +605,19 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
           </HStack>
         </ModalFooter>
       </ModalContent>
+
+      {/* SharePoint File Browser for Compliance Evidence Links */}
+      <SharePointFileBrowser
+        isOpen={isSharePointBrowserOpen}
+        onClose={onSharePointBrowserClose}
+        onSelect={(item) => {
+          setStep4Data({
+            ...step4Data,
+            complianceEvidenceLinks: [...step4Data.complianceEvidenceLinks, item.webUrl],
+          });
+          onSharePointBrowserClose();
+        }}
+      />
     </Modal>
   );
 }

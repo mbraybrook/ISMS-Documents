@@ -17,7 +17,7 @@ import {
   PerformanceRating,
   SupplierLifecycleState,
 } from '../types/enums';
-import { validateLifecycleTransition } from '../services/supplierLifecycleService';
+// validateLifecycleTransition import removed - lifecycle transitions are now unrestricted
 import { validatePciApprovalRule } from '../services/supplierApprovalService';
 
 const router = Router();
@@ -539,17 +539,8 @@ router.put(
         return res.status(404).json({ error: 'Supplier not found' });
       }
 
-      // Validate lifecycle state transition if provided
-      if (req.body.lifecycleState !== undefined) {
-        const newState = req.body.lifecycleState as SupplierLifecycleState;
-        const currentState = currentSupplier.lifecycleState as SupplierLifecycleState;
-        
-        if (!validateLifecycleTransition(currentState, newState, currentSupplier)) {
-          return res.status(400).json({
-            error: `Invalid lifecycle state transition from ${currentState} to ${newState}`,
-          });
-        }
-      }
+      // Lifecycle state transitions are now unrestricted - any change is allowed
+      // Validation removed per user request
 
       const updateData: any = {
         updatedAt: new Date(),
@@ -723,14 +714,9 @@ router.post(
         return res.status(404).json({ error: 'Supplier not found' });
       }
 
-      const currentState = currentSupplier.lifecycleState as SupplierLifecycleState;
+      // Lifecycle state transitions are now unrestricted - any change is allowed
+      // Validation removed per user request
       const newState: SupplierLifecycleState = 'IN_REVIEW';
-
-      if (!validateLifecycleTransition(currentState, newState, currentSupplier)) {
-        return res.status(400).json({
-          error: `Cannot transition from ${currentState} to ${newState}`,
-        });
-      }
 
       const supplier = await prisma.supplier.update({
         where: { id: req.params.id },
@@ -900,7 +886,6 @@ router.get(
           data: {
             criticality: a.criticality,
             rationale: a.rationale,
-            supportingEvidenceLinks: a.supportingEvidenceLinks,
             rejectionReason: a.rejectionReason,
           },
         })),

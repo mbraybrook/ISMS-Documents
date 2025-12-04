@@ -24,35 +24,16 @@ export interface SupplierWithAssessments {
  * @param newState Desired new state
  * @param supplier Supplier data with assessments
  * @returns true if transition is allowed, false otherwise
+ * 
+ * NOTE: All transitions are now allowed - restrictions have been removed
  */
 export function validateLifecycleTransition(
   currentState: SupplierLifecycleState,
   newState: SupplierLifecycleState,
   supplier?: SupplierWithAssessments
 ): boolean {
-  // Same state is always valid (no-op)
-  if (currentState === newState) {
-    return true;
-  }
-
-  // EXIT_IN_PROGRESS can be set from any state (Phase 4)
-  if (newState === 'EXIT_IN_PROGRESS') {
-    return true;
-  }
-
-  // Valid transitions
-  const validTransitions: Record<SupplierLifecycleState, SupplierLifecycleState[]> = {
-    DRAFT: ['IN_ASSESSMENT', 'EXIT_IN_PROGRESS'],
-    IN_ASSESSMENT: ['AWAITING_APPROVAL', 'DRAFT', 'EXIT_IN_PROGRESS'],
-    AWAITING_APPROVAL: ['APPROVED', 'REJECTED', 'EXIT_IN_PROGRESS'],
-    APPROVED: ['IN_REVIEW', 'EXIT_IN_PROGRESS'],
-    REJECTED: ['DRAFT', 'IN_ASSESSMENT', 'EXIT_IN_PROGRESS'],
-    IN_REVIEW: ['APPROVED', 'AWAITING_APPROVAL', 'EXIT_IN_PROGRESS'],
-    EXIT_IN_PROGRESS: [], // Cannot transition from exit (would need separate exit completion flow)
-  };
-
-  const allowedStates = validTransitions[currentState] || [];
-  return allowedStates.includes(newState);
+  // All transitions are now allowed
+  return true;
 }
 
 /**
