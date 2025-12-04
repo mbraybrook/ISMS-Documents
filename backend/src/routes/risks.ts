@@ -1255,13 +1255,20 @@ router.post(
         }
       }
 
-      // Update control applicability
+      // Update control applicability - ensure this happens before response
       try {
         const { updateControlApplicability } = await import('../services/riskService');
         await updateControlApplicability();
+        console.log(`[RISK-CONTROL] Updated control applicability after linking controls to risk ${id}`);
       } catch (updateError: any) {
-        console.error('Error updating control applicability (non-fatal):', updateError);
+        console.error('[RISK-CONTROL] Error updating control applicability:', updateError);
+        console.error('[RISK-CONTROL] Error details:', {
+          message: updateError.message,
+          code: updateError.code,
+          meta: updateError.meta,
+        });
         // Don't fail the request if this fails - it's a background update
+        // But log it so we can debug
       }
 
       const risk = await prisma.risk.findUnique({

@@ -41,19 +41,28 @@ router.post(
       const format = (req.body.format || 'EXCEL') as 'EXCEL' | 'PDF';
 
       // Generate SoA data
+      console.log('[SOA] Generating SoA data...');
       const soaData = await generateSoAData();
+      console.log(`[SOA] Generated ${soaData.length} SoA rows`);
 
       if (format === 'EXCEL') {
         // Generate Excel file
+        console.log('[SOA] Generating Excel file...');
         const excelBuffer = await generateSoAExcel(soaData);
+        console.log(`[SOA] Excel buffer generated, size: ${excelBuffer.length} bytes`);
 
-        // Create SoAExport record for audit trail
-        await prisma.soAExport.create({
+        // Ensure buffer is a proper Buffer instance
+        const buffer = Buffer.isBuffer(excelBuffer) ? excelBuffer : Buffer.from(excelBuffer);
+
+        // Create SoAExport record for audit trail (don't await - do in background)
+        prisma.soAExport.create({
           data: {
             generatedByUserId: user.id,
             exportFormat: 'EXCEL',
             filePath: null, // File is returned directly, not stored
           },
+        }).catch((err) => {
+          console.error('[SOA] Error creating export record:', err);
         });
 
         // Set response headers for Excel download
@@ -65,8 +74,9 @@ router.post(
           'Content-Disposition',
           `attachment; filename="SoA_${new Date().toISOString().split('T')[0]}.xlsx"`
         );
+        res.setHeader('Content-Length', buffer.length.toString());
 
-        return res.send(excelBuffer);
+        return res.send(buffer);
       } else {
         // PDF export - for now, return error as it's optional
         // In the future, this could use a library like pdfkit or puppeteer
@@ -74,9 +84,18 @@ router.post(
           error: 'PDF export not yet implemented. Please use EXCEL format.',
         });
       }
-    } catch (error) {
-      console.error('Error generating SoA export:', error);
-      res.status(500).json({ error: 'Failed to generate SoA export' });
+    } catch (error: any) {
+      console.error('[SOA] Error generating SoA export:', error);
+      console.error('[SOA] Error stack:', error.stack);
+      console.error('[SOA] Error details:', {
+        message: error.message,
+        name: error.name,
+        code: error.code,
+      });
+      res.status(500).json({ 
+        error: 'Failed to generate SoA export',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
     }
   }
 );

@@ -46,7 +46,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       take: 10,
     });
 
-    // Upcoming documents (next 30 days)
+    // Upcoming documents (next 30 days) - no limit to get accurate count
     const upcomingDocuments = await prisma.document.findMany({
       where: {
         nextReviewDate: {
@@ -72,7 +72,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       orderBy: {
         nextReviewDate: 'asc',
       },
-      take: 10,
+      // Removed take: 10 limit to get accurate count matching Reviews dashboard
     });
 
     // Documents missing review dates
@@ -130,6 +130,38 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         dueDate: 'asc',
       },
       take: 10,
+    });
+
+    // Upcoming review tasks (next 30 days) - no limit to get accurate count
+    const upcomingReviewTasks = await prisma.reviewTask.findMany({
+      where: {
+        dueDate: {
+          gte: now,
+          lte: thirtyDaysFromNow,
+        },
+        status: 'PENDING',
+      },
+      include: {
+        document: {
+          select: {
+            id: true,
+            title: true,
+            version: true,
+            type: true,
+          },
+        },
+        reviewer: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        dueDate: 'asc',
+      },
+      // Removed take: 10 limit to get accurate count matching Reviews dashboard
     });
 
     // Documents by status
@@ -353,6 +385,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         upcoming: upcomingDocuments,
         missingReviewDate: documentsMissingReviewDate,
         overdueReviewTasks,
+        upcomingReviewTasks,
         byStatus: documentsByStatus.reduce((acc, item) => {
           acc[item.status] = item._count;
           return acc;

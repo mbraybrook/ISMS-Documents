@@ -1,7 +1,7 @@
 // Type definitions for Supplier
 export type SupplierStatus = 'ACTIVE' | 'IN_ONBOARDING' | 'IN_EXIT' | 'INACTIVE';
 export type SupplierType = 'SERVICE_PROVIDER' | 'CONNECTED_ENTITY' | 'PCI_SERVICE_PROVIDER';
-export type ServiceSubType = 'CLOUD_VENDOR' | 'SAAS' | 'OTHER';
+export type ServiceSubType = 'SAAS';
 export type CiaImpact = 'LOW' | 'MEDIUM' | 'HIGH';
 export type RiskRating = 'LOW' | 'MEDIUM' | 'HIGH';
 export type Criticality = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -41,12 +41,8 @@ export function getSupplierTypeDisplayName(type: SupplierType | null | undefined
 
 export function getServiceSubTypeDisplayName(type: ServiceSubType | null | undefined): string {
   if (!type) return 'Not specified';
-  const displayNames: Record<ServiceSubType, string> = {
-    CLOUD_VENDOR: 'Cloud Vendor',
-    SAAS: 'SaaS',
-    OTHER: 'Other',
-  };
-  return displayNames[type] || type;
+  if (type === 'SAAS') return 'SaaS';
+  return type;
 }
 
 export function getCiaImpactDisplayName(impact: CiaImpact | null | undefined): string {

@@ -146,64 +146,113 @@ export const trustApi = {
   },
 
   async downloadDocument(docId: string, token?: string): Promise<{ blob: Blob; filename: string }> {
-    const url = token
-      ? `${API_URL}/download/${docId}?token=${token}`
-      : `${API_URL}/download/${docId}`;
-    
-    const response = await axios.get(url, {
-      responseType: 'blob',
-      headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
-    });
-    
-    // Extract filename from Content-Disposition header
-    let filename = 'document';
-    const contentDisposition = response.headers['content-disposition'];
-    if (contentDisposition) {
-      // Try RFC 5987 encoded filename first (filename*=UTF-8''...)
-      const encodedMatch = contentDisposition.match(/filename\*=UTF-8''(.+?)(?:;|$)/);
-      if (encodedMatch) {
-        filename = decodeURIComponent(encodedMatch[1]);
-      } else {
-        // Fall back to regular filename
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '');
+    try {
+      const url = token
+        ? `${API_URL}/download/${docId}?token=${token}`
+        : `${API_URL}/download/${docId}`;
+      
+      console.log('[TRUST-API] Downloading document:', { docId, url, hasToken: !!token });
+      
+      const response = await axios.get(url, {
+        responseType: 'blob',
+        headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+        timeout: 60000, // 60 second timeout for large files
+      });
+      
+      console.log('[TRUST-API] Download response received:', {
+        status: response.status,
+        contentType: response.headers['content-type'],
+        contentLength: response.headers['content-length'],
+        dataType: response.data?.constructor?.name,
+        dataSize: response.data?.size || response.data?.length,
+      });
+      
+      // Extract filename from Content-Disposition header
+      let filename = 'document';
+      const contentDisposition = response.headers['content-disposition'];
+      if (contentDisposition) {
+        // Try RFC 5987 encoded filename first (filename*=UTF-8''...)
+        const encodedMatch = contentDisposition.match(/filename\*=UTF-8''(.+?)(?:;|$)/);
+        if (encodedMatch) {
+          filename = decodeURIComponent(encodedMatch[1]);
+        } else {
+          // Fall back to regular filename
+          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (filenameMatch && filenameMatch[1]) {
+            filename = filenameMatch[1].replace(/['"]/g, '');
+          }
         }
       }
-    }
-    
-    // Get content type from response headers
-    // All documents are now converted to PDF, so default to PDF
-    const contentType = response.headers['content-type'] || 'application/pdf';
-    
-    // Axios with responseType: 'blob' should return a Blob
-    // However, we need to ensure it's properly created with the correct MIME type
-    let blob: Blob;
-    
-    if (response.data instanceof Blob) {
-      // Already a Blob - but we should ensure it has the correct type
-      // If the type is generic, update it from headers
-      if (response.data.type === '' || response.data.type === 'application/octet-stream') {
-        blob = new Blob([response.data], { type: contentType });
+      
+      // Get content type from response headers
+      // All documents are now converted to PDF, so default to PDF
+      const contentType = response.headers['content-type'] || 'application/pdf';
+      
+      // Axios with responseType: 'blob' should return a Blob
+      // However, we need to ensure it's properly created with the correct MIME type
+      let blob: Blob;
+      
+      if (response.data instanceof Blob) {
+        // Already a Blob - but we should ensure it has the correct type
+        // If the type is generic, update it from headers
+        if (response.data.type === '' || response.data.type === 'application/octet-stream') {
+          blob = new Blob([response.data], { type: contentType });
+        } else {
+          blob = response.data;
+        }
       } else {
-        blob = response.data;
+        // Convert to Blob with proper MIME type from headers
+        if (response.data instanceof ArrayBuffer) {
+          blob = new Blob([response.data], { type: contentType });
+        } else {
+          // For other types, create blob with correct type
+          blob = new Blob([response.data], { type: contentType });
+        }
       }
-    } else {
-      // Convert to Blob with proper MIME type from headers
-      if (response.data instanceof ArrayBuffer) {
-        blob = new Blob([response.data], { type: contentType });
-      } else {
-        // For other types, create blob with correct type
-        blob = new Blob([response.data], { type: contentType });
+      
+      // Validate blob size
+      if (blob.size === 0) {
+        throw new Error('Received empty file from server');
       }
+      
+      console.log('[TRUST-API] Blob created successfully:', {
+        size: blob.size,
+        type: blob.type,
+        filename,
+      });
+      
+      return { blob, filename };
+    } catch (error: any) {
+      console.error('[TRUST-API] Download error:', error);
+      console.error('[TRUST-API] Error details:', {
+        message: error.message,
+        response: error.response ? {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          headers: error.response.headers,
+        } : null,
+      });
+      
+      // If it's an error response with JSON data, try to extract the error message
+      if (error.response?.data) {
+        // If the response is a blob (error response), try to read it as text
+        if (error.response.data instanceof Blob) {
+          try {
+            const errorText = await error.response.data.text();
+            const errorJson = JSON.parse(errorText);
+            throw new Error(errorJson.error || errorJson.message || 'Download failed');
+          } catch (parseError) {
+            // If parsing fails, use the original error
+            throw new Error(error.response.statusText || 'Download failed');
+          }
+        } else if (typeof error.response.data === 'object' && error.response.data.error) {
+          throw new Error(error.response.data.error);
+        }
+      }
+      
+      throw error;
     }
-    
-    // Validate blob size
-    if (blob.size === 0) {
-      throw new Error('Received empty file');
-    }
-    
-    return { blob, filename };
   },
 
   async acceptTerms(documentId?: string): Promise<{ message: string }> {

@@ -127,17 +127,24 @@ export async function updateRiskControls(riskId: string, controlCodes: string[])
 export async function updateControlApplicability() {
   // Optimize: Use a single raw SQL query to update all controls at once
   // This sets selectedForRiskAssessment to true if the control is referenced in RiskControl, false otherwise
-  await prisma.$executeRaw`
-    UPDATE Control
-    SET selectedForRiskAssessment = (
-      CASE 
-        WHEN EXISTS (
-          SELECT 1 FROM RiskControl WHERE RiskControl.controlId = Control.id
-        ) THEN 1 
-        ELSE 0 
-      END
-    )
-  `;
+  // Note: PostgreSQL requires quoted identifiers for case-sensitive table/column names
+  try {
+    await prisma.$executeRaw`
+      UPDATE "Control"
+      SET "selectedForRiskAssessment" = (
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM "RiskControl" WHERE "RiskControl"."controlId" = "Control"."id"
+          ) THEN true 
+          ELSE false 
+        END
+      )
+    `;
+    console.log('[CONTROL-APPLICABILITY] Successfully updated control applicability flags');
+  } catch (error: any) {
+    console.error('[CONTROL-APPLICABILITY] Error updating control applicability:', error);
+    throw error; // Re-throw so caller can handle it
+  }
 }
 
 /**
