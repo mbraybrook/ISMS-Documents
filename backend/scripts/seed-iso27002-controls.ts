@@ -55,9 +55,40 @@ async function seedISO27002Controls() {
         });
         
         if (existing) {
-          // Update existing control if it's not a standard control yet
-          // or if we need to update the standard control fields
-          if (!existing.isStandardControl) {
+          // Always update standard controls to ensure they match the source document
+          // This is important when the source document is corrected or updated
+          if (existing.isStandardControl) {
+            // Check if any fields have changed
+            const hasChanges = 
+              existing.title !== control.title ||
+              existing.controlText !== control.controlText ||
+              existing.purpose !== control.purpose ||
+              existing.guidance !== control.guidance ||
+              existing.otherInformation !== control.otherInformation ||
+              existing.category !== control.category ||
+              existing.description !== control.controlText.substring(0, 500);
+            
+            if (hasChanges) {
+              await prisma.control.update({
+                where: { code: control.code },
+                data: {
+                  title: control.title,
+                  description: control.controlText.substring(0, 500), // Use control text as description
+                  controlText: control.controlText,
+                  purpose: control.purpose,
+                  guidance: control.guidance,
+                  otherInformation: control.otherInformation,
+                  category: control.category,
+                  updatedAt: new Date(),
+                },
+              });
+              updated++;
+              console.log(`  ↻ Updated: ${control.code} - ${control.title}`);
+            } else {
+              skipped++;
+              console.log(`  ⊘ Skipped (no changes): ${control.code} - ${control.title}`);
+            }
+          } else {
             // Update non-standard control to become standard
             await prisma.control.update({
               where: { code: control.code },
@@ -75,10 +106,6 @@ async function seedISO27002Controls() {
             });
             updated++;
             console.log(`  ↻ Updated: ${control.code} - ${control.title}`);
-          } else {
-            // Standard control already exists, skip
-            skipped++;
-            console.log(`  ⊘ Skipped (already exists): ${control.code} - ${control.title}`);
           }
         } else {
           // Create new control

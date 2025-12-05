@@ -173,6 +173,7 @@ export function RisksPage() {
     treatmentCategory: '',
     mitigationImplemented: '',
     policyNonConformance: '',
+    controlsApplied: '',
     riskLevel: '',
     search: '',
     dateAddedFrom: '',
@@ -278,6 +279,8 @@ export function RisksPage() {
         params.append('mitigationImplemented', filters.mitigationImplemented === 'true' ? 'true' : 'false');
       if (filters.policyNonConformance !== '')
         params.append('policyNonConformance', filters.policyNonConformance === 'true' ? 'true' : 'false');
+      if (filters.controlsApplied !== '')
+        params.append('controlsApplied', filters.controlsApplied === 'true' ? 'true' : 'false');
       if (filters.riskLevel) {
         params.append('riskLevel', filters.riskLevel);
       }
@@ -561,6 +564,8 @@ export function RisksPage() {
     if (filters.ownerId) count++;
     if (filters.treatmentCategory) count++;
     if (filters.mitigationImplemented) count++;
+    if (filters.policyNonConformance) count++;
+    if (filters.controlsApplied) count++;
     if (filters.riskLevel) count++;
     if (filters.search) count++;
     if (filters.dateAddedFrom || filters.dateAddedTo) count++;
@@ -1112,6 +1117,15 @@ export function RisksPage() {
       ],
     },
     {
+      key: 'controlsApplied',
+      type: 'select',
+      placeholder: 'Controls Applied',
+      options: [
+        { value: 'true', label: 'Has Controls' },
+        { value: 'false', label: 'No Controls' },
+      ],
+    },
+    {
       key: 'status',
       type: 'select',
       placeholder: 'Status',
@@ -1250,6 +1264,8 @@ export function RisksPage() {
         params.append('mitigationImplemented', filters.mitigationImplemented === 'true' ? 'true' : 'false');
       if (filters.policyNonConformance !== '')
         params.append('policyNonConformance', filters.policyNonConformance === 'true' ? 'true' : 'false');
+      if (filters.controlsApplied !== '')
+        params.append('controlsApplied', filters.controlsApplied === 'true' ? 'true' : 'false');
       if (filters.riskLevel) params.append('riskLevel', filters.riskLevel);
       if (filters.search) params.append('search', filters.search);
       if (filters.dateAddedFrom) params.append('dateAddedFrom', filters.dateAddedFrom);
@@ -1640,6 +1656,8 @@ export function RisksPage() {
                 treatmentCategory: filters.treatmentCategory,
                 riskLevel: filters.riskLevel,
                 mitigationImplemented: filters.mitigationImplemented,
+                policyNonConformance: filters.policyNonConformance,
+                controlsApplied: filters.controlsApplied,
                 status: filters.status,
                 department: filters.department,
               }}
@@ -1662,6 +1680,8 @@ export function RisksPage() {
                   ownerId: '',
                   treatmentCategory: '',
                   mitigationImplemented: '',
+                  policyNonConformance: '',
+                  controlsApplied: '',
                   riskLevel: '',
                   search: '',
                   dateAddedFrom: '',

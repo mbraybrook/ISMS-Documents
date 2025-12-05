@@ -89,6 +89,7 @@ model Control {
   category                         String?
   isStandardControl                Boolean           @default(false)
   implemented                      Boolean           @default(false)
+  embedding                        Json?
   createdAt                        DateTime          @default(now())
   updatedAt                        DateTime
   documentControls                 DocumentControl[]
