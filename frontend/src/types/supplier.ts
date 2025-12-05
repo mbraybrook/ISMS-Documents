@@ -8,12 +8,7 @@ export type PciStatus = 'UNKNOWN' | 'PASS' | 'FAIL' | 'NOT_APPLICABLE';
 export type IsoStatus = 'UNKNOWN' | 'CERTIFIED' | 'NOT_CERTIFIED' | 'IN_PROGRESS' | 'NOT_APPLICABLE';
 export type GdprStatus = 'UNKNOWN' | 'ADEQUATE' | 'HIGH_RISK' | 'NOT_APPLICABLE';
 export type PerformanceRating = 'GOOD' | 'CAUTION' | 'BAD';
-export type AssessmentStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
-export type SupplierLifecycleState = 'DRAFT' | 'IN_ASSESSMENT' | 'AWAITING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'IN_REVIEW' | 'EXIT_IN_PROGRESS';
-export type ReviewType = 'SCHEDULED' | 'TRIGGERED_BY_INCIDENT' | 'TRIGGERED_BY_CHANGE';
-export type ReviewOutcome = 'PASS' | 'ISSUES_FOUND' | 'FAIL';
-export type CertificateType = 'PCI' | 'ISO27001' | 'ISO22301' | 'ISO9001' | 'GDPR' | 'OTHER';
-export type ExitPlanStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type SupplierLifecycleState = 'DRAFT' | 'AWAITING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'IN_REVIEW' | 'EXIT_IN_PROGRESS';
 export type TrustCenterCategory = 'HOSTING' | 'PAYMENTS' | 'COMMUNICATIONS' | 'SECURITY' | 'OTHER';
 
 // Helper functions for display names
@@ -98,22 +93,10 @@ export function getPerformanceRatingDisplayName(rating: PerformanceRating | null
   return displayNames[rating] || rating;
 }
 
-export function getAssessmentStatusDisplayName(status: AssessmentStatus | null | undefined): string {
-  if (!status) return 'Unknown';
-  const displayNames: Record<AssessmentStatus, string> = {
-    DRAFT: 'Draft',
-    SUBMITTED: 'Submitted',
-    APPROVED: 'Approved',
-    REJECTED: 'Rejected',
-  };
-  return displayNames[status] || status;
-}
-
 export function getLifecycleStateDisplayName(state: SupplierLifecycleState | null | undefined): string {
   if (!state) return 'Unknown';
   const displayNames: Record<SupplierLifecycleState, string> = {
     DRAFT: 'Draft',
-    IN_ASSESSMENT: 'In Assessment',
     AWAITING_APPROVAL: 'Awaiting Approval',
     APPROVED: 'Approved',
     REJECTED: 'Rejected',
@@ -130,83 +113,6 @@ export interface SupplierContact {
   email: string;
   phone: string;
   notes: string;
-}
-
-// User interface for assessments
-export interface User {
-  id: string;
-  displayName: string;
-  email: string;
-}
-
-// Risk Assessment interface
-export interface SupplierRiskAssessment {
-  id: string;
-  supplierId: string;
-  supplierType: SupplierType;
-  riskRating: RiskRating;
-  rationale: string | null;
-  assessedByUserId: string;
-  assessedAt: string;
-  approvedByUserId: string | null;
-  approvedAt: string | null;
-  status: AssessmentStatus;
-  rejectionReason: string | null;
-  assessedBy: User;
-  approvedBy: User | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Criticality Assessment interface
-export interface SupplierCriticalityAssessment {
-  id: string;
-  supplierId: string;
-  criticality: Criticality;
-  rationale: string | null;
-  assessedByUserId: string;
-  assessedAt: string;
-  approvedByUserId: string | null;
-  approvedAt: string | null;
-  status: AssessmentStatus;
-  rejectionReason: string | null;
-  assessedBy: User;
-  approvedBy: User | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Compliance Review interface
-export interface SupplierComplianceReview {
-  id: string;
-  supplierId: string;
-  reviewType: ReviewType;
-  plannedAt: string;
-  completedAt: string | null;
-  reviewedByUserId: string | null;
-  checksPerformed: string | null;
-  outcome: ReviewOutcome | null;
-  updatedPerformanceRating: PerformanceRating | null;
-  notes: string | null;
-  evidenceLinks: string[] | null;
-  reviewedBy: User | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Certificate interface
-export interface SupplierCertificate {
-  id: string;
-  supplierId: string;
-  certificateType: CertificateType;
-  certificateNumber: string | null;
-  issuer: string | null;
-  issueDate: string | null;
-  expiryDate: string;
-  evidenceLink: string | null;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
 }
 
 // Exit Plan Section interfaces
@@ -256,11 +162,6 @@ export interface LessonsLearned {
 export interface SupplierExitPlan {
   id: string;
   supplierId: string;
-  reason: string | null;
-  startDate: string | null;
-  targetEndDate: string | null;
-  completedAt: string | null;
-  status: ExitPlanStatus;
   impactAssessment: ImpactAssessment | null;
   dataAndIpr: DataAndIpr | null;
   replacementServiceAnalysis: ReplacementServiceAnalysis | null;
@@ -287,14 +188,11 @@ export interface Supplier {
   criticality: Criticality | null;
   riskRationale: string | null;
   criticalityRationale: string | null;
-  lastRiskAssessmentAt: string | null;
-  lastCriticalityAssessmentAt: string | null;
   pciStatus: PciStatus | null;
   iso27001Status: IsoStatus | null;
   iso22301Status: IsoStatus | null;
   iso9001Status: IsoStatus | null;
   gdprStatus: GdprStatus | null;
-  lastComplianceReviewAt: string | null;
   complianceEvidenceLinks: string[] | null;
   relationshipOwnerUserId: string | null;
   relationshipOwner: {
@@ -312,12 +210,7 @@ export interface Supplier {
   performanceNotes: string | null;
   lifecycleState: SupplierLifecycleState;
   cisoExemptionGranted: boolean;
-  currentRiskAssessmentId: string | null;
-  currentCriticalityAssessmentId: string | null;
-  currentRiskAssessment: SupplierRiskAssessment | null;
-  currentCriticalityAssessment: SupplierCriticalityAssessment | null;
-  nextReviewAt: string | null;
-  lastReviewAt: string | null;
+  reviewDate: string | null;
   supplierRisks?: Array<{
     risk: {
       id: string;
@@ -336,7 +229,6 @@ export interface Supplier {
       category: string | null;
     };
   }>;
-  complianceReviews?: SupplierComplianceReview[];
   certificates?: SupplierCertificate[];
   exitPlan?: SupplierExitPlan | null;
   showInTrustCenter: boolean;

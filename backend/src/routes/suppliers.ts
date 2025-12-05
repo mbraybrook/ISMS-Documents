@@ -51,7 +51,7 @@ router.get(
     query('iso27001Status').optional().isIn(['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS']),
     query('status').optional().isIn(['ACTIVE', 'IN_ONBOARDING', 'IN_EXIT', 'INACTIVE']),
     query('performanceRating').optional().isIn(['GOOD', 'CAUTION', 'BAD']),
-    query('lifecycleState').optional().isIn(['DRAFT', 'IN_ASSESSMENT', 'AWAITING_APPROVAL', 'APPROVED', 'REJECTED', 'IN_REVIEW', 'EXIT_IN_PROGRESS']),
+    query('lifecycleState').optional().isIn(['DRAFT', 'AWAITING_APPROVAL', 'APPROVED', 'REJECTED', 'IN_REVIEW', 'EXIT_IN_PROGRESS']),
     query('search').optional().isString(),
   ],
   validate,
@@ -123,22 +123,6 @@ router.get(
               email: true,
             },
           },
-          currentRiskAssessment: {
-            select: {
-              id: true,
-              status: true,
-              riskRating: true,
-              assessedAt: true,
-            },
-          },
-          currentCriticalityAssessment: {
-            select: {
-              id: true,
-              status: true,
-              criticality: true,
-              assessedAt: true,
-            },
-          },
         },
       });
 
@@ -192,42 +176,6 @@ router.get(
               email: true,
             },
           },
-          currentRiskAssessment: {
-            include: {
-              assessedBy: {
-                select: {
-                  id: true,
-                  displayName: true,
-                  email: true,
-                },
-              },
-              approvedBy: {
-                select: {
-                  id: true,
-                  displayName: true,
-                  email: true,
-                },
-              },
-            },
-          },
-          currentCriticalityAssessment: {
-            include: {
-              assessedBy: {
-                select: {
-                  id: true,
-                  displayName: true,
-                  email: true,
-                },
-              },
-              approvedBy: {
-                select: {
-                  id: true,
-                  displayName: true,
-                  email: true,
-                },
-              },
-            },
-          },
           supplierRisks: {
             include: {
               risk: {
@@ -253,22 +201,6 @@ router.get(
                 },
               },
             },
-          },
-          complianceReviews: {
-            include: {
-              reviewedBy: {
-                select: {
-                  id: true,
-                  displayName: true,
-                  email: true,
-                },
-              },
-            },
-            orderBy: { plannedAt: 'desc' },
-            take: 10, // Limit to most recent 10
-          },
-          certificates: {
-            orderBy: { expiryDate: 'asc' },
           },
           exitPlan: true,
         },
@@ -309,14 +241,12 @@ router.post(
     body('criticality').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('riskRationale').optional().isString(),
     body('criticalityRationale').optional().isString(),
-    body('lastRiskAssessmentAt').optional().isISO8601().toDate(),
-    body('lastCriticalityAssessmentAt').optional().isISO8601().toDate(),
     body('pciStatus').optional().isIn(['UNKNOWN', 'PASS', 'FAIL', 'NOT_APPLICABLE']),
     body('iso27001Status').optional().isIn(['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS']),
     body('iso22301Status').optional().isIn(['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS']),
     body('iso9001Status').optional().isIn(['UNKNOWN', 'CERTIFIED', 'NOT_CERTIFIED', 'IN_PROGRESS']),
     body('gdprStatus').optional().isIn(['UNKNOWN', 'ADEQUATE', 'HIGH_RISK', 'NOT_APPLICABLE']),
-    body('lastComplianceReviewAt').optional().isISO8601().toDate(),
+    body('reviewDate').optional().isISO8601().toDate(),
     body('complianceEvidenceLinks').optional().isArray(),
     body('relationshipOwnerUserId').optional().isUUID(),
     body('primaryContacts').optional().isArray(),
@@ -327,7 +257,7 @@ router.post(
     body('autoRenewal').optional().isBoolean(),
     body('performanceRating').optional().isIn(['GOOD', 'CAUTION', 'BAD']),
     body('performanceNotes').optional().isString(),
-    body('lifecycleState').optional().isIn(['DRAFT', 'IN_ASSESSMENT', 'AWAITING_APPROVAL', 'APPROVED', 'REJECTED', 'IN_REVIEW', 'EXIT_IN_PROGRESS']),
+    body('lifecycleState').optional().isIn(['DRAFT', 'AWAITING_APPROVAL', 'APPROVED', 'REJECTED', 'IN_REVIEW', 'EXIT_IN_PROGRESS']),
     body('cisoExemptionGranted').optional().isBoolean(),
   ],
   validate,
@@ -358,14 +288,12 @@ router.post(
         criticality: req.body.criticality || null,
         riskRationale: req.body.riskRationale || null,
         criticalityRationale: req.body.criticalityRationale || null,
-        lastRiskAssessmentAt: req.body.lastRiskAssessmentAt ? new Date(req.body.lastRiskAssessmentAt) : null,
-        lastCriticalityAssessmentAt: req.body.lastCriticalityAssessmentAt ? new Date(req.body.lastCriticalityAssessmentAt) : null,
         pciStatus: req.body.pciStatus || null,
         iso27001Status: req.body.iso27001Status || null,
         iso22301Status: req.body.iso22301Status || null,
         iso9001Status: req.body.iso9001Status || null,
         gdprStatus: req.body.gdprStatus || null,
-        lastComplianceReviewAt: req.body.lastComplianceReviewAt ? new Date(req.body.lastComplianceReviewAt) : null,
+        reviewDate: req.body.reviewDate ? new Date(req.body.reviewDate) : null,
         complianceEvidenceLinks: req.body.complianceEvidenceLinks ? JSON.parse(JSON.stringify(req.body.complianceEvidenceLinks)) : null,
         relationshipOwnerUserId: req.body.relationshipOwnerUserId || null,
         primaryContacts: req.body.primaryContacts ? JSON.parse(JSON.stringify(req.body.primaryContacts)) : null,
@@ -453,14 +381,6 @@ router.put(
     }).withMessage('criticality must be LOW, MEDIUM, or HIGH'),
     body('riskRationale').optional().isString(),
     body('criticalityRationale').optional().isString(),
-    body('lastRiskAssessmentAt').optional().custom((value) => {
-      if (value === null || value === undefined || value === '') return true;
-      return /^\d{4}-\d{2}-\d{2}$/.test(value) || !isNaN(Date.parse(value));
-    }).withMessage('lastRiskAssessmentAt must be a valid date'),
-    body('lastCriticalityAssessmentAt').optional().custom((value) => {
-      if (value === null || value === undefined || value === '') return true;
-      return /^\d{4}-\d{2}-\d{2}$/.test(value) || !isNaN(Date.parse(value));
-    }).withMessage('lastCriticalityAssessmentAt must be a valid date'),
     body('pciStatus').optional().custom((value) => {
       if (value === null || value === undefined) return true;
       return ['UNKNOWN', 'PASS', 'FAIL', 'NOT_APPLICABLE'].includes(value);
@@ -481,10 +401,10 @@ router.put(
       if (value === null || value === undefined) return true;
       return ['UNKNOWN', 'ADEQUATE', 'HIGH_RISK', 'NOT_APPLICABLE'].includes(value);
     }).withMessage('gdprStatus must be UNKNOWN, ADEQUATE, HIGH_RISK, or NOT_APPLICABLE'),
-    body('lastComplianceReviewAt').optional().custom((value) => {
+    body('reviewDate').optional().custom((value) => {
       if (value === null || value === undefined || value === '') return true;
       return /^\d{4}-\d{2}-\d{2}$/.test(value) || !isNaN(Date.parse(value));
-    }).withMessage('lastComplianceReviewAt must be a valid date'),
+    }).withMessage('reviewDate must be a valid date'),
     body('complianceEvidenceLinks').optional().isArray(),
     body('relationshipOwnerUserId').optional().custom((value) => {
       if (value === null || value === undefined) return true;
@@ -507,7 +427,7 @@ router.put(
       return ['GOOD', 'CAUTION', 'BAD'].includes(value);
     }).withMessage('performanceRating must be GOOD, CAUTION, or BAD'),
     body('performanceNotes').optional().isString(),
-    body('lifecycleState').optional().isIn(['DRAFT', 'IN_ASSESSMENT', 'AWAITING_APPROVAL', 'APPROVED', 'REJECTED', 'IN_REVIEW', 'EXIT_IN_PROGRESS']),
+    body('lifecycleState').optional().isIn(['DRAFT', 'AWAITING_APPROVAL', 'APPROVED', 'REJECTED', 'IN_REVIEW', 'EXIT_IN_PROGRESS']),
     body('cisoExemptionGranted').optional().isBoolean(),
   ],
   validate,
@@ -554,14 +474,12 @@ router.put(
       if (req.body.criticality !== undefined) updateData.criticality = req.body.criticality || null;
       if (req.body.riskRationale !== undefined) updateData.riskRationale = req.body.riskRationale || null;
       if (req.body.criticalityRationale !== undefined) updateData.criticalityRationale = req.body.criticalityRationale || null;
-      if (req.body.lastRiskAssessmentAt !== undefined) updateData.lastRiskAssessmentAt = req.body.lastRiskAssessmentAt && req.body.lastRiskAssessmentAt.trim() !== '' ? new Date(req.body.lastRiskAssessmentAt) : null;
-      if (req.body.lastCriticalityAssessmentAt !== undefined) updateData.lastCriticalityAssessmentAt = req.body.lastCriticalityAssessmentAt && req.body.lastCriticalityAssessmentAt.trim() !== '' ? new Date(req.body.lastCriticalityAssessmentAt) : null;
       if (req.body.pciStatus !== undefined) updateData.pciStatus = req.body.pciStatus || null;
       if (req.body.iso27001Status !== undefined) updateData.iso27001Status = req.body.iso27001Status || null;
       if (req.body.iso22301Status !== undefined) updateData.iso22301Status = req.body.iso22301Status || null;
       if (req.body.iso9001Status !== undefined) updateData.iso9001Status = req.body.iso9001Status || null;
       if (req.body.gdprStatus !== undefined) updateData.gdprStatus = req.body.gdprStatus || null;
-      if (req.body.lastComplianceReviewAt !== undefined) updateData.lastComplianceReviewAt = req.body.lastComplianceReviewAt && req.body.lastComplianceReviewAt.trim() !== '' ? new Date(req.body.lastComplianceReviewAt) : null;
+      if (req.body.reviewDate !== undefined) updateData.reviewDate = req.body.reviewDate && req.body.reviewDate.trim() !== '' ? new Date(req.body.reviewDate) : null;
       if (req.body.complianceEvidenceLinks !== undefined) updateData.complianceEvidenceLinks = req.body.complianceEvidenceLinks ? JSON.parse(JSON.stringify(req.body.complianceEvidenceLinks)) : null;
       if (req.body.relationshipOwnerUserId !== undefined) updateData.relationshipOwnerUserId = req.body.relationshipOwnerUserId || null;
       if (req.body.primaryContacts !== undefined) updateData.primaryContacts = req.body.primaryContacts ? JSON.parse(JSON.stringify(req.body.primaryContacts)) : null;
@@ -676,289 +594,6 @@ router.patch(
       }
       console.error('Error archiving supplier:', error);
       res.status(500).json({ error: 'Failed to archive supplier' });
-    }
-  }
-);
-
-// POST /api/suppliers/:id/start-review - Manually trigger IN_REVIEW state
-router.post(
-  '/:id/start-review',
-  authenticateToken,
-  requireRole('ADMIN', 'EDITOR'),
-  [param('id').isUUID()],
-  validate,
-  async (req: AuthRequest, res: Response) => {
-    try {
-      const user = await prisma.user.findUnique({
-        where: { email: req.user!.email },
-      });
-
-      if (!user) {
-        return res.status(403).json({ error: 'User not found' });
-      }
-
-      const currentSupplier = await prisma.supplier.findUnique({
-        where: { id: req.params.id },
-      });
-
-      if (!currentSupplier) {
-        return res.status(404).json({ error: 'Supplier not found' });
-      }
-
-      // Lifecycle state transitions are now unrestricted - any change is allowed
-      // Validation removed per user request
-      const newState: SupplierLifecycleState = 'IN_REVIEW';
-
-      const supplier = await prisma.supplier.update({
-        where: { id: req.params.id },
-        data: {
-          lifecycleState: newState,
-          updatedAt: new Date(),
-          updatedByUserId: user.id,
-        },
-        include: {
-          relationshipOwner: {
-            select: {
-              id: true,
-              displayName: true,
-              email: true,
-            },
-          },
-          createdBy: {
-            select: {
-              id: true,
-              displayName: true,
-              email: true,
-            },
-          },
-          updatedBy: {
-            select: {
-              id: true,
-              displayName: true,
-              email: true,
-            },
-          },
-          currentRiskAssessment: {
-            include: {
-              assessedBy: {
-                select: {
-                  id: true,
-                  displayName: true,
-                  email: true,
-                },
-              },
-              approvedBy: {
-                select: {
-                  id: true,
-                  displayName: true,
-                  email: true,
-                },
-              },
-            },
-          },
-          currentCriticalityAssessment: {
-            include: {
-              assessedBy: {
-                select: {
-                  id: true,
-                  displayName: true,
-                  email: true,
-                },
-              },
-              approvedBy: {
-                select: {
-                  id: true,
-                  displayName: true,
-                  email: true,
-                },
-              },
-            },
-          },
-        },
-      });
-
-      res.json(supplier);
-    } catch (error: any) {
-      if (error.code === 'P2025') {
-        return res.status(404).json({ error: 'Supplier not found' });
-      }
-      console.error('Error starting review:', error);
-      res.status(500).json({ error: 'Failed to start review' });
-    }
-  }
-);
-
-// GET /api/suppliers/:id/assessment-history - Get timeline of all assessments and approvals
-router.get(
-  '/:id/assessment-history',
-  authenticateToken,
-  [param('id').isUUID()],
-  validate,
-  async (req: AuthRequest, res: Response) => {
-    try {
-      const supplier = await prisma.supplier.findUnique({
-        where: { id: req.params.id },
-      });
-
-      if (!supplier) {
-        return res.status(404).json({ error: 'Supplier not found' });
-      }
-
-      const [riskAssessments, criticalityAssessments] = await Promise.all([
-        prisma.supplierRiskAssessment.findMany({
-          where: { supplierId: req.params.id },
-          include: {
-            assessedBy: {
-              select: {
-                id: true,
-                displayName: true,
-                email: true,
-              },
-            },
-            approvedBy: {
-              select: {
-                id: true,
-                displayName: true,
-                email: true,
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.supplierCriticalityAssessment.findMany({
-          where: { supplierId: req.params.id },
-          include: {
-            assessedBy: {
-              select: {
-                id: true,
-                displayName: true,
-                email: true,
-              },
-            },
-            approvedBy: {
-              select: {
-                id: true,
-                displayName: true,
-                email: true,
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-      ]);
-
-      // Combine and sort by date
-      const timeline = [
-        ...riskAssessments.map((a) => ({
-          type: 'RISK_ASSESSMENT' as const,
-          id: a.id,
-          createdAt: a.createdAt,
-          updatedAt: a.updatedAt,
-          status: a.status,
-          assessedBy: a.assessedBy,
-          approvedBy: a.approvedBy,
-          approvedAt: a.approvedAt,
-          data: {
-            riskRating: a.riskRating,
-            rationale: a.rationale,
-            rejectionReason: a.rejectionReason,
-          },
-        })),
-        ...criticalityAssessments.map((a) => ({
-          type: 'CRITICALITY_ASSESSMENT' as const,
-          id: a.id,
-          createdAt: a.createdAt,
-          updatedAt: a.updatedAt,
-          status: a.status,
-          assessedBy: a.assessedBy,
-          approvedBy: a.approvedBy,
-          approvedAt: a.approvedAt,
-          data: {
-            criticality: a.criticality,
-            rationale: a.rationale,
-            rejectionReason: a.rejectionReason,
-          },
-        })),
-      ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-      res.json(timeline);
-    } catch (error) {
-      console.error('Error fetching assessment history:', error);
-      res.status(500).json({ error: 'Failed to fetch assessment history' });
-    }
-  }
-);
-
-// GET /api/suppliers/:id/review-status - Returns review status, upcoming dates, open tasks
-router.get(
-  '/:id/review-status',
-  authenticateToken,
-  [param('id').isUUID()],
-  validate,
-  async (req: AuthRequest, res: Response) => {
-    try {
-      const supplier = await prisma.supplier.findUnique({
-        where: { id: req.params.id },
-        select: {
-          id: true,
-          name: true,
-          nextReviewAt: true,
-          lastReviewAt: true,
-          criticality: true,
-          lifecycleState: true,
-        },
-      });
-
-      if (!supplier) {
-        return res.status(404).json({ error: 'Supplier not found' });
-      }
-
-      // Get open review tasks
-      const openTasks = await prisma.reviewTask.findMany({
-        where: {
-          supplierId: req.params.id,
-          status: {
-            in: ['PENDING', 'OVERDUE'],
-          },
-        },
-        include: {
-          reviewer: {
-            select: {
-              id: true,
-              displayName: true,
-              email: true,
-            },
-          },
-        },
-        orderBy: { dueDate: 'asc' },
-      });
-
-      res.json({
-        supplier: {
-          id: supplier.id,
-          name: supplier.name,
-          nextReviewAt: supplier.nextReviewAt,
-          lastReviewAt: supplier.lastReviewAt,
-          criticality: supplier.criticality,
-          lifecycleState: supplier.lifecycleState,
-        },
-        openTasks,
-        reviewStatus: {
-          hasUpcomingReview: supplier.nextReviewAt !== null,
-          daysUntilReview: supplier.nextReviewAt
-            ? Math.ceil(
-                (supplier.nextReviewAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-              )
-            : null,
-          isOverdue: supplier.nextReviewAt
-            ? supplier.nextReviewAt < new Date()
-            : false,
-          lastReviewDate: supplier.lastReviewAt,
-        },
-      });
-    } catch (error) {
-      console.error('Error fetching review status:', error);
-      res.status(500).json({ error: 'Failed to fetch review status' });
     }
   }
 );

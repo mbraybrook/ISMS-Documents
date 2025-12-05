@@ -161,9 +161,9 @@ export function SuppliersPage() {
           const bCompliance = getComplianceStatus(b);
           comparison = (complianceOrder[aCompliance] || 0) - (complianceOrder[bCompliance] || 0);
           break;
-        case 'lastReview':
-          const aDate = a.lastComplianceReviewAt ? new Date(a.lastComplianceReviewAt).getTime() : 0;
-          const bDate = b.lastComplianceReviewAt ? new Date(b.lastComplianceReviewAt).getTime() : 0;
+        case 'reviewDate':
+          const aDate = a.reviewDate ? new Date(a.reviewDate).getTime() : 0;
+          const bDate = b.reviewDate ? new Date(b.reviewDate).getTime() : 0;
           comparison = aDate - bDate;
           break;
         default:
@@ -271,6 +271,29 @@ export function SuppliersPage() {
       default:
         return 'Unknown';
     }
+  };
+
+  const getReviewStatus = (reviewDate: string | null | undefined): 'OK' | 'WARNING' | 'OVERDUE' | 'MISSING' => {
+    if (!reviewDate) {
+      return 'MISSING';
+    }
+    
+    const reviewDateObj = new Date(reviewDate);
+    const now = new Date();
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    const elevenMonthsAgo = new Date();
+    elevenMonthsAgo.setMonth(elevenMonthsAgo.getMonth() - 11);
+    
+    if (reviewDateObj < twelveMonthsAgo) {
+      return 'OVERDUE';
+    }
+    
+    if (reviewDateObj >= twelveMonthsAgo && reviewDateObj < elevenMonthsAgo) {
+      return 'WARNING';
+    }
+    
+    return 'OK';
   };
 
   const getActiveFilterCount = () => {
@@ -438,7 +461,6 @@ export function SuppliersPage() {
               borderColor={lifecycleStateFilter ? 'blue.300' : 'gray.200'}
             >
               <option value="DRAFT">Draft</option>
-              <option value="IN_ASSESSMENT">In Assessment</option>
               <option value="AWAITING_APPROVAL">Awaiting Approval</option>
               <option value="APPROVED">Approved</option>
               <option value="REJECTED">Rejected</option>
@@ -587,15 +609,15 @@ export function SuppliersPage() {
               </Th>
               <Th
                 cursor="pointer"
-                onClick={() => handleSort('lastReview')}
+                onClick={() => handleSort('reviewDate')}
                 _hover={{ bg: 'gray.50' }}
-                bg={sortField === 'lastReview' ? 'blue.50' : 'transparent'}
-                minW="120px"
+                bg={sortField === 'reviewDate' ? 'blue.50' : 'transparent'}
+                minW="140px"
                 px={3}
               >
                 <HStack spacing={2}>
-                  <Box fontWeight={sortField === 'lastReview' ? 'semibold' : 'normal'}>Last Review</Box>
-                  {sortField === 'lastReview' ? (
+                  <Box fontWeight={sortField === 'reviewDate' ? 'semibold' : 'normal'}>Review Date</Box>
+                  {sortField === 'reviewDate' ? (
                     sortDirection === 'asc' ? (
                       <ChevronUpIcon boxSize={4} color="blue.500" />
                     ) : (
@@ -623,6 +645,12 @@ export function SuppliersPage() {
                   _hover={{ bg: 'blue.50', cursor: 'pointer' }}
                   transition="background-color 0.2s"
                   onClick={() => navigate(`/admin/suppliers/${supplier.id}?mode=view`)}
+                  bg={(() => {
+                    const status = getReviewStatus(supplier.reviewDate);
+                    if (status === 'OVERDUE' || status === 'MISSING') return 'red.50';
+                    if (status === 'WARNING') return 'orange.50';
+                    return 'white';
+                  })()}
                   sx={{
                     '&:hover td:first-of-type': {
                       bg: 'blue.50',
@@ -686,13 +714,31 @@ export function SuppliersPage() {
                     </Badge>
                   </Td>
                   <Td px={3} whiteSpace="nowrap" fontSize="sm">
-                    {supplier.lastComplianceReviewAt
-                      ? new Date(supplier.lastComplianceReviewAt).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })
-                      : '-'}
+                    {(() => {
+                      const reviewStatus = getReviewStatus(supplier.reviewDate);
+                      const reviewDate = supplier.reviewDate
+                        ? new Date(supplier.reviewDate).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })
+                        : '-';
+                      
+                      return (
+                        <HStack spacing={2}>
+                          <Text>{reviewDate}</Text>
+                          {reviewStatus === 'OVERDUE' && (
+                            <Badge colorScheme="red" fontSize="xs">Overdue</Badge>
+                          )}
+                          {reviewStatus === 'WARNING' && (
+                            <Badge colorScheme="orange" fontSize="xs">Due Soon</Badge>
+                          )}
+                          {reviewStatus === 'MISSING' && (
+                            <Badge colorScheme="red" fontSize="xs">Missing</Badge>
+                          )}
+                        </HStack>
+                      );
+                    })()}
                   </Td>
                   <Td onClick={(e) => e.stopPropagation()} px={3}>
                     <HStack spacing={2}>

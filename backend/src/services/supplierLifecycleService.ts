@@ -1,5 +1,4 @@
-import { SupplierLifecycleState, AssessmentStatus } from '../types/enums';
-import { prisma } from '../lib/prisma';
+import { SupplierLifecycleState } from '../types/enums';
 
 export interface SupplierWithAssessments {
   id: string;
@@ -8,14 +7,6 @@ export interface SupplierWithAssessments {
   criticality: string | null;
   pciStatus: string | null;
   cisoExemptionGranted: boolean;
-  riskAssessments?: Array<{
-    status: string;
-    id: string;
-  }>;
-  criticalityAssessments?: Array<{
-    status: string;
-    id: string;
-  }>;
 }
 
 /**
@@ -37,87 +28,18 @@ export function validateLifecycleTransition(
 }
 
 /**
- * Auto-determines the next lifecycle state based on supplier and assessment statuses
- * @param supplier Supplier with assessments
+ * Auto-determines the next lifecycle state based on supplier status
+ * @param supplier Supplier data
  * @returns The determined next state, or null if state should remain unchanged
+ * 
+ * NOTE: Assessment-based auto-transitions have been removed. This function now returns null
+ * to allow manual state management.
  */
 export async function determineNextState(
   supplier: SupplierWithAssessments
 ): Promise<SupplierLifecycleState | null> {
-  const currentState = supplier.lifecycleState as SupplierLifecycleState;
-
-  // Don't auto-transition from these states
-  if (['EXIT_IN_PROGRESS', 'REJECTED'].includes(currentState)) {
-    return null;
-  }
-
-  // Fetch assessments if not provided
-  let riskAssessments = supplier.riskAssessments;
-  let criticalityAssessments = supplier.criticalityAssessments;
-
-  if (!riskAssessments || !criticalityAssessments) {
-    const fullSupplier = await prisma.supplier.findUnique({
-      where: { id: supplier.id },
-      include: {
-        riskAssessments: {
-          select: { id: true, status: true },
-          orderBy: { createdAt: 'desc' },
-        },
-        criticalityAssessments: {
-          select: { id: true, status: true },
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    });
-
-    if (!fullSupplier) {
-      return null;
-    }
-
-    riskAssessments = fullSupplier.riskAssessments;
-    criticalityAssessments = fullSupplier.criticalityAssessments;
-  }
-
-  const hasRiskAssessment = riskAssessments.length > 0;
-  const hasCriticalityAssessment = criticalityAssessments.length > 0;
-  const latestRiskAssessment = riskAssessments[0];
-  const latestCriticalityAssessment = criticalityAssessments[0];
-
-  // DRAFT → IN_ASSESSMENT: When first assessment is created
-  if (currentState === 'DRAFT' && (hasRiskAssessment || hasCriticalityAssessment)) {
-    return 'IN_ASSESSMENT';
-  }
-
-  // IN_ASSESSMENT → AWAITING_APPROVAL: When both assessments are SUBMITTED
-  if (currentState === 'IN_ASSESSMENT') {
-    const riskSubmitted = latestRiskAssessment?.status === 'SUBMITTED';
-    const criticalitySubmitted = latestCriticalityAssessment?.status === 'SUBMITTED';
-
-    if (riskSubmitted && criticalitySubmitted) {
-      return 'AWAITING_APPROVAL';
-    }
-  }
-
-  // AWAITING_APPROVAL → APPROVED: When both assessments are APPROVED
-  if (currentState === 'AWAITING_APPROVAL') {
-    const riskApproved = latestRiskAssessment?.status === 'APPROVED';
-    const criticalityApproved = latestCriticalityAssessment?.status === 'APPROVED';
-
-    if (riskApproved && criticalityApproved) {
-      return 'APPROVED';
-    }
-  }
-
-  // AWAITING_APPROVAL → REJECTED: When any assessment is REJECTED
-  if (currentState === 'AWAITING_APPROVAL') {
-    const riskRejected = latestRiskAssessment?.status === 'REJECTED';
-    const criticalityRejected = latestCriticalityAssessment?.status === 'REJECTED';
-
-    if (riskRejected || criticalityRejected) {
-      return 'REJECTED';
-    }
-  }
-
+  // Assessment-based auto-transitions have been removed
+  // Lifecycle state is now managed manually
   return null;
 }
 

@@ -4,7 +4,6 @@ import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
-import { ExitPlanStatus } from '../types/enums';
 
 const router = Router();
 
@@ -57,10 +56,6 @@ router.post(
   requireRole('ADMIN', 'EDITOR'),
   [
     param('id').isUUID(),
-    body('reason').optional().isString(),
-    body('startDate').optional().isISO8601(),
-    body('targetEndDate').optional().isISO8601(),
-    body('status').optional().isIn(['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -88,10 +83,6 @@ router.post(
         data: {
           id: randomUUID(),
           supplierId: req.params.id,
-          reason: req.body.reason || null,
-          startDate: req.body.startDate ? new Date(req.body.startDate) : null,
-          targetEndDate: req.body.targetEndDate ? new Date(req.body.targetEndDate) : null,
-          status: (req.body.status as ExitPlanStatus) || 'PLANNED',
           impactAssessment: null,
           dataAndIpr: null,
           replacementServiceAnalysis: null,
@@ -122,11 +113,6 @@ router.put(
   requireRole('ADMIN', 'EDITOR'),
   [
     param('id').isUUID(),
-    body('reason').optional().isString(),
-    body('startDate').optional().isISO8601(),
-    body('targetEndDate').optional().isISO8601(),
-    body('completedAt').optional().isISO8601(),
-    body('status').optional().isIn(['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
     body('impactAssessment').optional().isObject(),
     body('dataAndIpr').optional().isObject(),
     body('replacementServiceAnalysis').optional().isObject(),
@@ -146,21 +132,11 @@ router.put(
 
       const updateData: any = {};
 
-      if (req.body.reason !== undefined) updateData.reason = req.body.reason;
-      if (req.body.startDate !== undefined) updateData.startDate = req.body.startDate ? new Date(req.body.startDate) : null;
-      if (req.body.targetEndDate !== undefined) updateData.targetEndDate = req.body.targetEndDate ? new Date(req.body.targetEndDate) : null;
-      if (req.body.completedAt !== undefined) updateData.completedAt = req.body.completedAt ? new Date(req.body.completedAt) : null;
-      if (req.body.status !== undefined) updateData.status = req.body.status;
       if (req.body.impactAssessment !== undefined) updateData.impactAssessment = req.body.impactAssessment;
       if (req.body.dataAndIpr !== undefined) updateData.dataAndIpr = req.body.dataAndIpr;
       if (req.body.replacementServiceAnalysis !== undefined) updateData.replacementServiceAnalysis = req.body.replacementServiceAnalysis;
       if (req.body.contractClosure !== undefined) updateData.contractClosure = req.body.contractClosure;
       if (req.body.lessonsLearned !== undefined) updateData.lessonsLearned = req.body.lessonsLearned;
-
-      // If status is COMPLETED and completedAt is not set, set it automatically
-      if (req.body.status === 'COMPLETED' && !exitPlan.completedAt && !updateData.completedAt) {
-        updateData.completedAt = new Date();
-      }
 
       const updatedPlan = await prisma.supplierExitPlan.update({
         where: { supplierId: req.params.id },

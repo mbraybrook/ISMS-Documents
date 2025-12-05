@@ -44,11 +44,9 @@ export type PciStatus = 'UNKNOWN' | 'PASS' | 'FAIL' | 'NOT_APPLICABLE';
 export type IsoStatus = 'UNKNOWN' | 'CERTIFIED' | 'NOT_CERTIFIED' | 'IN_PROGRESS' | 'NOT_APPLICABLE';
 export type GdprStatus = 'UNKNOWN' | 'ADEQUATE' | 'HIGH_RISK' | 'NOT_APPLICABLE';
 export type PerformanceRating = 'GOOD' | 'CAUTION' | 'BAD';
-export type AssessmentStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
-export type SupplierLifecycleState = 'DRAFT' | 'IN_ASSESSMENT' | 'AWAITING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'IN_REVIEW' | 'EXIT_IN_PROGRESS';
+export type SupplierLifecycleState = 'DRAFT' | 'AWAITING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'IN_REVIEW' | 'EXIT_IN_PROGRESS';
 export type ReviewType = 'SCHEDULED' | 'TRIGGERED_BY_INCIDENT' | 'TRIGGERED_BY_CHANGE';
 export type ReviewOutcome = 'PASS' | 'ISSUES_FOUND' | 'FAIL';
 export type CertificateType = 'PCI' | 'ISO27001' | 'ISO22301' | 'ISO9001' | 'GDPR' | 'OTHER';
-export type ExitPlanStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type TrustCenterCategory = 'HOSTING' | 'PAYMENTS' | 'COMMUNICATIONS' | 'SECURITY' | 'OTHER';
 

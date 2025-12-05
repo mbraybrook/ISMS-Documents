@@ -87,6 +87,14 @@ interface DashboardData {
     pending: any[];
     stats: any;
   };
+  suppliers?: {
+    missingReviewDate: any[];
+    overdue: any[];
+    warning: any[];
+    missingReviewDateCount: number;
+    overdueCount: number;
+    warningCount: number;
+  };
   lastUpdated: string;
 }
 
@@ -509,6 +517,53 @@ export function HomePage() {
           </VStack>
         </Box>
       </Box>
+
+      {/* Supplier Review Section */}
+      {dashboardData.suppliers && (
+        <Box p={6} bg="white" borderRadius="md" boxShadow="sm">
+          <Heading size="md" mb={4}>Suppliers Needing Review</Heading>
+          <Box>
+            <VStack spacing={4} align="stretch">
+              <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
+                <Stat p={4} bg="red.50" borderRadius="md" boxShadow="sm">
+                  <StatLabel>Missing Review Date</StatLabel>
+                  <StatNumber color="red.600">
+                    {dashboardData.suppliers.missingReviewDateCount || 0}
+                  </StatNumber>
+                </Stat>
+
+                <Stat p={4} bg="red.50" borderRadius="md" boxShadow="sm">
+                  <StatLabel>Overdue (&gt;12 months)</StatLabel>
+                  <StatNumber color="red.600">
+                    {dashboardData.suppliers.overdueCount || 0}
+                  </StatNumber>
+                </Stat>
+
+                <Stat p={4} bg="orange.50" borderRadius="md" boxShadow="sm">
+                  <StatLabel>Warning (nearing 12 months)</StatLabel>
+                  <StatNumber color="orange.600">
+                    {dashboardData.suppliers.warningCount || 0}
+                  </StatNumber>
+                </Stat>
+              </SimpleGrid>
+
+              <HStack>
+                <Button
+                  colorScheme="blue"
+                  variant="outline"
+                  rightIcon={<ArrowForwardIcon />}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate('/admin/suppliers');
+                  }}
+                >
+                  View Suppliers
+                </Button>
+              </HStack>
+            </VStack>
+          </Box>
+        </Box>
+      )}
 
     </VStack>
   );
