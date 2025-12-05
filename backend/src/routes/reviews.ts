@@ -40,12 +40,6 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
             type: true,
           },
         },
-        supplier: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
         reviewer: {
           select: {
             id: true,
@@ -84,12 +78,6 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
             },
           },
         },
-        supplier: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
         reviewer: {
           select: {
             id: true,
@@ -121,12 +109,6 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
             title: true,
             version: true,
             type: true,
-          },
-        },
-        supplier: {
-          select: {
-            id: true,
-            name: true,
           },
         },
         reviewer: {
@@ -293,8 +275,7 @@ router.post(
   authenticateToken,
   requireRole('ADMIN', 'EDITOR'),
   [
-    body('documentId').optional().isUUID(),
-    body('supplierId').optional().isUUID(),
+    body('documentId').isUUID(),
     body('reviewerUserId').isUUID(),
     body('dueDate').isISO8601(),
     body('changeNotes').optional().isString(),
@@ -302,14 +283,11 @@ router.post(
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
-      const { documentId, supplierId, reviewerUserId, dueDate, changeNotes } = req.body;
+      const { documentId, reviewerUserId, dueDate, changeNotes } = req.body;
 
-      // Validate that exactly one of documentId or supplierId is provided
-      if (!documentId && !supplierId) {
-        return res.status(400).json({ error: 'Either documentId or supplierId must be provided' });
-      }
-      if (documentId && supplierId) {
-        return res.status(400).json({ error: 'Cannot provide both documentId and supplierId' });
+      // Validate that documentId is provided
+      if (!documentId) {
+        return res.status(400).json({ error: 'documentId must be provided' });
       }
 
       // Determine status based on due date
@@ -352,28 +330,11 @@ router.post(
             version: true,
           },
         };
-      } else if (supplierId) {
-        // Check if supplier exists
-        const supplier = await prisma.supplier.findUnique({
-          where: { id: supplierId },
-        });
-
-        if (!supplier) {
-          return res.status(404).json({ error: 'Supplier not found' });
-        }
-
-        includeData.supplier = {
-          select: {
-            id: true,
-            name: true,
-          },
-        };
       }
 
       const reviewTask = await prisma.reviewTask.create({
         data: {
-          documentId: documentId || null,
-          supplierId: supplierId || null,
+          documentId: documentId,
           reviewerUserId,
           dueDate: dueDateObj,
           changeNotes,
@@ -408,12 +369,11 @@ router.put(
 
       const completedDateObj = completedDate ? new Date(completedDate) : new Date();
 
-      // Get the review task with document/supplier info
+      // Get the review task with document info
       const reviewTask = await prisma.reviewTask.findUnique({
         where: { id },
         include: {
           document: true,
-          supplier: true,
         },
       });
 
@@ -438,15 +398,6 @@ router.put(
             id: true,
             title: true,
             version: true,
-          },
-        };
-      }
-
-      if (reviewTask.supplierId) {
-        includeData.supplier = {
-          select: {
-            id: true,
-            name: true,
           },
         };
       }
@@ -480,36 +431,6 @@ router.put(
         invalidateCache(reviewTask.documentId).catch((err) => {
           console.error('[Review Complete] Error invalidating PDF cache:', err);
         });
-      }
-
-      // Handle supplier review completion
-      if (reviewTask.supplierId) {
-        // Update supplier review dates and recalculate nextReviewAt
-        const supplier = await prisma.supplier.findUnique({
-          where: { id: reviewTask.supplierId },
-          select: {
-            id: true,
-            criticality: true,
-            lastReviewAt: true,
-            nextReviewAt: true,
-          },
-        });
-
-        if (supplier) {
-          const { calculateNextReviewDate } = await import('../services/supplierReviewScheduler');
-          const nextReviewAt = calculateNextReviewDate({
-            ...supplier,
-            lastReviewAt: completedDateObj,
-          });
-
-          await prisma.supplier.update({
-            where: { id: reviewTask.supplierId },
-            data: {
-              lastReviewAt: completedDateObj,
-              nextReviewAt,
-            },
-          });
-        }
       }
 
       res.json(updatedReviewTask);

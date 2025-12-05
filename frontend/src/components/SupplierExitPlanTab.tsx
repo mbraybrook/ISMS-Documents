@@ -9,24 +9,13 @@ import {
   Alert,
   AlertIcon,
   Text,
-  Badge,
-  Progress,
   FormControl,
   FormLabel,
   Input,
   Textarea,
   Checkbox,
   Divider,
-  SimpleGrid,
   IconButton,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  ModalCloseButton,
-  useDisclosure,
   Spinner,
   Center,
 } from '@chakra-ui/react';
@@ -34,7 +23,6 @@ import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
 import { supplierApi } from '../services/api';
 import {
   SupplierExitPlan,
-  ExitPlanStatus,
   ImpactAssessment,
   DataAndIpr,
   ReplacementServiceAnalysis,
@@ -57,17 +45,6 @@ export function SupplierExitPlanTab({
   const [exitPlan, setExitPlan] = useState<SupplierExitPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const {
-    isOpen: isCreateModalOpen,
-    onOpen: onCreateModalOpen,
-    onClose: onCreateModalClose,
-  } = useDisclosure();
-
-  const [formData, setFormData] = useState({
-    reason: '',
-    startDate: '',
-    targetEndDate: '',
-  });
 
   useEffect(() => {
     fetchExitPlan();
@@ -95,15 +72,8 @@ export function SupplierExitPlanTab({
   const handleCreateExitPlan = async () => {
     try {
       setSaving(true);
-      const newPlan = await supplierApi.createExitPlan(supplierId, {
-        reason: formData.reason || null,
-        startDate: formData.startDate || null,
-        targetEndDate: formData.targetEndDate || null,
-        status: 'PLANNED',
-      });
+      const newPlan = await supplierApi.createExitPlan(supplierId, {});
       setExitPlan(newPlan);
-      onCreateModalClose();
-      setFormData({ reason: '', startDate: '', targetEndDate: '' });
       toast({
         title: 'Success',
         description: 'Exit plan created successfully',
@@ -147,60 +117,6 @@ export function SupplierExitPlanTab({
     }
   };
 
-  const handleUpdateStatus = async (newStatus: ExitPlanStatus) => {
-    try {
-      setSaving(true);
-      const updateData: any = { status: newStatus };
-      if (newStatus === 'COMPLETED' && !exitPlan?.completedAt) {
-        updateData.completedAt = new Date().toISOString();
-      }
-      const updated = await supplierApi.updateExitPlan(supplierId, updateData);
-      setExitPlan(updated);
-      toast({
-        title: 'Success',
-        description: 'Exit plan status updated',
-        status: 'success',
-        duration: 3000,
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update exit plan status',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const calculateProgress = (): number => {
-    if (!exitPlan) return 0;
-    const sections = [
-      exitPlan.impactAssessment,
-      exitPlan.dataAndIpr,
-      exitPlan.replacementServiceAnalysis,
-      exitPlan.contractClosure,
-      exitPlan.lessonsLearned,
-    ];
-    const completedSections = sections.filter((s) => s?.completed).length;
-    return Math.round((completedSections / sections.length) * 100);
-  };
-
-  const getStatusColor = (status: ExitPlanStatus): string => {
-    switch (status) {
-      case 'PLANNED':
-        return 'blue';
-      case 'IN_PROGRESS':
-        return 'orange';
-      case 'COMPLETED':
-        return 'green';
-      case 'CANCELLED':
-        return 'red';
-      default:
-        return 'gray';
-    }
-  };
 
   const renderSection = (
     title: string,
@@ -350,178 +266,29 @@ export function SupplierExitPlanTab({
           </Alert>
         )}
 
-        {canEdit && (
-          <Alert status="info">
-            <AlertIcon />
-            Exit plans can be created for business continuity planning without changing the supplier status. 
-            The supplier lifecycle state can be updated separately when you're ready to begin the exit process.
-          </Alert>
-        )}
-
         <Box textAlign="center" py={8}>
           <Text fontSize="lg" color="gray.600" mb={4}>
             No exit plan exists for this supplier
           </Text>
           {canEdit && (
-            <Button colorScheme="blue" onClick={onCreateModalOpen}>
+            <Button 
+              colorScheme="blue" 
+              onClick={handleCreateExitPlan}
+              isLoading={saving}
+            >
               Create Exit Plan
             </Button>
           )}
         </Box>
-
-        {/* Create Exit Plan Modal */}
-        <Modal isOpen={isCreateModalOpen} onClose={onCreateModalClose}>
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Create Exit Plan</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              <VStack spacing={4} align="stretch">
-                <FormControl>
-                  <FormLabel>Reason for Exit</FormLabel>
-                  <Textarea
-                    value={formData.reason}
-                    onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                    placeholder="Describe the reason for exiting this supplier..."
-                    rows={4}
-                  />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Start Date</FormLabel>
-                  <Input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Target End Date</FormLabel>
-                  <Input
-                    type="date"
-                    value={formData.targetEndDate}
-                    onChange={(e) => setFormData({ ...formData, targetEndDate: e.target.value })}
-                  />
-                </FormControl>
-              </VStack>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" mr={3} onClick={onCreateModalClose}>
-                Cancel
-              </Button>
-              <Button
-                colorScheme="blue"
-                onClick={handleCreateExitPlan}
-                isLoading={saving}
-              >
-                Create Exit Plan
-              </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
       </VStack>
     );
   }
 
-  const progress = calculateProgress();
-
   return (
     <VStack spacing={6} align="stretch">
-      {/* Header with status and progress */}
+      {/* Header */}
       <Box>
-        <HStack justify="space-between" mb={4}>
-          <Heading size="md">Exit Plan</Heading>
-          <Badge colorScheme={getStatusColor(exitPlan.status)} fontSize="md" px={3} py={1}>
-            {exitPlan.status.replace(/_/g, ' ')}
-          </Badge>
-        </HStack>
-
-        {exitPlan.reason && (
-          <Box mb={4} p={3} bg="gray.50" borderRadius="md">
-            <Text fontWeight="semibold" mb={1}>
-              Reason for Exit:
-            </Text>
-            <Text>{exitPlan.reason}</Text>
-          </Box>
-        )}
-
-        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4} mb={4}>
-          <Box>
-            <Text fontSize="sm" color="gray.600">
-              Start Date
-            </Text>
-            <Text fontWeight="bold">
-              {exitPlan.startDate
-                ? new Date(exitPlan.startDate).toLocaleDateString()
-                : 'Not set'}
-            </Text>
-          </Box>
-          <Box>
-            <Text fontSize="sm" color="gray.600">
-              Target End Date
-            </Text>
-            <Text fontWeight="bold">
-              {exitPlan.targetEndDate
-                ? new Date(exitPlan.targetEndDate).toLocaleDateString()
-                : 'Not set'}
-            </Text>
-          </Box>
-          <Box>
-            <Text fontSize="sm" color="gray.600">
-              Completed Date
-            </Text>
-            <Text fontWeight="bold">
-              {exitPlan.completedAt
-                ? new Date(exitPlan.completedAt).toLocaleDateString()
-                : 'Not completed'}
-            </Text>
-          </Box>
-        </SimpleGrid>
-
-        <Box mb={4}>
-          <HStack justify="space-between" mb={2}>
-            <Text fontSize="sm" fontWeight="semibold">
-              Overall Progress
-            </Text>
-            <Text fontSize="sm" fontWeight="bold">
-              {progress}%
-            </Text>
-          </HStack>
-          <Progress value={progress} colorScheme="blue" size="lg" borderRadius="md" />
-        </Box>
-
-        {canEdit && exitPlan.status !== 'COMPLETED' && exitPlan.status !== 'CANCELLED' && (
-          <HStack spacing={2} mb={4}>
-            {exitPlan.status === 'PLANNED' && (
-              <Button
-                size="sm"
-                colorScheme="orange"
-                onClick={() => handleUpdateStatus('IN_PROGRESS')}
-                isLoading={saving}
-              >
-                Start Exit Process
-              </Button>
-            )}
-            {exitPlan.status === 'IN_PROGRESS' && (
-              <Button
-                size="sm"
-                colorScheme="green"
-                onClick={() => handleUpdateStatus('COMPLETED')}
-                isLoading={saving}
-              >
-                Mark as Completed
-              </Button>
-            )}
-            <Button
-              size="sm"
-              colorScheme="red"
-              variant="outline"
-              onClick={() => handleUpdateStatus('CANCELLED')}
-              isLoading={saving}
-            >
-              Cancel Exit Plan
-            </Button>
-          </HStack>
-        )}
+        <Heading size="md" mb={4}>Exit Plan</Heading>
       </Box>
 
       <Divider />

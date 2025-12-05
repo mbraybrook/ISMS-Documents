@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Heading,
@@ -34,6 +35,7 @@ import {
   Tab,
   TabPanel,
   Tooltip,
+  Link,
 } from '@chakra-ui/react';
 import { DeleteIcon, AddIcon } from '@chakra-ui/icons';
 import { supplierApi } from '../services/api';
@@ -68,6 +70,7 @@ export function SupplierRisksControlsTab({
   canEdit,
   criticality,
 }: SupplierRisksControlsTabProps) {
+  const navigate = useNavigate();
   const toast = useToast();
   const [risks, setRisks] = useState<Risk[]>([]);
   const [controls, setControls] = useState<Control[]>([]);
@@ -363,7 +366,6 @@ export function SupplierRisksControlsTab({
           <Table variant="simple">
             <Thead>
               <Tr>
-                <Th>ID</Th>
                 <Th>Title</Th>
                 <Th>Risk Score</Th>
                 <Th>Status</Th>
@@ -374,8 +376,20 @@ export function SupplierRisksControlsTab({
             <Tbody>
               {risks.map((risk) => (
                 <Tr key={risk.id}>
-                  <Td>{risk.id.substring(0, 8)}...</Td>
-                  <Td>{risk.title}</Td>
+                  <Td>
+                    <Link
+                      color="blue.500"
+                      textDecoration="underline"
+                      _hover={{ color: 'blue.700' }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate(`/admin/risks/risks?view=${risk.id}`);
+                      }}
+                      cursor="pointer"
+                    >
+                      {risk.title}
+                    </Link>
+                  </Td>
                   <Td>
                     <Badge colorScheme={getRiskLevelColor(risk.calculatedScore)}>
                       {risk.calculatedScore} ({getRiskLevel(risk.calculatedScore)})

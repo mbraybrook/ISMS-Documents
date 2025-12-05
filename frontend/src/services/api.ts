@@ -2,7 +2,7 @@ import axios from 'axios';
 import { config } from '../config';
 import { authService } from './authService';
 import { SimilarRisk } from '../types/risk';
-import { Supplier, SupplierRiskAssessment, SupplierCriticalityAssessment } from '../types/supplier';
+import { Supplier } from '../types/supplier';
 
 const api = axios.create({
   baseURL: config.apiUrl,
@@ -93,94 +93,6 @@ export const supplierApi = {
     return response.data;
   },
 
-  /**
-   * Start a review for a supplier
-   */
-  startReview: async (id: string): Promise<Supplier> => {
-    const response = await api.post(`/api/suppliers/${id}/start-review`);
-    return response.data;
-  },
-
-  /**
-   * Get assessment history for a supplier
-   */
-  getAssessmentHistory: async (id: string): Promise<any[]> => {
-    const response = await api.get(`/api/suppliers/${id}/assessment-history`);
-    return response.data;
-  },
-
-  // Risk Assessment methods
-  createRiskAssessment: async (supplierId: string, data: Partial<SupplierRiskAssessment>): Promise<SupplierRiskAssessment> => {
-    const response = await api.post(`/api/suppliers/${supplierId}/risk-assessments`, data);
-    return response.data;
-  },
-
-  updateRiskAssessment: async (supplierId: string, id: string, data: Partial<SupplierRiskAssessment>): Promise<SupplierRiskAssessment> => {
-    const response = await api.put(`/api/suppliers/${supplierId}/risk-assessments/${id}`, data);
-    return response.data;
-  },
-
-  getRiskAssessments: async (supplierId: string): Promise<SupplierRiskAssessment[]> => {
-    const response = await api.get(`/api/suppliers/${supplierId}/risk-assessments`);
-    return response.data;
-  },
-
-  getRiskAssessment: async (supplierId: string, id: string): Promise<SupplierRiskAssessment> => {
-    const response = await api.get(`/api/suppliers/${supplierId}/risk-assessments/${id}`);
-    return response.data;
-  },
-
-  submitRiskAssessment: async (supplierId: string, id: string): Promise<SupplierRiskAssessment> => {
-    const response = await api.post(`/api/suppliers/${supplierId}/risk-assessments/${id}/submit`);
-    return response.data;
-  },
-
-  approveRiskAssessment: async (supplierId: string, id: string): Promise<SupplierRiskAssessment> => {
-    const response = await api.post(`/api/suppliers/${supplierId}/risk-assessments/${id}/approve`);
-    return response.data;
-  },
-
-  rejectRiskAssessment: async (supplierId: string, id: string, rejectionReason: string): Promise<SupplierRiskAssessment> => {
-    const response = await api.post(`/api/suppliers/${supplierId}/risk-assessments/${id}/reject`, { rejectionReason });
-    return response.data;
-  },
-
-  // Criticality Assessment methods
-  createCriticalityAssessment: async (supplierId: string, data: Partial<SupplierCriticalityAssessment>): Promise<SupplierCriticalityAssessment> => {
-    const response = await api.post(`/api/suppliers/${supplierId}/criticality-assessments`, data);
-    return response.data;
-  },
-
-  updateCriticalityAssessment: async (supplierId: string, id: string, data: Partial<SupplierCriticalityAssessment>): Promise<SupplierCriticalityAssessment> => {
-    const response = await api.put(`/api/suppliers/${supplierId}/criticality-assessments/${id}`, data);
-    return response.data;
-  },
-
-  getCriticalityAssessments: async (supplierId: string): Promise<SupplierCriticalityAssessment[]> => {
-    const response = await api.get(`/api/suppliers/${supplierId}/criticality-assessments`);
-    return response.data;
-  },
-
-  getCriticalityAssessment: async (supplierId: string, id: string): Promise<SupplierCriticalityAssessment> => {
-    const response = await api.get(`/api/suppliers/${supplierId}/criticality-assessments/${id}`);
-    return response.data;
-  },
-
-  submitCriticalityAssessment: async (supplierId: string, id: string): Promise<SupplierCriticalityAssessment> => {
-    const response = await api.post(`/api/suppliers/${supplierId}/criticality-assessments/${id}/submit`);
-    return response.data;
-  },
-
-  approveCriticalityAssessment: async (supplierId: string, id: string): Promise<SupplierCriticalityAssessment> => {
-    const response = await api.post(`/api/suppliers/${supplierId}/criticality-assessments/${id}/approve`);
-    return response.data;
-  },
-
-  rejectCriticalityAssessment: async (supplierId: string, id: string, rejectionReason: string): Promise<SupplierCriticalityAssessment> => {
-    const response = await api.post(`/api/suppliers/${supplierId}/criticality-assessments/${id}/reject`, { rejectionReason });
-    return response.data;
-  },
-
   // Link methods
   getSupplierRisks: async (supplierId: string): Promise<any[]> => {
     const response = await api.get(`/api/suppliers/${supplierId}/risks`);
@@ -223,62 +135,7 @@ export const supplierApi = {
   },
 
   // Compliance review methods
-  getComplianceReviews: async (supplierId: string): Promise<any[]> => {
-    const response = await api.get(`/api/suppliers/${supplierId}/compliance-reviews`);
-    return response.data;
-  },
-
-  getComplianceReview: async (supplierId: string, reviewId: string): Promise<any> => {
-    const response = await api.get(`/api/suppliers/${supplierId}/compliance-reviews/${reviewId}`);
-    return response.data;
-  },
-
-  createComplianceReview: async (supplierId: string, data: any): Promise<any> => {
-    const response = await api.post(`/api/suppliers/${supplierId}/compliance-reviews`, data);
-    return response.data;
-  },
-
-  updateComplianceReview: async (supplierId: string, reviewId: string, data: any): Promise<any> => {
-    const response = await api.put(`/api/suppliers/${supplierId}/compliance-reviews/${reviewId}`, data);
-    return response.data;
-  },
-
-  completeComplianceReview: async (supplierId: string, reviewId: string, data: any): Promise<any> => {
-    const response = await api.post(`/api/suppliers/${supplierId}/compliance-reviews/${reviewId}/complete`, data);
-    return response.data;
-  },
-
-  // Certificate methods
-  getCertificates: async (supplierId: string): Promise<any[]> => {
-    const response = await api.get(`/api/suppliers/${supplierId}/certificates`);
-    return response.data;
-  },
-
-  addCertificate: async (supplierId: string, data: any): Promise<any> => {
-    const response = await api.post(`/api/suppliers/${supplierId}/certificates`, data);
-    return response.data;
-  },
-
-  updateCertificate: async (supplierId: string, certificateId: string, data: any): Promise<any> => {
-    const response = await api.put(`/api/suppliers/${supplierId}/certificates/${certificateId}`, data);
-    return response.data;
-  },
-
-  deleteCertificate: async (supplierId: string, certificateId: string): Promise<void> => {
-    await api.delete(`/api/suppliers/${supplierId}/certificates/${certificateId}`);
-  },
-
-  getExpiringCertificates: async (daysBeforeExpiry?: number): Promise<any[]> => {
-    const params = daysBeforeExpiry ? { daysBeforeExpiry } : {};
-    const response = await api.get('/api/suppliers/certificates/expiring', { params });
-    return response.data;
-  },
-
   // Review status
-  getReviewStatus: async (supplierId: string): Promise<any> => {
-    const response = await api.get(`/api/suppliers/${supplierId}/review-status`);
-    return response.data;
-  },
 
   // Exit plan methods
   getExitPlan: async (supplierId: string): Promise<any> => {

@@ -201,7 +201,6 @@ model Legislation {
 model ReviewTask {
   id             String    @id
   documentId     String?
-  supplierId     String?
   reviewerUserId String
   dueDate        DateTime
   completedDate  DateTime?
@@ -211,13 +210,11 @@ model ReviewTask {
   updatedAt      DateTime
   reviewer       User      @relation(fields: [reviewerUserId], references: [id])
   document       Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  supplier       Supplier? @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([dueDate])
   @@index([reviewerUserId])
   @@index([documentId])
-  @@index([supplierId])
 }
 
 model Risk {
@@ -341,11 +338,6 @@ model User {
   supplierRelationshipOwner Supplier[] @relation("SupplierRelationshipOwner")
   supplierCreatedBy         Supplier[] @relation("SupplierCreatedBy")
   supplierUpdatedBy         Supplier[] @relation("SupplierUpdatedBy")
-  riskAssessmentsAssessedBy    SupplierRiskAssessment[] @relation("RiskAssessmentAssessedBy")
-  riskAssessmentsApprovedBy    SupplierRiskAssessment[] @relation("RiskAssessmentApprovedBy")
-  criticalityAssessmentsAssessedBy SupplierCriticalityAssessment[] @relation("CriticalityAssessmentAssessedBy")
-  criticalityAssessmentsApprovedBy SupplierCriticalityAssessment[] @relation("CriticalityAssessmentApprovedBy")
-  supplierComplianceReviewsReviewedBy SupplierComplianceReview[] @relation("SupplierComplianceReviewReviewedBy")
 
   @@index([entraObjectId])
   @@index([email])
@@ -439,55 +431,6 @@ model TrustCenterSettings {
   @@index([key])
 }
 
-model SupplierRiskAssessment {
-  id                String   @id @default(uuid())
-  supplierId        String
-  supplierType      String
-  riskRating        String
-  rationale         String?
-  assessedByUserId  String
-  assessedAt        DateTime @default(now())
-  approvedByUserId   String?
-  approvedAt         DateTime?
-  status             String   @default("DRAFT")
-  rejectionReason    String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  supplier           Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  assessedBy         User     @relation("RiskAssessmentAssessedBy", fields: [assessedByUserId], references: [id])
-  approvedBy         User?    @relation("RiskAssessmentApprovedBy", fields: [approvedByUserId], references: [id])
-  currentSupplier    Supplier? @relation("CurrentRiskAssessment")
-
-  @@index([supplierId])
-  @@index([status])
-  @@index([assessedByUserId])
-  @@index([approvedByUserId])
-}
-
-model SupplierCriticalityAssessment {
-  id                   String   @id @default(uuid())
-  supplierId           String
-  criticality          String
-  rationale            String?
-  assessedByUserId     String
-  assessedAt           DateTime @default(now())
-  approvedByUserId      String?
-  approvedAt           DateTime?
-  status               String   @default("DRAFT")
-  rejectionReason      String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  supplier             Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  assessedBy           User     @relation("CriticalityAssessmentAssessedBy", fields: [assessedByUserId], references: [id])
-  approvedBy           User?    @relation("CriticalityAssessmentApprovedBy", fields: [approvedByUserId], references: [id])
-  currentSupplier      Supplier? @relation("CurrentCriticalityAssessment")
-
-  @@index([supplierId])
-  @@index([status])
-  @@index([assessedByUserId])
-  @@index([approvedByUserId])
-}
-
 model SupplierRiskLink {
   supplierId String
   riskId     String
@@ -510,57 +453,9 @@ model SupplierControlLink {
   @@index([supplierId])
 }
 
-model SupplierComplianceReview {
-  id                    String   @id @default(uuid())
-  supplierId            String
-  reviewType            String
-  plannedAt             DateTime
-  completedAt           DateTime?
-  reviewedByUserId      String?
-  checksPerformed        String?
-  outcome                String?
-  updatedPerformanceRating String?
-  notes                 String?
-  evidenceLinks         Json?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  supplier              Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  reviewedBy            User?     @relation("SupplierComplianceReviewReviewedBy", fields: [reviewedByUserId], references: [id])
-
-  @@index([supplierId])
-  @@index([reviewType])
-  @@index([plannedAt])
-  @@index([completedAt])
-  @@index([outcome])
-}
-
-model SupplierCertificate {
-  id                String   @id @default(uuid())
-  supplierId        String
-  certificateType   String
-  certificateNumber String?
-  issuer            String?
-  issueDate         DateTime?
-  expiryDate        DateTime
-  evidenceLink      String?
-  notes             String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  supplier          Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-
-  @@index([supplierId])
-  @@index([certificateType])
-  @@index([expiryDate])
-}
-
 model SupplierExitPlan {
   id                        String   @id @default(uuid())
   supplierId                String   @unique
-  reason                    String?
-  startDate                 DateTime?
-  targetEndDate             DateTime?
-  completedAt               DateTime?
-  status                    String   @default("PLANNED") // PLANNED, IN_PROGRESS, COMPLETED, CANCELLED
   impactAssessment          Json?    // { notes: string, scopeOfServices: string, dependencies: string[], stakeholders: string[], completed: boolean }
   dataAndIpr                Json?    // { notes: string, dataInventory: string, exportDetails: string, integrityValidation: string, iprTransfer: string, deletionConfirmation: string, completed: boolean }
   replacementServiceAnalysis Json?   // { notes: string, alternativeProviders: string[], securityComplianceChecks: string, pocNotes: string, tcoAnalysis: string, completed: boolean }
@@ -571,10 +466,6 @@ model SupplierExitPlan {
   supplier                  Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@index([supplierId])
-  @@index([status])
-  @@index([startDate])
-  @@index([targetEndDate])
-  @@index([completedAt])
 }
 
 model Supplier {
@@ -593,8 +484,6 @@ model Supplier {
   criticality               String?
   riskRationale             String?
   criticalityRationale      String?
-  lastRiskAssessmentAt      DateTime?
-  lastCriticalityAssessmentAt DateTime?
   pciStatus                 String?
   iso27001Status            String?
   iso22301Status            String?
@@ -620,19 +509,9 @@ model Supplier {
   updatedBy                 User?    @relation("SupplierUpdatedBy", fields: [updatedByUserId], references: [id])
   lifecycleState            String   @default("DRAFT")
   cisoExemptionGranted      Boolean  @default(false)
-  currentRiskAssessmentId    String? @unique
-  currentCriticalityAssessmentId String? @unique
-  riskAssessments            SupplierRiskAssessment[]
-  criticalityAssessments     SupplierCriticalityAssessment[]
-  currentRiskAssessment      SupplierRiskAssessment? @relation("CurrentRiskAssessment", fields: [currentRiskAssessmentId], references: [id])
-  currentCriticalityAssessment SupplierCriticalityAssessment? @relation("CurrentCriticalityAssessment", fields: [currentCriticalityAssessmentId], references: [id])
-  nextReviewAt               DateTime?
-  lastReviewAt               DateTime?
+  reviewDate                 DateTime?
   supplierRisks               SupplierRiskLink[]
   supplierControls            SupplierControlLink[]
-  complianceReviews           SupplierComplianceReview[]
-  certificates                SupplierCertificate[]
-  reviewTasks                 ReviewTask[]
   exitPlan                    SupplierExitPlan?
   showInTrustCenter           Boolean  @default(false)
   trustCenterDisplayName      String?
@@ -641,8 +520,7 @@ model Supplier {
   trustCenterComplianceSummary String?
 
   @@index([status])
-  @@index([nextReviewAt])
-  @@index([lastReviewAt])
+  @@index([reviewDate])
   @@index([supplierType])
   @@index([criticality])
   @@index([pciStatus])
@@ -651,8 +529,6 @@ model Supplier {
   @@index([relationshipOwnerUserId])
   @@index([name])
   @@index([lifecycleState])
-  @@index([currentRiskAssessmentId])
-  @@index([currentCriticalityAssessmentId])
   @@index([showInTrustCenter])
   @@index([trustCenterCategory])
 }

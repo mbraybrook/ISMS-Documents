@@ -316,6 +316,68 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       if (control.selectedForBusinessRequirement) controlsBySelectionReason.businessRequirement++;
     });
 
+    // ===== SUPPLIER REVIEW STATISTICS =====
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    const elevenMonthsAgo = new Date();
+    elevenMonthsAgo.setMonth(elevenMonthsAgo.getMonth() - 11);
+
+    // Suppliers with no review date
+    const suppliersMissingReviewDate = await prisma.supplier.findMany({
+      where: {
+        reviewDate: null,
+        status: { in: ['ACTIVE', 'IN_ONBOARDING'] },
+      },
+      select: {
+        id: true,
+        name: true,
+        reviewDate: true,
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+      take: 20,
+    });
+
+    // Suppliers overdue (>12 months since review)
+    const suppliersOverdue = await prisma.supplier.findMany({
+      where: {
+        reviewDate: {
+          lt: twelveMonthsAgo,
+        },
+        status: { in: ['ACTIVE', 'IN_ONBOARDING'] },
+      },
+      select: {
+        id: true,
+        name: true,
+        reviewDate: true,
+      },
+      orderBy: {
+        reviewDate: 'asc',
+      },
+      take: 20,
+    });
+
+    // Suppliers with warning (within 1 month of 12 months)
+    const suppliersWarning = await prisma.supplier.findMany({
+      where: {
+        reviewDate: {
+          gte: twelveMonthsAgo,
+          lt: elevenMonthsAgo,
+        },
+        status: { in: ['ACTIVE', 'IN_ONBOARDING'] },
+      },
+      select: {
+        id: true,
+        name: true,
+        reviewDate: true,
+      },
+      orderBy: {
+        reviewDate: 'asc',
+      },
+      take: 20,
+    });
+
     // ===== ACKNOWLEDGMENT STATISTICS =====
     let pendingAcknowledgments: any[] = [];
     let acknowledgmentStats: any = null;
@@ -436,6 +498,14 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       acknowledgments: {
         pending: pendingAcknowledgments,
         stats: acknowledgmentStats,
+      },
+      suppliers: {
+        missingReviewDate: suppliersMissingReviewDate,
+        overdue: suppliersOverdue,
+        warning: suppliersWarning,
+        missingReviewDateCount: suppliersMissingReviewDate.length,
+        overdueCount: suppliersOverdue.length,
+        warningCount: suppliersWarning.length,
       },
       lastUpdated: now.toISOString(),
     });
