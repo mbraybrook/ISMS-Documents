@@ -441,7 +441,6 @@ model TrustCenterSettings {
 model SupplierRiskAssessment {
   id                String   @id @default(uuid())
   supplierId        String
-  ciaImpact         String
   supplierType      String
   riskRating        String
   rationale         String?
@@ -589,7 +588,6 @@ model Supplier {
   processesPersonalData     Boolean  @default(false)
   hostingRegions            Json?
   customerFacingImpact      Boolean  @default(false)
-  ciaImpact                 String?
   overallRiskRating         String?
   criticality               String?
   riskRationale             String?

@@ -15,6 +15,7 @@ import {
   updateRiskControls,
   calculateCIAFromWizard,
   validateStatusTransition,
+  hasPolicyNonConformance,
 } from '../services/riskService';
 import { importRisksFromCSV } from '../services/riskImportService';
 import { findSimilarRisksForRisk, checkSimilarityForNewRisk } from '../services/similarityService';
@@ -46,6 +47,7 @@ router.get(
     query('ownerId').optional().isUUID(),
     query('treatmentCategory').optional().isIn(['RETAIN', 'MODIFY', 'SHARE', 'AVOID']),
     query('mitigationImplemented').optional().isBoolean(),
+    query('policyNonConformance').optional().isBoolean(),
     query('riskLevel').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     query('search').optional().isString(),
     query('dateAddedFrom').optional().isISO8601(),
@@ -93,6 +95,7 @@ router.get(
         status,
         department,
         testDepartment,
+        policyNonConformance,
       } = req.query;
 
       const pageNum = parseInt(page as string, 10);
@@ -234,6 +237,32 @@ router.get(
         });
         const filteredIds = risksForLevel
           .filter((r) => getRiskLevel(r.calculatedScore) === riskLevel)
+          .map((r) => r.id);
+        where.id = { in: filteredIds };
+        countWhere.id = { in: filteredIds };
+      }
+
+      // Apply policy non-conformance filter if specified
+      if (policyNonConformance !== undefined) {
+        const allRisksForNonConformance = await prisma.risk.findMany({
+          where: countWhere,
+          select: {
+            id: true,
+            initialRiskTreatmentCategory: true,
+            calculatedScore: true,
+            mitigatedConfidentialityScore: true,
+            mitigatedIntegrityScore: true,
+            mitigatedAvailabilityScore: true,
+            mitigatedLikelihood: true,
+            mitigatedScore: true,
+            mitigationDescription: true,
+          },
+        });
+        const filteredIds = allRisksForNonConformance
+          .filter((r) => {
+            const hasNonConformance = hasPolicyNonConformance(r);
+            return policyNonConformance === 'true' ? hasNonConformance : !hasNonConformance;
+          })
           .map((r) => r.id);
         where.id = { in: filteredIds };
         countWhere.id = { in: filteredIds };
@@ -766,6 +795,10 @@ router.put(
           effectiveDepartment = testDepartment;
         } else if (userRole === 'CONTRIBUTOR') {
           // Real CONTRIBUTOR - use database department
+          // Check if Contributor has a department assigned
+          if (!userDepartment) {
+            return res.status(403).json({ error: 'Contributors must have a department assigned' });
+          }
           effectiveDepartment = userDepartment;
         }
         
@@ -778,12 +811,6 @@ router.put(
             error: 'You can only edit risks from your department',
             details: { riskDepartment, effectiveDepartment, isTesting: isTestingAsContributor }
           });
-        }
-
-        // Contributors can only edit DRAFT or PROPOSED risks
-        const currentStatus = (existing as any).status || 'DRAFT';
-        if (currentStatus !== 'DRAFT' && currentStatus !== 'PROPOSED') {
-          return res.status(403).json({ error: 'You can only edit risks in DRAFT or PROPOSED status' });
         }
 
         // Contributors cannot set status to ACTIVE

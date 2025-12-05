@@ -1,6 +1,15 @@
 [
   {
     "code": "5.1",
+    "title": "Policies for information security",
+    "controlText": "Information security policy and topic-specific policies should be\ndefined, approved by management, published, communicated to and\nacknowledged by relevant personnel and relevant interested parties,\nand reviewed at planned intervals and if significant changes occur.",
+    "purpose": "To ensure continuing suitability, adequacy, effectiveness of\nmanagement direction and support for information security in\naccordance with business, legal, statutory, regulatory and contractual\nrequirements.",
+    "guidance": "At the highest level, the organization should define an \"information\nsecurity policy\" which is approved by top management and which sets\nout the organization's approach to managing its information security.\n\nThe information security policy should take into consideration\nrequirements derived from:\n\na)  business strategy and requirements;\n\nb)  regulations, legislation and contracts;\n\nc)  the current and projected information security risks and threats.\n    > The information security policy should contain statements\n    > concerning:\n\n```{=html}\n<!-- -->\n```\na)  definition of information security;\n\nb)  information security objectives or the framework for setting\n    information security objectives;\n\nc)  principles to guide all activities relating to information security;\n\nd)  commitment to satisfy applicable requirements related to information\n    > security;\n\ne)  commitment to continual improvement of the information security\n    management system;\n\nf)  assignment of responsibilities for information security management\n    to defined roles;\n\ng)  procedures for handling exemptions and exceptions.\n\nTop management should approve any changes to the information security\npolicy.\n\nAt a lower level, the information security policy should be supported\nby topic-specific policies as needed, to further mandate the\nimplementation of information security controls. Topic-specific\npolicies are typically structured to address the needs of certain\ntarget groups within an organization or to cover certain security\nareas. Topic-specific policies should be aligned with and\ncomplementary to the information security policy of the organization.\n\nExamples of such topics include:\n\na)  access control;\n\nb)  physical and environmental security;\n\nc)  asset management;\n\nd)  information transfer;\n\ne)  secure configuration and handling of user endpoint devices;\n\nf)  networking security;\n\ng)  information security incident management;\n\nh)  backup;\n\ni)  cryptography and key management;\n\nj)  information classification and handling;\n\nk)  management of technical vulnerabilities;\n\nl)  secure development.\n\nThe responsibility for the development, review and approval of the\ntopic-specific policies should be allocated to relevant personnel\nbased on their appropriate level of authority and technical\ncompetency. The review should include assessing opportunities for\nimprovement of the organization's information security policy and\ntopic-specific policies and managing information security in response\nto changes to:\n\na.  the organization's business strategy;\n\nb.  the organization's technical environment;\n\nc.  regulations, statutes, legislation and contracts;\n\nd.  information security risks;\n\ne.  the current and projected information security threat environment;\n\nf.  lessons learned from information security events and incidents.\n\nThe review of information security policy and topic-specific policies\nshould take the results of management reviews and audits into account.\nReview and update of other related policies should be considered when\none policy is changed to maintain consistency.\n\nThe information security policy and topic-specific policies should be\ncommunicated to relevant personnel and interested parties in a form\nthat is relevant, accessible and understandable to the intended\nreader. Recipients of the policies should be required to acknowledge\nthey understand and agree to comply with the policies where\napplicable. The organization can determine the formats and names of\nthese policy documents that meet the organization's needs. In some\norganizations, the information security policy and topic-specific\npolicies can be in a single document. The organization can name these\ntopic-specific policies as standards, directives, policies or others.\n\nIf the information security policy or any topic-specific policy is\ndistributed outside the organization, care should be taken not to\nimproperly disclose confidential information.\n\n[[Table\n1]](#table-1-differences-between-information-security-policy-and-topic-specific-policy)\nillustrates the differences between information security policy and\ntopic-specific policy.\n\n##### Table 1 --- Differences between information security policy and topic-specific policy\n\n**Other information**\n\nTopic-specific policies can vary across organizations.",
+    "otherInformation": null,
+    "category": "ORGANIZATIONAL"
+  },
+  {
+    "code": "5.2",
     "title": "Information security roles and responsibilities",
     "controlText": "Information security roles and responsibilities should be defined and\nallocated according to the organization needs.",
     "purpose": "To establish a defined, approved and understood structure for the\nimplementation, operation and management of information security\nwithin the organization.",
@@ -9,7 +18,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.2",
+    "code": "5.3",
     "title": "Segregation of duties",
     "controlText": "Conflicting duties and conflicting areas of responsibility should be\nsegregated.",
     "purpose": "To reduce the risk of fraud, error and bypassing of information\nsecurity controls.",
@@ -18,7 +27,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.3",
+    "code": "5.4",
     "title": "Management responsibilities",
     "controlText": "Management should require all personnel to apply information security\nin accordance with the established information security policy,\ntopic-specific policies and procedures of the organization.",
     "purpose": "To ensure management understand their role in information security and\nundertake actions aiming to ensure all personnel are aware of and\nfulfil their information security responsibilities.",
@@ -27,7 +36,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.4",
+    "code": "5.5",
     "title": "Contact with authorities",
     "controlText": "The organization should establish and maintain contact with relevant\nauthorities.",
     "purpose": "To ensure appropriate flow of information takes place with respect to\ninformation security between the organization and relevant legal,\nregulatory and supervisory authorities.",
@@ -36,7 +45,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.5",
+    "code": "5.6",
     "title": "Contact with special interest groups",
     "controlText": "The organization should establish and maintain contact with special\ninterest groups or other specialist security forums and professional\nassociations.",
     "purpose": "To ensure appropriate flow of information takes place with respect to\ninformation security.",
@@ -45,7 +54,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.6",
+    "code": "5.7",
     "title": "Threat intelligence",
     "controlText": "Information relating to information security threats should be\ncollected and analysed to produce threat\n\nintelligence.",
     "purpose": "To provide awareness of the organization's threat environment so that\nthe appropriate mitigation actions can be taken.",
@@ -54,7 +63,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.7",
+    "code": "5.8",
     "title": "Information security in project management",
     "controlText": "Information security should be integrated into project management.",
     "purpose": "To ensure information security risks related to projects and\ndeliverables are effectively addressed in project management\nthroughout the project life cycle.",
@@ -63,7 +72,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.8",
+    "code": "5.9",
     "title": "Inventory of information and other associated assets",
     "controlText": "An inventory of information and other associated assets, including\nowners, should be developed and maintained.",
     "purpose": "To identify the organization's information and other associated assets\nin order to preserve their information security and assign appropriate\nownership.",
@@ -72,7 +81,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.9",
+    "code": "5.10",
     "title": "Acceptable use of information and other associated assets",
     "controlText": "Rules for the acceptable use and procedures for handling information\nand other associated assets should be identified, documented and\nimplemented.",
     "purpose": "To ensure information and other associated assets are appropriately\nprotected, used and handled.",
@@ -81,7 +90,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.10",
+    "code": "5.11",
     "title": "Return of assets",
     "controlText": "Personnel and other interested parties as appropriate should return\nall the organization's assets in their possession upon change or\ntermination of their employment, contract or agreement.",
     "purpose": "To protect the organization's assets as part of the process of\nchanging or terminating employment, contract or agreement.",
@@ -90,8 +99,17 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.11",
+    "code": "5.12",
     "title": "Classification of information",
+    "controlText": "Information should be classified according to the information security\nneeds of the organization based on confidentiality, integrity,\navailability and relevant interested party requirements.",
+    "purpose": "To ensure identification and understanding of protection needs of\ninformation in accordance with its importance to the organization.",
+    "guidance": "The organization should establish a topic-specific policy on\ninformation classification and communicate it to all relevant\ninterested parties.\n\nThe organization should take into account requirements for\nconfidentiality, integrity and availability in the classification\nscheme.\n\nClassifications and associated protective controls for information\nshould take account of business needs for sharing or restricting\ninformation, for protecting integrity of information and for assuring\navailability, as well as legal requirements concerning the\nconfidentiality, integrity or availability of the information. Assets\nother than information can also be classified in compliance with\nclassification of information, which is stored in, processed by or\notherwise handled or protected by the asset.\n\nOwners of information should be accountable for their classification.\n\nThe classification scheme should include conventions for\nclassification and criteria for review of the classification over\ntime. Results of classification should be updated in accordance with\nchanges of the value, sensitivity and criticality of information\nthrough their life cycle.\n\nThe scheme should be aligned to the topic-specific policy on access\ncontrol (see [[5.1]](#policies-for-information-security))\nand should be able to address specific business needs of the\norganization.\n\nThe classification can be determined by the level of impact that the\ninformation\\'s compromise would have for the organization. Each level\ndefined in the scheme should be given a name that makes sense in the\ncontext of the classification scheme's application.\n\nThe scheme should be consistent across the whole organization and\nincluded in its procedures so that everyone classifies information and\napplicable other associated assets in the same way. In this manner,\neveryone has a common understanding of protection requirements and\napplies appropriate protection.\n\nThe classification scheme used within the organization can be\ndifferent from the schemes used by other organizations, even if the\nnames for levels are similar. In addition, information moving between\n\norganizations can vary in classification depending on its context in\neach organization, even if their classification schemes are identical.\nTherefore, agreements with other organizations that include\ninformation sharing should include procedures to identify the\nclassification of that information and to interpret the classification\nlevels from other organizations. Correspondence between different\nschemes can be determined by looking for equivalence in the associated\nhandling and protection methods.",
+    "otherInformation": "Classification provides people who deal with information with a\nconcise indication of how to handle and protect it. Creating groups of\ninformation with similar protection needs and specifying information\nsecurity procedures that apply to all the information in each group\nfacilitates this. This approach reduces the need for case-by-case risk\nassessment and custom design of controls.\n\nInformation can cease to be sensitive or critical after a certain\nperiod of time. For example, when the information has been made\npublic, it no longer has confidentiality requirements but can still\nrequire protection for its integrity and availability properties.\nThese aspects should be taken into account, as over-classification can\nlead to the implementation of unnecessary controls resulting in\nadditional expense or, on the contrary, under-classification can lead\nto insufficient controls to protect the information from compromise.\n\nAs an example, an information confidentiality classification scheme\ncan be based on four levels as\n\nfollows:\n\na)  disclosure causes no harm;\n\nb)  disclosure causes minor reputational damage or minor operational\n    impact;\n\nc)  disclosure has a significant short-term impact on operations or\n    business objectives;\n\nd)  disclosure has a serious impact on long term business objectives or\n    puts the survival of the organization at risk.",
+    "category": "ORGANIZATIONAL"
+  },
+  {
+    "code": "5.13",
+    "title": "Labelling of information",
     "controlText": "An appropriate set of procedures for information labelling should be\ndeveloped and implemented in accordance with the information\nclassification scheme adopted by the organization.",
     "purpose": "To facilitate the communication of classification of information and\nsupport automation of information processing and management.",
     "guidance": "Procedures for information labelling should cover information and\nother associated assets in all formats. The labelling should reflect\nthe classification scheme established in\n[[5.12]](#classification-of-information). The labels\nshould be easily recognizable. The procedures should give guidance on\nwhere and how labels are attached in consideration of how the\ninformation is accessed or the assets are handled depending on the\ntypes of storage media. The procedures can define:\n\na)  cases where labelling is omitted (e.g. labelling of non-confidential\n    information to reduce workloads);\n\nb)  how to label information sent by or stored on electronic or physical\n    means, or any other format;\n\nc)  how to handle cases where labelling is not possible (e.g. due to\n    > technical restrictions). Examples of labelling techniques include:\n\n```{=html}\n<!-- -->\n```\na)  physical labels;\n\nb)  headers and footers;\n\nc)  metadata;\n\nd)  watermarking;\n\ne)  rubber-stamps.\n\nDigital information should utilize metadata in order to identify,\nmanage and control information, especially with regard to\nconfidentiality. Metadata should also enable efficient and correct\nsearching for information. Metadata should facilitate systems to\ninteract and make decisions based on the associated classification\nlabels.\n\nThe procedures should describe how to attach metadata to information,\nwhat labels to use and how data should be handled, in line with the\norganization's information model and ICT architecture.\n\nRelevant additional metadata should be added by systems when they\nprocess information depending on its information security properties.\n\nPersonnel and other interested parties should be made aware of\nlabelling procedures. All personnel should be provided with the\nnecessary training to ensure that information is correctly labelled\nand handled accordingly.\n\nOutput from systems containing information that is classified as being\nsensitive or critical should carry an appropriate classification\nlabel.",
@@ -99,7 +117,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.12",
+    "code": "5.14",
     "title": "Information transfer",
     "controlText": "Information transfer rules, procedures, or agreements should be in\nplace for all types of transfer facilities within the organization and\nbetween the organization and other parties.",
     "purpose": "To maintain the security of information transferred within an\norganization and with any external interested party.",
@@ -108,7 +126,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.13",
+    "code": "5.15",
     "title": "Access control",
     "controlText": "Rules to control physical and logical access to information and other\nassociated assets should be established and implemented based on\nbusiness and information security requirements.",
     "purpose": "To ensure authorized access and to prevent unauthorized access to\ninformation and other associated assets.",
@@ -117,7 +135,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.14",
+    "code": "5.16",
     "title": "Identity management",
     "controlText": "The full life cycle of identities should be managed.",
     "purpose": "To allow for the unique identification of individuals and systems\naccessing the organization's information and other associated assets\nand to enable appropriate assignment of access rights.",
@@ -126,8 +144,17 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.15",
+    "code": "5.17",
     "title": "Authentication information",
+    "controlText": "Allocation and management of authentication information should be\ncontrolled by a management process, including advising personnel on\nthe appropriate handling of authentication information.",
+    "purpose": "To ensure proper entity authentication and prevent failures of\nauthentication processes.",
+    "guidance": "[Allocation of authentication information]\n\nThe allocation and management process should ensure that:\n\na)  personal passwords or personal identification numbers (PINs)\n    generated automatically during enrolment processes as temporary\n    secret authentication information are non-guessable and unique for\n    each person, and that users are required to change them after the\n    first use;\n\nb)  procedures are established to verify the identity of a user prior to\n    providing new, replacement or temporary authentication information;\n\nc)  authentication information, including temporary authentication\n    information, is transmitted to users in a secure manner (e.g. over\n    an authenticated and protected channel) and the use of unprotected\n    (clear text) electronic mail messages for this purpose is avoided;\n\nd)  users acknowledge receipt of authentication information;\n\ne)  default authentication information as predefined or provided by\n    vendors is changed immediately following installation of systems or\n    software;\n\nf)  records of significant events concerning allocation and management\n    of authentication information are kept and their confidentiality is\n    granted, and that the record-keeping method is approved (e.g. by\n    using an approved password vault tool).\n\n[User responsibilities]\n\nAny person having access to or using authentication information should\nbe advised to ensure that:\n\na)  secret authentication information such as passwords are kept\n    confidential. Personal secret authentication information is not to\n    be shared with anyone. Secret authentication information used in the\n    context of identities linked to multiple users or linked to\n    non-personal entities are solely shared with authorized persons;\n\nb)  affected or compromised authentication information is changed\n    immediately upon notification of or any other indication of a\n    compromise;\n\nc)  when passwords are used as authentication information, strong\n    > passwords according to best practice recommendations are selected,\n    > for example:\n\n    1.  passwords are not based on anything somebody else can easily\n        guess or obtain using person- related information (e.g. names,\n        telephone numbers and dates of birth);\n\n    2.  passwords are not based on dictionary words or combinations\n        thereof;\n\n    3.  use easy to remember passphrases and try to include\n        alphanumerical and special characters;\n\n    4.  passwords have a minimum length;\n\nd)  the same passwords are not used across distinct services and\n    > systems;\n\ne)  the obligation to follow these rules is also included in terms and\n    > conditions of employment (see\n\n[[6.2]](#terms-and-conditions-of-employment)).\n\n[Password management system]\n\nWhen passwords are used as authentication information, the password\nmanagement system should:\n\na)  allow users to select and change their own passwords and include a\n    confirmation procedure to address input errors;\n\nb)  enforce strong passwords according to good practice recommendations\n    \\[see c) of \\\"User responsibilities\\];\n\nc)  force users to change their passwords at first login;\n\nd)  enforce password changes as necessary, for example after a security\n    incident, or upon termination or change of employment when a user\n    has known passwords for identities that remain active (e.g. shared\n    identities);\n\ne)  prevent re-use of previous passwords;\n\nf)  prevent the use of commonly-used passwords and compromised\n    usernames, password combinations from hacked systems;\n\ng)  not display passwords on the screen when being entered;\n\nh)  store and transmit passwords in protected form.\n\nPassword encryption and hashing should be performed according to\napproved cryptographic techniques for passwords (see\n[[8.24]](#use-of-cryptography)).",
+    "otherInformation": "Passwords or passphrases are a commonly used type of authentication\ninformation and are a common means of verifying a user's identity.\nOther types of authentication information are cryptographic keys, data\nstored on hardware tokens (e.g. smart cards) that produce\nauthentication codes and biometric data such as iris scans or\nfingerprints. Additional information can be found in the ISO/IEC 24760\nseries.\n\nRequiring frequent change of passwords can be problematic because\nusers can get annoyed by the frequent changes, forget new passwords,\nnote them down in unsafe places, or choose unsafe passwords. Provision\nof single sign on (SSO) or other authentication management tools (e.g.\npassword vaults) reduces the amount of authentication information that\nusers are required to protect and can thereby increase the\neffectiveness of this control. However, these tools can also increase\nthe impact of disclosure of authentication information.\n\nSome applications require user passwords to be assigned by an\nindependent authority. In such cases, a),\n\nc)  and d) of \\\"Password management system\\\" do not apply.",
+    "category": "ORGANIZATIONAL"
+  },
+  {
+    "code": "5.18",
+    "title": "Access rights",
     "controlText": "Access rights to information and other associated assets should be\nprovisioned, reviewed, modified and removed in accordance with the\norganization's topic-specific policy on and rules for access control.",
     "purpose": "To ensure access to information and other associated assets is defined\nand authorized according to the business requirements.",
     "guidance": "[Provision and revocation of access rights]\n\nThe provisioning process for assigning or revoking physical and\nlogical access rights granted to an entity's authenticated identity\nshould include:\n\na)  obtaining authorization from the owner of the information and other\n    associated assets for the use of the information and other\n    associated assets (see\n    [[5.9]](#inventory-of-information-and-other-associated-assets)).\n    Separate approval for access rights by management can also be\n    appropriate;\n\nb)  considering the business requirements and the organization's\n    topic-specific policy and rules on access control;\n\nc)  considering segregation of duties, including segregating the roles\n    of approval and implementation of the access rights and separation\n    of conflicting roles;\n\nd)  ensuring access rights are removed when someone does not need to\n    access the information and other associated assets, in particular\n    ensuring access rights of users who have left the organization are\n    removed in a timely fashion;\n\ne)  considering giving temporary access rights for a limited time period\n    and revoking them at the expiration date, in particular for\n    temporary personnel or temporary access required by personnel;\n\nf)  verifying that the level of access granted is in accordance with the\n    topic-specific policies on access control (see\n    [[5.15]](#access-control)) and is consistent with other\n    information security requirements such as segregation of duties (see\n    [[5.3]](#segregation-of-duties));\n\ng)  ensuring that access rights are activated (e.g. by service\n    providers) only after authorization procedures are successfully\n    completed;\n\nh)  maintaining a central record of access rights granted to a user\n    identifier (ID, logical or physical) to access information and other\n    associated assets;\n\ni)  modifying access rights of users who have changed roles or jobs;\n\nj)  removing or adjusting physical and logical access rights, which can\n    be done by removal, revocation or replacement of keys,\n    authentication information, identification cards or subscriptions;\n\nk)  maintaining a record of changes to users' logical and physical\n    > access rights. [Review of access rights]\n\nRegular reviews of physical and logical access rights should consider\nthe following:\n\na.  users' access rights after any change within the same organization\n    (e.g. job change, promotion, demotion) or termination of employment\n    (see [[6.1]](#screening) to\n    [[6.5]](#responsibilities-after-termination-or-change-of-employment));\n\nb.  authorizations for privileged access rights. [Consideration before\n    > change or termination of employment]\n\nA user's access rights to information and other associated assets\nshould be reviewed and adjusted or removed before any change or\ntermination of employment based on the evaluation of risk factors such\nas:\n\na)  whether the termination or change is initiated by the user or by\n    management and the reason for termination;\n\nb)  the current responsibilities of the user;\n\nc)  the value of the assets currently accessible.",
@@ -135,7 +162,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.16",
+    "code": "5.19",
     "title": "Information security in supplier relationships",
     "controlText": "Processes and procedures should be defined and implemented to manage\nthe information security risks associated with the use of supplier's\nproducts or services.",
     "purpose": "To maintain an agreed level of information security in supplier\nrelationships.",
@@ -144,7 +171,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.17",
+    "code": "5.20",
     "title": "Addressing information security within supplier agreements",
     "controlText": "Relevant information security requirements should be established and\nagreed with each supplier based on the type of supplier relationship.",
     "purpose": "To maintain an agreed level of information security in supplier\nrelationships.",
@@ -153,7 +180,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.18",
+    "code": "5.21",
     "title": "Managing information security in the ICT supply chain",
     "controlText": "Processes and procedures should be defined and implemented to manage\nthe information security risks associated with the ICT products and\nservices supply chain.",
     "purpose": "To maintain an agreed level of information security in supplier\nrelationships.",
@@ -162,7 +189,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.19",
+    "code": "5.22",
     "title": "Monitoring, review and change management of supplier services",
     "controlText": "The organization should regularly monitor, review, evaluate and manage\nchange in supplier information security practices and service\ndelivery.",
     "purpose": "To maintain an agreed level of information security and service\ndelivery in line with supplier agreements.",
@@ -171,7 +198,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.20",
+    "code": "5.23",
     "title": "Information security for use of cloud services",
     "controlText": "Processes for acquisition, use, management and exit from cloud\nservices should be established in accordance with the organization's\ninformation security requirements.",
     "purpose": "To specify and manage information security for the use of cloud\nservices.",
@@ -180,7 +207,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.21",
+    "code": "5.24",
     "title": "Information security incident management planning and preparation",
     "controlText": "The organization should plan and prepare for managing information\nsecurity incidents by defining, establishing and communicating\ninformation security incident management processes, roles and\nresponsibilities.",
     "purpose": "To ensure quick, effective, consistent and orderly response to\ninformation security incidents, including communication on information\nsecurity events.",
@@ -189,7 +216,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.22",
+    "code": "5.25",
     "title": "Assessment and decision on information security events",
     "controlText": "The organization should assess information security events and decide\nif they are to be categorized as information security incidents.",
     "purpose": "To ensure effective categorization and prioritization of information\nsecurity events.",
@@ -198,7 +225,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.23",
+    "code": "5.26",
     "title": "Response to information security incidents",
     "controlText": "Information security incidents should be responded to in accordance\nwith the documented procedures.",
     "purpose": "To ensure efficient and effective response to information security\nincidents.",
@@ -207,7 +234,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.24",
+    "code": "5.27",
     "title": "Learning from information security incidents",
     "controlText": "Knowledge gained from information security incidents should be used to\nstrengthen and improve the information security controls.",
     "purpose": "To reduce the likelihood or consequences of future incidents.",
@@ -216,7 +243,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.25",
+    "code": "5.28",
     "title": "Collection of evidence",
     "controlText": "The organization should establish and implement procedures for the\nidentification, collection, acquisition and preservation of evidence\nrelated to information security events.",
     "purpose": "To ensure a consistent and effective management of evidence related to\ninformation security incidents for the purposes of disciplinary and\nlegal actions.",
@@ -225,7 +252,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.26",
+    "code": "5.29",
     "title": "Information security during disruption",
     "controlText": "The organization should plan how to maintain information security at\nan appropriate level during\n\ndisruption.",
     "purpose": "To protect information and other associated assets during disruption.",
@@ -234,7 +261,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.27",
+    "code": "5.30",
     "title": "ICT readiness for business continuity",
     "controlText": "ICT readiness should be planned, implemented, maintained and tested\nbased on business continuity objectives and ICT continuity\nrequirements.",
     "purpose": "To ensure the availability of the organization's information and other\nassociated assets during\n\ndisruption.",
@@ -243,7 +270,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.28",
+    "code": "5.31",
     "title": "Legal, statutory, regulatory and contractual requirements",
     "controlText": "Legal, statutory, regulatory and contractual requirements relevant to\ninformation security and the organization's approach to meet these\nrequirements should be identified, documented and kept up to date.",
     "purpose": "To ensure compliance with legal, statutory, regulatory and contractual\nrequirements related to information security.",
@@ -252,7 +279,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.29",
+    "code": "5.32",
     "title": "Intellectual property rights",
     "controlText": "The organization should implement appropriate procedures to protect\nintellectual property rights.",
     "purpose": "To ensure compliance with legal, statutory, regulatory and contractual\nrequirements related to intellectual property rights and use of\nproprietary products.",
@@ -261,7 +288,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.30",
+    "code": "5.33",
     "title": "Protection of records",
     "controlText": "Records should be protected from loss, destruction, falsification,\nunauthorized access and unauthorized release.",
     "purpose": "To ensure compliance with legal, statutory, regulatory and contractual\nrequirements, as well as community or societal expectations related to\nthe protection and availability of records.",
@@ -270,7 +297,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.31",
+    "code": "5.34",
     "title": "Privacy and protection of PII",
     "controlText": "The organization should identify and meet the requirements regarding\nthe preservation of privacy and protection of PII according to\napplicable laws and regulations and contractual requirements.",
     "purpose": "To ensure compliance with legal, statutory, regulatory and contractual\nrequirements related to the information security aspects of the\nprotection of PII.",
@@ -279,7 +306,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.32",
+    "code": "5.35",
     "title": "Independent review of information security",
     "controlText": "The organization's approach to managing information security and its\nimplementation including people, processes and technologies should be\nreviewed independently at planned intervals, or when significant\nchanges occur.",
     "purpose": "To ensure the continuing suitability, adequacy and effectiveness of\nthe organization's approach to managing information security.",
@@ -288,7 +315,7 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.33",
+    "code": "5.36",
     "title": "Compliance with policies, rules and standards for information security",
     "controlText": "Compliance with the organization's information security policy,\ntopic-specific policies, rules and standards should be regularly\nreviewed.",
     "purpose": "To ensure that information security is implemented and operated in\naccordance with the organization's information security policy,\ntopic-specific policies, rules and standards.",
@@ -297,16 +324,25 @@
     "category": "ORGANIZATIONAL"
   },
   {
-    "code": "5.34",
+    "code": "5.37",
     "title": "Documented operating procedures",
-    "controlText": "Background verification checks on all candidates to become personnel\nshould be carried out prior to joining the organization and on an\nongoing basis taking into consideration applicable laws, regulations\nand ethics and be proportional to the business requirements, the\nclassification of the information to be accessed and the perceived\nrisks.",
-    "purpose": "To ensure all personnel are eligible and suitable for the roles for\nwhich they are considered and remain eligible and suitable during\ntheir employment.",
-    "guidance": "A screening process should be performed for all personnel including\nfull-time, part-time and temporary staff. Where these individuals are\ncontracted through suppliers of services, screening requirements\nshould be included in the contractual agreements between the\norganization and the suppliers.\n\nInformation on all candidates being considered for positions within\nthe organization should be collected and handled taking into\nconsideration any appropriate legislation existing in the relevant\njurisdiction. In some jurisdictions, the organization can be legally\nrequired to inform the candidates beforehand about the screening\nactivities.\n\nVerification should take into consideration all relevant privacy, PII\nprotection and employment-based legislation and should, where\npermitted, include the following:\n\na)  availability of satisfactory references (e.g. business and personal\n    references);\n\nb)  a verification (for completeness and accuracy) of the applicant's\n    curriculum vitae;\n\nc)  confirmation of claimed academic and professional qualifications;\n\nd)  independent identity verification (e.g. passport or other acceptable\n    document issued by appropriate authorities);\n\ne)  more detailed verification, such as credit review or review of\n    > criminal records if the candidate takes on a critical role.\n\nWhen an individual is hired for a specific information security role,\nthe organization should make sure the candidate:\n\na)  has the necessary competence to perform the security role;\n\nb)  can be trusted to take on the role, especially if the role is\n    critical for the organization.\n\nWhere a job, either on initial appointment or on promotion, involves\nthe person having access to information processing facilities and, in\nparticular, if these involve handling confidential information (e.g.\nfinancial information, personal information or health care\ninformation) the organization should also consider further, more\ndetailed verifications.\n\nProcedures should define criteria and limitations for verification\nreviews (e.g. who is eligible to screen people and how, when and why\nverification reviews are carried out).\n\nIn situations where verification cannot be completed in a timely\nmanner, mitigating controls should be implemented until the review has\nbeen finished, for example:\n\na)  delayed onboarding;\n\nb)  delayed deployment of corporate assets;\n\nc)  onboarding with reduced access;\n\nd)  termination of employment.\n\nVerification checks should be repeated periodically to confirm ongoing\nsuitability of personnel, depending on the criticality of a person's\nrole.",
-    "otherInformation": "No other information.",
+    "controlText": "Operating procedures for information processing facilities should be\ndocumented and made available\n\nto personnel who need them.",
+    "purpose": "To ensure the correct and secure operation of information processing\nfacilities.",
+    "guidance": "Documented procedures should be prepared for the organization's\noperational activities associated with information security, for\nexample:\n\na)  when the activity needs to be performed in the same way by many\n    people;\n\nb)  when the activity is performed rarely and when next performed the\n    procedure is likely to have been forgotten;\n\nc)  when the activity is new and presents a risk if not performed\n    correctly;\n\nd)  prior to handing over the activity to new personnel. The operating\n    > procedures should specify:\n\n```{=html}\n<!-- -->\n```\na)  the responsible individuals;\n\nb)  the secure installation and configuration of systems;\n\nc)  processing and handling of information, both automated and manual;\n\nd)  backup (see [[8.13]](#information-backup)) and\n    > resilience;\n\ne)  scheduling requirements, including interdependencies with other\n    systems;\n\nf)  instructions for handling errors or other exceptional conditions\n    \\[e.g. restrictions on the use of utility programs (see\n    [[8.18]](#use-of-privileged-utility-programs))\\], which\n    can arise during job execution;\n\ng)  support and escalation contacts including external support contacts\n    in the event of unexpected operational or technical difficulties;\n\nh)  storage media handling instructions (see\n    [[7.10]](#storage-media) and\n    [[7.14]](#secure-disposal-or-re-use-of-equipment));\n\ni)  system restart and recovery procedures for use in the event of\n    > system failure;\n\nj)  the management of audit trail and system log information (see\n    > [[8.15]](#logging) and\n    > [[8.17]](#clock-synchronization)) and video monitoring\n    > systems (see [[7.4]](#physical-security-monitoring));\n\nk)  monitoring procedures such as capacity, performance and security\n    > (see [[8.6]](#capacity-management) and\n    > [[8.16]](#monitoring-activities));\n\nl)  maintenance instructions.\n\nDocumented operating procedures should be reviewed and updated when\nneeded. Changes to documented operating procedures should be\nauthorized. Where technically feasible, information systems should be\nmanaged consistently, using the same procedures, tools and utilities.",
+    "otherInformation": "No other information.\n\n    ---------------",
     "category": "ORGANIZATIONAL"
   },
   {
     "code": "6.1",
+    "title": "Screening",
+    "controlText": "Background verification checks on all candidates to become personnel\nshould be carried out prior to joining the organization and on an\nongoing basis taking into consideration applicable laws, regulations\nand ethics and be proportional to the business requirements, the\nclassification of the information to be accessed and the perceived\nrisks.",
+    "purpose": "To ensure all personnel are eligible and suitable for the roles for\nwhich they are considered and remain eligible and suitable during\ntheir employment.",
+    "guidance": "A screening process should be performed for all personnel including\nfull-time, part-time and temporary staff. Where these individuals are\ncontracted through suppliers of services, screening requirements\nshould be included in the contractual agreements between the\norganization and the suppliers.\n\nInformation on all candidates being considered for positions within\nthe organization should be collected and handled taking into\nconsideration any appropriate legislation existing in the relevant\njurisdiction. In some jurisdictions, the organization can be legally\nrequired to inform the candidates beforehand about the screening\nactivities.\n\nVerification should take into consideration all relevant privacy, PII\nprotection and employment-based legislation and should, where\npermitted, include the following:\n\na)  availability of satisfactory references (e.g. business and personal\n    references);\n\nb)  a verification (for completeness and accuracy) of the applicant's\n    curriculum vitae;\n\nc)  confirmation of claimed academic and professional qualifications;\n\nd)  independent identity verification (e.g. passport or other acceptable\n    document issued by appropriate authorities);\n\ne)  more detailed verification, such as credit review or review of\n    > criminal records if the candidate takes on a critical role.\n\nWhen an individual is hired for a specific information security role,\nthe organization should make sure the candidate:\n\na)  has the necessary competence to perform the security role;\n\nb)  can be trusted to take on the role, especially if the role is\n    critical for the organization.\n\nWhere a job, either on initial appointment or on promotion, involves\nthe person having access to information processing facilities and, in\nparticular, if these involve handling confidential information (e.g.\nfinancial information, personal information or health care\ninformation) the organization should also consider further, more\ndetailed verifications.\n\nProcedures should define criteria and limitations for verification\nreviews (e.g. who is eligible to screen people and how, when and why\nverification reviews are carried out).\n\nIn situations where verification cannot be completed in a timely\nmanner, mitigating controls should be implemented until the review has\nbeen finished, for example:\n\na)  delayed onboarding;\n\nb)  delayed deployment of corporate assets;\n\nc)  onboarding with reduced access;\n\nd)  termination of employment.\n\nVerification checks should be repeated periodically to confirm ongoing\nsuitability of personnel, depending on the criticality of a person's\nrole.",
+    "otherInformation": "No other information.",
+    "category": "PEOPLE"
+  },
+  {
+    "code": "6.2",
     "title": "Terms and conditions of employment",
     "controlText": "The employment contractual agreements should state the personnel's and\nthe organization's responsibilities for information security.",
     "purpose": "To ensure personnel understand their information security\nresponsibilities for the roles for which they are considered.",
@@ -315,7 +351,7 @@
     "category": "PEOPLE"
   },
   {
-    "code": "6.2",
+    "code": "6.3",
     "title": "Information security awareness, education and training",
     "controlText": "Personnel of the organization and relevant interested parties should\nreceive appropriate information security awareness, education and\ntraining and regular updates of the organization\\'s information\nsecurity policy, topic-specific policies and procedures, as relevant\nfor their job function.",
     "purpose": "To ensure personnel and relevant interested parties are aware of and\nfulfil their information security\n\nresponsibilities. **Guidance** [General]\n\nAn information security awareness, education and training programme\nshould be established in line with the organization's information\nsecurity policy, topic-specific policies and relevant procedures on\ninformation security, taking into consideration the organization's\ninformation to be protected and the information security controls that\nhave been implemented to protect the information.\n\nInformation security awareness, education and training should take\nplace periodically. Initial awareness, education and training can\napply to new personnel and to those who transfer to new positions or\nroles with substantially different information security requirements.\n\nPersonnel's understanding should be assessed at the end of an\nawareness, education or training activity to test knowledge transfer\nand the effectiveness of the awareness, education and training\nprogramme.\n\n[Awareness]\n\nAn information security awareness programme should aim to make\npersonnel aware of their responsibilities for information security and\nthe means by which those responsibilities are discharged.\n\nThe awareness programme should be planned taking into consideration\nthe roles of personnel in the organization, including internal and\nexternal personnel (e.g. external consultants, supplier personnel).\nThe activities in the awareness programme should be scheduled over\ntime, preferably regularly, so that the activities are repeated and\ncover new personnel. It should also be built on lessons learnt from\ninformation security incidents.\n\nThe awareness programme should include a number of awareness-raising\nactivities via appropriate physical or virtual channels such as\ncampaigns, booklets, posters, newsletters, websites, information\nsessions, briefings, e-learning modules and e-mails.\n\nInformation security awareness should cover general aspects such as:\n\na)  management's commitment to information security throughout the\n    organization;\n\nb)  familiarity and compliance needs concerning applicable information\n    security rules and obligations, taking into account information\n    security policy and topic-specific policies, standards, laws,\n    statutes, regulations, contracts and agreements;\n\nc)  personal accountability for one's own actions and inactions, and\n    general responsibilities towards securing or protecting information\n    belonging to the organization and interested parties;\n\nd)  basic information security procedures \\[e.g. information security\n    event reporting\n    ([[6.8]](#information-security-event-reporting))\\] and\n    baseline controls \\[e.g. password security\n    ([[5.17]](#authentication-information))\\];\n\ne)  contact points and resources for additional information and advice\n    > on information security matters, including further information\n    > security awareness materials.\n\n[Education and training]\n\nThe organization should identify, prepare and implement an appropriate\ntraining plan for technical teams whose roles require specific skill\nsets and expertise. Technical teams should have the skills for\nconfiguring and maintaining the required security level for devices,\nsystems, applications and services. If there are missing skills, the\norganization should take action and acquire them.\n\nThe education and training programme should consider different forms\n\\[e.g. lectures or self-studies, being mentored by expert staff or\nconsultants (on-the-job training), rotating staff members to follow\ndifferent activities, recruiting already skilled people and hiring\nconsultants\\]. It can use different means\n\nof delivery including classroom-based, distance learning, web-based,\nself-paced and others. Technical personnel should keep their knowledge\nup to date by subscribing to newsletters and magazines or by attending\nconferences and events aimed at technical and professional\nimprovement.",
@@ -324,7 +360,7 @@
     "category": "PEOPLE"
   },
   {
-    "code": "6.3",
+    "code": "6.4",
     "title": "Disciplinary process",
     "controlText": "A disciplinary process should be formalized and communicated to take\nactions against personnel and other relevant interested parties who\nhave committed an information security policy violation.",
     "purpose": "To ensure personnel and other relevant interested parties understand\nthe consequences of information security policy violation, to deter\nand appropriately deal with personnel and other relevant interested\nparties who committed the violation.",
@@ -333,7 +369,7 @@
     "category": "PEOPLE"
   },
   {
-    "code": "6.4",
+    "code": "6.5",
     "title": "Responsibilities after termination or change of employment",
     "controlText": "Information security responsibilities and duties that remain valid\nafter termination or change of employment should be defined, enforced\nand communicated to relevant personnel and other interested parties.",
     "purpose": "To protect the organization's interests as part of the process of\nchanging or terminating employment or contracts.",
@@ -342,7 +378,7 @@
     "category": "PEOPLE"
   },
   {
-    "code": "6.5",
+    "code": "6.6",
     "title": "Confidentiality or non-disclosure agreements",
     "controlText": "Confidentiality or non-disclosure agreements reflecting the\norganization's needs for the protection of information should be\nidentified, documented, regularly reviewed and signed by personnel and\nother relevant interested parties.",
     "purpose": "To maintain confidentiality of information accessible by personnel or\nexternal parties.",
@@ -351,7 +387,7 @@
     "category": "PEOPLE"
   },
   {
-    "code": "6.6",
+    "code": "6.7",
     "title": "Remote working",
     "controlText": "Security measures should be implemented when personnel are working\nremotely to protect information accessed, processed or stored outside\nthe organization's premises.",
     "purpose": "To ensure the security of information when personnel are working\nremotely.",
@@ -360,16 +396,25 @@
     "category": "PEOPLE"
   },
   {
-    "code": "6.7",
+    "code": "6.8",
     "title": "Information security event reporting",
-    "controlText": "Security perimeters should be defined and used to protect areas that\ncontain information and other associated assets.",
-    "purpose": "To prevent unauthorized physical access, damage and interference to\nthe organization's information and other associated assets.",
-    "guidance": "The following guidelines should be considered and implemented where\nappropriate for physical security perimeters:\n\na)  defining security perimeters and the siting and strength of each of\n    the perimeters in accordance with the information security\n    requirements related to the assets within the perimeter;\n\nb)  having physically sound perimeters for a building or site containing\n    > information processing facilities (i.e. there should be no gaps in\n    > the perimeter or areas where a break-in can easily occur). The\n    > exterior roofs, walls, ceilings and flooring of the site should be\n    > of solid construction and all external doors should be suitably\n    > protected against unauthorized access with control mechanisms\n    > (e.g. bars, alarms, locks). Doors and windows should be locked\n    > when unattended and external protection should be considered for\n    > windows, particularly at ground level; ventilation points should\n    > also be considered;\n\nc)  alarming, monitoring and testing all fire doors on a security\n    > perimeter in conjunction with the walls to establish the required\n    > level of resistance in accordance with suitable standards. They\n    > should operate in a failsafe manner.",
-    "otherInformation": "Physical protection can be achieved by creating one or more physical\nbarriers around the organization's premises and information processing\nfacilities.\n\nA secure area can be a lockable office or several rooms surrounded by\na continuous internal physical security barrier. Additional barriers\nand perimeters to control physical access can be necessary between\nareas with different security requirements inside the security\nperimeter. The organization should consider having physical security\nmeasures that can be strengthened during increased threat situations.",
+    "controlText": "The organization should provide a mechanism for personnel to report\nobserved or suspected information security events through appropriate\nchannels in a timely manner.",
+    "purpose": "To support timely, consistent and effective reporting of information\nsecurity events that can be identified by personnel.",
+    "guidance": "All personnel and users should be made aware of their responsibility\nto report information security events as quickly as possible in order\nto prevent or minimize the effect of information security incidents.\n\nThey should also be aware of the procedure for reporting information\nsecurity events and the point of contact to which the events should be\nreported. The reporting mechanism should be as easy, accessible and\navailable as possible. Information security events include incidents,\nbreaches and vulnerabilities.\n\nSituations to be considered for information security event reporting\ninclude:\n\na)  ineffective information security controls;\n\nb)  breach of information confidentiality, integrity or availability\n    expectations;\n\nc)  human errors;\n\nd)  non-compliance with the information security policy, topic-specific\n    > policies or applicable standards;\n\ne)  breaches of physical security measures;\n\nf)  system changes that have not gone through the change management\n    process;\n\ng)  malfunctions or other anomalous system behaviour of software or\n    hardware;\n\nh)  access violations;\n\ni)  vulnerabilities;\n\nj)  suspected malware infection.\n\nPersonnel and users should be advised not to attempt to prove\nsuspected information security vulnerabilities. Testing\nvulnerabilities can be interpreted as a potential misuse of the system\nand can also cause damage to the information system or service, and it\ncan corrupt or obscure digital evidence. Ultimately, this can result\nin legal liability for the individual performing the testing.",
+    "otherInformation": "See the ISO/IEC 27035 series for additional information.\n\n    -----------------",
     "category": "PEOPLE"
   },
   {
     "code": "7.1",
+    "title": "Physical security perimeters",
+    "controlText": "Security perimeters should be defined and used to protect areas that\ncontain information and other associated assets.",
+    "purpose": "To prevent unauthorized physical access, damage and interference to\nthe organization's information and other associated assets.",
+    "guidance": "The following guidelines should be considered and implemented where\nappropriate for physical security perimeters:\n\na)  defining security perimeters and the siting and strength of each of\n    the perimeters in accordance with the information security\n    requirements related to the assets within the perimeter;\n\nb)  having physically sound perimeters for a building or site containing\n    > information processing facilities (i.e. there should be no gaps in\n    > the perimeter or areas where a break-in can easily occur). The\n    > exterior roofs, walls, ceilings and flooring of the site should be\n    > of solid construction and all external doors should be suitably\n    > protected against unauthorized access with control mechanisms\n    > (e.g. bars, alarms, locks). Doors and windows should be locked\n    > when unattended and external protection should be considered for\n    > windows, particularly at ground level; ventilation points should\n    > also be considered;\n\nc)  alarming, monitoring and testing all fire doors on a security\n    > perimeter in conjunction with the walls to establish the required\n    > level of resistance in accordance with suitable standards. They\n    > should operate in a failsafe manner.",
+    "otherInformation": "Physical protection can be achieved by creating one or more physical\nbarriers around the organization's premises and information processing\nfacilities.\n\nA secure area can be a lockable office or several rooms surrounded by\na continuous internal physical security barrier. Additional barriers\nand perimeters to control physical access can be necessary between\nareas with different security requirements inside the security\nperimeter. The organization should consider having physical security\nmeasures that can be strengthened during increased threat situations.",
+    "category": "PHYSICAL"
+  },
+  {
+    "code": "7.2",
     "title": "Physical entry",
     "controlText": "Secure areas should be protected by appropriate entry controls and\naccess points.",
     "purpose": "To ensure only authorized physical access to the organization's\ninformation and other associated assets\n\noccurs. **Guidance** [General]\n\nAccess points such as delivery and loading areas and other points\nwhere unauthorized persons can enter the premises should be controlled\nand, if possible, isolated from information processing facilities to\navoid unauthorized access.\n\nThe following guidelines should be considered:\n\na)  restricting access to sites and buildings to authorized personnel\n    only. The process for the management of access rights to physical\n    areas should include the provision, periodical review, update and\n    revocation of authorizations (see\n    [[5.18]](#access-rights));\n\nb)  securely maintaining and monitoring a physical logbook or electronic\n    audit trail of all access and protecting all logs (see\n    [[5.33]](#protection-of-records)) and sensitive\n    authentication information;\n\nc)  establishing and implementing a process and technical mechanisms for\n    the management of access to areas where information is processed or\n    stored. Authentication mechanisms include the use of access cards,\n    biometrics or two-factor authentication such as an access card and\n    secret PIN. Double security doors should be considered for access to\n    sensitive areas;\n\nd)  setting up a reception area monitored by personnel, or other means\n    > to control physical access to the site or building;\n\ne)  inspecting and examining personal belongings of personnel and\n    > interested parties upon entry and exit;\n\nNOTE Local legislation and regulations can exist regarding the\npossibility of inspecting personal\n\nbelongings.\n\nf)  requiring all personnel and interested parties to wear some form of\n    > visible identification and to immediately notify security\n    > personnel if they encounter unescorted visitors and anyone not\n    > wearing visible identification. Easily distinguishable badges\n    > should be considered to better identify permanent employees,\n    > suppliers and visitors;\n\ng)  granting supplier personnel restricted access to secure areas or\n    > information processing facilities only when required. This access\n    > should be authorized and monitored;\n\nh)  giving special attention to physical access security in the case of\n    > buildings holding assets for multiple organizations;\n\ni)  designing physical security measures so that they can be\n    > strengthened when the likelihood of physical incidents increases;\n\nj)  securing other entry points such as emergency exits from\n    > unauthorized access;\n\nk)  setting up a key management process to ensure the management of the\n    > physical keys or authentication information (e.g. lock codes,\n    > combination locks to offices, rooms and facilities such as key\n    > cabinets) and to ensure a log book or annual key audit and that\n    > access to physical keys or authentication information is\n    > controlled (see [[5.17]](#authentication-information)\n    > for further guidance on authentication information).\n\n[Visitors]\n\nThe following guidelines should be considered:\n\na)  authenticating the identity of visitors by an appropriate means;\n\nb)  recording the date and time of entry and departure of visitors;\n\nc)  only granting access for visitors for specific, authorized purposes\n    and with instructions on the security requirements of the area and\n    on emergency procedures;\n\nd)  supervising all visitors, unless an explicit exception is granted.\n    > [Delivery and loading areas and incoming material]\n\nThe following guidelines should be considered:\n\na)  restricting access to delivery and loading areas from outside of the\n    building to identified and authorized personnel;\n\nb)  designing the delivery and loading areas so that deliveries can be\n    loaded and unloaded without delivery personnel gaining unauthorized\n    access to other parts of the building;\n\nc)  securing the external doors of delivery and loading areas when doors\n    to restricted areas are opened;\n\nd)  inspecting and examining incoming deliveries for explosives,\n    chemicals or other hazardous materials before they are moved from\n    delivery and loading areas;\n\ne)  registering incoming deliveries in accordance with asset management\n    procedures (see\n    [[5.9]](#inventory-of-information-and-other-associated-assets)\n    and [[7.10]](#storage-media)) on entry to the site;\n\nf)  physically segregating incoming and outgoing shipments, where\n    > possible;\n\ng)  inspecting incoming deliveries for evidence of tampering on the way.\n    > If tampering is discovered, it should be immediately reported to\n    > security personnel.",
@@ -378,7 +423,7 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.2",
+    "code": "7.3",
     "title": "Securing offices, rooms and facilities",
     "controlText": "Physical security for offices, rooms and facilities should be designed\nand implemented.",
     "purpose": "To prevent unauthorized physical access, damage and interference to\nthe organization's information and other associated assets in offices,\nrooms and facilities.",
@@ -387,7 +432,7 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.3",
+    "code": "7.4",
     "title": "Physical security monitoring",
     "controlText": "Premises should be continuously monitored for unauthorized physical\naccess.",
     "purpose": "To detect and deter unauthorized physical access.",
@@ -396,7 +441,7 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.4",
+    "code": "7.5",
     "title": "Protecting against physical and environmental threats",
     "controlText": "Protection against physical and environmental threats, such as natural\ndisasters and other intentional or unintentional physical threats to\ninfrastructure should be designed and implemented.",
     "purpose": "To prevent or reduce the consequences of events originating from\nphysical and environmental threats.",
@@ -405,7 +450,7 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.5",
+    "code": "7.6",
     "title": "Working in secure areas",
     "controlText": "Security measures for working in secure areas should be designed and\nimplemented.",
     "purpose": "To protect information and other associated assets in secure areas\nfrom damage and unauthorized interference by personnel working in\nthese areas.",
@@ -414,7 +459,7 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.6",
+    "code": "7.7",
     "title": "Clear desk and clear screen",
     "controlText": "Clear desk rules for papers and removable storage media and clear\nscreen rules for information processing facilities should be defined\nand appropriately enforced.",
     "purpose": "To reduce the risks of unauthorized access, loss of and damage to\ninformation on desks, screens and in other accessible locations during\nand outside normal working hours.",
@@ -423,7 +468,7 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.7",
+    "code": "7.8",
     "title": "Equipment siting and protection",
     "controlText": "Equipment should be sited securely and protected.",
     "purpose": "To reduce the risks from physical and environmental threats, and from\nunauthorized access and damage.",
@@ -432,7 +477,7 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.8",
+    "code": "7.9",
     "title": "Security of assets off-premises",
     "controlText": "Off-site assets should be protected.",
     "purpose": "To prevent loss, damage, theft or compromise of off-site devices and\ninterruption to the organization's operations.",
@@ -441,7 +486,7 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.9",
+    "code": "7.10",
     "title": "Storage media",
     "controlText": "Storage media should be managed through their life cycle of\nacquisition, use, transportation and disposal in accordance with the\norganization's classification scheme and handling requirements.",
     "purpose": "To ensure only authorized disclosure, modification, removal or\ndestruction of information on storage media.",
@@ -450,7 +495,7 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.10",
+    "code": "7.11",
     "title": "Supporting utilities",
     "controlText": "Information processing facilities should be protected from power\nfailures and other disruptions caused by failures in supporting\nutilities.",
     "purpose": "To prevent loss, damage or compromise of information and other\nassociated assets, or interruption to the organization's operations\ndue to failure and disruption of supporting utilities.",
@@ -459,7 +504,7 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.11",
+    "code": "7.12",
     "title": "Cabling security",
     "controlText": "Cables carrying power, data or supporting information services should\nbe protected from interception, interference or damage.",
     "purpose": "To prevent loss, damage, theft or compromise of information and other\nassociated assets and interruption to the organization's operations\nrelated to power and communications cabling.",
@@ -468,7 +513,7 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.12",
+    "code": "7.13",
     "title": "Equipment maintenance",
     "controlText": "Equipment should be maintained correctly to ensure availability,\nintegrity and confidentiality of information.",
     "purpose": "To prevent loss, damage, theft or compromise of information and other\nassociated assets and interruption to the organization's operations\ncaused by lack of maintenance.",
@@ -477,16 +522,25 @@
     "category": "PHYSICAL"
   },
   {
-    "code": "7.13",
+    "code": "7.14",
     "title": "Secure disposal or re-use of equipment",
-    "controlText": "Information stored on, processed by or accessible via user endpoint\ndevices should be protected.",
-    "purpose": "To protect information against the risks introduced by using user\nendpoint devices.",
-    "guidance": "[General]\n\nThe organization should establish a topic-specific policy on secure\nconfiguration and handling of user endpoint devices. The\ntopic-specific policy should be communicated to all relevant personnel\nand consider the following:\n\na)  the type of information and the classification level that the user\n    endpoint devices can handle, process, store or support;\n\nb)  registration of user endpoint devices;\n\nc)  requirements for physical protection;\n\nd)  restriction of software installation (e.g. remotely controlled by\n    > system administrators);\n\ne)  requirements for user endpoint device software (including software\n    versions) and for applying updates (e.g. active automatic updating);\n\nf)  rules for connection to information services, public networks or any\n    other network off premises (e.g. requiring the use of personal\n    firewall);\n\ng)  access controls;\n\nh)  storage device encryption;\n\ni)  protection against malware;\n\nj)  remote disabling, deletion or lockout;\n\nk)  backups;\n\nl)  usage of web services and web applications;\n\nm)  end user behaviour analytics (see\n    > [[8.16]](#monitoring-activities));\n\nn)  the use of removable devices, including removable memory devices,\n    > and the possibility of disabling physical ports (e.g. USB ports);\n\no)  the use of partitioning capabilities, if supported by the user\n    > endpoint device, which can securely separate the organization\\'s\n    > information and other associated assets (e.g. software) from other\n    > information and other associated assets on the device.\n\nConsideration should be given as to whether certain information is so\nsensitive that it can only be accessed via user endpoint devices, but\nnot stored on such devices. In such cases, additional technical\nsafeguards can be required on the device. For example, ensuring that\ndownloading files for offline working is disabled and that local\nstorage such as SD card is disabled.\n\nAs far as possible, the recommendations on this control should be\nenforced through configuration management (see\n[[8.9]](#configuration-management)) or automated tools.\n\n[User responsibility]\n\nAll users should be made aware of the security requirements and\nprocedures for protecting user endpoint devices, as well as of their\nresponsibilities for implementing such security measures. Users should\nbe advised to:\n\na)  log-off active sessions and terminate services when no longer\n    needed;\n\nb)  protect user endpoint devices from unauthorized use with a physical\n    control (e.g. key lock or special locks) and logical control (e.g.\n    password access) when not in use; not leave devices carrying\n    important, sensitive or critical business information unattended;\n\nc)  use devices with special care in public places, open offices,\n    meeting places and other unprotected areas (e.g. avoid reading\n    confidential information if people can read from the back, use\n    privacy screen filters);\n\nd)  physically protect user endpoint devices against theft (e.g. in cars\n    and other forms of transport, hotel rooms, conference centres and\n    meeting places).\n\nA specific procedure taking into account legal, statutory, regulatory,\ncontractual (including insurance) and other security requirements of\nthe organization should be established for cases of theft or loss of\nuser endpoint devices.\n\n[Use of personal devices]\n\nWhere the organization allows the use of personal devices (sometimes\nknown as BYOD), in addition to the guidance given in this control, the\nfollowing should be considered:\n\na)  separation of personal and business use of the devices, including\n    using software to support such separation and protect business data\n    on a private device;\n\nb)  providing access to business information only after users have\n    acknowledged their duties (physical protection, software updating,\n    etc.), waiving ownership of business data, allowing remote wiping of\n    data by the organization in case of theft or loss of the device or\n    when no longer authorized to use the service. In such cases, PII\n    protection legislation should be considered;\n\nc)  topic-specific policies and procedures to prevent disputes\n    concerning rights to intellectual property developed on privately\n    owned equipment;\n\nd)  access to privately owned equipment (to verify the security of the\n    > machine or during an investigation), which can be prevented by\n    > legislation;\n\ne)  software licensing agreements that are such that organizations can\n    > become liable for licensing for client software on user endpoint\n    > devices owned privately by personnel or external party users.\n\n[Wireless connections]\n\nThe organization should establish procedures for:\n\na)  the configuration of wireless connections on devices (e.g. disabling\n    vulnerable protocols);\n\nb)  using wireless or wired connections with appropriate bandwidth in\n    accordance with relevant topic-specific policies (e.g. because\n    backups or software updates are needed).",
-    "otherInformation": "Controls to protect information on user endpoint devices depend on\nwhether the user endpoint device is used only inside of the\norganization\\'s secured premises and network connections, or whether\nit is exposed to increased physical and network related threats\noutside of the organization.\n\nThe wireless connections for user endpoint devices are similar to\nother types of network connections but have important differences that\nshould be considered when identifying controls. In particular, back-up\nof information stored on user endpoint devices can sometimes fail\nbecause of limited network bandwidth or because user endpoint devices\nare not connected at the times when backups are scheduled.\n\nFor some USB ports, such as USB-C, disabling the USB port is not\npossible because it is used for other purposes (e.g. power delivery\nand display output).",
+    "controlText": "Items of equipment containing storage media should be verified to\nensure that any sensitive data and licensed software has been removed\nor securely overwritten prior to disposal or re-use.",
+    "purpose": "To prevent leakage of information from equipment to be disposed or\nre-used.",
+    "guidance": "Equipment should be verified to ensure whether or not storage media is\ncontained prior to disposal or\n\nre-use.\n\nStorage media containing confidential or copyrighted information\nshould be physically destroyed or the information should be destroyed,\ndeleted or overwritten using techniques to make the original\ninformation non-retrievable rather than using the standard delete\nfunction. See [[7.10]](#storage-media) for detailed\nguidance on secure disposal of storage media and\n[[8.10]](#information-deletion) for guidance on\ninformation deletion.\n\nLabels and markings identifying the organization or indicating the\nclassification, owner, system or network, should be removed prior to\ndisposal, including reselling or donating to charity.\n\nThe organization should consider the removal of security controls such\nas access controls or surveillance equipment at the end of lease or\nwhen moving out of premises. This depends on factors such as:\n\na)  its lease agreement to return the facility to original condition;\n\nb)  minimizing the risk of leaving systems with sensitive information on\n    them for the next tenant (e.g. user access lists, video or image\n    files);\n\nc)  the ability to reuse the controls at the next facility.",
+    "otherInformation": "Damaged equipment containing storage media can require a risk\nassessment to determine whether the items should be physically\ndestroyed rather than sent for repair or discarded. Information can be\ncompromised through careless disposal or re-use of equipment.\n\nIn addition to secure disk deletion, full-disk encryption reduces the\nrisk of disclosure of confidential information when equipment is\ndisposed of or redeployed, provided that:\n\na.  the encryption process is sufficiently strong and covers the entire\n    disk (including slack space, swap files);\n\nb.  the cryptographic keys are long enough to resist brute force\n    attacks;\n\nc.  the cryptographic keys are themselves kept confidential (e.g. never\n    > stored on the same disk). For further advice on cryptography, see\n    > [[8.24]](#use-of-cryptography).\n\nTechniques for securely overwriting storage media differ according to\nthe storage media technology and the classification level of the\ninformation on the storage media. Overwriting tools should be reviewed\nto make sure that they are applicable to the technology of the storage\nmedia.\n\nSee ISO/IEC 27040 for detail on methods for sanitizing storage media.\n\n    ----------------------",
     "category": "PHYSICAL"
   },
   {
     "code": "8.1",
+    "title": "User endpoint devices",
+    "controlText": "Information stored on, processed by or accessible via user endpoint\ndevices should be protected.",
+    "purpose": "To protect information against the risks introduced by using user\nendpoint devices.",
+    "guidance": "[General]\n\nThe organization should establish a topic-specific policy on secure\nconfiguration and handling of user endpoint devices. The\ntopic-specific policy should be communicated to all relevant personnel\nand consider the following:\n\na)  the type of information and the classification level that the user\n    endpoint devices can handle, process, store or support;\n\nb)  registration of user endpoint devices;\n\nc)  requirements for physical protection;\n\nd)  restriction of software installation (e.g. remotely controlled by\n    > system administrators);\n\ne)  requirements for user endpoint device software (including software\n    versions) and for applying updates (e.g. active automatic updating);\n\nf)  rules for connection to information services, public networks or any\n    other network off premises (e.g. requiring the use of personal\n    firewall);\n\ng)  access controls;\n\nh)  storage device encryption;\n\ni)  protection against malware;\n\nj)  remote disabling, deletion or lockout;\n\nk)  backups;\n\nl)  usage of web services and web applications;\n\nm)  end user behaviour analytics (see\n    > [[8.16]](#monitoring-activities));\n\nn)  the use of removable devices, including removable memory devices,\n    > and the possibility of disabling physical ports (e.g. USB ports);\n\no)  the use of partitioning capabilities, if supported by the user\n    > endpoint device, which can securely separate the organization\\'s\n    > information and other associated assets (e.g. software) from other\n    > information and other associated assets on the device.\n\nConsideration should be given as to whether certain information is so\nsensitive that it can only be accessed via user endpoint devices, but\nnot stored on such devices. In such cases, additional technical\nsafeguards can be required on the device. For example, ensuring that\ndownloading files for offline working is disabled and that local\nstorage such as SD card is disabled.\n\nAs far as possible, the recommendations on this control should be\nenforced through configuration management (see\n[[8.9]](#configuration-management)) or automated tools.\n\n[User responsibility]\n\nAll users should be made aware of the security requirements and\nprocedures for protecting user endpoint devices, as well as of their\nresponsibilities for implementing such security measures. Users should\nbe advised to:\n\na)  log-off active sessions and terminate services when no longer\n    needed;\n\nb)  protect user endpoint devices from unauthorized use with a physical\n    control (e.g. key lock or special locks) and logical control (e.g.\n    password access) when not in use; not leave devices carrying\n    important, sensitive or critical business information unattended;\n\nc)  use devices with special care in public places, open offices,\n    meeting places and other unprotected areas (e.g. avoid reading\n    confidential information if people can read from the back, use\n    privacy screen filters);\n\nd)  physically protect user endpoint devices against theft (e.g. in cars\n    and other forms of transport, hotel rooms, conference centres and\n    meeting places).\n\nA specific procedure taking into account legal, statutory, regulatory,\ncontractual (including insurance) and other security requirements of\nthe organization should be established for cases of theft or loss of\nuser endpoint devices.\n\n[Use of personal devices]\n\nWhere the organization allows the use of personal devices (sometimes\nknown as BYOD), in addition to the guidance given in this control, the\nfollowing should be considered:\n\na)  separation of personal and business use of the devices, including\n    using software to support such separation and protect business data\n    on a private device;\n\nb)  providing access to business information only after users have\n    acknowledged their duties (physical protection, software updating,\n    etc.), waiving ownership of business data, allowing remote wiping of\n    data by the organization in case of theft or loss of the device or\n    when no longer authorized to use the service. In such cases, PII\n    protection legislation should be considered;\n\nc)  topic-specific policies and procedures to prevent disputes\n    concerning rights to intellectual property developed on privately\n    owned equipment;\n\nd)  access to privately owned equipment (to verify the security of the\n    > machine or during an investigation), which can be prevented by\n    > legislation;\n\ne)  software licensing agreements that are such that organizations can\n    > become liable for licensing for client software on user endpoint\n    > devices owned privately by personnel or external party users.\n\n[Wireless connections]\n\nThe organization should establish procedures for:\n\na)  the configuration of wireless connections on devices (e.g. disabling\n    vulnerable protocols);\n\nb)  using wireless or wired connections with appropriate bandwidth in\n    accordance with relevant topic-specific policies (e.g. because\n    backups or software updates are needed).",
+    "otherInformation": "Controls to protect information on user endpoint devices depend on\nwhether the user endpoint device is used only inside of the\norganization\\'s secured premises and network connections, or whether\nit is exposed to increased physical and network related threats\noutside of the organization.\n\nThe wireless connections for user endpoint devices are similar to\nother types of network connections but have important differences that\nshould be considered when identifying controls. In particular, back-up\nof information stored on user endpoint devices can sometimes fail\nbecause of limited network bandwidth or because user endpoint devices\nare not connected at the times when backups are scheduled.\n\nFor some USB ports, such as USB-C, disabling the USB port is not\npossible because it is used for other purposes (e.g. power delivery\nand display output).",
+    "category": "TECHNOLOGICAL"
+  },
+  {
+    "code": "8.2",
     "title": "Privileged access rights",
     "controlText": "The allocation and use of privileged access rights should be\nrestricted and managed.",
     "purpose": "To ensure only authorized users, software components and services are\nprovided with privileged access rights.",
@@ -495,7 +549,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.2",
+    "code": "8.3",
     "title": "Information access restriction",
     "controlText": "Access to information and other associated assets should be restricted\nin accordance with the established topic-specific policy on access\ncontrol.",
     "purpose": "To ensure only authorized access and to prevent unauthorized access to\ninformation and other associated assets.",
@@ -504,7 +558,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.3",
+    "code": "8.4",
     "title": "Access to source code",
     "controlText": "Read and write access to source code, development tools and software\nlibraries should be appropriately managed.",
     "purpose": "To prevent the introduction of unauthorized functionality, avoid\nunintentional or malicious changes and to maintain the confidentiality\nof valuable intellectual property.",
@@ -513,7 +567,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.4",
+    "code": "8.5",
     "title": "Secure authentication",
     "controlText": "Secure authentication technologies and procedures should be\nimplemented based on information access restrictions and the\ntopic-specific policy on access control.",
     "purpose": "To ensure a user or an entity is securely authenticated, when access\nto systems, applications and services is granted.",
@@ -522,7 +576,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.5",
+    "code": "8.6",
     "title": "Capacity management",
     "controlText": "The use of resources should be monitored and adjusted in line with\ncurrent and expected capacity requirements.",
     "purpose": "To ensure the required capacity of information processing facilities,\nhuman resources, offices and other facilities.",
@@ -531,7 +585,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.6",
+    "code": "8.7",
     "title": "Protection against malware",
     "controlText": "Protection against malware should be implemented and supported by\nappropriate user awareness.",
     "purpose": "To ensure information and other associated assets are protected\nagainst malware.",
@@ -540,7 +594,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.7",
+    "code": "8.8",
     "title": "Management of technical vulnerabilities",
     "controlText": "Information about technical vulnerabilities of information systems in\nuse should be obtained, the organization's exposure to such\nvulnerabilities should be evaluated and appropriate measures should be\ntaken.",
     "purpose": "To prevent exploitation of technical vulnerabilities.",
@@ -549,7 +603,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.8",
+    "code": "8.9",
     "title": "Configuration management",
     "controlText": "Configurations, including security configurations, of hardware,\nsoftware, services and networks should be established, documented,\nimplemented, monitored and reviewed.",
     "purpose": "To ensure hardware, software, services and networks function correctly\nwith required security settings, and configuration is not altered by\nunauthorized or incorrect changes.",
@@ -558,7 +612,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.9",
+    "code": "8.10",
     "title": "Information deletion",
     "controlText": "Information stored in information systems, devices or in any other\nstorage media should be deleted when no longer required.",
     "purpose": "To prevent unnecessary exposure of sensitive information and to comply\nwith legal, statutory, regulatory and contractual requirements for\ninformation deletion.",
@@ -567,7 +621,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.10",
+    "code": "8.11",
     "title": "Data masking",
     "controlText": "Data masking should be used in accordance with the organization's\ntopic-specific policy on access control and other related\ntopic-specific policies, and business requirements, taking applicable\nlegislation into consideration.",
     "purpose": "To limit the exposure of sensitive data including PII, and to comply\nwith legal, statutory, regulatory and contractual requirements.",
@@ -576,7 +630,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.11",
+    "code": "8.12",
     "title": "Data leakage prevention",
     "controlText": "Data leakage prevention measures should be applied to systems,\nnetworks and any other devices that process, store or transmit\nsensitive information.",
     "purpose": "To detect and prevent the unauthorized disclosure and extraction of\ninformation by individuals or systems.",
@@ -585,7 +639,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.12",
+    "code": "8.13",
     "title": "Information backup",
     "controlText": "Backup copies of information, software and systems should be\nmaintained and regularly tested in accordance with the agreed\ntopic-specific policy on backup.",
     "purpose": "To enable recovery from loss of data or systems.",
@@ -594,7 +648,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.13",
+    "code": "8.14",
     "title": "Redundancy of information processing facilities",
     "controlText": "Information processing facilities should be implemented with\nredundancy sufficient to meet availability requirements.",
     "purpose": "To ensure the continuous operation of information processing\nfacilities.",
@@ -603,7 +657,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.14",
+    "code": "8.15",
     "title": "Logging",
     "controlText": "Logs that record activities, exceptions, faults and other relevant\nevents should be produced, stored, protected and analysed.",
     "purpose": "To record events, generate evidence, ensure the integrity of log\ninformation, prevent against unauthorized access, identify information\nsecurity events that can lead to an information security incident and\nto support investigations.",
@@ -612,7 +666,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.15",
+    "code": "8.16",
     "title": "Monitoring activities",
     "controlText": "Networks, systems and applications should be monitored for anomalous\nbehaviour and appropriate actions taken to evaluate potential\ninformation security incidents.",
     "purpose": "To detect anomalous behaviour and potential information security\nincidents.",
@@ -621,7 +675,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.16",
+    "code": "8.17",
     "title": "Clock synchronization",
     "controlText": "The clocks of information processing systems used by the organization\nshould be synchronized to approved time sources.",
     "purpose": "To enable the correlation and analysis of security-related events and\nother recorded data, and to support investigations into information\nsecurity incidents.",
@@ -630,7 +684,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.17",
+    "code": "8.18",
     "title": "Use of privileged utility programs",
     "controlText": "The use of utility programs that can be capable of overriding system\nand application controls should be restricted and tightly controlled.",
     "purpose": "To ensure the use of utility programs does not harm system and\napplication controls for information security.",
@@ -639,7 +693,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.18",
+    "code": "8.19",
     "title": "Installation of software on operational systems",
     "controlText": "Procedures and measures should be implemented to securely manage\nsoftware installation on operational systems.",
     "purpose": "To ensure the integrity of operational systems and prevent\nexploitation of technical vulnerabilities.",
@@ -648,7 +702,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.19",
+    "code": "8.20",
     "title": "Networks security",
     "controlText": "Networks and network devices should be secured, managed and controlled\nto protect information in systems and applications.",
     "purpose": "To protect information in networks and its supporting information\nprocessing facilities from compromise via the network.",
@@ -657,7 +711,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.20",
+    "code": "8.21",
     "title": "Security of network services",
     "controlText": "Security mechanisms, service levels and service requirements of\nnetwork services should be identified, implemented and monitored.",
     "purpose": "To ensure security in the use of network services.",
@@ -666,7 +720,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.21",
+    "code": "8.22",
     "title": "Segregation of networks",
     "controlText": "Groups of information services, users and information systems should\nbe segregated in the organization's networks.",
     "purpose": "To split the network in security boundaries and to control traffic\nbetween them based on business\n\nneeds.",
@@ -675,7 +729,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.22",
+    "code": "8.23",
     "title": "Web filtering",
     "controlText": "Access to external websites should be managed to reduce exposure to\nmalicious content.",
     "purpose": "To protect systems from being compromised by malware and to prevent\naccess to unauthorized web\n\nresources.",
@@ -684,7 +738,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.23",
+    "code": "8.24",
     "title": "Use of cryptography",
     "controlText": "Rules for the effective use of cryptography, including cryptographic\nkey management, should be defined and implemented.",
     "purpose": "To ensure proper and effective use of cryptography to protect the\nconfidentiality, authenticity or integrity of information according to\nbusiness and information security requirements, and taking into\nconsideration legal, statutory, regulatory and contractual\nrequirements related to cryptography.",
@@ -693,7 +747,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.24",
+    "code": "8.25",
     "title": "Secure development life cycle",
     "controlText": "Rules for the secure development of software and systems should be\nestablished and applied.",
     "purpose": "To ensure information security is designed and implemented within the\nsecure development life cycle of software and systems.",
@@ -702,7 +756,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.25",
+    "code": "8.26",
     "title": "Application security requirements",
     "controlText": "Information security requirements should be identified, specified and\napproved when developing or acquiring applications.",
     "purpose": "To ensure all information security requirements are identified and\naddressed when developing or acquiring applications.",
@@ -711,7 +765,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.26",
+    "code": "8.27",
     "title": "Secure system architecture and engineering principles",
     "controlText": "Principles for engineering secure systems should be established,\ndocumented, maintained and applied to any information system\ndevelopment activities.",
     "purpose": "To ensure information systems are securely designed, implemented and\noperated within the development life cycle.",
@@ -720,7 +774,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.27",
+    "code": "8.28",
     "title": "Secure coding",
     "controlText": "Secure coding principles should be applied to software development.",
     "purpose": "To ensure software is written securely thereby reducing the number of\npotential information security vulnerabilities in the software.",
@@ -729,7 +783,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.28",
+    "code": "8.29",
     "title": "Security testing in development and acceptance",
     "controlText": "Security testing processes should be defined and implemented in the\ndevelopment life cycle.",
     "purpose": "To validate if information security requirements are met when\napplications or code are deployed to the\n\nproduction environment.",
@@ -738,7 +792,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.29",
+    "code": "8.30",
     "title": "Outsourced development",
     "controlText": "The organization should direct, monitor and review the activities\nrelated to outsourced system\n\ndevelopment.",
     "purpose": "To ensure information security measures required by the organization\nare implemented in outsourced system development.",
@@ -747,7 +801,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.30",
+    "code": "8.31",
     "title": "Separation of development, test and production environments",
     "controlText": "Development, testing and production environments should be separated\nand secured.",
     "purpose": "To protect the production environment and data from compromise by\ndevelopment and test activities.",
@@ -756,7 +810,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.31",
+    "code": "8.32",
     "title": "Change management",
     "controlText": "Changes to information processing facilities and information systems\nshould be subject to change management procedures.",
     "purpose": "To preserve information security when executing changes.",
@@ -765,7 +819,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.32",
+    "code": "8.33",
     "title": "Test information",
     "controlText": "Test information should be appropriately selected, protected and\nmanaged.",
     "purpose": "To ensure relevance of testing and protection of operational\ninformation used for testing.",
@@ -774,7 +828,7 @@
     "category": "TECHNOLOGICAL"
   },
   {
-    "code": "8.33",
+    "code": "8.34",
     "title": "Protection of information systems during audit testing",
     "controlText": "Audit tests and other assurance activities involving assessment of\noperational systems should be planned and agreed between the tester\nand appropriate management.",
     "purpose": "To minimize the impact of audit and other assurance activities on\noperational systems and business\n\nprocesses.",

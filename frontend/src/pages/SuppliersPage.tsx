@@ -40,7 +40,6 @@ import { Supplier } from '../types/supplier';
 import {
   getSupplierStatusDisplayName,
   getCriticalityDisplayName,
-  getCiaImpactDisplayName,
   getRiskRatingDisplayName,
 } from '../types/supplier';
 import { SupplierOnboardingWizard } from '../components/SupplierOnboardingWizard';
@@ -147,11 +146,6 @@ export function SuppliersPage() {
           const criticalityOrder = { HIGH: 3, MEDIUM: 2, LOW: 1, null: 0 };
           comparison = (criticalityOrder[a.criticality as keyof typeof criticalityOrder] || 0) - 
                       (criticalityOrder[b.criticality as keyof typeof criticalityOrder] || 0);
-          break;
-        case 'ciaImpact':
-          const ciaOrder = { HIGH: 3, MEDIUM: 2, LOW: 1, null: 0 };
-          comparison = (ciaOrder[a.ciaImpact as keyof typeof ciaOrder] || 0) - 
-                      (ciaOrder[b.ciaImpact as keyof typeof ciaOrder] || 0);
           break;
         case 'riskRating':
           const riskOrder = { HIGH: 3, MEDIUM: 2, LOW: 1, null: 0 };
@@ -332,19 +326,6 @@ export function SuppliersPage() {
 
   const getCriticalityColor = (criticality: string | null) => {
     switch (criticality) {
-      case 'HIGH':
-        return 'red';
-      case 'MEDIUM':
-        return 'orange';
-      case 'LOW':
-        return 'green';
-      default:
-        return 'gray';
-    }
-  };
-
-  const getCiaImpactColor = (impact: string | null) => {
-    switch (impact) {
       case 'HIGH':
         return 'red';
       case 'MEDIUM':
@@ -543,27 +524,6 @@ export function SuppliersPage() {
               </Th>
               <Th
                 cursor="pointer"
-                onClick={() => handleSort('ciaImpact')}
-                _hover={{ bg: 'gray.50' }}
-                bg={sortField === 'ciaImpact' ? 'blue.50' : 'transparent'}
-                minW="110px"
-                px={3}
-              >
-                <HStack spacing={2}>
-                  <Box fontWeight={sortField === 'ciaImpact' ? 'semibold' : 'normal'}>CIA Impact</Box>
-                  {sortField === 'ciaImpact' ? (
-                    sortDirection === 'asc' ? (
-                      <ChevronUpIcon boxSize={4} color="blue.500" />
-                    ) : (
-                      <ChevronDownIcon boxSize={4} color="blue.500" />
-                    )
-                  ) : (
-                    <Box boxSize={4} opacity={0}><ChevronUpIcon boxSize={4} /></Box>
-                  )}
-                </HStack>
-              </Th>
-              <Th
-                cursor="pointer"
                 onClick={() => handleSort('riskRating')}
                 _hover={{ bg: 'gray.50' }}
                 bg={sortField === 'riskRating' ? 'blue.50' : 'transparent'}
@@ -701,15 +661,6 @@ export function SuppliersPage() {
                     {supplier.criticality ? (
                       <Badge colorScheme={getCriticalityColor(supplier.criticality)}>
                         {getCriticalityDisplayName(supplier.criticality)}
-                      </Badge>
-                    ) : (
-                      <Text color="gray.400">-</Text>
-                    )}
-                  </Td>
-                  <Td px={3}>
-                    {supplier.ciaImpact ? (
-                      <Badge colorScheme={getCiaImpactColor(supplier.ciaImpact)}>
-                        {getCiaImpactDisplayName(supplier.ciaImpact)}
                       </Badge>
                     ) : (
                       <Text color="gray.400">-</Text>

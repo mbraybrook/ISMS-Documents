@@ -105,7 +105,6 @@ export function SupplierAssessmentTimeline({
     setSelectedAssessment(item);
     if (item.type === 'RISK_ASSESSMENT') {
       setEditFormData({
-        ciaImpact: item.data.ciaImpact,
         riskRating: item.data.riskRating,
         rationale: item.data.rationale || '',
       });
@@ -294,9 +293,6 @@ export function SupplierAssessmentTimeline({
                 {item.type === 'RISK_ASSESSMENT' && (
                   <VStack align="stretch" spacing={1} mb={2}>
                     <Text fontSize="sm">
-                      <strong>CIA Impact:</strong> {item.data.ciaImpact}
-                    </Text>
-                    <Text fontSize="sm">
                       <strong>Risk Rating:</strong> {item.data.riskRating}
                     </Text>
                     {item.data.rationale && (
@@ -402,17 +398,6 @@ export function SupplierAssessmentTimeline({
             <VStack spacing={4} align="stretch">
               {selectedAssessment?.type === 'RISK_ASSESSMENT' && editFormData && (
                 <>
-                  <FormControl>
-                    <FormLabel>CIA Impact</FormLabel>
-                    <Select
-                      value={editFormData.ciaImpact}
-                      onChange={(e) => setEditFormData({ ...editFormData, ciaImpact: e.target.value })}
-                    >
-                      <option value="LOW">Low</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="HIGH">High</option>
-                    </Select>
-                  </FormControl>
                   <FormControl>
                     <FormLabel>Risk Rating</FormLabel>
                     <Select

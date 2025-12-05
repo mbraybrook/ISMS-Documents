@@ -45,6 +45,7 @@ import {
   Checkbox,
 } from '@chakra-ui/react';
 import { ChevronDownIcon, WarningIcon, TimeIcon, CheckCircleIcon, InfoIcon } from '@chakra-ui/icons';
+import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { ReviewFormModal } from '../components/ReviewFormModal';
 import { DocumentFormModal } from '../components/DocumentFormModal';
@@ -125,6 +126,7 @@ interface DashboardData {
 
 export function ReviewsPage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [tabIndex, setTabIndex] = useState(0);
@@ -143,6 +145,18 @@ export function ReviewsPage() {
   const toast = useToast();
   
   const canEdit = user?.role === 'ADMIN' || user?.role === 'EDITOR';
+
+  // Initialize tab from URL parameter
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'overdue') {
+      setTabIndex(1); // Overdue Reviews tab
+      // Remove the param from URL after reading it
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('tab');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, []); // Only run on mount
 
   useEffect(() => {
     fetchDashboard();

@@ -8,7 +8,6 @@ import {
   SupplierStatus,
   SupplierType,
   ServiceSubType,
-  CiaImpact,
   RiskRating,
   Criticality,
   PciStatus,
@@ -129,7 +128,6 @@ router.get(
               id: true,
               status: true,
               riskRating: true,
-              ciaImpact: true,
               assessedAt: true,
             },
           },
@@ -307,7 +305,6 @@ router.post(
     body('processesPersonalData').optional().isBoolean(),
     body('hostingRegions').optional().isArray(),
     body('customerFacingImpact').optional().isBoolean(),
-    body('ciaImpact').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('overallRiskRating').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('criticality').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('riskRationale').optional().isString(),
@@ -357,7 +354,6 @@ router.post(
         processesPersonalData: req.body.processesPersonalData || false,
         hostingRegions: req.body.hostingRegions ? JSON.parse(JSON.stringify(req.body.hostingRegions)) : null,
         customerFacingImpact: req.body.customerFacingImpact || false,
-        ciaImpact: req.body.ciaImpact || null,
         overallRiskRating: req.body.overallRiskRating || null,
         criticality: req.body.criticality || null,
         riskRationale: req.body.riskRationale || null,
@@ -447,10 +443,6 @@ router.put(
     body('processesPersonalData').optional().isBoolean(),
     body('hostingRegions').optional().isArray(),
     body('customerFacingImpact').optional().isBoolean(),
-    body('ciaImpact').optional().custom((value) => {
-      if (value === null || value === undefined) return true;
-      return ['LOW', 'MEDIUM', 'HIGH'].includes(value);
-    }).withMessage('ciaImpact must be LOW, MEDIUM, or HIGH'),
     body('overallRiskRating').optional().custom((value) => {
       if (value === null || value === undefined) return true;
       return ['LOW', 'MEDIUM', 'HIGH'].includes(value);
@@ -558,7 +550,6 @@ router.put(
       if (req.body.processesPersonalData !== undefined) updateData.processesPersonalData = req.body.processesPersonalData;
       if (req.body.hostingRegions !== undefined) updateData.hostingRegions = req.body.hostingRegions ? JSON.parse(JSON.stringify(req.body.hostingRegions)) : null;
       if (req.body.customerFacingImpact !== undefined) updateData.customerFacingImpact = req.body.customerFacingImpact;
-      if (req.body.ciaImpact !== undefined) updateData.ciaImpact = req.body.ciaImpact || null;
       if (req.body.overallRiskRating !== undefined) updateData.overallRiskRating = req.body.overallRiskRating || null;
       if (req.body.criticality !== undefined) updateData.criticality = req.body.criticality || null;
       if (req.body.riskRationale !== undefined) updateData.riskRationale = req.body.riskRationale || null;
@@ -868,7 +859,6 @@ router.get(
           approvedBy: a.approvedBy,
           approvedAt: a.approvedAt,
           data: {
-            ciaImpact: a.ciaImpact,
             riskRating: a.riskRating,
             rationale: a.rationale,
             rejectionReason: a.rejectionReason,

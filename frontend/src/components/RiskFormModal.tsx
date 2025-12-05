@@ -59,15 +59,16 @@ import {
   Td,
   Divider,
 } from '@chakra-ui/react';
-import { SearchIcon, DeleteIcon, CopyIcon, AddIcon } from '@chakra-ui/icons';
+import { SearchIcon, DeleteIcon, CopyIcon, AddIcon, EditIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import { similarityApi, supplierApi } from '../services/api';
-import { SimilarRisk } from '../types/risk';
+import { SimilarRisk, Department, getDepartmentDisplayName } from '../types/risk';
 import { SimilarRisksPanel } from './SimilarRisksPanel';
 import { SimilarityAlert } from './SimilarityAlert';
 import { useDebounce } from '../hooks/useDebounce';
+import { useAuth } from '../contexts/AuthContext';
 
 interface RiskFormModalProps {
   isOpen: boolean;
@@ -77,6 +78,7 @@ interface RiskFormModalProps {
   viewMode?: boolean;
   onDuplicate?: (risk: any) => void;
   onDelete?: (risk: any) => void;
+  onEdit?: () => void;
 }
 
 interface User {
@@ -107,7 +109,17 @@ const RISK_NATURES = ['STATIC', 'INSTANCE'];
 
 const TREATMENT_CATEGORIES = ['RETAIN', 'MODIFY', 'SHARE', 'AVOID'];
 
-export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, viewMode = false, onDuplicate, onDelete }: RiskFormModalProps) {
+const DEPARTMENTS: { value: Department; label: string }[] = [
+  { value: 'BUSINESS_STRATEGY', label: 'Business Strategy' },
+  { value: 'FINANCE', label: 'Finance' },
+  { value: 'HR', label: 'HR' },
+  { value: 'OPERATIONS', label: 'Operations' },
+  { value: 'PRODUCT', label: 'Product' },
+  { value: 'MARKETING', label: 'Marketing' },
+];
+
+export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, viewMode = false, onDuplicate, onDelete, onEdit }: RiskFormModalProps) {
+  const { getEffectiveRole } = useAuth();
   const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [controls, setControls] = useState<Control[]>([]);
@@ -155,6 +167,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
     existingControlsDescription: '',
     residualRiskTreatmentCategory: '',
     isSupplierRisk: false,
+    department: null as Department | null,
   });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -369,9 +382,10 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         mitigatedLikelihood: templateRisk.mitigatedLikelihood || null,
         mitigationImplemented: templateRisk.mitigationImplemented || false,
         mitigationDescription: templateRisk.mitigationDescription || '',
-        existingControlsDescription: templateRisk.existingControlsDescription || '',
-        residualRiskTreatmentCategory: templateRisk.residualRiskTreatmentCategory || '',
-      });
+          existingControlsDescription: templateRisk.existingControlsDescription || '',
+          residualRiskTreatmentCategory: templateRisk.residualRiskTreatmentCategory || '',
+          department: templateRisk.department || null,
+        });
 
       // Load control associations if available
       if (templateRisk.riskControls && templateRisk.riskControls.length > 0) {
@@ -550,6 +564,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           existingControlsDescription: risk.existingControlsDescription || '',
           residualRiskTreatmentCategory: risk.residualRiskTreatmentCategory || '',
           isSupplierRisk: risk.isSupplierRisk || false,
+          department: risk.department || null,
         };
         setFormData(initialData);
         // Load existing control associations
@@ -605,6 +620,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           existingControlsDescription: '',
           residualRiskTreatmentCategory: '',
           isSupplierRisk: false,
+          department: null,
         };
         setFormData(initialData);
         setSelectedControlIds([]);
@@ -946,6 +962,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       if (payload.mitigationDescription === '') payload.mitigationDescription = undefined;
       if (payload.existingControlsDescription === '') payload.existingControlsDescription = undefined;
       if (payload.residualRiskTreatmentCategory === '') payload.residualRiskTreatmentCategory = undefined;
+      if (payload.department === '' || payload.department === null) payload.department = null;
 
       // Remove null values for optional fields
       if (payload.mitigatedConfidentialityScore === null) payload.mitigatedConfidentialityScore = undefined;
@@ -1032,9 +1049,14 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       console.error('Error saving risk:', error);
       let errorMessage = error.response?.data?.error || error.message || 'Failed to save risk';
 
-      // Provide more specific error message for authorization errors
+      // Use the backend error message if available, otherwise provide a generic message
       if (error.response?.status === 403 || error.response?.status === 401) {
-        errorMessage = 'You do not have permission to create or edit risks. Please contact an administrator if you need this access.';
+        // Use the specific backend error message if provided, otherwise show generic message
+        if (error.response?.data?.error) {
+          errorMessage = error.response.data.error;
+        } else {
+          errorMessage = 'You do not have permission to create or edit risks. Please contact an administrator if you need this access.';
+        }
       } else if (error.response?.status === 400) {
         errorMessage = error.response?.data?.error || 'Invalid data provided. Please check all required fields.';
       }
@@ -1081,7 +1103,27 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                   <Tab>Essentials</Tab>
                   <Tab>Additional Details</Tab>
                   <Tab>Existing Controls Assessment</Tab>
-                  <Tab>Additional Controls Assessment</Tab>
+                  <Tab>
+                    Additional Controls Assessment
+                    {formData.initialRiskTreatmentCategory === 'MODIFY' && (() => {
+                      const hasMitigatedScores = 
+                        formData.mitigatedConfidentialityScore !== null ||
+                        formData.mitigatedIntegrityScore !== null ||
+                        formData.mitigatedAvailabilityScore !== null ||
+                        formData.mitigatedLikelihood !== null ||
+                        formData.mitigatedScore !== null;
+                      const hasMitigationDescription = formData.mitigationDescription && formData.mitigationDescription.trim().length > 0;
+                      const isComplete = hasMitigatedScores && hasMitigationDescription;
+                      const currentRiskLevel = getRiskLevel(calculatedRiskScore);
+                      // Only show warning badge for MEDIUM/HIGH risks
+                      const shouldShowWarning = currentRiskLevel !== 'LOW' && !isComplete;
+                      return shouldShowWarning ? (
+                        <Badge ml={2} colorScheme="red" fontSize="xs">
+                          !
+                        </Badge>
+                      ) : null;
+                    })()}
+                  </Tab>
                   <Tab>Controls Linkage</Tab>
                 </TabList>
 
@@ -1243,6 +1285,28 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                             </option>
                           ))}
                         </Select>
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Department</FormLabel>
+                        <Select
+                          value={formData.department || ''}
+                          onChange={(e) => setFormData({ ...formData, department: e.target.value as Department || null })}
+                          placeholder="Select department"
+                          isDisabled={viewMode || getEffectiveRole() === 'CONTRIBUTOR'}
+                        >
+                          <option value="">Not assigned</option>
+                          {DEPARTMENTS.map((dept) => (
+                            <option key={dept.value} value={dept.value}>
+                              {dept.label}
+                            </option>
+                          ))}
+                        </Select>
+                        {getEffectiveRole() === 'CONTRIBUTOR' && (
+                          <Text fontSize="xs" color="gray.500" mt={1}>
+                            Department cannot be changed by Contributors
+                          </Text>
+                        )}
                       </FormControl>
 
                       <FormControl>
@@ -1582,10 +1646,54 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
 
                   {/* Tab 3: Existing Controls Assessment */}
                   <TabPanel>
-                    <HStack spacing={6} align="flex-start">
-                      {/* Left side: Sliders */}
-                      <VStack spacing={6} flex="1">
-                        <HStack spacing={4} width="100%" justify="space-around">
+                    <VStack spacing={6} align="stretch">
+                      <FormControl>
+                        <FormLabel>
+                          Existing Controls Description
+                          <Tooltip label="Describe the controls that are already in place to mitigate this risk before any additional mitigation measures are implemented">
+                            <IconButton
+                              aria-label="Info"
+                              icon={<Text fontSize="xs">?</Text>}
+                              size="xs"
+                              variant="ghost"
+                              ml={1}
+                              verticalAlign="middle"
+                            />
+                          </Tooltip>
+                        </FormLabel>
+                        <Textarea
+                          value={formData.existingControlsDescription}
+                          onChange={(e) =>
+                            setFormData({ ...formData, existingControlsDescription: e.target.value })
+                          }
+                          placeholder="Describe the existing controls that are in place to mitigate this risk..."
+                          rows={4}
+                          isDisabled={viewMode}
+                        />
+                      </FormControl>
+
+                      {formData.initialRiskTreatmentCategory && (
+                        <Alert status="info" borderRadius="md">
+                          <AlertIcon />
+                          <Text fontSize="sm">
+                            All risks should have an Initial Risk Treatment Category. Please ensure this is set before completing the assessment.
+                          </Text>
+                        </Alert>
+                      )}
+
+                      {formData.initialRiskTreatmentCategory && !formData.existingControlsDescription?.trim() && (
+                        <Alert status="warning" borderRadius="md">
+                          <AlertIcon />
+                          <Text fontSize="sm">
+                            It is recommended to provide an Existing Controls Description when a treatment category is selected.
+                          </Text>
+                        </Alert>
+                      )}
+
+                      <HStack spacing={6} align="flex-start">
+                        {/* Left side: Sliders */}
+                        <VStack spacing={6} flex="1">
+                          <HStack spacing={4} width="100%" justify="space-around">
                           <FormControl isRequired>
                             <FormLabel textAlign="center" mb={2}>
                               Confidentiality (C)
@@ -1822,51 +1930,27 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                             </VStack>
                           </CardBody>
                         </Card>
-                      </VStack>
-                    </HStack>
+                        </VStack>
+                      </HStack>
 
-                    <FormControl>
-                      <FormLabel>
-                        Existing Controls Description
-                        <Tooltip label="Describe the controls that are already in place to mitigate this risk before any additional mitigation measures are implemented">
-                          <IconButton
-                            aria-label="Info"
-                            icon={<Text fontSize="xs">?</Text>}
-                            size="xs"
-                            variant="ghost"
-                            ml={1}
-                            verticalAlign="middle"
-                          />
-                        </Tooltip>
-                      </FormLabel>
-                      <Textarea
-                        value={formData.existingControlsDescription}
-                        onChange={(e) =>
-                          setFormData({ ...formData, existingControlsDescription: e.target.value })
-                        }
-                        placeholder="Describe the existing controls that are in place to mitigate this risk..."
-                        rows={4}
-                        isDisabled={viewMode}
-                      />
-                    </FormControl>
-
-                    <FormControl>
-                      <FormLabel>Initial Risk Treatment Category</FormLabel>
-                      <Select
-                        value={formData.initialRiskTreatmentCategory}
-                        onChange={(e) =>
-                          setFormData({ ...formData, initialRiskTreatmentCategory: e.target.value })
-                        }
-                        placeholder="Select treatment category"
-                        isDisabled={viewMode}
-                      >
-                        {TREATMENT_CATEGORIES.map((cat) => (
-                          <option key={cat} value={cat}>
-                            {cat}
-                          </option>
-                        ))}
-                      </Select>
-                    </FormControl>
+                      <FormControl>
+                        <FormLabel>Initial Risk Treatment Category</FormLabel>
+                        <Select
+                          value={formData.initialRiskTreatmentCategory}
+                          onChange={(e) =>
+                            setFormData({ ...formData, initialRiskTreatmentCategory: e.target.value })
+                          }
+                          placeholder="Select treatment category"
+                          isDisabled={viewMode}
+                        >
+                          {TREATMENT_CATEGORIES.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </VStack>
                   </TabPanel>
 
                   {/* Tab 4: Additional Controls Assessment */}
@@ -1882,12 +1966,104 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                           </Button>
                         )}
                       </HStack>
+
+                      <FormControl>
+                        <FormLabel>
+                          Mitigation Description
+                          <Tooltip label="Describe the additional mitigation measures or controls that have been implemented to reduce the risk after the initial assessment">
+                            <IconButton
+                              aria-label="Info"
+                              icon={<Text fontSize="xs">?</Text>}
+                              size="xs"
+                              variant="ghost"
+                              ml={1}
+                              verticalAlign="middle"
+                            />
+                          </Tooltip>
+                        </FormLabel>
+                        <Textarea
+                          value={formData.mitigationDescription}
+                          onChange={(e) =>
+                            setFormData({ ...formData, mitigationDescription: e.target.value })
+                          }
+                          rows={4}
+                          placeholder="Describe the mitigation measures implemented..."
+                          isReadOnly={viewMode}
+                        />
+                      </FormControl>
+
+                      {/* Guidance messages based on treatment category */}
+                      {formData.initialRiskTreatmentCategory === 'RETAIN' && (
+                        <Alert status="warning" borderRadius="md">
+                          <AlertIcon />
+                          <Text fontSize="sm">
+                            This risk is set to RETAIN. Additional Controls Assessment is typically not needed for RETAIN risks, as you are accepting the risk as-is.
+                          </Text>
+                        </Alert>
+                      )}
+
+                      {formData.initialRiskTreatmentCategory === 'MODIFY' && (() => {
+                        const hasMitigatedScores = 
+                          formData.mitigatedConfidentialityScore !== null ||
+                          formData.mitigatedIntegrityScore !== null ||
+                          formData.mitigatedAvailabilityScore !== null ||
+                          formData.mitigatedLikelihood !== null ||
+                          formData.mitigatedScore !== null;
+                        const hasMitigationDescription = formData.mitigationDescription && formData.mitigationDescription.trim().length > 0;
+                        const isComplete = hasMitigatedScores && hasMitigationDescription;
+                        const currentRiskLevel = getRiskLevel(calculatedRiskScore);
+                        // Non-conformance only applies to MODIFY risks with MEDIUM or HIGH initial risk scores
+                        const shouldShowNonConformance = currentRiskLevel !== 'LOW';
+                        
+                        return (
+                          <>
+                            {!isComplete && shouldShowNonConformance ? (
+                              <Alert status="error" borderRadius="md">
+                                <AlertIcon />
+                                <VStack align="start" spacing={1}>
+                                  <Text fontSize="sm" fontWeight="bold">
+                                    Policy Non-Conformance
+                                  </Text>
+                                  <Text fontSize="sm">
+                                    This risk is set to MODIFY with a {currentRiskLevel} initial risk score, which requires Additional Controls Assessment to be completed. Please fill in both mitigated scores and mitigation description.
+                                  </Text>
+                                </VStack>
+                              </Alert>
+                            ) : !isComplete && !shouldShowNonConformance ? (
+                              <Alert status="info" borderRadius="md">
+                                <AlertIcon />
+                                <Text fontSize="sm">
+                                  This risk is set to MODIFY but has a LOW initial risk score. Additional Controls Assessment is recommended but not required for policy compliance.
+                                </Text>
+                              </Alert>
+                            ) : isComplete ? (
+                              <Alert status="success" borderRadius="md">
+                                <AlertIcon />
+                                <Text fontSize="sm">
+                                  Additional Controls Assessment is complete for this MODIFY risk.
+                                </Text>
+                              </Alert>
+                            ) : null}
+                          </>
+                        );
+                      })()}
+
+                      {formData.initialRiskTreatmentCategory && formData.initialRiskTreatmentCategory !== 'RETAIN' && formData.initialRiskTreatmentCategory !== 'MODIFY' && (
+                        <Alert status="info" borderRadius="md">
+                          <AlertIcon />
+                          <Text fontSize="sm">
+                            For {formData.initialRiskTreatmentCategory} risks, Additional Controls Assessment may be optional depending on your risk management approach.
+                          </Text>
+                        </Alert>
+                      )}
+
                       {mitigatedRiskScore === null && (
                         <Alert status="info" mb={4} borderRadius="md">
                           <AlertIcon />
                           Mitigated scores are not set. Adjust the sliders below to calculate them.
                         </Alert>
                       )}
+
                       <HStack spacing={6} align="flex-start">
                         {/* Left side: Sliders */}
                         <VStack spacing={6} flex="1">
@@ -2237,31 +2413,6 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                       </FormControl>
 
                       <FormControl>
-                        <FormLabel>
-                          Mitigation Description
-                          <Tooltip label="Describe the additional mitigation measures or controls that have been implemented to reduce the risk after the initial assessment">
-                            <IconButton
-                              aria-label="Info"
-                              icon={<Text fontSize="xs">?</Text>}
-                              size="xs"
-                              variant="ghost"
-                              ml={1}
-                              verticalAlign="middle"
-                            />
-                          </Tooltip>
-                        </FormLabel>
-                        <Textarea
-                          value={formData.mitigationDescription}
-                          onChange={(e) =>
-                            setFormData({ ...formData, mitigationDescription: e.target.value })
-                          }
-                          rows={4}
-                          placeholder="Describe the mitigation measures implemented..."
-                          isReadOnly={viewMode}
-                        />
-                      </FormControl>
-
-                      <FormControl>
                         <FormLabel>Residual Risk Treatment Category</FormLabel>
                         <Select
                           value={formData.residualRiskTreatmentCategory}
@@ -2487,6 +2638,13 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                   mr={3}
                 >
                   Duplicate
+                </Button>
+              )}
+
+              {/* Edit button - show when in view mode */}
+              {viewMode && onEdit && (
+                <Button colorScheme="blue" onClick={onEdit} leftIcon={<EditIcon />}>
+                  Edit
                 </Button>
               )}
 

@@ -53,7 +53,22 @@ router.get(
 
       // Use provided IDs or fall back to config defaults
       let siteId = (req.query.siteId as string) || config.sharePoint.siteId;
-      let driveId = (req.query.driveId as string) || config.sharePoint.driveId;
+
+      // Helper to compare IDs robustly (handles case sensitivity and potential hostname prefixes)
+      const areIdsEqual = (id1: string, id2: string) => {
+        if (!id1 || !id2) return false;
+        const n1 = id1.toLowerCase();
+        const n2 = id2.toLowerCase();
+        return n1 === n2 || n1.includes(n2) || n2.includes(n1);
+      };
+
+      // Only use configured drive ID if we are on the configured site
+      // OR if no site ID was provided (so we defaulted to configured site)
+      let driveId = req.query.driveId as string;
+      if (!driveId && areIdsEqual(siteId, config.sharePoint.siteId)) {
+        console.log('[SharePoint] Using configured default drive ID for default site');
+        driveId = config.sharePoint.driveId;
+      }
       const folderPath = req.query.folderPath as string | undefined;
       const folderId = req.query.folderId as string | undefined;
 
@@ -109,14 +124,14 @@ router.get(
           folderPath,
           folderId
         );
-        
+
         // Add siteId and driveId to each item so the frontend can save them
         const itemsWithContext = items.map(item => ({
           ...item,
           siteId,
           driveId,
         }));
-        
+
         console.log('[SharePoint] Returning items with context', {
           itemCount: itemsWithContext.length,
           siteId,
@@ -128,7 +143,7 @@ router.get(
             hasDriveId: !!itemsWithContext[0].driveId,
           } : null,
         });
-        
+
         return res.json({ items: itemsWithContext });
       } catch (error: any) {
         // If drive ID is invalid, fetch available drives to help debug
@@ -141,7 +156,7 @@ router.get(
               name: d.name,
               driveType: d.driveType,
             })));
-            
+
             return res.status(400).json({
               error: 'The provided drive ID is invalid or does not belong to this site.',
               providedDriveId: driveId,

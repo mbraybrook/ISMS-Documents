@@ -173,9 +173,6 @@ export function SupplierApprovalPanel({
               </HStack>
               <VStack align="stretch" spacing={2} mb={3}>
                 <Text fontSize="sm">
-                  <strong>CIA Impact:</strong> {assessment.ciaImpact}
-                </Text>
-                <Text fontSize="sm">
                   <strong>Risk Rating:</strong> {assessment.riskRating}
                 </Text>
                 {assessment.rationale && (

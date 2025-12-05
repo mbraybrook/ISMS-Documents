@@ -33,7 +33,6 @@ import {
   ReviewType,
   ReviewOutcome,
   PerformanceRating,
-  CiaImpact,
   RiskRating,
   Criticality,
   PciStatus,
@@ -46,7 +45,6 @@ interface SupplierReviewModalProps {
   onClose: () => void;
   supplierId: string;
   currentSupplier?: {
-    ciaImpact?: string | null;
     overallRiskRating?: string | null;
     criticality?: string | null;
     riskRationale?: string | null;
@@ -87,7 +85,6 @@ export function SupplierReviewModal({
     evidenceLinks: [] as string[],
     
     // Risk & Criticality fields
-    ciaImpact: currentSupplier?.ciaImpact || '',
     overallRiskRating: currentSupplier?.overallRiskRating || '',
     criticality: currentSupplier?.criticality || '',
     riskRationale: currentSupplier?.riskRationale || '',
@@ -201,9 +198,6 @@ export function SupplierReviewModal({
       }
       
       // Risk & Criticality updates
-      if (formData.ciaImpact) {
-        completionPayload.ciaImpact = formData.ciaImpact;
-      }
       if (formData.overallRiskRating) {
         completionPayload.overallRiskRating = formData.overallRiskRating;
       }
@@ -248,11 +242,10 @@ export function SupplierReviewModal({
       await supplierApi.completeComplianceReview(supplierId, review.id, completionPayload);
 
       // Optionally create assessments if requested
-      if (formData.createRiskAssessment && formData.ciaImpact && formData.overallRiskRating) {
+      if (formData.createRiskAssessment && formData.overallRiskRating) {
         setCreatingAssessments(true);
         try {
           await supplierApi.createRiskAssessment(supplierId, {
-            ciaImpact: formData.ciaImpact as CiaImpact,
             supplierType: currentSupplier?.supplierType || 'SERVICE_PROVIDER',
             riskRating: formData.overallRiskRating as RiskRating,
             rationale: formData.riskRationale || null,
@@ -370,19 +363,7 @@ export function SupplierReviewModal({
             {/* Risk & Criticality */}
             <Box>
               <Heading size="sm" mb={4}>Risk & Criticality</Heading>
-              <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-                <FormControl>
-                  <FormLabel>CIA Impact</FormLabel>
-                  <Select
-                    value={formData.ciaImpact}
-                    onChange={(e) => setFormData({ ...formData, ciaImpact: e.target.value })}
-                  >
-                    <option value="">Not assessed</option>
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                  </Select>
-                </FormControl>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                 <FormControl>
                   <FormLabel>Risk Rating</FormLabel>
                   <Select
@@ -569,7 +550,7 @@ export function SupplierReviewModal({
                     isChecked={formData.createRiskAssessment}
                     onChange={(e) => setFormData({ ...formData, createRiskAssessment: e.target.checked })}
                   >
-                    Create Risk Assessment (requires CIA Impact and Risk Rating)
+                    Create Risk Assessment (requires Risk Rating)
                   </Checkbox>
                 </FormControl>
                 <FormControl>
