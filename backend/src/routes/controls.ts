@@ -4,6 +4,7 @@ import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
 import { updateControlApplicability } from '../services/riskService';
+import { computeAndStoreControlEmbedding } from '../services/embeddingService';
 
 const router = Router();
 
@@ -354,6 +355,18 @@ router.post(
         data: createData,
       });
 
+      // Compute and store embedding asynchronously (best-effort, doesn't block response)
+      computeAndStoreControlEmbedding(
+        control.id,
+        control.code,
+        control.title,
+        control.description,
+        control.purpose,
+        control.guidance,
+      ).catch((error) => {
+        console.error(`[Control Embedding] Failed to compute embedding for control ${control.id}:`, error);
+      });
+
       res.status(201).json(control);
     } catch (error: any) {
       if (error.code === 'P2002') {
@@ -451,6 +464,9 @@ router.put(
           data: updateData,
         });
 
+        // Note: For standard controls, we don't recompute embeddings since
+        // the text fields (code, title, description, purpose, guidance) cannot be modified
+
         return res.json(control);
       } else {
         // Non-standard controls can be fully updated, except Risk Assessment (auto-computed)
@@ -475,10 +491,28 @@ router.put(
           updateData.isStandardControl = updateData.isStandardControl === true || updateData.isStandardControl === 'true';
         }
 
+        // Check if any text fields that affect embeddings are being updated
+        const embeddingFields = ['code', 'title', 'description', 'purpose', 'guidance'];
+        const needsEmbeddingUpdate = embeddingFields.some((field) => updateData[field] !== undefined);
+
         const control = await prisma.control.update({
           where: { id },
           data: updateData,
         });
+
+        // Recompute embedding if text fields were updated
+        if (needsEmbeddingUpdate) {
+          computeAndStoreControlEmbedding(
+            control.id,
+            control.code,
+            control.title,
+            control.description,
+            control.purpose,
+            control.guidance,
+          ).catch((error) => {
+            console.error(`[Control Embedding] Failed to recompute embedding for control ${control.id}:`, error);
+          });
+        }
 
         return res.json(control);
       }

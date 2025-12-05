@@ -20,6 +20,7 @@ import {
 import { importRisksFromCSV } from '../services/riskImportService';
 import { findSimilarRisksForRisk, checkSimilarityForNewRisk } from '../services/similarityService';
 import { computeAndStoreEmbedding } from '../services/embeddingService';
+import { generateEmbedding, normalizeRiskText, cosineSimilarity, mapToScore } from '../services/llmService';
 
 const router = Router();
 
@@ -48,6 +49,7 @@ router.get(
     query('treatmentCategory').optional().isIn(['RETAIN', 'MODIFY', 'SHARE', 'AVOID']),
     query('mitigationImplemented').optional().isBoolean(),
     query('policyNonConformance').optional().isBoolean(),
+    query('controlsApplied').optional().isBoolean(),
     query('riskLevel').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     query('search').optional().isString(),
     query('dateAddedFrom').optional().isISO8601(),
@@ -96,6 +98,7 @@ router.get(
         department,
         testDepartment,
         policyNonConformance,
+        controlsApplied,
       } = req.query;
 
       const pageNum = parseInt(page as string, 10);
@@ -262,6 +265,29 @@ router.get(
           .filter((r) => {
             const hasNonConformance = hasPolicyNonConformance(r);
             return policyNonConformance === 'true' ? hasNonConformance : !hasNonConformance;
+          })
+          .map((r) => r.id);
+        where.id = { in: filteredIds };
+        countWhere.id = { in: filteredIds };
+      }
+
+      // Apply controls applied filter if specified
+      if (controlsApplied !== undefined) {
+        const allRisksForControls = await prisma.risk.findMany({
+          where: countWhere,
+          select: {
+            id: true,
+            riskControls: {
+              select: {
+                controlId: true,
+              },
+            },
+          },
+        });
+        const filteredIds = allRisksForControls
+          .filter((r) => {
+            const hasControls = r.riskControls.length > 0;
+            return controlsApplied === 'true' ? hasControls : !hasControls;
           })
           .map((r) => r.id);
         where.id = { in: filteredIds };
@@ -1388,7 +1414,7 @@ router.post(
   }
 );
 
-// POST /api/risks/suggest-controls - AI-based control suggestions
+// POST /api/risks/suggest-controls - AI-based control suggestions using semantic similarity
 router.post(
   '/suggest-controls',
   authenticateToken,
@@ -1403,103 +1429,130 @@ router.post(
       const { title, description, threatDescription } = req.body;
 
       // Combine all text fields for analysis
-      const combinedText = [
+      const riskText = normalizeRiskText(
         title || '',
-        description || '',
-        threatDescription || '',
-      ]
-        .filter((text) => text.trim().length > 0)
-        .join(' ')
-        .toLowerCase();
+        threatDescription || null,
+        description || null
+      );
 
-      if (combinedText.length === 0) {
+      if (!riskText || riskText.trim().length === 0) {
         return res.status(400).json({ error: 'No text provided for analysis' });
       }
 
-      // Get all controls with their descriptions
+      // Generate embedding for the risk text
+      const riskEmbedding = await generateEmbedding(riskText);
+      if (!riskEmbedding) {
+        // Fallback to keyword-based matching if embeddings fail
+        console.warn('[Control Suggestions] Embedding generation failed, falling back to keyword matching');
+        return res.status(500).json({ error: 'Failed to generate embeddings. Please ensure the embedding model is configured.' });
+      }
+
+      // Get all controls with their stored embeddings and text fields for keyword matching
       const allControls = await prisma.control.findMany({
         where: {
           isStandardControl: true, // Focus on ISO 27002 controls
+          embedding: { not: null }, // Only include controls with pre-computed embeddings
         },
         select: {
           id: true,
           code: true,
           title: true,
-          description: true,
-          purpose: true,
-          guidance: true,
+          embedding: true,
         },
       });
 
-      // Simple keyword-based matching (can be enhanced with AI/ML later)
-      // Look for control codes and keywords in the text
-      const suggestedControlIds: string[] = [];
+      // Extract keywords from risk text for boosting
+      const riskTextLower = riskText.toLowerCase();
+      const riskWords = riskTextLower
+        .split(/\s+/)
+        .filter((word) => word.length > 4) // Focus on meaningful words
+        .map((word) => word.replace(/[^\w]/g, '')); // Remove punctuation
+
+      // Detect supplier-related risks
+      const supplierKeywords = ['supplier', 'vendor', 'third-party', 'third party', 'external party', 
+                               'external provider', 'outsource', 'contractor', 'partner', 'service provider',
+                               'cloud provider', 'subcontractor', 'sub-supplier', 'agreement', 'contract'];
+      const hasSupplierIndicators = supplierKeywords.some(keyword => riskTextLower.includes(keyword));
+      
+      // Also check for patterns indicating external storage or management
+      // This helps catch risks like "Documentation stored at JR Chesham..." or "managed by [company]"
+      const externalLocationPatterns = [
+        'stored at', 'located at', 'managed by', 'hosted by', 'provided by',
+        'maintained by', 'handled by', 'processed by', 'accessed by'
+      ];
+      const hasExternalLocation = externalLocationPatterns.some(pattern => riskTextLower.includes(pattern));
+
+      const isSupplierRelatedRisk = hasSupplierIndicators || hasExternalLocation;
+
+      // Calculate similarity scores using stored embeddings with keyword boosting
+      const controlScores: Array<{ id: string; score: number; code: string; title: string }> = [];
 
       for (const control of allControls) {
-        let score = 0;
-        const controlText = [
-          control.code,
-          control.title || '',
-          control.description || '',
-          control.purpose || '',
-          control.guidance || '',
-        ]
-          .join(' ')
-          .toLowerCase();
-
-        // Check if control code appears in text
-        if (combinedText.includes(control.code.toLowerCase())) {
-          score += 10;
+        // Skip controls without embeddings (shouldn't happen due to WHERE clause, but safety check)
+        if (!control.embedding || !Array.isArray(control.embedding)) {
+          continue;
         }
 
-        // Check for keyword matches
-        const keywords = controlText.split(/\s+/).filter((word) => word.length > 4);
-        for (const keyword of keywords) {
-          if (combinedText.includes(keyword)) {
-            score += 1;
+        // Calculate cosine similarity using stored embedding
+        const controlEmbedding = control.embedding as number[];
+        const cosineSim = cosineSimilarity(riskEmbedding, controlEmbedding);
+        let similarityScore = mapToScore(cosineSim);
+
+        // Keyword boosting: Check for exact term matches in control title/code
+        const controlTextLower = `${control.code} ${control.title || ''}`.toLowerCase();
+        let keywordBoost = 0;
+        
+        // Boost for exact keyword matches (especially important terms)
+        for (const word of riskWords) {
+          if (word.length > 4 && controlTextLower.includes(word)) {
+            // More boost for longer, more specific words
+            keywordBoost += word.length > 6 ? 8 : 5;
+          }
+        }
+        
+        // Special boost for common security/risk terms that appear in both
+        const importantTerms = ['capacity', 'availability', 'monitoring', 'performance', 
+                               'service', 'system', 'resource', 'failure', 'outage', 
+                               'transaction', 'access', 'security', 'incident'];
+        for (const term of importantTerms) {
+          if (riskTextLower.includes(term) && controlTextLower.includes(term)) {
+            keywordBoost += 10; // Significant boost for matching important terms
           }
         }
 
-        // Check for common security terms
-        const securityTerms = [
-          'access',
-          'authentication',
-          'authorization',
-          'encryption',
-          'backup',
-          'disaster',
-          'incident',
-          'vulnerability',
-          'patch',
-          'monitoring',
-          'audit',
-          'compliance',
-          'policy',
-          'procedure',
-          'training',
-          'awareness',
-        ];
-
-        for (const term of securityTerms) {
-          if (combinedText.includes(term) && controlText.includes(term)) {
-            score += 2;
-          }
+        // Special boost for supplier relationship controls when supplier-related risks are detected
+        const supplierControlCodes = ['5.19', '5.20', '5.21', '5.22'];
+        if (isSupplierRelatedRisk && supplierControlCodes.includes(control.code)) {
+          keywordBoost += 25; // Strong boost for supplier controls when supplier risk is detected
         }
 
-        // If score is high enough, suggest this control
-        if (score >= 3) {
-          suggestedControlIds.push(control.id);
+        // Apply keyword boost (cap at +30 points to allow for supplier control boosting)
+        similarityScore = Math.min(100, similarityScore + Math.min(keywordBoost, 30));
+
+        // Lower threshold to 55% to catch more relevant matches, but still maintain quality
+        // Controls with keyword matches get boosted, so they're more likely to pass threshold
+        if (similarityScore >= 55) {
+          controlScores.push({
+            id: control.id,
+            score: similarityScore,
+            code: control.code,
+            title: control.title || '',
+          });
         }
       }
 
-      // Limit to top 10 suggestions
-      const limitedSuggestions = suggestedControlIds.slice(0, 10);
+      // Sort by similarity score (descending) and limit to top 8 suggestions
+      // Fewer suggestions but higher quality
+      const sortedSuggestions = controlScores
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8)
+        .map((item) => item.id);
 
       res.json({
-        suggestedControlIds: limitedSuggestions,
-        totalMatches: suggestedControlIds.length,
+        suggestedControlIds: sortedSuggestions,
+        totalMatches: controlScores.length,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error suggesting controls:', error);
       res.status(500).json({ error: 'Failed to generate control suggestions' });
     }

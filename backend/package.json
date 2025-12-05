@@ -19,7 +19,9 @@
     "db:studio": "node node_modules/prisma/build/index.js studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:status": "node node_modules/prisma/build/index.js migrate status",
-    "backfill-embeddings": "tsx scripts/backfill-embeddings.ts"
+    "backfill-embeddings": "tsx scripts/backfill-embeddings.ts",
+    "backfill-control-embeddings": "tsx scripts/backfill-control-embeddings.ts",
+    "check-control-embeddings": "tsx scripts/check-control-embeddings.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
