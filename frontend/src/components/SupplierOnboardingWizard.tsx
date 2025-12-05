@@ -31,7 +31,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { SharePointFileBrowser } from './SharePointFileBrowser';
 import {
   SupplierType,
-  CiaImpact,
   RiskRating,
   Criticality,
   PciStatus,
@@ -64,7 +63,6 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
   });
 
   const [step2Data, setStep2Data] = useState({
-    ciaImpact: null as CiaImpact | null,
     riskRating: null as RiskRating | null,
     rationale: '',
   });
@@ -101,7 +99,6 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
         customerFacingImpact: false,
       });
       setStep2Data({
-        ciaImpact: null,
         riskRating: null,
         rationale: '',
       });
@@ -125,7 +122,7 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
       return step1Data.name.trim() !== '' && step1Data.supplierType !== null;
     }
     if (step === 2) {
-      return step2Data.ciaImpact !== null && step2Data.riskRating !== null;
+      return step2Data.riskRating !== null;
     }
     if (step === 3) {
       return step3Data.criticality !== null;
@@ -177,7 +174,6 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
 
         // Update supplier with risk & criticality snapshot data first
         const snapshotUpdate: any = {};
-        if (step2Data.ciaImpact) snapshotUpdate.ciaImpact = step2Data.ciaImpact;
         if (step2Data.riskRating) snapshotUpdate.overallRiskRating = step2Data.riskRating;
         if (step2Data.rationale) snapshotUpdate.riskRationale = step2Data.rationale;
         if (step3Data.criticality) snapshotUpdate.criticality = step3Data.criticality;
@@ -188,10 +184,9 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
         }
 
         // Create risk assessment (non-blocking - continue even if it fails)
-        if (step2Data.ciaImpact && step2Data.riskRating) {
+        if (step2Data.riskRating) {
           try {
             await supplierApi.createRiskAssessment(supplier.id, {
-              ciaImpact: step2Data.ciaImpact,
               supplierType: step1Data.supplierType,
               riskRating: step2Data.riskRating,
               rationale: step2Data.rationale || null,
@@ -369,19 +364,6 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
           {currentStep === 2 && (
             <VStack spacing={4} align="stretch">
               <FormControl isRequired>
-                <FormLabel>CIA Impact</FormLabel>
-                <Select
-                  value={step2Data.ciaImpact || ''}
-                  onChange={(e) => setStep2Data({ ...step2Data, ciaImpact: e.target.value as CiaImpact || null })}
-                >
-                  <option value="">Select CIA Impact</option>
-                  <option value="LOW">Low</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="HIGH">High</option>
-                </Select>
-              </FormControl>
-
-              <FormControl isRequired>
                 <FormLabel>Risk Rating</FormLabel>
                 <Select
                   value={step2Data.riskRating || ''}
@@ -555,7 +537,6 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
 
               <Box p={4} borderWidth="1px" borderRadius="md">
                 <Text fontWeight="bold" mb={2}>Risk Assessment</Text>
-                <Text>CIA Impact: {step2Data.ciaImpact || 'Not set'}</Text>
                 <Text>Risk Rating: {step2Data.riskRating || 'Not set'}</Text>
               </Box>
 

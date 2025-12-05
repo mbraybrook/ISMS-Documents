@@ -46,7 +46,6 @@ import {
   getSupplierStatusDisplayName,
   getSupplierTypeDisplayName,
   getServiceSubTypeDisplayName,
-  getCiaImpactDisplayName,
   getRiskRatingDisplayName,
   getCriticalityDisplayName,
   getPciStatusDisplayName,
@@ -116,7 +115,6 @@ export function SupplierDetailPage() {
     processesPersonalData: false,
     hostingRegions: [] as string[],
     customerFacingImpact: false,
-    ciaImpact: null as string | null,
     overallRiskRating: null as string | null,
     criticality: null as string | null,
     riskRationale: '',
@@ -215,7 +213,6 @@ export function SupplierDetailPage() {
         processesPersonalData: data.processesPersonalData,
         hostingRegions: data.hostingRegions || [],
         customerFacingImpact: data.customerFacingImpact,
-        ciaImpact: data.ciaImpact,
         overallRiskRating: data.overallRiskRating,
         criticality: data.criticality,
         riskRationale: data.riskRationale || '',
@@ -432,6 +429,16 @@ export function SupplierDetailPage() {
         return 'gray';
       default:
         return 'gray';
+    }
+  };
+
+  const isUrl = (str: string): boolean => {
+    if (!str || !str.trim()) return false;
+    try {
+      const url = new URL(str);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
     }
   };
 
@@ -723,26 +730,7 @@ export function SupplierDetailPage() {
 
               <Box>
                 <Heading size="md" mb={4}>Risk & Criticality Snapshot</Heading>
-                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-                  <FormControl>
-                    <FormLabel>CIA Impact</FormLabel>
-                    {supplier?.ciaImpact ? (
-                      <Badge
-                        colorScheme={
-                          supplier.ciaImpact === 'HIGH' ? 'red' :
-                          supplier.ciaImpact === 'MEDIUM' ? 'orange' :
-                          'green'
-                        }
-                        fontSize="md"
-                        px={3}
-                        py={1}
-                      >
-                        {getCiaImpactDisplayName(supplier.ciaImpact)}
-                      </Badge>
-                    ) : (
-                      <Text color="gray.400">Not assessed</Text>
-                    )}
-                  </FormControl>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                   <FormControl>
                     <FormLabel>Risk Rating</FormLabel>
                     {supplier?.overallRiskRating ? (
@@ -842,25 +830,7 @@ export function SupplierDetailPage() {
                   </Text>
                 </Box>
               </Alert>
-              <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-                <FormControl>
-                  <FormLabel>
-                    CIA Impact
-                    <Tooltip label="CIA stands for Confidentiality, Integrity, and Availability - the three core security principles">
-                      <span style={{ marginLeft: '4px', cursor: 'help' }}>ℹ️</span>
-                    </Tooltip>
-                  </FormLabel>
-                  <Select
-                    value={formData.ciaImpact || ''}
-                    onChange={(e) => setFormData({ ...formData, ciaImpact: e.target.value || null })}
-                    isDisabled={!isEditing}
-                  >
-                    <option value="">Not assessed</option>
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                  </Select>
-                </FormControl>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                 <FormControl>
                   <FormLabel>Risk Rating</FormLabel>
                   <Select
@@ -1088,13 +1058,35 @@ export function SupplierDetailPage() {
                 <VStack align="stretch" spacing={2}>
                   {formData.complianceEvidenceLinks.map((link, index) => (
                     <HStack key={index}>
-                      <Input
-                        value={link}
-                        onChange={(e) => updateComplianceEvidenceLink(index, e.target.value)}
-                        isReadOnly={!isEditing}
-                        placeholder="URL to certificate or evidence (SharePoint or public website)"
-                        flex={1}
-                      />
+                      {isEditing ? (
+                        <Input
+                          value={link}
+                          onChange={(e) => updateComplianceEvidenceLink(index, e.target.value)}
+                          placeholder="URL to certificate or evidence (SharePoint or public website)"
+                          flex={1}
+                        />
+                      ) : (
+                        <Box flex={1} p={2} borderWidth="1px" borderRadius="md" borderColor="gray.200">
+                          {link ? (
+                            isUrl(link) ? (
+                              <Text fontSize="sm" wordBreak="break-all">
+                                <a
+                                  href={link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: '#3182ce', textDecoration: 'underline' }}
+                                >
+                                  {link}
+                                </a>
+                              </Text>
+                            ) : (
+                              <Text fontSize="sm" wordBreak="break-all">{link}</Text>
+                            )
+                          ) : (
+                            <Text fontSize="sm" color="gray.400">No link</Text>
+                          )}
+                        </Box>
+                      )}
                       {isEditing && (
                         <>
                           <Button
@@ -1118,9 +1110,21 @@ export function SupplierDetailPage() {
                     </HStack>
                   ))}
                   {isEditing && (
-                    <Button leftIcon={<AddIcon />} size="sm" onClick={addComplianceEvidenceLink}>
-                      Add Evidence Link
-                    </Button>
+                    <HStack>
+                      <Button leftIcon={<AddIcon />} size="sm" onClick={addComplianceEvidenceLink}>
+                        Add Evidence Link
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingEvidenceIndex(null);
+                          onEvidenceBrowserOpen();
+                        }}
+                      >
+                        Browse SharePoint
+                      </Button>
+                    </HStack>
                   )}
                 </VStack>
               </FormControl>
@@ -1215,37 +1219,6 @@ export function SupplierDetailPage() {
                     </Badge>
                   </FormControl>
                 </SimpleGrid>
-
-                {/* Compliance Evidence Links */}
-                {supplier?.complianceEvidenceLinks && supplier.complianceEvidenceLinks.length > 0 && (
-                  <Box mt={4}>
-                    <Heading size="sm" mb={3}>Compliance Evidence Links</Heading>
-                    <VStack align="stretch" spacing={2}>
-                      {supplier.complianceEvidenceLinks.map((link: string, index: number) => (
-                        <Box
-                          key={index}
-                          p={3}
-                          borderWidth="1px"
-                          borderRadius="md"
-                          borderColor="gray.200"
-                        >
-                          <HStack>
-                            <Text fontSize="sm" flex={1} wordBreak="break-all">
-                              {link}
-                            </Text>
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              onClick={() => window.open(link, '_blank')}
-                            >
-                              Open
-                            </Button>
-                          </HStack>
-                        </Box>
-                      ))}
-                    </VStack>
-                  </Box>
-                )}
               </Box>
 
               <Divider />
@@ -1408,11 +1381,22 @@ export function SupplierDetailPage() {
                             <Td>
                               {cert.evidenceLink ? (
                                 <HStack spacing={2}>
-                                  <Text fontSize="sm" isTruncated maxW="200px">
-                                    <a href={cert.evidenceLink} target="_blank" rel="noopener noreferrer">
+                                  {isUrl(cert.evidenceLink) ? (
+                                    <Text fontSize="sm" isTruncated maxW="200px">
+                                      <a
+                                        href={cert.evidenceLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{ color: '#3182ce', textDecoration: 'underline' }}
+                                      >
+                                        {cert.evidenceLink}
+                                      </a>
+                                    </Text>
+                                  ) : (
+                                    <Text fontSize="sm" isTruncated maxW="200px">
                                       {cert.evidenceLink}
-                                    </a>
-                                  </Text>
+                                    </Text>
+                                  )}
                                   {canEdit && (
                                     <Button
                                       size="xs"
@@ -1585,12 +1569,32 @@ export function SupplierDetailPage() {
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                   <FormControl>
                     <FormLabel>Data Processing Agreement Reference</FormLabel>
-                    <Input
-                      value={formData.dataProcessingAgreementRef}
-                      onChange={(e) => setFormData({ ...formData, dataProcessingAgreementRef: e.target.value })}
-                      isReadOnly={!isEditing}
-                      placeholder="DPA reference or link"
-                    />
+                    {isEditing ? (
+                      <Input
+                        value={formData.dataProcessingAgreementRef}
+                        onChange={(e) => setFormData({ ...formData, dataProcessingAgreementRef: e.target.value })}
+                        placeholder="DPA reference or link"
+                      />
+                    ) : (
+                      formData.dataProcessingAgreementRef ? (
+                        isUrl(formData.dataProcessingAgreementRef) ? (
+                          <Text fontSize="md">
+                            <a
+                              href={formData.dataProcessingAgreementRef}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: '#3182ce', textDecoration: 'underline' }}
+                            >
+                              {formData.dataProcessingAgreementRef}
+                            </a>
+                          </Text>
+                        ) : (
+                          <Text fontSize="md">{formData.dataProcessingAgreementRef}</Text>
+                        )
+                      ) : (
+                        <Text fontSize="md" color="gray.400">Not provided</Text>
+                      )
+                    )}
                   </FormControl>
                   <FormControl>
                     <Checkbox
@@ -1624,12 +1628,35 @@ export function SupplierDetailPage() {
                     <VStack align="stretch" spacing={2}>
                       {formData.contractReferences.map((ref, index) => (
                         <HStack key={index}>
-                          <Input
-                            value={ref}
-                            onChange={(e) => updateContractReference(index, e.target.value)}
-                            isReadOnly={!isEditing}
-                            placeholder="Contract reference, ID, or SharePoint URL"
-                          />
+                          {isEditing ? (
+                            <Input
+                              value={ref}
+                              onChange={(e) => updateContractReference(index, e.target.value)}
+                              placeholder="Contract reference, ID, or SharePoint URL"
+                              flex={1}
+                            />
+                          ) : (
+                            <Box flex={1} p={2} borderWidth="1px" borderRadius="md" borderColor="gray.200">
+                              {ref ? (
+                                isUrl(ref) ? (
+                                  <Text fontSize="sm" wordBreak="break-all">
+                                    <a
+                                      href={ref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{ color: '#3182ce', textDecoration: 'underline' }}
+                                    >
+                                      {ref}
+                                    </a>
+                                  </Text>
+                                ) : (
+                                  <Text fontSize="sm" wordBreak="break-all">{ref}</Text>
+                                )
+                              ) : (
+                                <Text fontSize="sm" color="gray.400">No reference</Text>
+                              )}
+                            </Box>
+                          )}
                           {isEditing && (
                             <>
                               <Button
@@ -1802,7 +1829,6 @@ export function SupplierDetailPage() {
                       {supplier.currentRiskAssessment && (
                         <Box p={4} borderWidth="1px" borderRadius="md">
                           <Text fontWeight="bold" mb={2}>Current Risk Assessment</Text>
-                          <Text fontSize="sm">CIA Impact: {supplier.currentRiskAssessment.ciaImpact}</Text>
                           <Text fontSize="sm">Risk Rating: {supplier.currentRiskAssessment.riskRating}</Text>
                           <Text fontSize="sm" color="gray.600" mt={2}>
                             Approved: {new Date(supplier.currentRiskAssessment.approvedAt || supplier.currentRiskAssessment.assessedAt).toLocaleString()}
@@ -1852,7 +1878,6 @@ export function SupplierDetailPage() {
                                 approvedBy: assessment.approvedBy,
                                 approvedAt: assessment.approvedAt,
                                 data: {
-                                  ciaImpact: assessment.ciaImpact,
                                   riskRating: assessment.riskRating,
                                   rationale: assessment.rationale,
                                   rejectionReason: assessment.rejectionReason,
@@ -1974,7 +1999,6 @@ export function SupplierDetailPage() {
           onClose={onReviewModalClose}
           supplierId={supplier.id}
           currentSupplier={{
-            ciaImpact: supplier.ciaImpact,
             overallRiskRating: supplier.overallRiskRating,
             criticality: supplier.criticality,
             riskRationale: supplier.riskRationale,

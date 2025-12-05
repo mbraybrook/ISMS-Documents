@@ -255,7 +255,9 @@ export function SharePointFileBrowser({
       // When changing sites (overrideSiteId is provided), don't pass driveId
       // This allows the backend to get the default drive for the new site
       // Otherwise, use currentDriveId or the prop driveId
-      const isChangingSite = !!overrideSiteId && overrideSiteId !== siteId;
+      // FIX: Check against selectedSiteId (current state) instead of siteId (prop)
+      // to correctly detect when we are switching away from the currently viewed site
+      const isChangingSite = !!overrideSiteId && overrideSiteId !== selectedSiteId;
       const driveIdToUse = isChangingSite ? undefined : (currentDriveId || driveId);
       
       if (driveIdToUse) {

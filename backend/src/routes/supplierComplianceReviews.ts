@@ -233,7 +233,6 @@ router.post(
       return typeof value === 'string';
     }).withMessage('notes must be a string'),
     // Risk & Criticality fields
-    body('ciaImpact').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('overallRiskRating').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('criticality').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('riskRationale').optional().custom((value) => {
@@ -324,9 +323,6 @@ router.post(
       }
 
       // Risk & Criticality fields
-      if (req.body.ciaImpact !== undefined) {
-        updateData.ciaImpact = req.body.ciaImpact || null;
-      }
       if (req.body.overallRiskRating !== undefined) {
         updateData.overallRiskRating = req.body.overallRiskRating || null;
       }

@@ -5,7 +5,6 @@ import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
 import {
-  CiaImpact,
   SupplierType,
   RiskRating,
   Criticality,
@@ -41,7 +40,6 @@ async function updateSupplierSnapshotOnApproval(
   const updateData: any = {};
 
   if (assessmentType === 'RISK') {
-    updateData.ciaImpact = assessment.ciaImpact;
     updateData.overallRiskRating = assessment.riskRating;
     updateData.riskRationale = assessment.rationale;
     updateData.lastRiskAssessmentAt = assessment.approvedAt;
@@ -68,7 +66,6 @@ router.post(
   requireRole('ADMIN', 'EDITOR'),
   [
     param('supplierId').isUUID(),
-    body('ciaImpact').isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('supplierType').isIn(['SERVICE_PROVIDER', 'CONNECTED_ENTITY', 'PCI_SERVICE_PROVIDER']),
     body('riskRating').isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('rationale').optional().isString(),
@@ -98,7 +95,6 @@ router.post(
         data: {
           id: randomUUID(),
           supplierId: req.params.supplierId,
-          ciaImpact: req.body.ciaImpact,
           supplierType: req.body.supplierType,
           riskRating: req.body.riskRating,
           rationale: req.body.rationale || null,
@@ -230,7 +226,6 @@ router.put(
   [
     param('supplierId').isUUID(),
     param('id').isUUID(),
-    body('ciaImpact').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('supplierType').optional().isIn(['SERVICE_PROVIDER', 'CONNECTED_ENTITY', 'PCI_SERVICE_PROVIDER']),
     body('riskRating').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     body('rationale').optional().isString(),
@@ -251,7 +246,6 @@ router.put(
       }
 
       const updateData: any = {};
-      if (req.body.ciaImpact !== undefined) updateData.ciaImpact = req.body.ciaImpact;
       if (req.body.supplierType !== undefined) updateData.supplierType = req.body.supplierType;
       if (req.body.riskRating !== undefined) updateData.riskRating = req.body.riskRating;
       if (req.body.rationale !== undefined) updateData.rationale = req.body.rationale || null;

@@ -35,6 +35,7 @@ interface RiskWizardModalProps {
 interface WizardData {
   threat: string;
   vulnerability: string;
+  riskDescription: string;
   impact: number;
   likelihood: number;
 }
@@ -63,6 +64,7 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
   const [wizardData, setWizardData] = useState<WizardData>({
     threat: '',
     vulnerability: '',
+    riskDescription: '',
     impact: 0,
     likelihood: 0,
   });
@@ -76,6 +78,7 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
       setWizardData({
         threat: '',
         vulnerability: '',
+        riskDescription: '',
         impact: 0,
         likelihood: 0,
       });
@@ -108,7 +111,7 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
   };
 
   const handleSubmit = async (status: 'DRAFT' | 'PROPOSED') => {
-    if (!wizardData.threat.trim() || !wizardData.vulnerability.trim()) {
+    if (!wizardData.threat.trim() || !wizardData.vulnerability.trim() || !wizardData.riskDescription.trim()) {
       toast({
         title: 'Validation Error',
         description: 'Please fill in all required fields',
@@ -136,6 +139,7 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
       const wizardDataJson = JSON.stringify({
         threat: wizardData.threat,
         vulnerability: wizardData.vulnerability,
+        riskDescription: wizardData.riskDescription,
         impact: wizardData.impact,
         likelihood: wizardData.likelihood,
       });
@@ -145,7 +149,7 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
 
       const payload = {
         title: wizardData.threat.substring(0, 100) || 'Risk from Wizard',
-        description: `Threat: ${wizardData.threat}\n\nVulnerability: ${wizardData.vulnerability}`,
+        description: wizardData.riskDescription,
         threatDescription: wizardData.threat,
         department: department,
         status: status,
@@ -207,6 +211,18 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
                 onChange={(e) => setWizardData({ ...wizardData, vulnerability: e.target.value })}
                 rows={5}
               />
+            </FormControl>
+            <FormControl isRequired>
+              <FormLabel>Risk Description</FormLabel>
+              <Textarea
+                placeholder="Provide a comprehensive description of the risk, including context, potential impacts, and any relevant details..."
+                value={wizardData.riskDescription}
+                onChange={(e) => setWizardData({ ...wizardData, riskDescription: e.target.value })}
+                rows={5}
+              />
+              <Text fontSize="xs" color="gray.500" mt={1}>
+                This description will be used as the main risk description. Include context about the risk, its potential impacts, and any relevant background information.
+              </Text>
             </FormControl>
             <FormControl>
               <FormLabel>Department</FormLabel>
@@ -288,6 +304,9 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
                   <strong>Vulnerability:</strong> {wizardData.vulnerability}
                 </Text>
                 <Text>
+                  <strong>Risk Description:</strong> {wizardData.riskDescription}
+                </Text>
+                <Text>
                   <strong>Department:</strong> {getDepartmentDisplayName(department)}
                 </Text>
                 <HStack spacing={4} mt={2}>
@@ -319,7 +338,7 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return wizardData.threat.trim() && wizardData.vulnerability.trim();
+        return wizardData.threat.trim() && wizardData.vulnerability.trim() && wizardData.riskDescription.trim();
       case 2:
         return wizardData.impact > 0;
       case 3:

@@ -38,7 +38,6 @@ export function getDepartmentDisplayName(dept: Department | null | undefined): s
 export type SupplierStatus = 'ACTIVE' | 'IN_ONBOARDING' | 'IN_EXIT' | 'INACTIVE';
 export type SupplierType = 'SERVICE_PROVIDER' | 'CONNECTED_ENTITY' | 'PCI_SERVICE_PROVIDER';
 export type ServiceSubType = 'SAAS';
-export type CiaImpact = 'LOW' | 'MEDIUM' | 'HIGH';
 export type RiskRating = 'LOW' | 'MEDIUM' | 'HIGH';
 export type Criticality = 'LOW' | 'MEDIUM' | 'HIGH';
 export type PciStatus = 'UNKNOWN' | 'PASS' | 'FAIL' | 'NOT_APPLICABLE';

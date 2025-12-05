@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
-import { getRiskLevel } from '../services/riskService';
+import { getRiskLevel, hasPolicyNonConformance } from '../services/riskService';
 
 const router = Router();
 
@@ -184,6 +184,11 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         mitigationImplemented: true,
         initialRiskTreatmentCategory: true,
         residualRiskTreatmentCategory: true,
+        mitigatedConfidentialityScore: true,
+        mitigatedIntegrityScore: true,
+        mitigatedAvailabilityScore: true,
+        mitigatedLikelihood: true,
+        mitigationDescription: true,
       },
     });
 
@@ -200,6 +205,12 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       mitigatedScore: number | null;
     }> = [];
     const risksByTreatmentCategory: { [key: string]: number } = {};
+    let policyNonConformanceCount = 0;
+    const risksWithPolicyNonConformance: Array<{
+      id: string;
+      title: string;
+      initialRiskTreatmentCategory: string | null;
+    }> = [];
 
     allRisks.forEach((risk) => {
       // Total risk score
@@ -231,6 +242,16 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       // Treatment categories
       const treatmentCategory = risk.residualRiskTreatmentCategory || risk.initialRiskTreatmentCategory || 'UNCATEGORIZED';
       risksByTreatmentCategory[treatmentCategory] = (risksByTreatmentCategory[treatmentCategory] || 0) + 1;
+
+      // Policy non-conformance
+      if (hasPolicyNonConformance(risk)) {
+        policyNonConformanceCount++;
+        risksWithPolicyNonConformance.push({
+          id: risk.id,
+          title: risk.title,
+          initialRiskTreatmentCategory: risk.initialRiskTreatmentCategory,
+        });
+      }
     });
 
     // Risk score delta
@@ -401,6 +422,8 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         mitigatedByLevel: mitigatedRisksByLevel,
         withMitigationNotImplemented: risksWithMitigationNotImplemented.slice(0, 20),
         byTreatmentCategory: risksByTreatmentCategory,
+        policyNonConformanceCount,
+        withPolicyNonConformance: risksWithPolicyNonConformance.slice(0, 20),
       },
       controls: {
         totalCount: allControls.length,

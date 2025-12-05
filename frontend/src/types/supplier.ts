@@ -2,7 +2,6 @@
 export type SupplierStatus = 'ACTIVE' | 'IN_ONBOARDING' | 'IN_EXIT' | 'INACTIVE';
 export type SupplierType = 'SERVICE_PROVIDER' | 'CONNECTED_ENTITY' | 'PCI_SERVICE_PROVIDER';
 export type ServiceSubType = 'SAAS';
-export type CiaImpact = 'LOW' | 'MEDIUM' | 'HIGH';
 export type RiskRating = 'LOW' | 'MEDIUM' | 'HIGH';
 export type Criticality = 'LOW' | 'MEDIUM' | 'HIGH';
 export type PciStatus = 'UNKNOWN' | 'PASS' | 'FAIL' | 'NOT_APPLICABLE';
@@ -43,11 +42,6 @@ export function getServiceSubTypeDisplayName(type: ServiceSubType | null | undef
   if (!type) return 'Not specified';
   if (type === 'SAAS') return 'SaaS';
   return type;
-}
-
-export function getCiaImpactDisplayName(impact: CiaImpact | null | undefined): string {
-  if (!impact) return 'Not assessed';
-  return impact.charAt(0) + impact.slice(1).toLowerCase();
 }
 
 export function getRiskRatingDisplayName(rating: RiskRating | null | undefined): string {
@@ -149,7 +143,6 @@ export interface User {
 export interface SupplierRiskAssessment {
   id: string;
   supplierId: string;
-  ciaImpact: CiaImpact;
   supplierType: SupplierType;
   riskRating: RiskRating;
   rationale: string | null;
@@ -290,7 +283,6 @@ export interface Supplier {
   processesPersonalData: boolean;
   hostingRegions: string[] | null;
   customerFacingImpact: boolean;
-  ciaImpact: CiaImpact | null;
   overallRiskRating: RiskRating | null;
   criticality: Criticality | null;
   riskRationale: string | null;

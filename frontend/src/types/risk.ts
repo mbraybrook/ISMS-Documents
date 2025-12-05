@@ -75,6 +75,7 @@ export interface Risk {
   mitigatedLikelihood: number | null;
   mitigatedScore: number | null;
   mitigationImplemented: boolean;
+  mitigationDescription: string | null;
   residualRiskTreatmentCategory: string | null;
   annexAControlsRaw: string | null;
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';

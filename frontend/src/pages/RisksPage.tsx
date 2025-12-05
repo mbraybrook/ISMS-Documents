@@ -172,6 +172,7 @@ export function RisksPage() {
     ownerId: '',
     treatmentCategory: '',
     mitigationImplemented: '',
+    policyNonConformance: '',
     riskLevel: '',
     search: '',
     dateAddedFrom: '',
@@ -181,6 +182,9 @@ export function RisksPage() {
     page: 1,
     limit: 20,
   });
+  
+  // Track if we've initialized filters from URL to avoid re-initializing
+  const filtersInitializedRef = useRef(false);
 
   // Separate search state for immediate UI updates (must be declared before useDebounce)
   const [searchInput, setSearchInput] = useState(filters.search);
@@ -261,97 +265,7 @@ export function RisksPage() {
     setSearchInput(filters.search);
   }, [filters.search]);
 
-  useEffect(() => {
-    fetchRisks();
-    // Clear selections when filters change
-    setSelectedRiskIds(new Set());
-  }, [filters]);
-
-  // Handle view query parameter - open risk in view mode
-  useEffect(() => {
-    const viewRiskId = searchParams.get('view');
-    if (viewRiskId && viewRiskProcessedRef.current !== viewRiskId) {
-      // First check if risk is in current list
-      const risk = risks.find(r => r.id === viewRiskId);
-      if (risk) {
-        viewRiskProcessedRef.current = viewRiskId;
-        setSelectedRisk(risk);
-        setViewMode(true);
-        onOpen();
-        // Remove view parameter from URL
-        const newSearchParams = new URLSearchParams(searchParams);
-        newSearchParams.delete('view');
-        setSearchParams(newSearchParams, { replace: true });
-      } else if (!loading) {
-        // Risk not in current page, fetch it directly
-        // Only fetch if we're not currently loading (to avoid duplicate requests)
-        viewRiskProcessedRef.current = viewRiskId;
-        const fetchRiskById = async () => {
-          try {
-            const response = await api.get(`/api/risks/${viewRiskId}`);
-            if (response.data) {
-              setSelectedRisk(response.data);
-              setViewMode(true);
-              onOpen();
-              // Remove view parameter from URL
-              const newSearchParams = new URLSearchParams(searchParams);
-              newSearchParams.delete('view');
-              setSearchParams(newSearchParams, { replace: true });
-            }
-          } catch (error: any) {
-            console.error('Error fetching risk for view:', error);
-            toast({
-              title: 'Error',
-              description: 'Risk not found',
-              status: 'error',
-              duration: 3000,
-              isClosable: true,
-            });
-            // Remove view parameter even on error
-            const newSearchParams = new URLSearchParams(searchParams);
-            newSearchParams.delete('view');
-            setSearchParams(newSearchParams, { replace: true });
-          }
-        };
-        fetchRiskById();
-      }
-    } else if (!viewRiskId && viewRiskProcessedRef.current) {
-      // Reset when view parameter is removed
-      viewRiskProcessedRef.current = null;
-    }
-  }, [searchParams, risks, loading, onOpen, setSearchParams, toast]);
-
-  // Handle highlighting a risk when navigating from control detail
-  useEffect(() => {
-    const highlightRiskId = sessionStorage.getItem('highlightRiskId');
-    if (highlightRiskId && risks.length > 0) {
-      sessionStorage.removeItem('highlightRiskId');
-      // Wait a bit for the DOM to update, then scroll to the risk
-      const scrollToRisk = () => {
-        const riskElement = document.getElementById(`risk-${highlightRiskId}`);
-        if (riskElement) {
-          riskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Temporarily highlight the row with a yellow background
-          const originalBg = riskElement.style.backgroundColor;
-          riskElement.style.backgroundColor = '#fef3c7';
-          riskElement.style.transition = 'background-color 0.3s';
-          setTimeout(() => {
-            riskElement.style.backgroundColor = originalBg || '';
-            setTimeout(() => {
-              riskElement.style.transition = '';
-            }, 300);
-          }, 2000);
-        } else {
-          // If element not found yet, try again after a short delay
-          setTimeout(scrollToRisk, 100);
-        }
-      };
-      // Small delay to ensure DOM is ready
-      setTimeout(scrollToRisk, 100);
-    }
-  }, [risks, loading]);
-
-  const fetchRisks = async () => {
+  const fetchRisks = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -362,7 +276,11 @@ export function RisksPage() {
       if (filters.treatmentCategory) params.append('treatmentCategory', filters.treatmentCategory);
       if (filters.mitigationImplemented !== '')
         params.append('mitigationImplemented', filters.mitigationImplemented === 'true' ? 'true' : 'false');
-      if (filters.riskLevel) params.append('riskLevel', filters.riskLevel);
+      if (filters.policyNonConformance !== '')
+        params.append('policyNonConformance', filters.policyNonConformance === 'true' ? 'true' : 'false');
+      if (filters.riskLevel) {
+        params.append('riskLevel', filters.riskLevel);
+      }
       if (filters.search) params.append('search', filters.search);
       if (filters.dateAddedFrom) params.append('dateAddedFrom', filters.dateAddedFrom);
       if (filters.dateAddedTo) params.append('dateAddedTo', filters.dateAddedTo);
@@ -404,7 +322,144 @@ export function RisksPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, toast]);
+
+  // Initialize filters from URL query parameters
+  useEffect(() => {
+    const mitigationImplementedParam = searchParams.get('mitigationImplemented');
+    const policyNonConformanceParam = searchParams.get('policyNonConformance');
+    const riskLevelParam = searchParams.get('riskLevel');
+    
+    // Skip if we're handling view/edit params (those are handled separately)
+    const viewParam = searchParams.get('view');
+    const editParam = searchParams.get('edit');
+    if (viewParam || editParam) {
+      return;
+    }
+    
+    // Check if we have filter params that differ from current filters
+    const hasFilterParams = mitigationImplementedParam !== null || policyNonConformanceParam !== null || riskLevelParam !== null;
+    
+    if (hasFilterParams) {
+      // Always update filters when URL params are present to ensure they're applied
+      setFilters(prev => ({
+        ...prev,
+        mitigationImplemented: mitigationImplementedParam !== null ? mitigationImplementedParam : prev.mitigationImplemented,
+        policyNonConformance: policyNonConformanceParam !== null ? policyNonConformanceParam : prev.policyNonConformance,
+        riskLevel: riskLevelParam !== null ? riskLevelParam : prev.riskLevel,
+      }));
+      
+      // Remove the params from URL after a delay to ensure filters are applied first
+      const timeoutId = setTimeout(() => {
+        setSearchParams(prev => {
+          const newSearchParams = new URLSearchParams(prev);
+          if (mitigationImplementedParam !== null) newSearchParams.delete('mitigationImplemented');
+          if (policyNonConformanceParam !== null) newSearchParams.delete('policyNonConformance');
+          if (riskLevelParam !== null) newSearchParams.delete('riskLevel');
+          return newSearchParams;
+        });
+      }, 200);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    fetchRisks();
+    // Clear selections when filters change
+    setSelectedRiskIds(new Set());
+  }, [fetchRisks]);
+
+  // Handle view/edit query parameters - open risk in view or edit mode
+  useEffect(() => {
+    const viewRiskId = searchParams.get('view');
+    const editRiskId = searchParams.get('edit');
+    const riskId = editRiskId || viewRiskId;
+    const shouldEdit = !!editRiskId;
+    
+    if (riskId && viewRiskProcessedRef.current !== riskId) {
+      // First check if risk is in current list
+      const risk = risks.find(r => r.id === riskId);
+      if (risk) {
+        viewRiskProcessedRef.current = riskId;
+        setSelectedRisk(risk);
+        setViewMode(!shouldEdit);
+        onOpen();
+        // Remove view/edit parameter from URL
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('view');
+        newSearchParams.delete('edit');
+        setSearchParams(newSearchParams, { replace: true });
+      } else if (!loading) {
+        // Risk not in current page, fetch it directly
+        // Only fetch if we're not currently loading (to avoid duplicate requests)
+        viewRiskProcessedRef.current = riskId;
+        const fetchRiskById = async () => {
+          try {
+            const response = await api.get(`/api/risks/${riskId}`);
+            if (response.data) {
+              setSelectedRisk(response.data);
+              setViewMode(!shouldEdit);
+              onOpen();
+              // Remove view/edit parameter from URL
+              const newSearchParams = new URLSearchParams(searchParams);
+              newSearchParams.delete('view');
+              newSearchParams.delete('edit');
+              setSearchParams(newSearchParams, { replace: true });
+            }
+          } catch (error: any) {
+            console.error('Error fetching risk:', error);
+            toast({
+              title: 'Error',
+              description: 'Risk not found',
+              status: 'error',
+              duration: 3000,
+              isClosable: true,
+            });
+            // Remove view/edit parameter even on error
+            const newSearchParams = new URLSearchParams(searchParams);
+            newSearchParams.delete('view');
+            newSearchParams.delete('edit');
+            setSearchParams(newSearchParams, { replace: true });
+          }
+        };
+        fetchRiskById();
+      }
+    } else if (!riskId && viewRiskProcessedRef.current) {
+      // Reset when view/edit parameter is removed
+      viewRiskProcessedRef.current = null;
+    }
+  }, [searchParams, risks, loading, onOpen, setSearchParams, toast]);
+
+  // Handle highlighting a risk when navigating from control detail
+  useEffect(() => {
+    const highlightRiskId = sessionStorage.getItem('highlightRiskId');
+    if (highlightRiskId && risks.length > 0) {
+      sessionStorage.removeItem('highlightRiskId');
+      // Wait a bit for the DOM to update, then scroll to the risk
+      const scrollToRisk = () => {
+        const riskElement = document.getElementById(`risk-${highlightRiskId}`);
+        if (riskElement) {
+          riskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Temporarily highlight the row with a yellow background
+          const originalBg = riskElement.style.backgroundColor;
+          riskElement.style.backgroundColor = '#fef3c7';
+          riskElement.style.transition = 'background-color 0.3s';
+          setTimeout(() => {
+            riskElement.style.backgroundColor = originalBg || '';
+            setTimeout(() => {
+              riskElement.style.transition = '';
+            }, 300);
+          }, 2000);
+        } else {
+          // If element not found yet, try again after a short delay
+          setTimeout(scrollToRisk, 100);
+        }
+      };
+      // Small delay to ensure DOM is ready
+      setTimeout(scrollToRisk, 100);
+    }
+  }, [risks, loading]);
 
   const handleEdit = useCallback((risk: Risk) => {
     setSelectedRisk(risk);
@@ -831,25 +886,48 @@ export function RisksPage() {
         key: 'initialRiskTreatmentCategory',
         header: 'Treatment',
         minW: '120px',
-        render: (risk) =>
-          risk.initialRiskTreatmentCategory ? (
-            <Badge
-              colorScheme={
-                risk.initialRiskTreatmentCategory === 'MODIFY' ? 'blue' :
-                  risk.initialRiskTreatmentCategory === 'RETAIN' ? 'green' :
-                    risk.initialRiskTreatmentCategory === 'SHARE' ? 'purple' :
-                      'red'
-              }
-              fontSize="sm"
-              px={3}
-              py={1}
-              minW="80px"
+        render: (risk) => {
+          const hasMitigatedScores = 
+            risk.mitigatedConfidentialityScore !== null ||
+            risk.mitigatedIntegrityScore !== null ||
+            risk.mitigatedAvailabilityScore !== null ||
+            risk.mitigatedLikelihood !== null ||
+            risk.mitigatedScore !== null;
+          const hasMitigationDescription = risk.mitigationDescription && risk.mitigationDescription.trim().length > 0;
+          // Non-conformance only applies to MODIFY risks with MEDIUM or HIGH initial risk scores
+          const hasNonConformance = 
+            risk.initialRiskTreatmentCategory === 'MODIFY' && 
+            risk.riskLevel !== 'LOW' &&
+            !(hasMitigatedScores && hasMitigationDescription);
+          
+          return risk.initialRiskTreatmentCategory ? (
+            <HStack spacing={2}>
+              <Badge
+                colorScheme={
+                  risk.initialRiskTreatmentCategory === 'MODIFY' ? 'blue' :
+                    risk.initialRiskTreatmentCategory === 'RETAIN' ? 'green' :
+                      risk.initialRiskTreatmentCategory === 'SHARE' ? 'purple' :
+                        'red'
+                }
+                fontSize="sm"
+                px={3}
+                py={1}
+                minW="80px"
             >
               {risk.initialRiskTreatmentCategory}
             </Badge>
+            {hasNonConformance && (
+              <Tooltip label="Policy Non-Conformance: MODIFY risk without complete Additional Controls Assessment">
+                <Badge colorScheme="red" fontSize="xs" cursor="help">
+                  !
+                </Badge>
+              </Tooltip>
+            )}
+          </HStack>
           ) : (
             <Text fontSize="xs" color="gray.400" fontStyle="italic">N/A</Text>
-          ),
+          );
+        },
       });
     }
 
@@ -1025,6 +1103,15 @@ export function RisksPage() {
       ],
     },
     {
+      key: 'policyNonConformance',
+      type: 'select',
+      placeholder: 'Policy Non-Conformance',
+      options: [
+        { value: 'true', label: 'Has Non-Conformance' },
+        { value: 'false', label: 'No Non-Conformance' },
+      ],
+    },
+    {
       key: 'status',
       type: 'select',
       placeholder: 'Status',
@@ -1161,6 +1248,8 @@ export function RisksPage() {
       if (filters.treatmentCategory) params.append('treatmentCategory', filters.treatmentCategory);
       if (filters.mitigationImplemented !== '')
         params.append('mitigationImplemented', filters.mitigationImplemented === 'true' ? 'true' : 'false');
+      if (filters.policyNonConformance !== '')
+        params.append('policyNonConformance', filters.policyNonConformance === 'true' ? 'true' : 'false');
       if (filters.riskLevel) params.append('riskLevel', filters.riskLevel);
       if (filters.search) params.append('search', filters.search);
       if (filters.dateAddedFrom) params.append('dateAddedFrom', filters.dateAddedFrom);
@@ -1610,6 +1699,7 @@ export function RisksPage() {
         viewMode={viewMode}
         onDuplicate={handleDuplicate}
         onDelete={handleDelete}
+        onEdit={() => setViewMode(false)}
       />
 
       {/* Delete Confirmation Dialog */}

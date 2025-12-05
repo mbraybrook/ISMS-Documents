@@ -23,6 +23,8 @@ import {
   Link as ChakraLink,
   Divider,
   Button,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
@@ -57,6 +59,12 @@ interface DashboardData {
       mitigatedScore: number | null;
     }>;
     byTreatmentCategory: Record<string, number>;
+    policyNonConformanceCount: number;
+    withPolicyNonConformance: Array<{
+      id: string;
+      title: string;
+      initialRiskTreatmentCategory: string | null;
+    }>;
   };
   controls: {
     totalCount: number;
@@ -169,191 +177,6 @@ export function HomePage() {
         </Button>
       </HStack>
 
-      {/* Summary Cards */}
-      <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
-        <Tooltip label="Click to view overdue documents" placement="top">
-          <Stat
-            p={4}
-            bg={dashboardData.documents.overdue.length > 0 ? 'red.50' : 'white'}
-            borderLeft={dashboardData.documents.overdue.length > 0 ? '4px solid' : 'none'}
-            borderColor="red.500"
-            borderRadius="md"
-            boxShadow="sm"
-            cursor="pointer"
-            _hover={{
-              bg: dashboardData.documents.overdue.length > 0 ? 'red.100' : 'gray.50',
-              transform: 'translateY(-2px)',
-              boxShadow: 'md',
-            }}
-            transition="all 0.2s"
-            onClick={() => navigate('/admin/documents/reviews')}
-          >
-            <HStack spacing={2} mb={2}>
-              <WarningIcon
-                color={dashboardData.documents.overdue.length > 0 ? 'red.500' : 'gray.400'}
-              />
-              <StatLabel
-                color={
-                  dashboardData.documents.overdue.length > 0 ? 'red.700' : 'gray.600'
-                }
-              >
-                Overdue Documents
-              </StatLabel>
-            </HStack>
-            <StatNumber
-              color={dashboardData.documents.overdue.length > 0 ? 'red.600' : 'gray.500'}
-            >
-              {dashboardData.documents.overdue.length}
-            </StatNumber>
-          </Stat>
-        </Tooltip>
-
-        <Tooltip label="Risks with HIGH severity" placement="top">
-          <Stat
-            p={4}
-            bg={dashboardData.risks.byLevel.HIGH > 0 ? 'red.50' : 'white'}
-            borderLeft={dashboardData.risks.byLevel.HIGH > 0 ? '4px solid' : 'none'}
-            borderColor="red.500"
-            borderRadius="md"
-            boxShadow="sm"
-            cursor="pointer"
-            _hover={{
-              bg: dashboardData.risks.byLevel.HIGH > 0 ? 'red.100' : 'gray.50',
-              transform: 'translateY(-2px)',
-              boxShadow: 'md',
-            }}
-            transition="all 0.2s"
-            onClick={() => navigate('/admin/risks/risks')}
-          >
-            <HStack spacing={2} mb={2}>
-              <WarningIcon
-                color={dashboardData.risks.byLevel.HIGH > 0 ? 'red.500' : 'gray.400'}
-              />
-              <StatLabel
-                color={dashboardData.risks.byLevel.HIGH > 0 ? 'red.700' : 'gray.600'}
-              >
-                High Risks
-              </StatLabel>
-            </HStack>
-            <StatNumber
-              color={dashboardData.risks.byLevel.HIGH > 0 ? 'red.600' : 'gray.500'}
-            >
-              {dashboardData.risks.byLevel.HIGH}
-            </StatNumber>
-          </Stat>
-        </Tooltip>
-
-        <Tooltip label="Pending document acknowledgments" placement="top">
-          <Stat
-            p={4}
-            bg={dashboardData.acknowledgments.pending.length > 0 ? 'yellow.50' : 'white'}
-            borderLeft={
-              dashboardData.acknowledgments.pending.length > 0 ? '4px solid' : 'none'
-            }
-            borderColor="yellow.500"
-            borderRadius="md"
-            boxShadow="sm"
-            cursor="pointer"
-            _hover={{
-              bg:
-                dashboardData.acknowledgments.pending.length > 0
-                  ? 'yellow.100'
-                  : 'gray.50',
-              transform: 'translateY(-2px)',
-              boxShadow: 'md',
-            }}
-            transition="all 0.2s"
-            onClick={() => navigate('/admin/documents/acknowledgments')}
-          >
-            <HStack spacing={2} mb={2}>
-              <InfoIcon
-                color={
-                  dashboardData.acknowledgments.pending.length > 0
-                    ? 'yellow.600'
-                    : 'gray.400'
-                }
-              />
-              <StatLabel
-                color={
-                  dashboardData.acknowledgments.pending.length > 0
-                    ? 'yellow.700'
-                    : 'gray.600'
-                }
-              >
-                Pending Acknowledgments
-              </StatLabel>
-            </HStack>
-            <StatNumber
-              color={
-                dashboardData.acknowledgments.pending.length > 0
-                  ? 'yellow.600'
-                  : 'gray.500'
-              }
-            >
-              {dashboardData.acknowledgments.pending.length}
-            </StatNumber>
-          </Stat>
-        </Tooltip>
-
-        <Tooltip label="Controls selected but not implemented" placement="top">
-          <Stat
-            p={4}
-            bg={
-              dashboardData.controls.selectedButNotImplementedCount > 0
-                ? 'orange.50'
-                : 'white'
-            }
-            borderLeft={
-              dashboardData.controls.selectedButNotImplementedCount > 0
-                ? '4px solid'
-                : 'none'
-            }
-            borderColor="orange.500"
-            borderRadius="md"
-            boxShadow="sm"
-            cursor="pointer"
-            _hover={{
-              bg:
-                dashboardData.controls.selectedButNotImplementedCount > 0
-                  ? 'orange.100'
-                  : 'gray.50',
-              transform: 'translateY(-2px)',
-              boxShadow: 'md',
-            }}
-            transition="all 0.2s"
-            onClick={() => navigate('/admin/risks/controls')}
-          >
-            <HStack spacing={2} mb={2}>
-              <InfoIcon
-                color={
-                  dashboardData.controls.selectedButNotImplementedCount > 0
-                    ? 'orange.500'
-                    : 'gray.400'
-                }
-              />
-              <StatLabel
-                color={
-                  dashboardData.controls.selectedButNotImplementedCount > 0
-                    ? 'orange.700'
-                    : 'gray.600'
-                }
-              >
-                Controls Not Implemented
-              </StatLabel>
-            </HStack>
-            <StatNumber
-              color={
-                dashboardData.controls.selectedButNotImplementedCount > 0
-                  ? 'orange.600'
-                  : 'gray.500'
-              }
-            >
-              {dashboardData.controls.selectedButNotImplementedCount}
-            </StatNumber>
-          </Stat>
-        </Tooltip>
-      </SimpleGrid>
-
       {/* Risk Statistics Section */}
       <Box p={6} bg="white" borderRadius="md" boxShadow="sm">
         <Heading size="md" mb={4}>Risk Statistics</Heading>
@@ -463,61 +286,64 @@ export function HomePage() {
             {dashboardData.risks.withMitigationNotImplemented.length > 0 && (
               <>
                 <Divider />
-                <Box>
-                  <HStack justify="space-between" mb={3}>
-                    <Heading size="sm">
-                      Risks with Mitigations Identified but Not Implemented
-                    </Heading>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      rightIcon={<ArrowForwardIcon />}
-                      onClick={() => navigate('/admin/risks/risks')}
-                    >
-                      View All Risks
-                    </Button>
-                  </HStack>
-                  <Box overflowX="auto">
-                    <Table variant="simple" size="sm">
-                      <Thead>
-                        <Tr>
-                          <Th>Title</Th>
-                          <Th>Total Score</Th>
-                          <Th>Mitigated Score</Th>
-                          <Th>Level</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {dashboardData.risks.withMitigationNotImplemented.map(
-                          (risk) => {
-                            const level = getRiskLevel(risk.calculatedScore);
-                            return (
-                              <Tr
-                                key={risk.id}
-                                _hover={{ bg: 'gray.50' }}
-                                cursor="pointer"
-                                onClick={() => navigate('/admin/risks/risks')}
-                              >
-                                <Td>{risk.title}</Td>
-                                <Td>{risk.calculatedScore}</Td>
-                                <Td>
-                                  {risk.mitigatedScore !== null
-                                    ? risk.mitigatedScore
-                                    : '—'}
-                                </Td>
-                                <Td>
-                                  <Badge colorScheme={getRiskLevelColor(level)}>
-                                    {level}
-                                  </Badge>
-                                </Td>
-                              </Tr>
-                            );
-                          }
-                        )}
-                      </Tbody>
-                    </Table>
-                  </Box>
-                </Box>
+                <Tooltip label="Click to view risks with mitigations not implemented" placement="top">
+                  <Stat
+                    p={4}
+                    bg="orange.50"
+                    borderLeft="4px solid"
+                    borderColor="orange.500"
+                    borderRadius="md"
+                    boxShadow="sm"
+                    cursor="pointer"
+                    _hover={{
+                      bg: 'orange.100',
+                      transform: 'translateY(-2px)',
+                      boxShadow: 'md',
+                    }}
+                    transition="all 0.2s"
+                    onClick={() => navigate('/admin/risks/risks?mitigationImplemented=false')}
+                  >
+                    <StatLabel color="orange.700">Risks with Mitigations Identified but Not Implemented</StatLabel>
+                    <StatNumber color="orange.600">
+                      {dashboardData.risks.withMitigationNotImplemented.length}
+                    </StatNumber>
+                    <StatHelpText>
+                      Click to view all risks with mitigations not implemented
+                    </StatHelpText>
+                  </Stat>
+                </Tooltip>
+              </>
+            )}
+
+            {dashboardData.risks.policyNonConformanceCount > 0 && (
+              <>
+                <Divider />
+                <Tooltip label="Click to view risks with policy non-conformance" placement="top">
+                  <Stat
+                    p={4}
+                    bg="red.50"
+                    borderLeft="4px solid"
+                    borderColor="red.500"
+                    borderRadius="md"
+                    boxShadow="sm"
+                    cursor="pointer"
+                    _hover={{
+                      bg: 'red.100',
+                      transform: 'translateY(-2px)',
+                      boxShadow: 'md',
+                    }}
+                    transition="all 0.2s"
+                    onClick={() => navigate('/admin/risks/risks?policyNonConformance=true')}
+                  >
+                    <StatLabel color="red.700">Risks with Policy Non-Conformance</StatLabel>
+                    <StatNumber color="red.600">
+                      {dashboardData.risks.policyNonConformanceCount}
+                    </StatNumber>
+                    <StatHelpText>
+                      Risks with MODIFY treatment category missing complete Additional Controls Assessment
+                    </StatHelpText>
+                  </Stat>
+                </Tooltip>
               </>
             )}
           </VStack>
@@ -607,48 +433,32 @@ export function HomePage() {
             {dashboardData.controls.selectedButNotImplemented.length > 0 && (
               <>
                 <Divider />
-                <Box>
-                  <HStack justify="space-between" mb={3}>
-                    <Heading size="sm">
-                      Selected Controls Not Implemented
-                    </Heading>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      rightIcon={<ArrowForwardIcon />}
-                      onClick={() => navigate('/admin/risks/controls')}
-                    >
-                      View All Controls
-                    </Button>
-                  </HStack>
-                  <Box overflowX="auto">
-                    <Table variant="simple" size="sm">
-                      <Thead>
-                        <Tr>
-                          <Th>Code</Th>
-                          <Th>Title</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {dashboardData.controls.selectedButNotImplemented.map(
-                          (control) => (
-                            <Tr
-                              key={control.id}
-                              _hover={{ bg: 'gray.50' }}
-                              cursor="pointer"
-                              onClick={() => navigate('/admin/risks/controls')}
-                            >
-                              <Td>
-                                <Badge colorScheme="blue">{control.code}</Badge>
-                              </Td>
-                              <Td>{control.title}</Td>
-                            </Tr>
-                          )
-                        )}
-                      </Tbody>
-                    </Table>
-                  </Box>
-                </Box>
+                <Tooltip label="Click to view controls selected but not implemented" placement="top">
+                  <Stat
+                    p={4}
+                    bg="orange.50"
+                    borderLeft="4px solid"
+                    borderColor="orange.500"
+                    borderRadius="md"
+                    boxShadow="sm"
+                    cursor="pointer"
+                    _hover={{
+                      bg: 'orange.100',
+                      transform: 'translateY(-2px)',
+                      boxShadow: 'md',
+                    }}
+                    transition="all 0.2s"
+                    onClick={() => navigate('/admin/risks/controls')}
+                  >
+                    <StatLabel color="orange.700">Selected Controls Not Implemented</StatLabel>
+                    <StatNumber color="orange.600">
+                      {dashboardData.controls.selectedButNotImplementedCount}
+                    </StatNumber>
+                    <StatHelpText>
+                      Click to view all controls selected but not implemented
+                    </StatHelpText>
+                  </Stat>
+                </Tooltip>
               </>
             )}
           </VStack>
@@ -700,28 +510,6 @@ export function HomePage() {
         </Box>
       </Box>
 
-      {/* Acknowledgment Section */}
-      {dashboardData.acknowledgments.pending.length > 0 && (
-        <Box p={6} bg="white" borderRadius="md" boxShadow="sm">
-          <Heading size="md" mb={4}>Pending Acknowledgments</Heading>
-          <Box>
-            <VStack spacing={4} align="stretch">
-              <Text>
-                You have {dashboardData.acknowledgments.pending.length} document(s)
-                requiring acknowledgment.
-              </Text>
-              <Button
-                colorScheme="blue"
-                variant="outline"
-                rightIcon={<ArrowForwardIcon />}
-                onClick={() => navigate('/admin/documents/acknowledgments')}
-              >
-                View Pending Acknowledgments
-              </Button>
-            </VStack>
-          </Box>
-        </Box>
-      )}
     </VStack>
   );
 }

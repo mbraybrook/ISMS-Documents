@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { randomUUID } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { parseISO27002Controls } from './parse-iso27002-controls';
 
@@ -32,7 +33,10 @@ async function seedISO27002Controls() {
     console.log('🌱 Starting ISO 27002 controls seed...');
     
     // Parse controls from markdown file
-    const markdownPath = path.join(__dirname, '../../docs/ISO_IEC_27002_2022(en).md');
+    // Try Docker path first (/docs), then fall back to relative path for local development
+    const dockerPath = '/docs/ISO_IEC_27002_2022(en).md';
+    const localPath = path.join(__dirname, '../../docs/ISO_IEC_27002_2022(en).md');
+    const markdownPath = fs.existsSync(dockerPath) ? dockerPath : localPath;
     console.log(`📖 Parsing ISO 27002 document: ${markdownPath}`);
     
     const controls = parseISO27002Controls(markdownPath);
@@ -66,6 +70,7 @@ async function seedISO27002Controls() {
                 otherInformation: control.otherInformation,
                 category: control.category,
                 isStandardControl: true,
+                updatedAt: new Date(),
               },
             });
             updated++;
@@ -79,6 +84,7 @@ async function seedISO27002Controls() {
           // Create new control
           await prisma.control.create({
             data: {
+              id: randomUUID(),
               code: control.code,
               title: control.title,
               description: control.controlText.substring(0, 500), // Use control text as description
@@ -92,6 +98,7 @@ async function seedISO27002Controls() {
               selectedForContractualObligation: false,
               selectedForLegalRequirement: false,
               selectedForBusinessRequirement: false,
+              updatedAt: new Date(),
             },
           });
           created++;

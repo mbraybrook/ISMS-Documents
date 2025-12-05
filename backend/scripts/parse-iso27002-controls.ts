@@ -50,8 +50,9 @@ export function parseISO27002Controls(filePath: string): ParsedControl[] {
     // Skip if not in a control section
     if (!currentSection) continue;
     
-    // Detect control heading (#### Title) - must be followed by a table
-    const controlHeadingMatch = line.match(/^####\s+(.+)$/);
+    // Detect control heading (#### Title or 1.  #### Title) - must be followed by a table
+    // Handle both formats: "#### Title" and "1.  #### Title"
+    const controlHeadingMatch = line.match(/^(?:\s*\d+\.\s+)?####\s+(.+)$/);
     if (controlHeadingMatch) {
       // Check if next few lines contain a table (indicates this is a control heading)
       const nextLines = lines.slice(i + 1, Math.min(i + 5, lines.length));

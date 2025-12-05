@@ -192,3 +192,51 @@ export function validateStatusTransition(
   return false;
 }
 
+/**
+ * Check if a risk has policy non-conformance
+ * A risk has policy non-conformance if:
+ * - initialRiskTreatmentCategory === 'MODIFY'
+ * - AND initial risk score is not LOW (MEDIUM or HIGH)
+ * - AND Additional Controls Assessment is incomplete (missing mitigated scores OR missing mitigation description)
+ * 
+ * Additional Controls Assessment is considered complete when:
+ * - At least one mitigated score is set (MC, MI, MA, ML, or MR)
+ * - AND mitigationDescription is filled in
+ * 
+ * Note: LOW risk scores are exempt from non-conformance even if MODIFY, as the risk may have been incorrectly categorized.
+ */
+export function hasPolicyNonConformance(risk: {
+  initialRiskTreatmentCategory: string | null;
+  calculatedScore: number;
+  mitigatedConfidentialityScore: number | null;
+  mitigatedIntegrityScore: number | null;
+  mitigatedAvailabilityScore: number | null;
+  mitigatedLikelihood: number | null;
+  mitigatedScore: number | null;
+  mitigationDescription: string | null;
+}): boolean {
+  // Only MODIFY risks can have policy non-conformance
+  if (risk.initialRiskTreatmentCategory !== 'MODIFY') {
+    return false;
+  }
+
+  // Exempt LOW risk scores from non-conformance (even if MODIFY, may be incorrectly categorized)
+  const initialRiskLevel = getRiskLevel(risk.calculatedScore);
+  if (initialRiskLevel === 'LOW') {
+    return false;
+  }
+
+  // Check if Additional Controls Assessment is incomplete
+  const hasMitigatedScores =
+    risk.mitigatedConfidentialityScore !== null ||
+    risk.mitigatedIntegrityScore !== null ||
+    risk.mitigatedAvailabilityScore !== null ||
+    risk.mitigatedLikelihood !== null ||
+    risk.mitigatedScore !== null;
+
+  const hasMitigationDescription = risk.mitigationDescription && risk.mitigationDescription.trim().length > 0;
+
+  // Non-conformance if MODIFY (with MEDIUM/HIGH score) but Additional Controls are incomplete
+  return !(hasMitigatedScores && hasMitigationDescription);
+}
+
