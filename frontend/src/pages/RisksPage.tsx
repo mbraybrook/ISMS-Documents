@@ -1702,6 +1702,7 @@ export function RisksPage() {
                   search: '',
                   dateAddedFrom: '',
                   dateAddedTo: '',
+                  assetCategoryId: '',
                   status: '',
                   department: '',
                   sortBy: 'calculatedScore',
