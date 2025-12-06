@@ -954,8 +954,9 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       if (payload.nextReviewDate === '') payload.nextReviewDate = undefined;
       if (payload.ownerUserId === '') payload.ownerUserId = undefined;
       if (payload.assetCategory === '') payload.assetCategory = undefined;
-      if (payload.assetId === '') payload.assetId = undefined;
-      if (payload.assetCategoryId === '') payload.assetCategoryId = undefined;
+      // Send null (not undefined) for assetId and assetCategoryId so backend can clear them
+      if (payload.assetId === '') payload.assetId = null;
+      if (payload.assetCategoryId === '') payload.assetCategoryId = null;
       // interestedPartyId is required, so don't remove it if it's set
       if (payload.threatDescription === '') payload.threatDescription = undefined;
       if (payload.initialRiskTreatmentCategory === '') payload.initialRiskTreatmentCategory = undefined;

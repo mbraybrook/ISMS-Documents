@@ -451,8 +451,14 @@ router.post(
     body('nextReviewDate').optional().isISO8601().toDate(),
     body('ownerUserId').optional().isUUID(),
     body('assetCategory').optional().isString(),
-    body('assetId').optional().isUUID(),
-    body('assetCategoryId').optional().isUUID(),
+    body('assetId').optional().custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    }).withMessage('assetId must be a valid UUID or null'),
+    body('assetCategoryId').optional().custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    }).withMessage('assetCategoryId must be a valid UUID or null'),
     body('interestedPartyId').optional().isUUID(),
     body('threatDescription').optional().isString(),
     body('confidentialityScore').optional().isInt({ min: 1, max: 5 }),
@@ -752,8 +758,14 @@ router.put(
     body('nextReviewDate').optional().isISO8601().toDate(),
     body('ownerUserId').optional().isUUID(),
     body('assetCategory').optional().isString(),
-    body('assetId').optional().isUUID(),
-    body('assetCategoryId').optional().isUUID(),
+    body('assetId').optional().custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    }).withMessage('assetId must be a valid UUID or null'),
+    body('assetCategoryId').optional().custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    }).withMessage('assetCategoryId must be a valid UUID or null'),
     body('interestedPartyId').optional().isUUID(),
     body('threatDescription').optional().isString(),
     body('confidentialityScore').optional().isInt({ min: 1, max: 5 }),
@@ -885,10 +897,10 @@ router.put(
       }
 
       // Handle assetId and assetCategoryId - set to null if explicitly cleared
-      if (updateData.assetId === '') {
+      if (updateData.assetId === '' || updateData.assetId === null) {
         updateData.assetId = null;
       }
-      if (updateData.assetCategoryId === '') {
+      if (updateData.assetCategoryId === '' || updateData.assetCategoryId === null) {
         updateData.assetCategoryId = null;
       }
 
