@@ -823,7 +823,7 @@ export function ReviewsPage() {
                                       title: item.document.title,
                                       version: item.document.version,
                                       type: item.document.type,
-                                      nextReviewDate: item.document.nextReviewDate,
+                                      nextReviewDate: item.document.nextReviewDate || null,
                                       owner: item.document.owner || {
                                         id: '',
                                         displayName: 'Unknown',

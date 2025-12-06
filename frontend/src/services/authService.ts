@@ -20,7 +20,7 @@ const msalConfig: Configuration = {
         }
         console.log(`[MSAL ${level}]`, message);
       },
-      logLevel: 'Info',
+      logLevel: 'Info' as any,
     },
   },
 };

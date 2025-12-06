@@ -70,7 +70,7 @@ export function TrustAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     trustApi.logout();
     setUser(null);
   };

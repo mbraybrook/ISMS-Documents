@@ -163,10 +163,10 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
 
       try {
         // Create supplier - convert isSaaS to serviceSubType for backend compatibility
+        const { isSaaS, ...supplierData } = step1Data;
         const supplier = await supplierApi.createSupplier({
-          ...step1Data,
-          serviceSubType: step1Data.isSaaS ? 'SAAS' : null, // Convert checkbox to enum value
-          isSaaS: undefined, // Don't send isSaaS to backend
+          ...supplierData,
+          serviceSubType: isSaaS ? 'SAAS' : null, // Convert checkbox to enum value
           status: 'IN_ONBOARDING',
           lifecycleState: 'DRAFT',
         });

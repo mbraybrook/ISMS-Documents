@@ -211,7 +211,7 @@ export function TrustCenterAdminPage() {
           } else if (field === 'displayOrder' && (value === null || value === '')) {
             // Skip null/empty displayOrder
           } else {
-            normalizedData[field as keyof TrustDocSetting] = value;
+            (normalizedData as any)[field] = value;
           }
         }
       });

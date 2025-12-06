@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Heading,
@@ -68,6 +68,7 @@ export function AssetCategoriesPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useAlertDisclosure();
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<AssetCategory | null>(null);
   const [formData, setFormData] = useState({ name: '', description: '' });
@@ -434,7 +435,7 @@ export function AssetCategoriesPage() {
       </Modal>
 
       {/* Delete Confirmation */}
-      <AlertDialog isOpen={isDeleteOpen} onClose={onDeleteClose}>
+      <AlertDialog isOpen={isDeleteOpen} onClose={onDeleteClose} leastDestructiveRef={cancelRef}>
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
