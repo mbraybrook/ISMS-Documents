@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 /**
  * Database helpers for E2E tests
@@ -130,11 +131,13 @@ export async function createTestDocument(overrides?: any) {
 
   return await db.document.create({
     data: {
+      id: overrides?.id || randomUUID(),
       title: overrides?.title || 'Test Document',
       type: overrides?.type || 'POLICY',
       status: overrides?.status || 'APPROVED',
       version: overrides?.version || '1.0',
       ownerUserId: owner.id,
+      updatedAt: new Date(),
       ...overrides,
     },
   });
