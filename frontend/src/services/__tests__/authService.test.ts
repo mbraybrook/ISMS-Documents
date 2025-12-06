@@ -1,5 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { authService, msalInstance } from '../authService';
+
+// Mock config before importing authService (since it validates config at module load time)
+vi.mock('../config', () => ({
+  config: {
+    apiUrl: 'http://localhost:4000',
+    auth: {
+      tenantId: 'test-tenant-id',
+      clientId: 'test-client-id',
+      redirectUri: 'http://localhost:3000',
+    },
+  },
+}));
 
 // Mock MSAL
 vi.mock('@azure/msal-browser', () => {
@@ -30,6 +41,9 @@ vi.mock('@azure/msal-browser', () => {
     },
   };
 });
+
+// Import authService after mocks are set up
+import { authService, msalInstance } from '../authService';
 
 describe('authService', () => {
   beforeEach(() => {
