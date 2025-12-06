@@ -65,7 +65,7 @@ router.get(
             take: 10,
             orderBy: { date: 'desc' },
             include: {
-              classification: {
+              Classification: {
                 select: {
                   id: true,
                   name: true,

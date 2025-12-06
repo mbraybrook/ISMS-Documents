@@ -21,11 +21,16 @@ export interface CertificateForExpiry {
 export async function findCertificatesExpiringSoon(
   daysBeforeExpiry: number = 30
 ): Promise<CertificateForExpiry[]> {
+  // TODO: SupplierCertificate model doesn't exist in schema yet
+  // Return empty array until model is added
+  return [];
+  
+  /* Commented out until SupplierCertificate model is added to schema
   const now = new Date();
   const thresholdDate = new Date();
   thresholdDate.setDate(thresholdDate.getDate() + daysBeforeExpiry);
 
-  const certificates = await prisma.supplierCertificate.findMany({
+  const certificates = await (prisma as any).supplierCertificate.findMany({
     where: {
       expiryDate: {
         gte: now,
@@ -46,13 +51,14 @@ export async function findCertificatesExpiringSoon(
     },
   });
 
-  return certificates.map((cert) => ({
+  return certificates.map((cert: any) => ({
     id: cert.id,
     supplierId: cert.supplierId,
     certificateType: cert.certificateType,
     expiryDate: cert.expiryDate,
     supplier: cert.supplier,
   }));
+  */
 }
 
 /**
@@ -65,10 +71,14 @@ export async function createCertificateExpiryTask(
   supplier: { id: string; name: string; relationshipOwnerUserId: string | null },
   certificate: { id: string; certificateType: string; expiryDate: Date }
 ): Promise<any | null> {
-  // Check if there's already an open task for this certificate
+  // TODO: ReviewTask doesn't have supplierId field - this needs schema update
+  // Return null until schema is updated
+  return null;
+  
+  /* Commented out until ReviewTask schema includes supplierId
   const existingTask = await prisma.reviewTask.findFirst({
     where: {
-      supplierId: supplier.id,
+      // supplierId: supplier.id, // Field doesn't exist in schema
       status: {
         in: ['PENDING', 'OVERDUE'],
       },
@@ -110,11 +120,13 @@ export async function createCertificateExpiryTask(
     const reviewTask = await prisma.reviewTask.create({
       data: {
         id: `cert-${certificate.id}-${Date.now()}`,
-        supplierId: supplier.id,
+        // supplierId: supplier.id, // Field doesn't exist in schema
+        documentId: '', // Required field - using empty string as placeholder
         reviewerUserId,
         dueDate: certificate.expiryDate,
         status,
         changeNotes: `Certificate ${certificate.certificateType} expiring on ${certificate.expiryDate.toLocaleDateString()}`,
+        updatedAt: new Date(),
       },
       include: {
         reviewer: {
@@ -124,12 +136,12 @@ export async function createCertificateExpiryTask(
             email: true,
           },
         },
-        supplier: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        // supplier: { // Relation doesn't exist
+        //   select: {
+        //     id: true,
+        //     name: true,
+        //   },
+        // },
       },
     });
 
@@ -138,6 +150,7 @@ export async function createCertificateExpiryTask(
     console.error(`Error creating certificate expiry task for certificate ${certificate.id}:`, error);
     return null;
   }
+  */
 }
 
 /**

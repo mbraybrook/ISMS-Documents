@@ -148,23 +148,25 @@ router.post(
 
       // Generate JWT token
       // Validate JWT secret
-      const jwtSecret = config.trustCenter.jwtSecret;
-      if (!jwtSecret || typeof jwtSecret !== 'string' || jwtSecret.trim().length === 0) {
+      const jwtSecretValue = config.trustCenter.jwtSecret;
+      if (!jwtSecretValue || typeof jwtSecretValue !== 'string' || jwtSecretValue.trim().length === 0) {
         return res.status(500).json({ error: 'JWT secret not configured' });
       }
-      if (jwtSecret.length < 32) {
+      if (jwtSecretValue.length < 32) {
         return res.status(500).json({ error: 'JWT secret must be at least 32 characters long for security' });
       }
 
+      const jwtSecret = String(jwtSecretValue);
+      const jwtExpiry = String(config.trustCenter.jwtExpiry);
       const token = jwt.sign(
         {
           userId: user.id,
           email: user.email,
           tokenVersion: user.tokenVersion,
         },
-        config.trustCenter.jwtSecret as string,
+        jwtSecret,
         {
-          expiresIn: config.trustCenter.jwtExpiry as string,
+          expiresIn: jwtExpiry,
         }
       );
 
