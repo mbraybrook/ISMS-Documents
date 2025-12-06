@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import {
   Box,
@@ -912,7 +912,7 @@ export function LegislationPage() {
       </Modal>
 
       {/* Delete Confirmation */}
-      <AlertDialog isOpen={isDeleteOpen} onClose={onDeleteClose}>
+      <AlertDialog isOpen={isDeleteOpen} onClose={onDeleteClose} leastDestructiveRef={useRef<HTMLButtonElement>(null)}>
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">

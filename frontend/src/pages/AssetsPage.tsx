@@ -149,7 +149,7 @@ export function AssetsPage() {
       }
       
       // Extract unique owners for dropdown
-      const uniqueOwners = Array.from(new Set(response.data.data.map((a: Asset) => a.owner).filter(Boolean)));
+      const uniqueOwners = Array.from(new Set(response.data.data.map((a: Asset) => a.owner).filter(Boolean))) as string[];
       setOwners(uniqueOwners.sort());
     } catch (error) {
       console.error('Error fetching assets:', error);
@@ -532,7 +532,7 @@ export function AssetsPage() {
 
       const csvContent = [
         headers.join(','),
-        ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+        ...rows.map((row: any[]) => row.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
       ].join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1215,6 +1215,7 @@ export function AssetsPage() {
         isOpen={isBulkDeleteOpen}
         onClose={onBulkDeleteClose}
         closeOnOverlayClick={false}
+        leastDestructiveRef={bulkDeleteCancelRef}
       >
         <AlertDialogOverlay>
           <AlertDialogContent>

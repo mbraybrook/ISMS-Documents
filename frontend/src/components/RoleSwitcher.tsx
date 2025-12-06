@@ -44,11 +44,11 @@ export function RoleSwitcher() {
       }
     }
     // If switching away from STAFF and on a staff route, navigate to admin dashboard
-    else if (newRole !== 'STAFF' && newRole !== 'CONTRIBUTOR' && location.pathname.startsWith('/admin/staff')) {
+    else if (newRole !== 'STAFF' && (newRole as string) !== 'CONTRIBUTOR' && location.pathname.startsWith('/admin/staff')) {
       navigate('/admin', { replace: true });
     }
     // If switching away from CONTRIBUTOR and on department risks route, navigate to main risks page
-    else if (newRole !== 'CONTRIBUTOR' && location.pathname.startsWith('/admin/risks/department')) {
+    else if ((newRole as string) !== 'CONTRIBUTOR' && location.pathname.startsWith('/admin/risks/department')) {
       navigate('/admin/risks/risks', { replace: true });
     }
   }, [roleOverride, user, navigate, location.pathname, getEffectiveRole]);

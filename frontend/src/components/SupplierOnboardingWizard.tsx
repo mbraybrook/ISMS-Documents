@@ -186,7 +186,7 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
         // Create risk assessment (non-blocking - continue even if it fails)
         if (step2Data.riskRating) {
           try {
-            await supplierApi.createRiskAssessment(supplier.id, {
+            await (supplierApi as any).createRiskAssessment(supplier.id, {
               supplierType: step1Data.supplierType,
               riskRating: step2Data.riskRating,
               rationale: step2Data.rationale || null,
@@ -201,7 +201,7 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
         // Create criticality assessment (non-blocking - continue even if it fails)
         if (step3Data.criticality) {
           try {
-            await supplierApi.createCriticalityAssessment(supplier.id, {
+            await (supplierApi as any).createCriticalityAssessment(supplier.id, {
               criticality: step3Data.criticality,
               rationale: step3Data.rationale || null,
               status: 'DRAFT',

@@ -414,7 +414,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                           Linked Risks ({control.riskControls.length}):
                         </FormLabel>
                         <VStack align="stretch" spacing={2}>
-                          {control.riskControls.map((riskControl) => (
+                          {control.riskControls.map((riskControl: any) => (
                             <Box
                               key={riskControl.risk.id}
                               p={2}
@@ -541,7 +541,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                           Linked Risks ({control.riskControls.length}):
                         </FormLabel>
                         <VStack align="stretch" spacing={2}>
-                          {control.riskControls.map((riskControl) => (
+                          {control.riskControls.map((riskControl: any) => (
                             <Box
                               key={riskControl.risk.id}
                               p={2}

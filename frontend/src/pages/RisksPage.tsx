@@ -181,6 +181,8 @@ export function RisksPage() {
       dateAddedFrom: '',
       dateAddedTo: '',
       assetCategoryId: params.get('assetCategoryId') || '',
+      status: params.get('status') || '',
+      department: params.get('department') || '',
       sortBy: 'calculatedScore',
       sortOrder: 'desc' as 'asc' | 'desc',
       page: 1,
@@ -911,7 +913,7 @@ export function RisksPage() {
             risk.mitigatedAvailabilityScore !== null ||
             risk.mitigatedLikelihood !== null ||
             risk.mitigatedScore !== null;
-          const hasMitigationDescription = risk.mitigationDescription && risk.mitigationDescription.trim().length > 0;
+          const hasMitigationDescription = (risk as any).mitigationDescription && (risk as any).mitigationDescription.trim().length > 0;
           // Non-conformance only applies to MODIFY risks with MEDIUM or HIGH initial risk scores
           const hasNonConformance = 
             risk.initialRiskTreatmentCategory === 'MODIFY' && 
