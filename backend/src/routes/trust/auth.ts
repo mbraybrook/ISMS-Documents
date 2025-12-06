@@ -166,8 +166,8 @@ router.post(
         },
         jwtSecret,
         {
-          expiresIn: jwtExpiry,
-        }
+          expiresIn: jwtExpiry as string | number,
+        } as jwt.SignOptions
       );
 
       // Log successful login
