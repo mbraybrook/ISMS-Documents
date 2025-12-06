@@ -113,6 +113,8 @@ export function AssetsPage() {
   const { isOpen: isBulkDeleteOpen, onOpen: onBulkDeleteOpen, onClose: onBulkDeleteClose } = useAlertDisclosure();
   const { isOpen: isImportModalOpen, onOpen: onImportModalOpen, onClose: onImportModalClose } = useDisclosure();
   const { isOpen: isUnsavedDialogOpen, onOpen: onUnsavedDialogOpen, onClose: onUnsavedDialogClose } = useAlertDisclosure();
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const bulkDeleteCancelRef = useRef<HTMLButtonElement>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
   const [formData, setFormData] = useState<any>({});
@@ -1164,7 +1166,7 @@ export function AssetsPage() {
       </Modal>
 
       {/* Unsaved Changes Dialog */}
-      <AlertDialog isOpen={isUnsavedDialogOpen} onClose={onUnsavedDialogClose}>
+      <AlertDialog isOpen={isUnsavedDialogOpen} onClose={onUnsavedDialogClose} leastDestructiveRef={cancelRef}>
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
@@ -1184,7 +1186,7 @@ export function AssetsPage() {
       </AlertDialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog isOpen={isDeleteOpen} onClose={onDeleteClose}>
+      <AlertDialog isOpen={isDeleteOpen} onClose={onDeleteClose} leastDestructiveRef={cancelRef}>
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">

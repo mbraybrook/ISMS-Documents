@@ -166,8 +166,8 @@ export function SupplierDetailPage() {
       setFormData({
         name: data.name || '',
         tradingName: data.tradingName || '',
-        status: data.status,
-        supplierType: data.supplierType,
+        status: data.status as any,
+        supplierType: data.supplierType as any,
         serviceSubType: data.serviceSubType,
         serviceDescription: data.serviceDescription || '',
         processesCardholderData: data.processesCardholderData,

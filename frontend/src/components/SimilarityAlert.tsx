@@ -46,7 +46,7 @@ export function SimilarityAlert({
   };
 
   return (
-    <Alert status="warning" borderRadius="md" flexDirection="column" align="stretch">
+    <Alert status="warning" borderRadius="md" flexDirection="column">
       <HStack justify="space-between" w="100%">
         <HStack>
           <AlertIcon />

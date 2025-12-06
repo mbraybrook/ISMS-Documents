@@ -385,6 +385,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           existingControlsDescription: templateRisk.existingControlsDescription || '',
           residualRiskTreatmentCategory: templateRisk.residualRiskTreatmentCategory || '',
           department: templateRisk.department || null,
+          isSupplierRisk: templateRisk.isSupplierRisk || false,
         });
 
       // Load control associations if available
@@ -1112,7 +1113,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                         formData.mitigatedIntegrityScore !== null ||
                         formData.mitigatedAvailabilityScore !== null ||
                         formData.mitigatedLikelihood !== null ||
-                        formData.mitigatedScore !== null;
+                        formData.mitigatedRiskScore !== null;
                       const hasMitigationDescription = formData.mitigationDescription && formData.mitigationDescription.trim().length > 0;
                       const isComplete = hasMitigatedScores && hasMitigationDescription;
                       const currentRiskLevel = getRiskLevel(calculatedRiskScore);
@@ -2009,7 +2010,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                           formData.mitigatedIntegrityScore !== null ||
                           formData.mitigatedAvailabilityScore !== null ||
                           formData.mitigatedLikelihood !== null ||
-                          formData.mitigatedScore !== null;
+                          formData.mitigatedRiskScore !== null;
                         const hasMitigationDescription = formData.mitigationDescription && formData.mitigationDescription.trim().length > 0;
                         const isComplete = hasMitigatedScores && hasMitigationDescription;
                         const currentRiskLevel = getRiskLevel(calculatedRiskScore);

@@ -229,7 +229,7 @@ export interface Supplier {
       category: string | null;
     };
   }>;
-  certificates?: SupplierCertificate[];
+  // certificates?: SupplierCertificate[]; // TODO: SupplierCertificate type not yet defined
   exitPlan?: SupplierExitPlan | null;
   showInTrustCenter: boolean;
   trustCenterDisplayName: string | null;

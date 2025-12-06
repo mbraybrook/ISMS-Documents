@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, ReactElement } from 'react';
 import {
   Box,
   Heading,
@@ -53,7 +53,7 @@ export interface FilterConfig {
 }
 
 export interface ActionButton<T> {
-  icon: ReactNode;
+  icon: ReactElement | undefined;
   label: string;
   onClick: (row: T) => void;
   colorScheme?: string;
@@ -514,7 +514,7 @@ export function DataTable<T>({
                   <Tooltip key={idx} label={action.label}>
                     <IconButton
                       aria-label={action.label}
-                      icon={action.icon}
+                      icon={action.icon || undefined}
                       size="sm"
                       colorScheme={action.colorScheme || 'blue'}
                       variant="ghost"
