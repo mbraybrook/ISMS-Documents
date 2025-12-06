@@ -4,6 +4,7 @@ import { config } from '../config';
 import { PDFDocument } from 'pdf-lib';
 
 // Type definition for libreoffice-convert (if types package doesn't exist)
+// @ts-expect-error - libreoffice-convert may not have types
 declare module 'libreoffice-convert' {
   export function convert(
     buffer: Buffer,
@@ -107,7 +108,7 @@ async function removeHyperlinksFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
     // Remove link annotations from each page
     for (let i = 0; i < pages.length; i++) {
       const page = pages[i];
-      const pageDict = page.node.dict;
+      const pageDict = (page.node as any).dict;
       
       // Get annotations array reference
       // pdf-lib uses PDFName objects as keys - need to use the PDFName object directly
@@ -116,7 +117,7 @@ async function removeHyperlinksFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
       let annotsKey: any = null; // Store the PDFName key for later updates
       
       for (const key of pageKeys) {
-        const keyName = (key as any).encodedName || (key as any).name || key.toString();
+        const keyName = (key as any).encodedName || (key as any).name || String(key);
         if (keyName === '/Annots' || keyName === 'Annots') {
           annotsKey = key; // Store the PDFName key
           annotsRef = pageDict.get(key);
@@ -157,7 +158,7 @@ async function removeHyperlinksFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
         try {
           // Lookup is synchronous, not async
           const annot = pdfDoc.context.lookup(annotRef);
-          const annotDict = annot?.dict;
+          const annotDict = (annot as any)?.dict;
           if (!annotDict) {
             filteredAnnots.push(annotRef);
             continue;
@@ -169,7 +170,7 @@ async function removeHyperlinksFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
           
           // Find Subtype key and get its value
           for (const key of annotKeys) {
-            const keyName = (key as any).encodedName || (key as any).name || key.toString();
+            const keyName = (key as any).encodedName || (key as any).name || String(key);
             if (keyName === '/Subtype' || keyName === 'Subtype') {
               const subtype = annotDict.get(key);
               if (subtype) {
@@ -185,17 +186,17 @@ async function removeHyperlinksFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
           // Also check for A (Action) dictionary which contains URI actions
           if (!isLinkAnnotation) {
             for (const key of annotKeys) {
-              const keyName = (key as any).encodedName || (key as any).name || key.toString();
+              const keyName = (key as any).encodedName || (key as any).name || String(key);
               if (keyName === '/A' || keyName === 'A') {
                 try {
                   const actionRef = annotDict.get(key);
                   if (actionRef) {
                     const actionDict = pdfDoc.context.lookup(actionRef);
-                    const actionDictObj = actionDict?.dict;
+                    const actionDictObj = (actionDict as any)?.dict;
                     if (actionDictObj) {
                       const actionKeys = Array.from(actionDictObj.keys());
                       for (const actionKey of actionKeys) {
-                        const actionKeyName = (actionKey as any).encodedName || (actionKey as any).name || actionKey.toString();
+                        const actionKeyName = (actionKey as any).encodedName || (actionKey as any).name || String(actionKey);
                         if (actionKeyName === '/S' || actionKeyName === 'S') {
                           const actionType = actionDictObj.get(actionKey);
                           const actionTypeName = ((actionType as any)?.encodedName || (actionType as any)?.name || actionType?.toString())?.replace(/^\//, '');

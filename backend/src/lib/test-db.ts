@@ -94,10 +94,12 @@ export async function seedTestDatabase(): Promise<void> {
     where: { email: 'admin@paythru.com' },
     update: {},
     create: {
+      id: 'test-admin-id',
       email: 'admin@paythru.com',
       displayName: 'Test Admin',
       entraObjectId: 'test-admin-oid',
       role: 'ADMIN',
+      updatedAt: new Date(),
     },
   });
   
@@ -105,10 +107,12 @@ export async function seedTestDatabase(): Promise<void> {
     where: { email: 'editor@paythru.com' },
     update: {},
     create: {
+      id: 'test-editor-id',
       email: 'editor@paythru.com',
       displayName: 'Test Editor',
       entraObjectId: 'test-editor-oid',
       role: 'EDITOR',
+      updatedAt: new Date(),
     },
   });
   
@@ -116,10 +120,12 @@ export async function seedTestDatabase(): Promise<void> {
     where: { email: 'staff@paythru.com' },
     update: {},
     create: {
+      id: 'test-staff-id',
       email: 'staff@paythru.com',
       displayName: 'Test Staff',
       entraObjectId: 'test-staff-oid',
       role: 'STAFF',
+      updatedAt: new Date(),
     },
   });
   

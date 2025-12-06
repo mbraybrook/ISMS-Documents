@@ -478,7 +478,7 @@ export async function downloadSharePointFile(
       try {
         const response = await client
           .api(`/sites/${siteId}/drives/${driveId}/items/${itemId}/content`)
-          .responseType('arraybuffer')
+          .responseType('arraybuffer' as any)
           .get();
 
         const buffer = Buffer.from(response);

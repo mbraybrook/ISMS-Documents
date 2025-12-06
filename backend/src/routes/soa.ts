@@ -50,7 +50,8 @@ router.post(
         // Generate Excel file
         console.log('[SOA] Generating Excel file...');
         const excelBuffer = await generateSoAExcel(soaData);
-        const bufferSize = Buffer.isBuffer(excelBuffer) ? excelBuffer.byteLength : (excelBuffer as any).length || 0;
+        const buffer = Buffer.isBuffer(excelBuffer) ? excelBuffer : Buffer.from(excelBuffer as any);
+        const bufferSize = buffer.length;
         console.log(`[SOA] Excel buffer generated, size: ${bufferSize} bytes`);
 
         // Ensure buffer is a proper Buffer instance

@@ -693,7 +693,7 @@ router.post(
     try {
       const { userId } = req.params;
       // Get internal user from database to get the ID
-      const internalUser = req.user?.email ? await prisma.user.findUnique({
+      const internalUserApproval = req.user?.email ? await prisma.user.findUnique({
         where: { email: req.user.email },
         select: { id: true },
       }) : null;
@@ -714,7 +714,7 @@ router.post(
       // Log approval
       await logTrustAction(
         'USER_APPROVED',
-        internalUser?.id,
+        internalUserApproval?.id,
         undefined,
         userId,
         undefined,
@@ -747,7 +747,7 @@ router.post(
       const { userId } = req.params;
       const { reason } = req.body;
       // Get internal user from database to get the ID
-      const internalUser = req.user?.email ? await prisma.user.findUnique({
+      const internalUserDenial = req.user?.email ? await prisma.user.findUnique({
         where: { email: req.user.email },
         select: { id: true },
       }) : null;
@@ -774,7 +774,7 @@ router.post(
       // Log denial
       await logTrustAction(
         'USER_DENIED',
-        internalUser?.id,
+        internalUserDenial?.id,
         undefined,
         userId,
         undefined,
@@ -886,7 +886,11 @@ router.put(
         requiresNda,
         maxFileSizeMB,
       } = req.body;
-      const internalUser = req.user;
+      // Get internal user from database to get the ID
+      const internalUserForLog = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
 
       // Check if document exists
       const document = await prisma.document.findUnique({
@@ -975,17 +979,11 @@ router.put(
         });
       }
 
-      // Get internal user from database to get the ID
-      const internalUser = req.user?.email ? await prisma.user.findUnique({
-        where: { email: req.user.email },
-        select: { id: true },
-      }) : null;
-
       // Log action
       const action = existingSetting ? 'DOC_SETTINGS_UPDATED' : 'DOC_SETTINGS_CREATED';
       await logTrustAction(
         action,
-        internalUser?.id,
+        internalUserForLog?.id,
         undefined,
         undefined,
         docId,
@@ -1015,7 +1013,7 @@ router.delete(
     try {
       const { docId } = req.params;
       // Get internal user from database to get the ID
-      const internalUser = req.user?.email ? await prisma.user.findUnique({
+      const internalUserDelete = req.user?.email ? await prisma.user.findUnique({
         where: { email: req.user.email },
         select: { id: true },
       }) : null;
@@ -1042,7 +1040,7 @@ router.delete(
         // Log deletion
         await logTrustAction(
           'DOCUMENT_REMOVED_FROM_TRUST_CENTER',
-          internalUser?.id,
+          internalUserDelete?.id,
           undefined,
           undefined,
           docId,
@@ -1147,7 +1145,7 @@ router.put(
     try {
       const { watermarkPrefix } = req.body;
       // Get internal user from database to get the ID
-      const internalUser = req.user?.email ? await prisma.user.findUnique({
+      const internalUserSettings = req.user?.email ? await prisma.user.findUnique({
         where: { email: req.user.email },
         select: { id: true },
       }) : null;
@@ -1178,7 +1176,7 @@ router.put(
       // Log action
       await logTrustAction(
         'TRUST_SETTINGS_UPDATED',
-        internalUser?.id,
+        internalUserSettings?.id,
         undefined,
         undefined,
         undefined,

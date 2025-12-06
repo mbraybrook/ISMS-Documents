@@ -149,7 +149,7 @@ export async function findRelevantRisksForSupplier(
         title: risk.title,
         threatDescription: risk.threatDescription,
         description: risk.description,
-        embedding: risk.embedding,
+        embedding: Array.isArray(risk.embedding) ? risk.embedding as number[] : null,
       }))
     );
 

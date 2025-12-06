@@ -4,7 +4,12 @@ import sanitizeHtml from 'sanitize-html';
  * Configuration for HTML sanitization
  * Allows safe HTML tags and attributes while removing potentially dangerous content
  */
-const sanitizeOptions: sanitizeHtml.IOptions = {
+const sanitizeOptions: {
+  allowedTags?: string[];
+  allowedAttributes?: Record<string, string[]>;
+  allowedSchemes?: string[];
+  disallowedTagsMode?: 'discard' | 'escape';
+} = {
   allowedTags: [
     'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a',

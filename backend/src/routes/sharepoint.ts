@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { query, param, validationResult } from 'express-validator';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
+import { prisma } from '../lib/prisma';
 import {
   getSharePointItem,
   listSharePointItems,
