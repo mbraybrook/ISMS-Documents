@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
+import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -80,8 +81,10 @@ router.post(
     try {
       const classification = await prisma.classification.create({
         data: {
+          id: randomUUID(),
           name: req.body.name,
           description: req.body.description,
+          updatedAt: new Date(),
         },
       });
 

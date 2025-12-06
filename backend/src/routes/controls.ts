@@ -92,7 +92,7 @@ router.get(
       
       // Add implemented filter if provided
       if (implemented !== undefined) {
-        const implementedBool = implemented === 'true' || implemented === true;
+        const implementedBool = implemented === 'true' || (typeof implemented === 'boolean' && implemented === true);
         // If we already have OR or AND, we need to wrap everything
         if (where.OR || where.AND) {
           const existingCondition = where.OR ? { OR: where.OR } : { AND: where.AND };

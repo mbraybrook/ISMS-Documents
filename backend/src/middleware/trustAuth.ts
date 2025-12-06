@@ -40,6 +40,7 @@ export interface TrustAuthRequest extends Request {
     companyName: string;
     isApproved: boolean;
     tokenVersion: number;
+    termsAcceptedAt: Date | null;
   };
 }
 
@@ -89,6 +90,7 @@ export const authenticateTrustToken = async (
         companyName: true,
         isApproved: true,
         tokenVersion: true,
+        termsAcceptedAt: true,
       },
     });
 

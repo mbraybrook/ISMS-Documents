@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -83,11 +84,11 @@ router.post(
         data: {
           id: randomUUID(),
           supplierId: req.params.id,
-          impactAssessment: null,
-          dataAndIpr: null,
-          replacementServiceAnalysis: null,
-          contractClosure: null,
-          lessonsLearned: null,
+          impactAssessment: Prisma.JsonNull,
+          dataAndIpr: Prisma.JsonNull,
+          replacementServiceAnalysis: Prisma.JsonNull,
+          contractClosure: Prisma.JsonNull,
+          lessonsLearned: Prisma.JsonNull,
         },
       });
 

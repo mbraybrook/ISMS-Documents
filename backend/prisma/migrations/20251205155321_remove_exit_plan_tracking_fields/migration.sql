@@ -27,3 +27,4 @@ DROP COLUMN "targetEndDate",
 DROP COLUMN "completedAt",
 DROP COLUMN "status";
 
+

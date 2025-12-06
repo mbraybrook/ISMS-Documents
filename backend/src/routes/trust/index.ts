@@ -692,7 +692,11 @@ router.post(
   async (req: AuthRequest, res: Response) => {
     try {
       const { userId } = req.params;
-      const internalUser = req.user;
+      // Get internal user from database to get the ID
+      const internalUser = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
 
       const user = await prisma.externalUser.update({
         where: { id: userId },
@@ -742,7 +746,11 @@ router.post(
     try {
       const { userId } = req.params;
       const { reason } = req.body;
-      const internalUser = req.user;
+      // Get internal user from database to get the ID
+      const internalUser = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
 
       // Get user info before deletion
       const user = await prisma.externalUser.findUnique({
@@ -967,6 +975,12 @@ router.put(
         });
       }
 
+      // Get internal user from database to get the ID
+      const internalUser = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
+
       // Log action
       const action = existingSetting ? 'DOC_SETTINGS_UPDATED' : 'DOC_SETTINGS_CREATED';
       await logTrustAction(
@@ -1000,7 +1014,11 @@ router.delete(
   async (req: AuthRequest, res: Response) => {
     try {
       const { docId } = req.params;
-      const internalUser = req.user;
+      // Get internal user from database to get the ID
+      const internalUser = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
 
       // Check if document exists
       const document = await prisma.document.findUnique({
@@ -1128,7 +1146,11 @@ router.put(
   async (req: AuthRequest, res: Response) => {
     try {
       const { watermarkPrefix } = req.body;
-      const internalUser = req.user;
+      // Get internal user from database to get the ID
+      const internalUser = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
 
       // Get or create global settings
       let settings = await prisma.trustCenterSettings.findUnique({

@@ -3,6 +3,7 @@ import { body, param, query, validationResult } from 'express-validator';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import multer from 'multer';
+import { Prisma } from '@prisma/client';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { csvUpload, handleMulterError } from '../lib/multerConfig';
 import { requireRole } from '../middleware/authorize';
@@ -1463,7 +1464,7 @@ router.post(
       const allControls = await prisma.control.findMany({
         where: {
           isStandardControl: true, // Focus on ISO 27002 controls
-          embedding: { not: null }, // Only include controls with pre-computed embeddings
+          embedding: { not: Prisma.DbNull }, // Only include controls with pre-computed embeddings
         },
         select: {
           id: true,

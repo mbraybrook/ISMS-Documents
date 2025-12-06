@@ -9,8 +9,11 @@ async function globalSetup() {
   
   // Seed test users
   try {
-    await seedTestUsers();
-    console.log('Test users seeded successfully');
+    const users = await seedTestUsers();
+    console.log('Test users seeded successfully', {
+      adminUser: users.adminUser.email,
+      editorUser: users.editorUser.email,
+    });
   } catch (error) {
     console.error('Failed to seed test users:', error);
     throw error;

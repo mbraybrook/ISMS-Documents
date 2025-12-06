@@ -58,7 +58,7 @@ export function sanitizeObject<T extends Record<string, any>>(
     return obj;
   }
 
-  const sanitized = { ...obj };
+  const sanitized = { ...obj } as any;
   for (const [key, value] of Object.entries(sanitized)) {
     if (typeof value === 'string') {
       // If fieldsToSanitize is specified, only sanitize those fields
@@ -82,7 +82,7 @@ export function sanitizeObject<T extends Record<string, any>>(
     }
   }
 
-  return sanitized;
+  return sanitized as T;
 }
 
 

@@ -12,3 +12,4 @@ ALTER TABLE "Supplier" DROP COLUMN "ciaImpact";
 ALTER TABLE "SupplierRiskAssessment" DROP COLUMN "ciaImpact";
 
 
+

@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
+import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -250,7 +251,9 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
       if (a.daysOverdue !== b.daysOverdue) {
         return b.daysOverdue - a.daysOverdue;
       }
-      return new Date(a.reviewDate).getTime() - new Date(b.reviewDate).getTime();
+      const aDate = a.reviewDate ? new Date(a.reviewDate).getTime() : 0;
+      const bDate = b.reviewDate ? new Date(b.reviewDate).getTime() : 0;
+      return aDate - bDate;
     });
 
     res.json({
@@ -334,11 +337,13 @@ router.post(
 
       const reviewTask = await prisma.reviewTask.create({
         data: {
+          id: randomUUID(),
           documentId: documentId,
           reviewerUserId,
           dueDate: dueDateObj,
           changeNotes,
           status,
+          updatedAt: new Date(),
         },
         include: includeData,
       });

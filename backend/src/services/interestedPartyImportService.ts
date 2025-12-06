@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { randomUUID } from 'crypto';
 import { prisma } from '../lib/prisma';
 
 interface CSVRow {
@@ -225,6 +226,7 @@ export async function importInterestedPartiesFromCSV(csvFilePathOrContent: strin
         
         await prisma.interestedParty.create({
           data: {
+            id: randomUUID(),
             name: data.name,
             group: data.group,
             description: data.requirements, // Use requirements as description for backward compatibility
@@ -236,6 +238,7 @@ export async function importInterestedPartiesFromCSV(csvFilePathOrContent: strin
             keyProductsServices: data.keyProductsServices,
             ourObligations: data.ourObligations,
             theirObligations: data.theirObligations,
+            updatedAt: new Date(),
           },
         });
         

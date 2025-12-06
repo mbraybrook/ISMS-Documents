@@ -162,9 +162,9 @@ router.post(
           email: user.email,
           tokenVersion: user.tokenVersion,
         },
-        config.trustCenter.jwtSecret,
+        config.trustCenter.jwtSecret as string,
         {
-          expiresIn: config.trustCenter.jwtExpiry,
+          expiresIn: config.trustCenter.jwtExpiry as string,
         }
       );
 
