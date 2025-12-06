@@ -37,10 +37,15 @@ import {
   AlertDialogContent,
   AlertDialogOverlay,
   useDisclosure as useAlertDisclosure,
+  Link,
+  Divider,
+  Spinner,
 } from '@chakra-ui/react';
 import { SearchIcon, EditIcon, DeleteIcon, AddIcon } from '@chakra-ui/icons';
+import { Link as RouterLink } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { Risk } from '../types/risk';
 
 interface AssetCategory {
   id: string;
@@ -66,6 +71,8 @@ export function AssetCategoriesPage() {
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<AssetCategory | null>(null);
   const [formData, setFormData] = useState({ name: '', description: '' });
+  const [linkedRisks, setLinkedRisks] = useState<Risk[]>([]);
+  const [loadingRisks, setLoadingRisks] = useState(false);
 
   const canEdit = user?.role === 'ADMIN' || user?.role === 'EDITOR';
 
@@ -114,16 +121,49 @@ export function AssetCategoriesPage() {
   const handleCreate = () => {
     setSelectedCategory(null);
     setFormData({ name: '', description: '' });
+    setLinkedRisks([]);
     onOpen();
   };
 
-  const handleEdit = (category: AssetCategory) => {
+  const handleEdit = async (category: AssetCategory) => {
     setSelectedCategory(category);
     setFormData({
       name: category.name,
       description: category.description || '',
     });
+    setLinkedRisks([]);
     onOpen();
+    
+    // Fetch linked risks if there are any
+    if (category._count?.risks && category._count.risks > 0) {
+      setLoadingRisks(true);
+      try {
+        const response = await api.get(`/api/risks?assetCategoryId=${category.id}&limit=100`);
+        setLinkedRisks(response.data.data || []);
+      } catch (error) {
+        console.error('Error fetching linked risks:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch linked risks',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      } finally {
+        setLoadingRisks(false);
+      }
+    }
+  };
+
+  const handleRowClick = (category: AssetCategory, event: React.MouseEvent) => {
+    // Don't open edit if clicking on action buttons or links
+    const target = event.target as HTMLElement;
+    if (target.closest('button') || target.closest('a')) {
+      return;
+    }
+    if (canEdit) {
+      handleEdit(category);
+    }
   };
 
   const handleDelete = (category: AssetCategory) => {
@@ -153,6 +193,7 @@ export function AssetCategoriesPage() {
         });
       }
       onClose();
+      setLinkedRisks([]);
       fetchCategories();
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to save asset category';
@@ -238,14 +279,41 @@ export function AssetCategoriesPage() {
                 </Tr>
               ) : (
                 filteredCategories.map((category) => (
-                  <Tr key={category.id}>
+                  <Tr 
+                    key={category.id}
+                    cursor={canEdit ? "pointer" : "default"}
+                    _hover={canEdit ? { bg: "gray.50" } : {}}
+                    onClick={(e) => handleRowClick(category, e)}
+                  >
                     <Td fontWeight="medium">{category.name}</Td>
                     <Td>{category.description || <Text color="gray.400">—</Text>}</Td>
                     <Td>
                       <Badge colorScheme="blue">{category._count?.assets || 0}</Badge>
                     </Td>
                     <Td>
-                      <Badge colorScheme="purple">{category._count?.risks || 0}</Badge>
+                      {(category._count?.risks || 0) > 0 ? (
+                        <Tooltip
+                          label={`${category._count?.risks || 0} linked risk${(category._count?.risks || 0) !== 1 ? 's' : ''}. Click to view.`}
+                          hasArrow
+                        >
+                          <Link
+                            as={RouterLink}
+                            to={`/admin/risks/risks?assetCategoryId=${category.id}`}
+                            style={{ textDecoration: 'none' }}
+                          >
+                            <Badge
+                              colorScheme="purple"
+                              cursor="pointer"
+                              _hover={{ transform: 'scale(1.1)' }}
+                              transition="transform 0.2s"
+                            >
+                              {category._count?.risks || 0}
+                            </Badge>
+                          </Link>
+                        </Tooltip>
+                      ) : (
+                        <Badge colorScheme="purple">{category._count?.risks || 0}</Badge>
+                      )}
                     </Td>
                     <Td>
                       <HStack spacing={2}>
@@ -289,7 +357,7 @@ export function AssetCategoriesPage() {
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <VStack spacing={4}>
+            <VStack spacing={4} align="stretch">
               <FormControl isRequired>
                 <FormLabel>Name</FormLabel>
                 <Input
@@ -306,6 +374,52 @@ export function AssetCategoriesPage() {
                   placeholder="Optional description"
                 />
               </FormControl>
+              
+              {selectedCategory && (
+                <>
+                  <Divider />
+                  <Box>
+                    <FormLabel mb={2}>Linked Risks ({linkedRisks.length})</FormLabel>
+                    {loadingRisks ? (
+                      <HStack justify="center" py={4}>
+                        <Spinner size="sm" />
+                        <Text fontSize="sm" color="gray.500">Loading risks...</Text>
+                      </HStack>
+                    ) : linkedRisks.length > 0 ? (
+                      <VStack align="stretch" spacing={2} maxH="300px" overflowY="auto">
+                        {linkedRisks.map((risk) => (
+                          <Box
+                            key={risk.id}
+                            p={2}
+                            bg="white"
+                            borderRadius="md"
+                            border="1px"
+                            borderColor="blue.200"
+                            _hover={{ bg: "blue.50", borderColor: "blue.400" }}
+                          >
+                            <Link
+                              as={RouterLink}
+                              to={`/admin/risks/risks?view=${risk.id}`}
+                              style={{ textDecoration: 'none' }}
+                            >
+                              <HStack spacing={2}>
+                                <Badge colorScheme="purple" fontSize="xs">
+                                  Risk
+                                </Badge>
+                                <Text fontSize="sm" fontWeight="medium" color="blue.700" _hover={{ textDecoration: "underline" }}>
+                                  {risk.title}
+                                </Text>
+                              </HStack>
+                            </Link>
+                          </Box>
+                        ))}
+                      </VStack>
+                    ) : (
+                      <Text fontSize="sm" color="gray.500">No linked risks</Text>
+                    )}
+                  </Box>
+                </>
+              )}
             </VStack>
           </ModalBody>
           <ModalFooter>

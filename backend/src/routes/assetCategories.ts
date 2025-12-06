@@ -29,7 +29,19 @@ router.get(
         },
       });
 
-      res.json(categories);
+      // Map response to match frontend expectations (camelCase relation names)
+      const mappedCategories = categories.map((category: any) => {
+        const { _count, ...rest } = category;
+        return {
+          ...rest,
+          _count: _count ? {
+            assets: _count.Asset || 0,
+            risks: _count.Risk || 0,
+          } : undefined,
+        };
+      });
+
+      res.json(mappedCategories);
     } catch (error) {
       console.error('Error fetching asset categories:', error);
       res.status(500).json({ error: 'Failed to fetch asset categories' });
@@ -70,7 +82,17 @@ router.get(
         return res.status(404).json({ error: 'Asset category not found' });
       }
 
-      res.json(category);
+      // Map response to match frontend expectations (camelCase relation names)
+      const { _count, ...rest } = category as any;
+      const mappedCategory = {
+        ...rest,
+        _count: _count ? {
+          assets: _count.Asset || 0,
+          risks: _count.Risk || 0,
+        } : undefined,
+      };
+
+      res.json(mappedCategory);
     } catch (error) {
       console.error('Error fetching asset category:', error);
       res.status(500).json({ error: 'Failed to fetch asset category' });

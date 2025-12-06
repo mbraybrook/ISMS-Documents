@@ -164,25 +164,32 @@ export function RisksPage() {
   const cancelRef = useRef(null);
   const viewRiskProcessedRef = useRef<string | null>(null);
 
+  // Initialize filters from URL params on mount
+  const getInitialFilters = () => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      riskCategory: '',
+      riskNature: '',
+      archived: false,
+      ownerId: '',
+      treatmentCategory: '',
+      mitigationImplemented: params.get('mitigationImplemented') || '',
+      policyNonConformance: params.get('policyNonConformance') || '',
+      controlsApplied: '',
+      riskLevel: params.get('riskLevel') || '',
+      search: '',
+      dateAddedFrom: '',
+      dateAddedTo: '',
+      assetCategoryId: params.get('assetCategoryId') || '',
+      sortBy: 'calculatedScore',
+      sortOrder: 'desc' as 'asc' | 'desc',
+      page: 1,
+      limit: 20,
+    };
+  };
+
   // Filters and pagination
-  const [filters, setFilters] = useState({
-    riskCategory: '',
-    riskNature: '',
-    archived: false,
-    ownerId: '',
-    treatmentCategory: '',
-    mitigationImplemented: '',
-    policyNonConformance: '',
-    controlsApplied: '',
-    riskLevel: '',
-    search: '',
-    dateAddedFrom: '',
-    dateAddedTo: '',
-    sortBy: 'calculatedScore',
-    sortOrder: 'desc' as 'asc' | 'desc',
-    page: 1,
-    limit: 20,
-  });
+  const [filters, setFilters] = useState(getInitialFilters);
   
   // Track if we've initialized filters from URL to avoid re-initializing
   const filtersInitializedRef = useRef(false);
@@ -289,6 +296,7 @@ export function RisksPage() {
       if (filters.dateAddedTo) params.append('dateAddedTo', filters.dateAddedTo);
       if (filters.status) params.append('status', filters.status);
       if (filters.department) params.append('department', filters.department);
+      if (filters.assetCategoryId) params.append('assetCategoryId', filters.assetCategoryId);
       if (filters.sortBy) params.append('sortBy', filters.sortBy);
       if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
       params.append('page', filters.page.toString());
@@ -332,6 +340,7 @@ export function RisksPage() {
     const mitigationImplementedParam = searchParams.get('mitigationImplemented');
     const policyNonConformanceParam = searchParams.get('policyNonConformance');
     const riskLevelParam = searchParams.get('riskLevel');
+    const assetCategoryIdParam = searchParams.get('assetCategoryId');
     
     // Skip if we're handling view/edit params (those are handled separately)
     const viewParam = searchParams.get('view');
@@ -341,7 +350,7 @@ export function RisksPage() {
     }
     
     // Check if we have filter params that differ from current filters
-    const hasFilterParams = mitigationImplementedParam !== null || policyNonConformanceParam !== null || riskLevelParam !== null;
+    const hasFilterParams = mitigationImplementedParam !== null || policyNonConformanceParam !== null || riskLevelParam !== null || assetCategoryIdParam !== null;
     
     if (hasFilterParams) {
       // Always update filters when URL params are present to ensure they're applied
@@ -350,18 +359,22 @@ export function RisksPage() {
         mitigationImplemented: mitigationImplementedParam !== null ? mitigationImplementedParam : prev.mitigationImplemented,
         policyNonConformance: policyNonConformanceParam !== null ? policyNonConformanceParam : prev.policyNonConformance,
         riskLevel: riskLevelParam !== null ? riskLevelParam : prev.riskLevel,
+        assetCategoryId: assetCategoryIdParam !== null ? assetCategoryIdParam : prev.assetCategoryId,
+        page: 1, // Reset to first page when filter changes
       }));
       
       // Remove the params from URL after a delay to ensure filters are applied first
+      // Keep assetCategoryId in URL longer to ensure it's applied
       const timeoutId = setTimeout(() => {
         setSearchParams(prev => {
           const newSearchParams = new URLSearchParams(prev);
           if (mitigationImplementedParam !== null) newSearchParams.delete('mitigationImplemented');
           if (policyNonConformanceParam !== null) newSearchParams.delete('policyNonConformance');
           if (riskLevelParam !== null) newSearchParams.delete('riskLevel');
+          // Don't remove assetCategoryId - keep it in URL for better UX
           return newSearchParams;
         });
-      }, 200);
+      }, 500);
       
       return () => clearTimeout(timeoutId);
     }
@@ -1270,6 +1283,7 @@ export function RisksPage() {
       if (filters.search) params.append('search', filters.search);
       if (filters.dateAddedFrom) params.append('dateAddedFrom', filters.dateAddedFrom);
       if (filters.dateAddedTo) params.append('dateAddedTo', filters.dateAddedTo);
+      if (filters.assetCategoryId) params.append('assetCategoryId', filters.assetCategoryId);
       params.append('page', '1');
       params.append('limit', '10000'); // Get all matching risks
 
