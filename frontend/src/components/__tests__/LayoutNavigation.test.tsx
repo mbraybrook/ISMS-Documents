@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { Layout } from '../Layout';
 import { ChakraProvider } from '@chakra-ui/react';

@@ -831,7 +831,7 @@ export function SupplierDetailPage() {
                 </FormControl>
               </SimpleGrid>
 
-              {(user?.role === 'ADMIN' || user?.role === 'CISO') && (
+              {(user?.role === 'ADMIN' || (user?.role as string) === 'CISO') && (
                 <FormControl>
                   <Checkbox
                     isChecked={formData.cisoExemptionGranted}
