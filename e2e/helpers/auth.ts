@@ -73,11 +73,21 @@ export async function loginAs(page: Page, role: TestUser['role'], department?: s
  * Logout by clearing authentication state
  */
 export async function logout(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    localStorage.removeItem('msal.accessToken');
-    localStorage.removeItem('msal.account');
-    localStorage.removeItem('msal.idToken');
-  });
+  try {
+    await page.evaluate(() => {
+      try {
+        localStorage.removeItem('msal.accessToken');
+        localStorage.removeItem('msal.account');
+        localStorage.removeItem('msal.idToken');
+      } catch (e) {
+        // Ignore SecurityError - page might be on different origin or context
+        console.warn('Could not clear localStorage:', e);
+      }
+    });
+  } catch (e) {
+    // Ignore errors if page context is invalid
+    console.warn('Could not logout - page context may be invalid:', e);
+  }
 }
 
 /**
