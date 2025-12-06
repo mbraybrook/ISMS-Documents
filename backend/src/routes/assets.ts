@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
+import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -208,6 +209,7 @@ router.post(
     try {
       const asset = await prisma.asset.create({
         data: {
+          id: randomUUID(),
           date: new Date(req.body.date),
           assetCategoryId: req.body.assetCategoryId,
           assetSubCategory: req.body.assetSubCategory,
@@ -222,6 +224,7 @@ router.post(
           purpose: req.body.purpose,
           notes: req.body.notes,
           cost: req.body.cost,
+          updatedAt: new Date(),
         },
         include: {
           AssetCategory: {
@@ -240,7 +243,7 @@ router.post(
       });
 
       // Map response to match frontend expectations
-      const { AssetCategory, Classification, ...rest } = asset;
+      const { AssetCategory, Classification, ...rest } = asset as any;
       const mappedAsset = {
         ...rest,
         category: AssetCategory,

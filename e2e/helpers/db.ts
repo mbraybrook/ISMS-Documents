@@ -41,7 +41,12 @@ export async function closePrisma(): Promise<void> {
 /**
  * Create test users for E2E tests
  */
-export async function seedTestUsers(): Promise<void> {
+export async function seedTestUsers(): Promise<{
+  adminUser: any;
+  editorUser: any;
+  staffUser: any;
+  contributorUser: any;
+}> {
   const db = getPrisma();
   
   const users = [
@@ -72,13 +77,35 @@ export async function seedTestUsers(): Promise<void> {
     },
   ];
 
+  const results = [];
   for (const user of users) {
-    await db.user.upsert({
+    const result = await db.user.upsert({
       where: { email: user.email },
-      update: user,
-      create: user,
+      update: {
+        displayName: user.displayName,
+        entraObjectId: user.entraObjectId,
+        role: user.role,
+        department: user.department,
+      },
+      create: {
+        id: `test-${user.email.replace('@', '-at-')}`,
+        email: user.email,
+        displayName: user.displayName,
+        entraObjectId: user.entraObjectId,
+        role: user.role,
+        department: user.department,
+        updatedAt: new Date(),
+      },
     });
+    results.push(result);
   }
+
+  return {
+    adminUser: results[0],
+    editorUser: results[1],
+    staffUser: results[2],
+    contributorUser: results[3],
+  };
 }
 
 /**
@@ -92,10 +119,12 @@ export async function createTestDocument(overrides?: any) {
     where: { email: 'admin@paythru.com' },
     update: {},
     create: {
+      id: 'test-admin-at-paythru-com',
       email: 'admin@paythru.com',
       displayName: 'Test Admin',
       entraObjectId: 'test-admin-oid',
       role: 'ADMIN',
+      updatedAt: new Date(),
     },
   });
 

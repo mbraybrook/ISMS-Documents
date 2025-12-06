@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
 import { prisma } from '../lib/prisma';
 
 interface CSVRow {
@@ -160,7 +161,11 @@ export async function importAssetsFromCSV(csvFilePathOrContent: string | Buffer)
     for (const classificationName of uniqueClassifications) {
       if (!classificationMap.has(classificationName)) {
         const newClassification = await prisma.classification.create({
-          data: { name: classificationName },
+          data: {
+            id: randomUUID(),
+            name: classificationName,
+            updatedAt: new Date(),
+          },
         });
         classificationMap.set(classificationName, newClassification.id);
       }
@@ -184,7 +189,11 @@ export async function importAssetsFromCSV(csvFilePathOrContent: string | Buffer)
     for (const categoryName of uniqueCategories) {
       if (!categoryMap.has(categoryName)) {
         const newCategory = await prisma.assetCategory.create({
-          data: { name: categoryName },
+          data: {
+            id: randomUUID(),
+            name: categoryName,
+            updatedAt: new Date(),
+          },
         });
         categoryMap.set(categoryName, newCategory.id);
       }
@@ -250,6 +259,7 @@ export async function importAssetsFromCSV(csvFilePathOrContent: string | Buffer)
         
         await prisma.asset.create({
           data: {
+            id: randomUUID(),
             date,
             assetCategoryId: categoryId,
             assetSubCategory: (row['Asset Sub-category'] || '').trim() || null,
@@ -264,6 +274,7 @@ export async function importAssetsFromCSV(csvFilePathOrContent: string | Buffer)
             purpose: (row.Purpose || '').trim() || null,
             notes: (row.Notes || '').trim() || null,
             cost: (row.Cost || '').trim() || null,
+            updatedAt: new Date(),
           },
         });
         

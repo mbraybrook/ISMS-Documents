@@ -26,9 +26,10 @@ export const downloadLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   // Use a key generator that includes user ID if available
-  keyGenerator: (req) => {
+  keyGenerator: (req): string => {
     const userId = (req as any).externalUser?.id || (req as any).user?.id;
-    return userId ? `${req.ip}-${userId}` : req.ip;
+    const ip = req.ip || 'unknown';
+    return userId ? `${ip}-${userId}` : ip;
   },
 });
 
@@ -40,9 +41,10 @@ export const passwordResetLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   // Use email from request body if available
-  keyGenerator: (req) => {
+  keyGenerator: (req): string => {
     const email = (req.body as any)?.email;
-    return email ? `${req.ip}-${email}` : req.ip;
+    const ip = req.ip || 'unknown';
+    return email ? `${ip}-${email}` : ip;
   },
 });
 

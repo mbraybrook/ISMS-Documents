@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
+import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -49,7 +50,8 @@ router.post(
         // Generate Excel file
         console.log('[SOA] Generating Excel file...');
         const excelBuffer = await generateSoAExcel(soaData);
-        console.log(`[SOA] Excel buffer generated, size: ${excelBuffer.length} bytes`);
+        const bufferSize = Buffer.isBuffer(excelBuffer) ? excelBuffer.byteLength : (excelBuffer as any).length || 0;
+        console.log(`[SOA] Excel buffer generated, size: ${bufferSize} bytes`);
 
         // Ensure buffer is a proper Buffer instance
         const buffer = Buffer.isBuffer(excelBuffer) ? excelBuffer : Buffer.from(excelBuffer);
@@ -57,6 +59,7 @@ router.post(
         // Create SoAExport record for audit trail (don't await - do in background)
         prisma.soAExport.create({
           data: {
+            id: randomUUID(),
             generatedByUserId: user.id,
             exportFormat: 'EXCEL',
             filePath: null, // File is returned directly, not stored
@@ -109,7 +112,7 @@ router.get(
     try {
       const exports = await prisma.soAExport.findMany({
         include: {
-          generatedBy: {
+          User: {
             select: {
               id: true,
               displayName: true,

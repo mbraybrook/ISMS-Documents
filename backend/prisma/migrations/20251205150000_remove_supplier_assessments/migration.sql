@@ -32,3 +32,4 @@ ALTER TABLE "Supplier" DROP COLUMN IF EXISTS "lastCriticalityAssessmentAt";
 DROP TABLE IF EXISTS "SupplierRiskAssessment";
 DROP TABLE IF EXISTS "SupplierCriticalityAssessment";
 
+

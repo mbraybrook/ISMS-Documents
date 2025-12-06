@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
+import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -60,7 +61,7 @@ router.get(
       const category = await prisma.assetCategory.findUnique({
         where: { id: req.params.id },
         include: {
-          assets: {
+          Asset: {
             take: 10,
             orderBy: { date: 'desc' },
             include: {
@@ -114,8 +115,10 @@ router.post(
     try {
       const category = await prisma.assetCategory.create({
         data: {
+          id: randomUUID(),
           name: req.body.name,
           description: req.body.description,
+          updatedAt: new Date(),
         },
       });
 

@@ -228,11 +228,17 @@ router.get(
       const { siteId, driveId } = req.query;
       const { itemId } = req.params;
 
+      // Get user from database to get the ID
+      const user = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
+
       console.log('[SharePoint] Fetching item metadata', {
         itemId,
         siteId,
         driveId,
-        userId: req.user.id,
+        userId: user?.id || req.user?.sub,
       });
 
       const item = await getSharePointItem(
@@ -291,12 +297,18 @@ router.get(
       const { siteId, driveId, itemId } = req.query;
       const accessToken = req.headers['x-graph-token'] as string;
 
+      // Get user from database to get the ID
+      const user = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
+
       console.log('[SharePoint] Generating URL', {
         itemId,
         siteId,
         driveId,
         hasAccessToken: !!accessToken,
-        userId: req.user?.id,
+        userId: user?.id || req.user?.sub,
       });
 
       // Try to get the actual webUrl from SharePoint if we have an access token

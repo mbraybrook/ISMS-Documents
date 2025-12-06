@@ -92,9 +92,9 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
         prisma.user.create({
           data: {
             id: userId,
-            email: email || `user-${req.user.sub}@unknown.local`, // Fallback email if none provided
+            email: email || `user-${req.user?.sub || 'unknown'}@unknown.local`, // Fallback email if none provided
             displayName: name || email || 'Unknown User',
-            entraObjectId: oid || req.user.sub,
+            entraObjectId: oid || req.user?.sub || 'unknown',
             role: role as any,
             updatedAt: new Date(),
           },
@@ -104,7 +104,7 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
       // Update user info if changed, including email if it was missing before
       const updateData: any = {
         displayName: name || user.displayName,
-        entraObjectId: oid || req.user.sub,
+        entraObjectId: oid || req.user?.sub || 'unknown',
       };
       
       // Update email if it was missing or is different (and new one is valid)
@@ -117,7 +117,7 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
       user = await retryDbOperation(
         () =>
           prisma.user.update({
-            where: { id: user.id },
+            where: { id: user?.id || '' },
             data: updateData,
           }),
         {
@@ -149,7 +149,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
 
     const user = await retryDbOperation(() =>
       prisma.user.findUnique({
-        where: { email: req.user.email || '' },
+        where: { email: req.user?.email || '' },
         select: {
           id: true,
           email: true,
