@@ -129,7 +129,8 @@ export async function seedTestDatabase(): Promise<void> {
     },
   });
   
-  return { adminUser, editorUser, staffUser };
+  // Note: Users are created but not returned since function returns void
+  // If you need the users, use a different function with a return type
 }
 
 
