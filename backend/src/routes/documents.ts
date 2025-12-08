@@ -265,6 +265,19 @@ router.get(
         },
       });
 
+      // Fetch current version notes separately
+      let currentVersionNotes = null;
+      if (document) {
+        const versionHistory = await prisma.documentVersionHistory.findFirst({
+          where: {
+            documentId: id,
+            version: document.version,
+          },
+          orderBy: { updatedAt: 'desc' },
+        });
+        currentVersionNotes = versionHistory?.notes || null;
+      }
+
       if (!document) {
         return res.status(404).json({ error: 'Document not found' });
       }
@@ -274,10 +287,110 @@ router.get(
         return res.status(403).json({ error: 'Access denied. Only approved documents are available.' });
       }
 
-      res.json(document);
+      // Attach current version notes to response
+      const response = {
+        ...document,
+        currentVersionNotes,
+      };
+
+      res.json(response);
     } catch (error) {
       console.error('Error fetching document:', error);
       res.status(500).json({ error: 'Failed to fetch document' });
+    }
+  }
+);
+
+// GET /api/documents/:id/version-notes - get version notes for a specific version
+router.get(
+  '/:id/version-notes',
+  authenticateToken,
+  [
+    param('id').isUUID(),
+    query('version').optional().isString(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const versionParam = req.query.version as string | undefined;
+
+      // Fetch document to get current version
+      const document = await prisma.document.findUnique({
+        where: { id },
+        select: { version: true },
+      });
+
+      if (!document) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Resolve version: if 'current' or not provided, use document's current version
+      const resolvedVersion = versionParam === 'current' || !versionParam
+        ? document.version
+        : versionParam;
+
+      // Query DocumentVersionHistory for the resolved version
+      const versionHistory = await prisma.documentVersionHistory.findFirst({
+        where: {
+          documentId: id,
+          version: resolvedVersion,
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      res.json({
+        documentId: id,
+        version: resolvedVersion,
+        notes: versionHistory?.notes || null,
+      });
+    } catch (error) {
+      console.error('Error fetching version notes:', error);
+      res.status(500).json({ error: 'Failed to fetch version notes' });
+    }
+  }
+);
+
+// GET /api/documents/:id/version-history - get full version history (Admin/Editor only)
+router.get(
+  '/:id/version-history',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [param('id').isUUID()],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Verify document exists
+      const document = await prisma.document.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!document) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Get all version history for this document, ordered by creation date
+      const versionHistory = await prisma.documentVersionHistory.findMany({
+        where: { documentId: id },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          document: {
+            select: {
+              id: true,
+              title: true,
+              version: true,
+            },
+          },
+        },
+      });
+
+      res.json(versionHistory);
+    } catch (error) {
+      console.error('Error fetching version history:', error);
+      res.status(500).json({ error: 'Failed to fetch version history' });
     }
   }
 );
@@ -406,11 +519,11 @@ router.put(
     body('title').optional().notEmpty().trim(),
     body('type').optional().isIn(['POLICY', 'PROCEDURE', 'MANUAL', 'RECORD', 'TEMPLATE', 'OTHER']),
     body('storageLocation').optional().isIn(['SHAREPOINT', 'CONFLUENCE']),
-    body('version').optional().notEmpty().trim(),
     body('status').optional().isIn(['DRAFT', 'IN_REVIEW', 'APPROVED', 'SUPERSEDED']),
     body('ownerUserId').optional().isUUID(),
     body('requiresAcknowledgement').optional().isBoolean(),
     body('lastChangedDate').optional().isISO8601(),
+    body('versionNotes').optional().isString(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -452,52 +565,81 @@ router.put(
         }
       }
 
-      // Automatically set nextReviewDate to current date + 1 year if:
-      // 1. The document doesn't currently have a nextReviewDate, OR
-      // 2. The user is updating the document but not explicitly setting nextReviewDate
-      // This ensures documents always have a review date scheduled after updates
-      if (!existingDocument.nextReviewDate) {
-        // Document has no review date - set it to 1 year from today
-        if (!('nextReviewDate' in data) || data.nextReviewDate === null || data.nextReviewDate === '') {
-          const today = new Date();
-          const nextYear = new Date(today);
-          nextYear.setFullYear(today.getFullYear() + 1);
-          data.nextReviewDate = nextYear;
+      // Note: Review dates (lastReviewDate and nextReviewDate) are now managed through
+      // the version update flow. They can still be set here for new documents or manual updates,
+      // but they are no longer auto-updated on every document edit.
+
+      // Handle version notes update for current version
+      // Note: Version changes must be done through the /version-updates endpoint
+      if ('versionNotes' in data) {
+        const versionNotes = data.versionNotes;
+        delete data.versionNotes; // Remove from document update data
+
+        // Get current user ID for version history
+        if (req.user?.email) {
+          const currentUser = await prisma.user.findUnique({
+            where: { email: req.user.email },
+            select: { id: true },
+          });
+
+          if (currentUser) {
+            // Upsert version notes for current version
+            const existingVersionHistory = await prisma.documentVersionHistory.findFirst({
+              where: {
+                documentId: id,
+                version: existingDocument.version,
+              },
+            });
+
+            if (existingVersionHistory) {
+              // Update existing record
+              await prisma.documentVersionHistory.update({
+                where: { id: existingVersionHistory.id },
+                data: {
+                  notes: versionNotes || null,
+                  updatedAt: new Date(),
+                  updatedBy: currentUser.id,
+                  // Preserve SharePoint IDs
+                  sharePointSiteId: existingDocument.sharePointSiteId || undefined,
+                  sharePointDriveId: existingDocument.sharePointDriveId || undefined,
+                  sharePointItemId: existingDocument.sharePointItemId || undefined,
+                },
+              });
+            } else {
+              // Create new record for current version
+              await prisma.documentVersionHistory.create({
+                data: {
+                  id: randomUUID(),
+                  documentId: id,
+                  version: existingDocument.version,
+                  notes: versionNotes || null,
+                  createdAt: new Date(),
+                  createdBy: currentUser.id,
+                  updatedAt: new Date(),
+                  updatedBy: currentUser.id,
+                  // Store SharePoint IDs for history restoration
+                  sharePointSiteId: existingDocument.sharePointSiteId || null,
+                  sharePointDriveId: existingDocument.sharePointDriveId || null,
+                  sharePointItemId: existingDocument.sharePointItemId || null,
+                },
+              });
+            }
+          }
         }
-      } else if (!('nextReviewDate' in data)) {
-        // Document has a review date but user isn't changing it - update it to 1 year from today
-        // This ensures the review date is refreshed when the document is updated
-        const today = new Date();
-        const nextYear = new Date(today);
-        nextYear.setFullYear(today.getFullYear() + 1);
-        data.nextReviewDate = nextYear;
       }
 
-      // Handle version change on APPROVED document
-      if (data.version && existingDocument.status === 'APPROVED' && data.version !== existingDocument.version) {
-        // Version changed on approved document - set lastChangedDate and keep status as APPROVED
-        data.lastChangedDate = new Date();
-        // Explicitly preserve APPROVED status - don't allow it to be changed when version updates
-        if (!('status' in data) || data.status !== 'APPROVED') {
-          data.status = 'APPROVED';
-        }
-        // For POLICY documents, ensure requiresAcknowledgement is true when version changes
-        if (existingDocument.type === 'POLICY') {
+      // Auto-set requiresAcknowledgement based on type
+      // If type is being changed to POLICY, default to true (but allow manual override)
+      if (data.type && data.type === 'POLICY' && existingDocument.type !== 'POLICY') {
+        // Type changed to POLICY - default to true if not explicitly provided
+        if (!('requiresAcknowledgement' in data)) {
           data.requiresAcknowledgement = true;
         }
+      } else if (data.type && data.type !== 'POLICY' && existingDocument.type === 'POLICY') {
+        // Type changed away from POLICY - allow the value to be set (no auto-enforcement)
+        // The value in data.requiresAcknowledgement will be used as-is
       }
-
-      // Auto-set requiresAcknowledgement based on type if type is being changed
-      if (data.type) {
-        // If type is POLICY, automatically set requiresAcknowledgement to true
-        // But allow manual override if requiresAcknowledgement is explicitly provided
-        if (data.type === 'POLICY' && !('requiresAcknowledgement' in data)) {
-          data.requiresAcknowledgement = true;
-        }
-      } else if (existingDocument.type === 'POLICY' && !('requiresAcknowledgement' in data)) {
-        // If existing document is POLICY and requiresAcknowledgement not provided, ensure it's true
-        data.requiresAcknowledgement = true;
-      }
+      // Note: If type is not changing, requiresAcknowledgement can be set to any value by the user
 
       // Determine the storage location (use new value if provided, otherwise existing)
       const storageLocation = data.storageLocation || existingDocument.storageLocation;
@@ -592,6 +734,181 @@ router.put(
       }
       console.error('Error updating document:', error);
       res.status(500).json({ error: 'Failed to update document' });
+    }
+  }
+);
+
+// POST /api/documents/:id/version-updates - update document version
+router.post(
+  '/:id/version-updates',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    param('id').isUUID(),
+    body('currentVersion').notEmpty().trim(),
+    body('newVersion').notEmpty().trim(),
+    body('notes').notEmpty().trim(),
+    body('lastReviewDate').optional().isISO8601(),
+    body('nextReviewDate').optional().isISO8601(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { currentVersion, newVersion, notes, lastReviewDate, nextReviewDate } = req.body;
+
+      // Get current user ID
+      if (!req.user?.email) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const currentUser = await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      });
+
+      if (!currentUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Fetch existing document
+      const existingDocument = await prisma.document.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          version: true,
+          status: true,
+          sharePointSiteId: true,
+          sharePointDriveId: true,
+          sharePointItemId: true,
+        },
+      });
+
+      if (!existingDocument) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Validate currentVersion matches document's stored version
+      if (existingDocument.version !== currentVersion) {
+        return res.status(409).json({
+          error: 'Version mismatch',
+          message: `Document version has changed. Current version is "${existingDocument.version}". Please refresh and try again.`,
+          currentVersion: existingDocument.version,
+        });
+      }
+
+      // Convert date strings to DateTime objects if provided
+      const updateData: any = {
+        version: newVersion,
+        updatedAt: new Date(),
+      };
+
+      if (existingDocument.status === 'APPROVED') {
+        updateData.lastChangedDate = new Date();
+      }
+
+      // Handle review dates
+      if (lastReviewDate !== undefined) {
+        if (lastReviewDate === null || lastReviewDate === '') {
+          updateData.lastReviewDate = null;
+        } else if (typeof lastReviewDate === 'string') {
+          // If it's just a date (YYYY-MM-DD), convert to full datetime
+          if (lastReviewDate.length === 10) {
+            updateData.lastReviewDate = new Date(lastReviewDate + 'T00:00:00.000Z');
+          } else {
+            updateData.lastReviewDate = new Date(lastReviewDate);
+          }
+        }
+      }
+
+      if (nextReviewDate !== undefined) {
+        if (nextReviewDate === null || nextReviewDate === '') {
+          updateData.nextReviewDate = null;
+        } else if (typeof nextReviewDate === 'string') {
+          // If it's just a date (YYYY-MM-DD), convert to full datetime
+          if (nextReviewDate.length === 10) {
+            updateData.nextReviewDate = new Date(nextReviewDate + 'T00:00:00.000Z');
+          } else {
+            updateData.nextReviewDate = new Date(nextReviewDate);
+          }
+        }
+      }
+
+      // Upsert into DocumentVersionHistory
+      const existingVersionHistory = await prisma.documentVersionHistory.findFirst({
+        where: {
+          documentId: id,
+          version: newVersion,
+        },
+      });
+
+      if (existingVersionHistory) {
+        // Update existing record
+        await prisma.documentVersionHistory.update({
+          where: { id: existingVersionHistory.id },
+          data: {
+            notes,
+            updatedAt: new Date(),
+            updatedBy: currentUser.id,
+            // Preserve SharePoint IDs if they exist
+            sharePointSiteId: existingDocument.sharePointSiteId || undefined,
+            sharePointDriveId: existingDocument.sharePointDriveId || undefined,
+            sharePointItemId: existingDocument.sharePointItemId || undefined,
+          },
+        });
+      } else {
+        // Create new record
+        await prisma.documentVersionHistory.create({
+          data: {
+            id: randomUUID(),
+            documentId: id,
+            version: newVersion,
+            notes,
+            createdAt: new Date(),
+            createdBy: currentUser.id,
+            updatedAt: new Date(),
+            updatedBy: currentUser.id,
+            // Store SharePoint IDs for history restoration
+            sharePointSiteId: existingDocument.sharePointSiteId || null,
+            sharePointDriveId: existingDocument.sharePointDriveId || null,
+            sharePointItemId: existingDocument.sharePointItemId || null,
+          },
+        });
+      }
+
+      // Update the document
+      const document = await prisma.document.update({
+        where: { id },
+        data: updateData,
+        include: {
+          owner: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      // Invalidate PDF cache when version changes
+      invalidateCache(id).catch((err) => {
+        console.error('[Version Update] Error invalidating PDF cache:', err);
+      });
+
+      res.json(document);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      if (error.code === 'P2002') {
+        return res.status(409).json({
+          error: 'Version already exists',
+          message: `Version "${req.body.newVersion}" already exists for this document.`,
+        });
+      }
+      console.error('Error updating document version:', error);
+      res.status(500).json({ error: 'Failed to update document version' });
     }
   }
 );

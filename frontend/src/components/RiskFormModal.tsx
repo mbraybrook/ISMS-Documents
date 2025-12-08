@@ -1492,7 +1492,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                                           {asset.primaryUser && <Text>• User: {asset.primaryUser}</Text>}
                                         </HStack>
                                       </VStack>
-                                      <Badge colorScheme={asset.cdeImpacting ? 'red' : 'gray'} fontSize="xs">
+                                      <Badge colorScheme="blue" fontSize="xs">
                                         {asset.classification?.name || ''}
                                       </Badge>
                                     </HStack>

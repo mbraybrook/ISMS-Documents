@@ -17,114 +17,14 @@ const validate = (req: any, res: Response, next: any) => {
 };
 
 // GET /api/reviews/dashboard - structured data for dashboard
+// Simplified to use only document dates (lastReviewDate, nextReviewDate)
 router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const now = new Date();
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(now.getDate() + 30);
-
-    // Upcoming reviews (next 30 days)
-    const upcomingReviews = await prisma.reviewTask.findMany({
-      where: {
-        dueDate: {
-          gte: now,
-          lte: thirtyDaysFromNow,
-        },
-        status: 'PENDING',
-      },
-      include: {
-        document: {
-          select: {
-            id: true,
-            title: true,
-            version: true,
-            type: true,
-          },
-        },
-        reviewer: {
-          select: {
-            id: true,
-            displayName: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: {
-        dueDate: 'asc',
-      },
-    });
-
-    // Overdue reviews (review tasks that are overdue)
-    const overdueReviews = await prisma.reviewTask.findMany({
-      where: {
-        dueDate: {
-          lt: now,
-        },
-        status: { in: ['PENDING', 'OVERDUE'] },
-      },
-      include: {
-        document: {
-          select: {
-            id: true,
-            title: true,
-            version: true,
-            type: true,
-            nextReviewDate: true,
-            owner: {
-              select: {
-                id: true,
-                displayName: true,
-                email: true,
-              },
-            },
-          },
-        },
-        reviewer: {
-          select: {
-            id: true,
-            displayName: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: {
-        dueDate: 'asc',
-      },
-    });
-
-    // Recently completed reviews (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(now.getDate() - 30);
-
-    const recentlyCompletedReviews = await prisma.reviewTask.findMany({
-      where: {
-        status: 'COMPLETED',
-        completedDate: {
-          gte: thirtyDaysAgo,
-        },
-      },
-      include: {
-        document: {
-          select: {
-            id: true,
-            title: true,
-            version: true,
-            type: true,
-          },
-        },
-        reviewer: {
-          select: {
-            id: true,
-            displayName: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: {
-        completedDate: 'desc',
-      },
-      take: 20,
-    });
 
     // Documents with nextReviewDate in next 30 days (upcoming)
     const upcomingDocuments = await prisma.document.findMany({
@@ -134,12 +34,6 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
           lte: thirtyDaysFromNow,
         },
         status: { in: ['APPROVED', 'IN_REVIEW'] },
-        // Exclude documents that already have active ReviewTasks
-        ReviewTask: {
-          none: {
-            status: { in: ['PENDING', 'OVERDUE'] },
-          },
-        },
       },
       include: {
         owner: {
@@ -162,12 +56,6 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
           lt: now,
         },
         status: { in: ['APPROVED', 'IN_REVIEW'] },
-        // Exclude documents that already have active ReviewTasks
-        ReviewTask: {
-          none: {
-            status: { in: ['PENDING', 'OVERDUE'] },
-          },
-        },
       },
       include: {
         owner: {
@@ -184,17 +72,10 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
     });
 
     // Documents missing nextReviewDate
-    // Exclude documents that already have active ReviewTasks (they have a review scheduled)
     const needsReviewDate = await prisma.document.findMany({
       where: {
         nextReviewDate: null,
         status: { in: ['APPROVED', 'IN_REVIEW'] },
-        // Exclude documents that already have active ReviewTasks
-        ReviewTask: {
-          none: {
-            status: { in: ['PENDING', 'OVERDUE'] },
-          },
-        },
       },
       include: {
         owner: {
@@ -210,43 +91,49 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
       },
     });
 
-    // Create unified overdue items list
-    // Combine overdue reviews (with assigned tasks) and overdue documents (without tasks)
-    const overdueItems = [
-      // Overdue reviews with assigned tasks
-      ...overdueReviews.map((review) => ({
-        type: 'REVIEW_TASK' as const,
-        id: review.id,
-        documentId: review.documentId,
-        document: review.document,
-        dueDate: review.dueDate,
-        reviewDate: review.dueDate, // Use dueDate as the review date
-        reviewer: review.reviewer,
-        status: review.status,
-        hasAssignedTask: true,
-        daysOverdue: Math.ceil((now.getTime() - new Date(review.dueDate).getTime()) / (1000 * 60 * 60 * 24)),
-      })),
-      // Overdue documents without assigned tasks
-      ...overdueDocuments.map((doc) => ({
-        type: 'DOCUMENT' as const,
-        id: doc.id,
-        documentId: doc.id,
-        document: {
-          id: doc.id,
-          title: doc.title,
-          version: doc.version,
-          type: doc.type,
-          nextReviewDate: doc.nextReviewDate,
-          owner: doc.owner,
+    // Recently reviewed documents (lastReviewDate in last 30 days)
+    const recentlyReviewedDocuments = await prisma.document.findMany({
+      where: {
+        lastReviewDate: {
+          gte: thirtyDaysAgo,
         },
-        dueDate: doc.nextReviewDate,
-        reviewDate: doc.nextReviewDate,
-        reviewer: null,
-        status: null,
-        hasAssignedTask: false,
-        daysOverdue: doc.nextReviewDate ? Math.ceil((now.getTime() - new Date(doc.nextReviewDate).getTime()) / (1000 * 60 * 60 * 24)) : 0,
-      })),
-    ].sort((a, b) => {
+        status: { in: ['APPROVED', 'IN_REVIEW'] },
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        lastReviewDate: 'desc',
+      },
+      take: 20,
+    });
+
+    // Create unified overdue items list from overdue documents
+    const overdueItems = overdueDocuments.map((doc) => ({
+      type: 'DOCUMENT' as const,
+      id: doc.id,
+      documentId: doc.id,
+      document: {
+        id: doc.id,
+        title: doc.title,
+        version: doc.version,
+        type: doc.type,
+        nextReviewDate: doc.nextReviewDate,
+        owner: doc.owner,
+      },
+      dueDate: doc.nextReviewDate,
+      reviewDate: doc.nextReviewDate,
+      reviewer: null,
+      status: null,
+      hasAssignedTask: false,
+      daysOverdue: doc.nextReviewDate ? Math.ceil((now.getTime() - new Date(doc.nextReviewDate).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+    })).sort((a, b) => {
       // Sort by days overdue (most overdue first), then by review date
       if (a.daysOverdue !== b.daysOverdue) {
         return b.daysOverdue - a.daysOverdue;
@@ -256,15 +143,17 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
       return aDate - bDate;
     });
 
+    // For backward compatibility, create empty arrays for old ReviewTask-based fields
     res.json({
-      upcomingReviews,
-      overdueReviews,
-      recentlyCompletedReviews,
+      upcomingReviews: [], // No longer used - replaced by upcomingDocuments
+      overdueReviews: [], // No longer used - replaced by overdueDocuments
+      recentlyCompletedReviews: [], // No longer used - replaced by recentlyReviewedDocuments
       documentsNeedingReview: upcomingDocuments, // Keep for backward compatibility
       upcomingDocuments,
       overdueDocuments,
       needsReviewDate,
-      overdueItems, // New unified overdue items
+      overdueItems,
+      recentlyReviewedDocuments, // New field for recently reviewed
     });
   } catch (error) {
     console.error('Error fetching review dashboard:', error);

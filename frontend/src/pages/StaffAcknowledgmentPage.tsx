@@ -45,6 +45,7 @@ interface Document {
   confluenceSpaceKey?: string;
   confluencePageId?: string;
   documentUrl?: string | null;
+  versionNotes?: string | null; // Version notes for current version
 }
 
 // Configurable threshold for overdue acknowledgment (30 days)
@@ -93,7 +94,28 @@ export function StaffAcknowledgmentPage() {
     try {
       setLoading(true);
       const response = await api.get('/api/acknowledgments/pending');
-      setDocuments(response.data);
+      const docs = response.data;
+      
+      // Fetch version notes for each document
+      const docsWithNotes = await Promise.all(
+        docs.map(async (doc: Document) => {
+          try {
+            const notesResponse = await api.get(`/api/documents/${doc.id}/version-notes?version=current`);
+            return {
+              ...doc,
+              versionNotes: notesResponse.data.notes || null,
+            };
+          } catch (error) {
+            console.error(`Error fetching version notes for document ${doc.id}:`, error);
+            return {
+              ...doc,
+              versionNotes: null,
+            };
+          }
+        })
+      );
+      
+      setDocuments(docsWithNotes);
     } catch (error) {
       console.error('Error fetching pending documents:', error);
       toast({
@@ -412,65 +434,81 @@ export function StaffAcknowledgmentPage() {
                     const isSelected = selectedDocuments.has(doc.id);
                     const isAcknowledging = acknowledgingDocumentId === doc.id;
                     return (
-                      <Tr key={doc.id} bg={isSelected ? 'blue.50' : undefined}>
-                        <Td>
-                          <Checkbox
-                            isChecked={isSelected}
-                            onChange={() => handleToggleSelect(doc.id)}
-                          />
-                        </Td>
-                        <Td maxW="300px">
-                          <Box overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
-                            {url ? (
-                              <Link href={url} isExternal color="blue.500" fontWeight="medium">
-                                {doc.title} <ExternalLinkIcon mx="2px" />
-                              </Link>
-                            ) : (
-                              doc.title
+                      <>
+                        <Tr key={doc.id} bg={isSelected ? 'blue.50' : undefined}>
+                          <Td>
+                            <Checkbox
+                              isChecked={isSelected}
+                              onChange={() => handleToggleSelect(doc.id)}
+                            />
+                          </Td>
+                          <Td maxW="300px">
+                            <Box overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
+                              {url ? (
+                                <Link href={url} isExternal color="blue.500" fontWeight="medium">
+                                  {doc.title} <ExternalLinkIcon mx="2px" />
+                                </Link>
+                              ) : (
+                                doc.title
+                              )}
+                            </Box>
+                          </Td>
+                          <Td whiteSpace="nowrap">{doc.type}</Td>
+                          <Td whiteSpace="nowrap">{doc.version}</Td>
+                          <Td whiteSpace="nowrap">{doc.owner.displayName}</Td>
+                          <Td whiteSpace="nowrap">
+                            <Text>{doc.storageLocation}</Text>
+                          </Td>
+                          <Td whiteSpace="nowrap">
+                            {doc.lastChangedDate ? formatDateAgo(doc.lastChangedDate) : 'N/A'}
+                            {isOverdue && (
+                              <Tooltip label={`This document has been pending acknowledgment for more than ${OVERDUE_ACKNOWLEDGMENT_DAYS} days.`}>
+                                <Badge colorScheme="red" ml={2} fontSize="xs">Overdue</Badge>
+                              </Tooltip>
                             )}
-                          </Box>
-                        </Td>
-                        <Td whiteSpace="nowrap">{doc.type}</Td>
-                        <Td whiteSpace="nowrap">{doc.version}</Td>
-                        <Td whiteSpace="nowrap">{doc.owner.displayName}</Td>
-                        <Td whiteSpace="nowrap">
-                          <Text>{doc.storageLocation}</Text>
-                        </Td>
-                        <Td whiteSpace="nowrap">
-                          {doc.lastChangedDate ? formatDateAgo(doc.lastChangedDate) : 'N/A'}
-                          {isOverdue && (
-                            <Tooltip label={`This document has been pending acknowledgment for more than ${OVERDUE_ACKNOWLEDGMENT_DAYS} days.`}>
-                              <Badge colorScheme="red" ml={2} fontSize="xs">Overdue</Badge>
-                            </Tooltip>
-                          )}
-                        </Td>
-                        <Td whiteSpace="nowrap">
-                          <HStack spacing={2}>
-                            {url && (
+                          </Td>
+                          <Td whiteSpace="nowrap">
+                            <HStack spacing={2}>
+                              {url && (
+                                <Button
+                                  size="sm"
+                                  colorScheme="blue"
+                                  as={Link}
+                                  href={url}
+                                  isExternal
+                                  rightIcon={<ExternalLinkIcon />}
+                                >
+                                  Open
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
-                                colorScheme="blue"
-                                as={Link}
-                                href={url}
-                                isExternal
-                                rightIcon={<ExternalLinkIcon />}
+                                colorScheme="green"
+                                variant="outline"
+                                onClick={() => handleAcknowledgeSingle(doc.id)}
+                                isLoading={isAcknowledging}
+                                isDisabled={isAcknowledging}
                               >
-                                Open
+                                Acknowledge
                               </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              colorScheme="green"
-                              variant="outline"
-                              onClick={() => handleAcknowledgeSingle(doc.id)}
-                              isLoading={isAcknowledging}
-                              isDisabled={isAcknowledging}
-                            >
-                              Acknowledge
-                            </Button>
-                          </HStack>
-                        </Td>
-                      </Tr>
+                            </HStack>
+                          </Td>
+                        </Tr>
+                        {doc.versionNotes && (
+                          <Tr>
+                            <Td colSpan={8} bg="gray.50" py={3}>
+                              <Box>
+                                <Text fontWeight="medium" mb={1} fontSize="sm">
+                                  Summary of changes in this version:
+                                </Text>
+                                <Text fontSize="sm" color="gray.700">
+                                  {doc.versionNotes}
+                                </Text>
+                              </Box>
+                            </Td>
+                          </Tr>
+                        )}
+                      </>
                     );
                   })}
                 </Tbody>

@@ -13,7 +13,6 @@ interface CSVRow {
   'Manufacturer / Supplier': string;
   'Model / Version': string;
   'Name / Serial No.': string;
-  'CDE Impacting?': string;
   'Paythru Classification': string;
   Purpose: string;
   Notes: string;
@@ -255,8 +254,6 @@ export async function importAssetsFromCSV(csvFilePathOrContent: string | Buffer)
           continue;
         }
         
-        const cdeImpacting = (row['CDE Impacting?'] || '').trim().toLowerCase() === 'yes';
-        
         await prisma.asset.create({
           data: {
             id: randomUUID(),
@@ -269,7 +266,6 @@ export async function importAssetsFromCSV(csvFilePathOrContent: string | Buffer)
             manufacturer: (row['Manufacturer / Supplier'] || '').trim() || null,
             model: (row['Model / Version'] || '').trim() || null,
             nameSerialNo: (row['Name / Serial No.'] || '').trim() || null,
-            cdeImpacting,
             classificationId,
             purpose: (row.Purpose || '').trim() || null,
             notes: (row.Notes || '').trim() || null,

@@ -37,6 +37,13 @@ jest.mock('../../lib/prisma', () => ({
     user: {
       findUnique: jest.fn(),
     },
+    documentVersionHistory: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+    },
   },
 }));
 
@@ -412,6 +419,322 @@ describe('Documents API', () => {
       await request(app)
         .delete(`/api/documents/${docId}`)
         .expect(404);
+    });
+  });
+
+  describe('GET /api/documents/:id/version-notes', () => {
+    it('should return version notes for current version', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440001';
+      const document = {
+        id: docId,
+        version: '2.0',
+      };
+      const versionHistory = {
+        id: 'vh-1',
+        documentId: docId,
+        version: '2.0',
+        notes: 'Updated data retention policy',
+      };
+
+      prisma.document.findUnique.mockResolvedValue(document);
+      prisma.documentVersionHistory.findFirst.mockResolvedValue(versionHistory);
+      prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+
+      const response = await request(app)
+        .get(`/api/documents/${docId}/version-notes`)
+        .expect(200);
+
+      expect(response.body).toEqual({
+        documentId: docId,
+        version: '2.0',
+        notes: 'Updated data retention policy',
+      });
+    });
+
+    it('should return null notes if no version history exists', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440001';
+      const document = {
+        id: docId,
+        version: '2.0',
+      };
+
+      prisma.document.findUnique.mockResolvedValue(document);
+      prisma.documentVersionHistory.findFirst.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+
+      const response = await request(app)
+        .get(`/api/documents/${docId}/version-notes`)
+        .expect(200);
+
+      expect(response.body.notes).toBeNull();
+    });
+
+    it('should return 404 for non-existent document', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440000';
+      prisma.document.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+
+      await request(app)
+        .get(`/api/documents/${docId}/version-notes`)
+        .expect(404);
+    });
+  });
+
+  describe('GET /api/documents/:id/version-history', () => {
+    it('should return full version history for admin', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440001';
+      const document = { id: docId };
+      const versionHistory = [
+        {
+          id: 'vh-1',
+          documentId: docId,
+          version: '2.0',
+          notes: 'Updated policy',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'vh-2',
+          documentId: docId,
+          version: '1.0',
+          notes: 'Initial version',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+
+      prisma.document.findUnique.mockResolvedValue(document);
+      prisma.documentVersionHistory.findMany.mockResolvedValue(versionHistory);
+      prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+
+      const response = await request(app)
+        .get(`/api/documents/${docId}/version-history`)
+        .expect(200);
+
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0].version).toBe('2.0');
+    });
+
+    it('should return 404 for non-existent document', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440000';
+      prisma.document.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+
+      await request(app)
+        .get(`/api/documents/${docId}/version-history`)
+        .expect(404);
+    });
+  });
+
+  describe('POST /api/documents/:id/version-updates', () => {
+    it('should update document version successfully', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440001';
+      const existingDocument = {
+        id: docId,
+        version: '1.0',
+        status: 'APPROVED',
+        sharePointSiteId: 'site-1',
+        sharePointDriveId: 'drive-1',
+        sharePointItemId: 'item-1',
+      };
+      const updatedDocument = {
+        ...existingDocument,
+        version: '2.0',
+        owner: {
+          id: 'user-1',
+          displayName: 'Owner',
+          email: 'owner@paythru.com',
+        },
+      };
+
+      prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+      prisma.document.findUnique.mockResolvedValue(existingDocument);
+      prisma.documentVersionHistory.findFirst.mockResolvedValue(null);
+      prisma.documentVersionHistory.create.mockResolvedValue({
+        id: 'vh-1',
+        documentId: docId,
+        version: '2.0',
+        notes: 'Updated policy',
+      });
+      prisma.document.update.mockResolvedValue(updatedDocument);
+
+      const response = await request(app)
+        .post(`/api/documents/${docId}/version-updates`)
+        .send({
+          currentVersion: '1.0',
+          newVersion: '2.0',
+          notes: 'Updated policy',
+        })
+        .expect(200);
+
+      expect(response.body.version).toBe('2.0');
+      expect(prisma.document.update).toHaveBeenCalled();
+      expect(prisma.documentVersionHistory.create).toHaveBeenCalled();
+    });
+
+    it('should return 409 if currentVersion does not match', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440001';
+      const existingDocument = {
+        id: docId,
+        version: '2.0', // Different from currentVersion in request
+        status: 'APPROVED',
+      };
+
+      prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+      prisma.document.findUnique.mockResolvedValue(existingDocument);
+
+      const response = await request(app)
+        .post(`/api/documents/${docId}/version-updates`)
+        .send({
+          currentVersion: '1.0',
+          newVersion: '2.0',
+          notes: 'Updated policy',
+        })
+        .expect(409);
+
+      expect(response.body.error).toBe('Version mismatch');
+    });
+
+    it('should update existing version history if version already exists', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440001';
+      const existingDocument = {
+        id: docId,
+        version: '1.0',
+        status: 'APPROVED',
+        sharePointSiteId: 'site-1',
+        sharePointDriveId: 'drive-1',
+        sharePointItemId: 'item-1',
+      };
+      const existingVersionHistory = {
+        id: 'vh-1',
+        documentId: docId,
+        version: '2.0',
+        notes: 'Old notes',
+      };
+      const updatedDocument = {
+        ...existingDocument,
+        version: '2.0',
+        owner: {
+          id: 'user-1',
+          displayName: 'Owner',
+          email: 'owner@paythru.com',
+        },
+      };
+
+      prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+      prisma.document.findUnique.mockResolvedValue(existingDocument);
+      prisma.documentVersionHistory.findFirst.mockResolvedValue(existingVersionHistory);
+      prisma.documentVersionHistory.update.mockResolvedValue({
+        ...existingVersionHistory,
+        notes: 'Updated notes',
+      });
+      prisma.document.update.mockResolvedValue(updatedDocument);
+
+      const response = await request(app)
+        .post(`/api/documents/${docId}/version-updates`)
+        .send({
+          currentVersion: '1.0',
+          newVersion: '2.0',
+          notes: 'Updated notes',
+        })
+        .expect(200);
+
+      expect(prisma.documentVersionHistory.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('PUT /api/documents/:id with versionNotes', () => {
+    it('should update version notes for current version', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440001';
+      const existingDocument = {
+        id: docId,
+        version: '2.0',
+        status: 'APPROVED',
+        sharePointSiteId: 'site-1',
+        sharePointDriveId: 'drive-1',
+        sharePointItemId: 'item-1',
+      };
+      const updatedDocument = {
+        ...existingDocument,
+        title: 'Updated Title',
+        owner: {
+          id: 'user-1',
+          displayName: 'Owner',
+          email: 'owner@paythru.com',
+        },
+      };
+
+      prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+      prisma.document.findUnique.mockResolvedValue(existingDocument);
+      prisma.documentVersionHistory.findFirst.mockResolvedValue(null);
+      prisma.documentVersionHistory.create.mockResolvedValue({
+        id: 'vh-1',
+        documentId: docId,
+        version: '2.0',
+        notes: 'Updated notes',
+      });
+      prisma.document.update.mockResolvedValue(updatedDocument);
+
+      const response = await request(app)
+        .put(`/api/documents/${docId}`)
+        .send({
+          title: 'Updated Title',
+          versionNotes: 'Updated notes',
+        })
+        .expect(200);
+
+      expect(response.body.title).toBe('Updated Title');
+      expect(prisma.documentVersionHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            notes: 'Updated notes',
+            version: '2.0',
+          }),
+        })
+      );
+    });
+
+    it('should not allow version changes through PUT endpoint', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440001';
+      const existingDocument = {
+        id: docId,
+        version: '1.0',
+        status: 'APPROVED',
+      };
+      const updatedDocument = {
+        ...existingDocument,
+        title: 'Updated Title',
+        version: '1.0', // Version should remain unchanged
+        owner: {
+          id: 'user-1',
+          displayName: 'Owner',
+          email: 'owner@paythru.com',
+        },
+      };
+
+      prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+      prisma.document.findUnique.mockResolvedValue(existingDocument);
+      prisma.documentVersionHistory.findFirst.mockResolvedValue(null);
+      prisma.documentVersionHistory.create.mockResolvedValue({});
+      prisma.document.update.mockResolvedValue(updatedDocument);
+
+      const response = await request(app)
+        .put(`/api/documents/${docId}`)
+        .send({
+          title: 'Updated Title',
+          version: '2.0', // This should be ignored
+          versionNotes: 'Some notes',
+        })
+        .expect(200);
+
+      // Version should not be in the update call
+      expect(prisma.document.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.not.objectContaining({
+            version: '2.0',
+          }),
+        })
+      );
     });
   });
 });
