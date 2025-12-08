@@ -199,7 +199,6 @@ router.post(
     body('manufacturer').optional().isString(),
     body('model').optional().isString(),
     body('nameSerialNo').optional().isString(),
-    body('cdeImpacting').optional().isBoolean(),
     body('purpose').optional().isString(),
     body('notes').optional().isString(),
     body('cost').optional().isString(),
@@ -219,7 +218,6 @@ router.post(
           manufacturer: req.body.manufacturer,
           model: req.body.model,
           nameSerialNo: req.body.nameSerialNo,
-          cdeImpacting: req.body.cdeImpacting ?? false,
           classificationId: req.body.classificationId,
           purpose: req.body.purpose,
           notes: req.body.notes,
@@ -278,7 +276,6 @@ router.put(
     body('manufacturer').optional().isString(),
     body('model').optional().isString(),
     body('nameSerialNo').optional().isString(),
-    body('cdeImpacting').optional().isBoolean(),
     body('purpose').optional().isString(),
     body('notes').optional().isString(),
     body('cost').optional().isString(),
@@ -298,7 +295,6 @@ router.put(
       if (req.body.manufacturer !== undefined) updateData.manufacturer = req.body.manufacturer;
       if (req.body.model !== undefined) updateData.model = req.body.model;
       if (req.body.nameSerialNo !== undefined) updateData.nameSerialNo = req.body.nameSerialNo;
-      if (req.body.cdeImpacting !== undefined) updateData.cdeImpacting = req.body.cdeImpacting;
       if (req.body.purpose !== undefined) updateData.purpose = req.body.purpose;
       if (req.body.notes !== undefined) updateData.notes = req.body.notes;
       if (req.body.cost !== undefined) updateData.cost = req.body.cost;

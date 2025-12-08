@@ -50,7 +50,6 @@ interface Asset {
   manufacturer: string | null;
   model: string | null;
   nameSerialNo: string | null;
-  cdeImpacting: boolean;
   classificationId: string;
   purpose: string | null;
   notes: string | null;
@@ -190,7 +189,6 @@ export function AssetsPage() {
       assetCategoryId: '',
       classificationId: '',
       owner: '',
-      cdeImpacting: false,
     };
     setFormData(initialData);
     setFormErrors({});
@@ -211,7 +209,6 @@ export function AssetsPage() {
       manufacturer: asset.manufacturer || '',
       model: asset.model || '',
       nameSerialNo: asset.nameSerialNo || '',
-      cdeImpacting: asset.cdeImpacting,
       classificationId: asset.classificationId,
       purpose: asset.purpose || '',
       notes: asset.notes || '',
@@ -375,7 +372,6 @@ export function AssetsPage() {
       'Manufacturer',
       'Model',
       'Serial No',
-      'CDE Impacting',
       'Classification',
       'Purpose',
       'Notes',
@@ -392,7 +388,6 @@ export function AssetsPage() {
       asset.manufacturer || '',
       asset.model || '',
       asset.nameSerialNo || '',
-      asset.cdeImpacting ? 'Yes' : 'No',
       asset.classification.name,
       asset.purpose || '',
       asset.notes || '',
@@ -506,7 +501,6 @@ export function AssetsPage() {
         'Manufacturer',
         'Model',
         'Serial No',
-        'CDE Impacting',
         'Classification',
         'Purpose',
         'Notes',
@@ -523,7 +517,6 @@ export function AssetsPage() {
         asset.manufacturer || '',
         asset.model || '',
         asset.nameSerialNo || '',
-        asset.cdeImpacting ? 'Yes' : 'No',
         asset.classification.name,
         asset.purpose || '',
         asset.notes || '',
@@ -672,20 +665,6 @@ export function AssetsPage() {
       ),
     },
     {
-      key: 'cdeImpacting',
-      header: 'CDE',
-      render: (asset) =>
-        asset.cdeImpacting ? (
-          <Badge colorScheme="red" display="flex" alignItems="center" justifyContent="center" w="50px">
-            ✓
-          </Badge>
-        ) : (
-          <Badge colorScheme="gray" display="flex" alignItems="center" justifyContent="center" w="50px">
-            ✗
-          </Badge>
-        ),
-    },
-    {
       key: 'risks',
       header: 'Risks',
       render: (asset) =>
@@ -770,7 +749,6 @@ export function AssetsPage() {
       'Manufacturer / Supplier',
       'Model / Version',
       'Name / Serial No.',
-      'CDE Impacting?',
       'Paythru Classification',
       'Purpose',
       'Notes',
@@ -786,7 +764,6 @@ export function AssetsPage() {
       'Dell',
       'Latitude 5430',
       'ABC123',
-      'No',
       'Paythru Confidential',
       'Administrative work',
       '',
@@ -1070,16 +1047,6 @@ export function AssetsPage() {
                 )}
               </FormControl>
               <FormControl>
-                <FormLabel>CDE Impacting</FormLabel>
-                <Select
-                  value={formData.cdeImpacting ? 'true' : 'false'}
-                  onChange={(e) => setFormData({ ...formData, cdeImpacting: e.target.value === 'true' })}
-                >
-                  <option value="false">No</option>
-                  <option value="true">Yes</option>
-                </Select>
-              </FormControl>
-              <FormControl>
                 <FormLabel>Purpose</FormLabel>
                 <Input
                   value={formData.purpose || ''}
@@ -1130,7 +1097,6 @@ export function AssetsPage() {
                   <Text>• Date format: DD/MM/YYYY (e.g., 01/01/2025)</Text>
                   <Text>• Asset Category: Must match an existing category</Text>
                   <Text>• Paythru Classification: Must be one of: Public, Paythru Sensitive, Paythru Confidential, Paythru Proprietary</Text>
-                  <Text>• CDE Impacting?: Yes or No</Text>
                   <Text>• All other fields are optional</Text>
                 </VStack>
               </Box>

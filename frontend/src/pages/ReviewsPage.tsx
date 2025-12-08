@@ -47,8 +47,9 @@ import {
 import { ChevronDownIcon, WarningIcon, TimeIcon, CheckCircleIcon, InfoIcon } from '@chakra-ui/icons';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { ReviewFormModal } from '../components/ReviewFormModal';
+import { SetReviewDateModal } from '../components/SetReviewDateModal';
 import { DocumentFormModal } from '../components/DocumentFormModal';
+import { VersionUpdateModal } from '../components/VersionUpdateModal';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ReviewTask {
@@ -131,14 +132,14 @@ export function ReviewsPage() {
   const [loading, setLoading] = useState(true);
   const [tabIndex, setTabIndex] = useState(0);
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { isOpen: isCompleteOpen, onOpen: onCompleteOpen, onClose: onCompleteClose } = useDisclosure();
   const { isOpen: isDocumentOpen, onOpen: onDocumentOpen, onClose: onDocumentClose } = useDisclosure();
   const { isOpen: isDocumentEditOpen, onOpen: onDocumentEditOpen, onClose: onDocumentEditClose } = useDisclosure();
   const { isOpen: isBulkReviewOpen, onOpen: onBulkReviewOpen, onClose: onBulkReviewClose } = useDisclosure();
+  const { isOpen: isVersionUpdateOpen, onOpen: onVersionUpdateOpen, onClose: onVersionUpdateClose } = useDisclosure();
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
-  const [selectedReview, setSelectedReview] = useState<ReviewTask | null>(null);
   const [selectedDocumentForView, setSelectedDocumentForView] = useState<any>(null);
   const [selectedDocumentForEdit, setSelectedDocumentForEdit] = useState<any>(null);
+  const [selectedDocumentForVersionUpdate, setSelectedDocumentForVersionUpdate] = useState<any>(null);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<Set<string>>(new Set());
   const [bulkReviewDate, setBulkReviewDate] = useState<string>('');
   const [bulkSettingReviewDate, setBulkSettingReviewDate] = useState(false);
@@ -195,40 +196,6 @@ export function ReviewsPage() {
     fetchDashboard();
   };
 
-  const handleCompleteReview = (review: ReviewTask) => {
-    setSelectedReview(review);
-    onCompleteOpen();
-  };
-
-  const handleCompleteReviewSubmit = async (changeNotes: string) => {
-    if (!selectedReview) return;
-    
-    try {
-      await api.put(`/api/reviews/${selectedReview.id}/complete`, {
-        changeNotes,
-      });
-      toast({
-        title: 'Success',
-        description: 'Review marked as completed',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-        position: 'top-right',
-      });
-      onCompleteClose();
-      setSelectedReview(null);
-      fetchDashboard();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to complete review',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-        position: 'top-right',
-      });
-    }
-  };
 
   const handleViewDocument = async (documentId: string) => {
     try {
@@ -262,6 +229,29 @@ export function ReviewsPage() {
         position: 'top-right',
       });
     }
+  };
+
+  const handleUpdateVersion = async (documentId: string) => {
+    try {
+      const response = await api.get(`/api/documents/${documentId}`);
+      setSelectedDocumentForVersionUpdate(response.data);
+      onVersionUpdateOpen();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load document for version update',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+        position: 'top-right',
+      });
+    }
+  };
+
+  const handleVersionUpdateSuccess = () => {
+    fetchDashboard();
+    onVersionUpdateClose();
+    setSelectedDocumentForVersionUpdate(null);
   };
 
   const handleNavigateToTab = (index: number) => {
@@ -333,36 +323,6 @@ export function ReviewsPage() {
     }
   };
 
-  const handleQuickSetReviewDate = async (documentId: string) => {
-    try {
-      const today = new Date();
-      const nextYear = new Date(today);
-      nextYear.setFullYear(today.getFullYear() + 1);
-      
-      await api.post('/api/reviews/bulk-set-review-date', {
-        documentIds: [documentId],
-        reviewDate: nextYear.toISOString().split('T')[0],
-      });
-      toast({
-        title: 'Success',
-        description: 'Review date set to 1 year from today',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-        position: 'top-right',
-      });
-      fetchDashboard();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to set review date',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-        position: 'top-right',
-      });
-    }
-  };
 
   const statusColors: Record<string, string> = {
     PENDING: 'yellow',
@@ -596,28 +556,13 @@ export function ReviewsPage() {
                             </Td>
                             {canEdit && (
                               <Td>
-                                <HStack spacing={2}>
-                                  <Button
-                                    size="sm"
-                                    colorScheme="blue"
-                                    onClick={() => handleEditDocument(review.document.id)}
-                                  >
-                                    Edit Document
-                                  </Button>
-                                  <Menu>
-                                    <MenuButton
-                                      as={IconButton}
-                                      icon={<ChevronDownIcon />}
-                                      size="sm"
-                                      variant="outline"
-                                    />
-                                    <MenuList>
-                                      <MenuItem onClick={() => handleCompleteReview(review)}>
-                                        Mark Review Complete
-                                      </MenuItem>
-                                    </MenuList>
-                                  </Menu>
-                                </HStack>
+                                <Button
+                                  size="sm"
+                                  colorScheme="blue"
+                                  onClick={() => handleEditDocument(review.document.id)}
+                                >
+                                  Edit Document
+                                </Button>
                               </Td>
                             )}
                           </Tr>
@@ -725,7 +670,6 @@ export function ReviewsPage() {
                       <Th>Reviewer/Owner</Th>
                       <Th>Review Date</Th>
                       <Th>Days Overdue</Th>
-                      <Th>Status</Th>
                       {canEdit && <Th>Actions</Th>}
                     </Tr>
                   </Thead>
@@ -755,7 +699,7 @@ export function ReviewsPage() {
                           ) : (
                             <VStack align="start" spacing={1}>
                               <Text>{item.document.owner?.displayName || 'N/A'}</Text>
-                              <Badge colorScheme="orange" fontSize="xs">No Task</Badge>
+                              <Badge colorScheme="gray" fontSize="xs">Owner</Badge>
                             </VStack>
                           )}
                         </Td>
@@ -769,73 +713,23 @@ export function ReviewsPage() {
                         <Td>
                           <Badge colorScheme="red">{item.daysOverdue} days</Badge>
                         </Td>
-                        <Td>
-                          {item.hasAssignedTask && item.status ? (
-                            <Tooltip label={getStatusTooltip(item.status, item.dueDate)}>
-                              <Badge colorScheme={statusColors[item.status] || 'gray'}>
-                                {getStatusLabel(item.status, item.dueDate)}
-                              </Badge>
-                            </Tooltip>
-                          ) : (
-                            <Badge colorScheme="orange">Needs Task</Badge>
-                          )}
-                        </Td>
                         {canEdit && (
                           <Td>
                             <HStack spacing={2}>
-                              {item.hasAssignedTask && item.type === 'REVIEW_TASK' ? (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    colorScheme="blue"
-                                    onClick={() => handleEditDocument(item.documentId)}
-                                  >
-                                    Edit Document
-                                  </Button>
-                                  <Menu>
-                                    <MenuButton
-                                      as={IconButton}
-                                      icon={<ChevronDownIcon />}
-                                      size="sm"
-                                      variant="outline"
-                                    />
-                                    <MenuList>
-                                      <MenuItem onClick={async () => {
-                                        // Find the review task by ID
-                                        const review = dashboardData?.overdueReviews?.find(r => r.id === item.id);
-                                        if (review) {
-                                          handleCompleteReview(review);
-                                        }
-                                      }}>
-                                        Mark Review Complete
-                                      </MenuItem>
-                                    </MenuList>
-                                  </Menu>
-                                </>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  colorScheme="blue"
-                                  onClick={() => {
-                                    // Create a document object from the overdue item
-                                    const doc: Document = {
-                                      id: item.documentId,
-                                      title: item.document.title,
-                                      version: item.document.version,
-                                      type: item.document.type,
-                                      nextReviewDate: item.document.nextReviewDate || null,
-                                      owner: item.document.owner || {
-                                        id: '',
-                                        displayName: 'Unknown',
-                                        email: '',
-                                      },
-                                    };
-                                    handleCreateReview(doc);
-                                  }}
-                                >
-                                  Schedule Review
-                                </Button>
-                              )}
+                              <Button
+                                size="sm"
+                                colorScheme="blue"
+                                onClick={() => handleEditDocument(item.documentId)}
+                              >
+                                Edit Document
+                              </Button>
+                              <Button
+                                size="sm"
+                                colorScheme="green"
+                                onClick={() => handleUpdateVersion(item.documentId)}
+                              >
+                                Update Version
+                              </Button>
                             </HStack>
                           </Td>
                         )}
@@ -843,7 +737,7 @@ export function ReviewsPage() {
                     ))}
                     {(!dashboardData?.overdueItems || dashboardData.overdueItems.length === 0) && (
                       <Tr>
-                        <Td colSpan={canEdit ? 6 : 5} textAlign="center" py={8}>
+                        <Td colSpan={canEdit ? 5 : 4} textAlign="center" py={8}>
                           <VStack spacing={3}>
                             <CheckCircleIcon boxSize={8} color="green.400" />
                             <Text color="gray.500" fontSize="md">No overdue reviews</Text>
@@ -1044,23 +938,13 @@ export function ReviewsPage() {
                             </Td>
                             <Td>{doc.owner.displayName}</Td>
                             <Td>
-                              <HStack spacing={2}>
-                                <Button
-                                  size="sm"
-                                  colorScheme="blue"
-                                  variant="outline"
-                                  onClick={() => handleQuickSetReviewDate(doc.id)}
-                                >
-                                  Set Review Date
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  colorScheme="orange"
-                                  onClick={() => handleCreateReview(doc)}
-                                >
-                                  Schedule Review
-                                </Button>
-                              </HStack>
+                              <Button
+                                size="sm"
+                                colorScheme="orange"
+                                onClick={() => handleCreateReview(doc)}
+                              >
+                                Schedule Review
+                              </Button>
                             </Td>
                           </Tr>
                         ))}
@@ -1085,21 +969,17 @@ export function ReviewsPage() {
         </TabPanels>
       </Tabs>
 
-      <ReviewFormModal
+      <SetReviewDateModal
         isOpen={isOpen}
-        onClose={handleClose}
+        onClose={(success) => {
+          if (success) {
+            fetchDashboard();
+          }
+          handleClose();
+        }}
         document={selectedDocument}
       />
 
-      <CompleteReviewModal
-        isOpen={isCompleteOpen}
-        onClose={() => {
-          onCompleteClose();
-          setSelectedReview(null);
-        }}
-        review={selectedReview}
-        onComplete={handleCompleteReviewSubmit}
-      />
 
       <DocumentFormModal
         isOpen={isDocumentOpen}
@@ -1121,6 +1001,19 @@ export function ReviewsPage() {
         document={selectedDocumentForEdit}
         readOnly={false}
         isReviewContext={true}
+      />
+
+      <VersionUpdateModal
+        isOpen={isVersionUpdateOpen}
+        onClose={() => {
+          onVersionUpdateClose();
+          setSelectedDocumentForVersionUpdate(null);
+        }}
+        currentVersion={selectedDocumentForVersionUpdate?.version || ''}
+        documentId={selectedDocumentForVersionUpdate?.id || ''}
+        onSuccess={handleVersionUpdateSuccess}
+        currentLastReviewDate={selectedDocumentForVersionUpdate?.lastReviewDate ? new Date(selectedDocumentForVersionUpdate.lastReviewDate).toISOString().split('T')[0] : null}
+        currentNextReviewDate={selectedDocumentForVersionUpdate?.nextReviewDate ? new Date(selectedDocumentForVersionUpdate.nextReviewDate).toISOString().split('T')[0] : null}
       />
 
       {/* Bulk Set Review Date Modal */}
@@ -1167,86 +1060,4 @@ export function ReviewsPage() {
   );
 }
 
-// Complete Review Modal Component
-interface CompleteReviewModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  review: ReviewTask | null;
-  onComplete: (changeNotes: string) => void;
-}
-
-function CompleteReviewModal({ isOpen, onClose, review, onComplete }: CompleteReviewModalProps) {
-  const [changeNotes, setChangeNotes] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (isOpen && review) {
-      setChangeNotes(review.changeNotes || '');
-    } else {
-      setChangeNotes('');
-    }
-  }, [isOpen, review]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      onComplete(changeNotes);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md">
-      <ModalOverlay />
-      <ModalContent>
-        <form onSubmit={handleSubmit}>
-          <ModalHeader>Complete Review</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4}>
-              {review && (
-                <>
-                  <FormControl>
-                    <FormLabel>Document</FormLabel>
-                    <Input value={review.document.title} isReadOnly />
-                  </FormControl>
-                  <FormControl>
-                    <FormLabel>Reviewer</FormLabel>
-                    <Input value={review.reviewer.displayName} isReadOnly />
-                  </FormControl>
-                  <FormControl>
-                    <FormLabel>Due Date</FormLabel>
-                    <Input
-                      value={new Date(review.dueDate).toLocaleDateString('en-GB')}
-                      isReadOnly
-                    />
-                  </FormControl>
-                </>
-              )}
-              <FormControl>
-                <FormLabel>Change Notes</FormLabel>
-                <Textarea
-                  value={changeNotes}
-                  onChange={(e) => setChangeNotes(e.target.value)}
-                  placeholder="Describe any changes made or confirm 'No changes required'..."
-                  rows={4}
-                />
-              </FormControl>
-            </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onClose}>
-              Cancel
-            </Button>
-            <Button colorScheme="green" type="submit" isLoading={loading}>
-              Mark Complete
-            </Button>
-          </ModalFooter>
-        </form>
-      </ModalContent>
-    </Modal>
-  );
-}
 

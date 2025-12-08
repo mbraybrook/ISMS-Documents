@@ -39,6 +39,7 @@ interface Document {
   confluenceSpaceKey?: string;
   confluencePageId?: string;
   documentUrl?: string | null; // Cached URL for the document
+  versionNotes?: string | null; // Version notes for current version
 }
 
 export function AcknowledgmentPage() {
@@ -82,7 +83,28 @@ export function AcknowledgmentPage() {
     try {
       setLoading(true);
       const response = await api.get('/api/acknowledgments/pending');
-      setDocuments(response.data);
+      const docs = response.data;
+      
+      // Fetch version notes for each document
+      const docsWithNotes = await Promise.all(
+        docs.map(async (doc: Document) => {
+          try {
+            const notesResponse = await api.get(`/api/documents/${doc.id}/version-notes?version=current`);
+            return {
+              ...doc,
+              versionNotes: notesResponse.data.notes || null,
+            };
+          } catch (error) {
+            console.error(`Error fetching version notes for document ${doc.id}:`, error);
+            return {
+              ...doc,
+              versionNotes: null,
+            };
+          }
+        })
+      );
+      
+      setDocuments(docsWithNotes);
     } catch (error) {
       console.error('Error fetching pending documents:', error);
       toast({
@@ -251,45 +273,61 @@ export function AcknowledgmentPage() {
                   {documents.map((doc) => {
                     const url = documentUrls[doc.id];
                     return (
-                      <Tr key={doc.id}>
-                        <Td>
-                          {url ? (
-                            <Link href={url} isExternal color="blue.500">
-                              {doc.title}
-                            </Link>
-                          ) : (
-                            doc.title
-                          )}
-                        </Td>
-                        <Td>{doc.type}</Td>
-                        <Td>{doc.version}</Td>
-                        <Td>{doc.owner.displayName}</Td>
-                        <Td>
-                          {doc.lastReviewDate
-                            ? new Date(doc.lastReviewDate).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                              })
-                            : 'N/A'}
-                        </Td>
-                        <Td>
-                          {doc.lastChangedDate
-                            ? new Date(doc.lastChangedDate).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                              })
-                            : 'N/A'}
-                        </Td>
-                        <Td>
-                          {url && (
-                            <Link href={url} isExternal color="blue.500">
-                              Open Document
-                            </Link>
-                          )}
-                        </Td>
-                      </Tr>
+                      <>
+                        <Tr key={doc.id}>
+                          <Td>
+                            {url ? (
+                              <Link href={url} isExternal color="blue.500">
+                                {doc.title}
+                              </Link>
+                            ) : (
+                              doc.title
+                            )}
+                          </Td>
+                          <Td>{doc.type}</Td>
+                          <Td>{doc.version}</Td>
+                          <Td>{doc.owner.displayName}</Td>
+                          <Td>
+                            {doc.lastReviewDate
+                              ? new Date(doc.lastReviewDate).toLocaleDateString('en-GB', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                })
+                              : 'N/A'}
+                          </Td>
+                          <Td>
+                            {doc.lastChangedDate
+                              ? new Date(doc.lastChangedDate).toLocaleDateString('en-GB', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                })
+                              : 'N/A'}
+                          </Td>
+                          <Td>
+                            {url && (
+                              <Link href={url} isExternal color="blue.500">
+                                Open Document
+                              </Link>
+                            )}
+                          </Td>
+                        </Tr>
+                        {doc.versionNotes && (
+                          <Tr>
+                            <Td colSpan={7} bg="gray.50" py={3}>
+                              <Box>
+                                <Text fontWeight="medium" mb={1} fontSize="sm">
+                                  Summary of changes in this version:
+                                </Text>
+                                <Text fontSize="sm" color="gray.700">
+                                  {doc.versionNotes}
+                                </Text>
+                              </Box>
+                            </Td>
+                          </Tr>
+                        )}
+                      </>
                     );
                   })}
                 </Tbody>

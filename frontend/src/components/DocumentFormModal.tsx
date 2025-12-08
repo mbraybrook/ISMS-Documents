@@ -35,6 +35,7 @@ import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
 import { SharePointFileBrowser } from './SharePointFileBrowser';
+import { VersionUpdateModal } from './VersionUpdateModal';
 
 interface DocumentFormModalProps {
   isOpen: boolean;
@@ -62,6 +63,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     lastReviewDate: '',
     nextReviewDate: '',
     requiresAcknowledgement: false,
+    versionNotes: '',
   });
   const [loading, setLoading] = useState(false);
   const [sharePointUrl, setSharePointUrl] = useState('');
@@ -74,6 +76,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   const [users, setUsers] = useState<Array<{ id: string; displayName: string; email: string; role: string }>>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose } = useDisclosure();
+  const { isOpen: isVersionUpdateOpen, onOpen: onVersionUpdateOpen, onClose: onVersionUpdateClose } = useDisclosure();
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -149,6 +152,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         lastReviewDate: '',
         nextReviewDate: '',
         requiresAcknowledgement: false,
+        versionNotes: '',
       });
       setSharePointUrl('');
       setUrlError(null);
@@ -163,6 +167,17 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         loadDocumentUrl(document);
       }
       
+      // Load version notes for current version
+      const loadVersionNotes = async () => {
+        try {
+          const response = await api.get(`/api/documents/${document.id}/version-notes?version=current`);
+          return response.data.notes || '';
+        } catch (error) {
+          console.error('Error loading version notes:', error);
+          return '';
+        }
+      };
+
       // If opened from review context, set next review date to today + 1 year
       let nextReviewDate = document.nextReviewDate
         ? new Date(document.nextReviewDate).toISOString().split('T')[0]
@@ -175,23 +190,30 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         nextReviewDate = nextYear.toISOString().split('T')[0];
       }
       
-      setFormData({
-        title: document.title || '',
-        type: document.type || 'POLICY',
-        storageLocation: document.storageLocation || 'SHAREPOINT',
-        version: document.version || '1.0',
-        status: document.status || 'DRAFT',
-        ownerUserId: document.ownerUserId || user?.id || '',
-        sharePointSiteId: document.sharePointSiteId || '',
-        sharePointDriveId: document.sharePointDriveId || '',
-        sharePointItemId: document.sharePointItemId || '',
-        confluenceSpaceKey: document.confluenceSpaceKey || '',
-        confluencePageId: document.confluencePageId || '',
-        lastReviewDate: document.lastReviewDate
-          ? new Date(document.lastReviewDate).toISOString().split('T')[0]
-          : '',
-        nextReviewDate: nextReviewDate,
-        requiresAcknowledgement: document.requiresAcknowledgement ?? (document.type === 'POLICY'),
+      // Set form data and load version notes
+      loadVersionNotes().then((versionNotes) => {
+        setFormData({
+          title: document.title || '',
+          type: document.type || 'POLICY',
+          storageLocation: document.storageLocation || 'SHAREPOINT',
+          version: document.version || '1.0',
+          status: document.status || 'DRAFT',
+          ownerUserId: document.ownerUserId || user?.id || '',
+          sharePointSiteId: document.sharePointSiteId || '',
+          sharePointDriveId: document.sharePointDriveId || '',
+          sharePointItemId: document.sharePointItemId || '',
+          confluenceSpaceKey: document.confluenceSpaceKey || '',
+          confluencePageId: document.confluencePageId || '',
+          lastReviewDate: document.lastReviewDate
+            ? new Date(document.lastReviewDate).toISOString().split('T')[0]
+            : '',
+          nextReviewDate: nextReviewDate,
+          // Default to true for POLICY documents, but allow existing value to be changed
+          requiresAcknowledgement: document.type === 'POLICY' 
+            ? (document.requiresAcknowledgement ?? true)
+            : (document.requiresAcknowledgement ?? false),
+          versionNotes: versionNotes,
+        });
       });
     } else {
       // Auto-populate default dates for new documents
@@ -214,6 +236,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         lastReviewDate: today.toISOString().split('T')[0],
         nextReviewDate: nextYear.toISOString().split('T')[0],
         requiresAcknowledgement: true, // Default to true for POLICY type
+        versionNotes: '',
       });
     }
   }, [document, user, isOpen, isReviewContext, readOnly]);
@@ -441,15 +464,6 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       return;
     }
 
-    // Check if editing an APPROVED document and version is changing
-    if (document && document.status === 'APPROVED' && formData.version !== document.version) {
-      if (!pendingSubmit) {
-        setPendingSubmit(true);
-        onConfirmOpen();
-        return;
-      }
-    }
-
     setLoading(true);
 
     try {
@@ -463,6 +477,10 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       if (payload.confluencePageId === '') delete payload.confluencePageId;
 
       if (document) {
+        // Remove version from payload when updating (version can only be changed via version-updates endpoint)
+        delete payload.version;
+        // Include versionNotes for current version
+        // versionNotes will be handled by backend to upsert
         await api.put(`/api/documents/${document.id}`, payload);
         toast({
           title: 'Success',
@@ -508,6 +526,37 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     handleSubmit();
   };
 
+  const handleVersionUpdateSuccess = async () => {
+    // Reload document data to get updated version and review dates
+    if (document) {
+      try {
+        const response = await api.get(`/api/documents/${document.id}`);
+        const updatedDocument = response.data;
+        
+        // Update form data with new version and review dates
+        setFormData((prev) => ({
+          ...prev,
+          version: updatedDocument.version,
+          lastReviewDate: updatedDocument.lastReviewDate
+            ? new Date(updatedDocument.lastReviewDate).toISOString().split('T')[0]
+            : '',
+          nextReviewDate: updatedDocument.nextReviewDate
+            ? new Date(updatedDocument.nextReviewDate).toISOString().split('T')[0]
+            : '',
+        }));
+
+        // Reload version notes for the new version
+        const notesResponse = await api.get(`/api/documents/${document.id}/version-notes?version=current`);
+        setFormData((prev) => ({
+          ...prev,
+          versionNotes: notesResponse.data.notes || '',
+        }));
+      } catch (error) {
+        console.error('Error reloading document after version update:', error);
+      }
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl">
       <ModalOverlay />
@@ -535,8 +584,9 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                     setFormData({
                       ...formData,
                       type: newType,
-                      // Auto-set requiresAcknowledgement for POLICY type
-                      requiresAcknowledgement: newType === 'POLICY',
+                      // Auto-set requiresAcknowledgement to true only when changing TO POLICY
+                      // Don't change it when changing away from POLICY (user may want to keep it)
+                      requiresAcknowledgement: newType === 'POLICY' ? true : formData.requiresAcknowledgement,
                     });
                   }}
                   isDisabled={readOnly}
@@ -566,12 +616,41 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
 
               <FormControl isRequired>
                 <FormLabel>Version</FormLabel>
-                <Input
-                  value={formData.version}
-                  onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                  isReadOnly={readOnly}
-                />
+                <HStack spacing={2}>
+                  <Input
+                    value={formData.version}
+                    isReadOnly={true}
+                    bg="gray.50"
+                    flex={1}
+                  />
+                  {!readOnly && document && (
+                    <Button
+                      size="md"
+                      colorScheme="blue"
+                      variant="outline"
+                      onClick={onVersionUpdateOpen}
+                    >
+                      Update version
+                    </Button>
+                  )}
+                </HStack>
               </FormControl>
+
+              {!readOnly && document && (
+                <FormControl>
+                  <FormLabel>Version Notes</FormLabel>
+                  <Textarea
+                    value={formData.versionNotes}
+                    onChange={(e) => setFormData({ ...formData, versionNotes: e.target.value })}
+                    placeholder="Briefly describe what changed in this version..."
+                    rows={3}
+                    resize="vertical"
+                  />
+                  <Text fontSize="xs" color="gray.500" mt={1}>
+                    Briefly describe what changed in this version.
+                  </Text>
+                </FormControl>
+              )}
 
               <FormControl isRequired>
                 <FormLabel>Status</FormLabel>
@@ -806,34 +885,73 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                 </>
               )}
 
-              <FormControl>
-                <FormLabel>Last Review Date</FormLabel>
-                  <Input
-                  type="date"
-                  value={formData.lastReviewDate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, lastReviewDate: e.target.value })
-                  }
-                  isReadOnly={readOnly}
-                />
-              </FormControl>
+              {document ? (
+                // For existing documents, show review dates as text
+                <>
+                  <FormControl>
+                    <FormLabel>Last Review Date</FormLabel>
+                    <Text fontSize="md" color="gray.700">
+                      {formData.lastReviewDate
+                        ? new Date(formData.lastReviewDate).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })
+                        : 'Not set'}
+                    </Text>
+                  </FormControl>
 
-              <FormControl>
-                <FormLabel>Next Review Date</FormLabel>
-                  <Input
-                  type="date"
-                  value={formData.nextReviewDate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nextReviewDate: e.target.value })
-                  }
-                  isReadOnly={readOnly}
-                />
-                {isReviewContext && !readOnly && (
-                  <Text fontSize="xs" color="blue.600" mt={1}>
-                    Next review date set to 1 year from today. You can change this if needed.
-                  </Text>
-                )}
-              </FormControl>
+                  <FormControl>
+                    <FormLabel>Next Review Date</FormLabel>
+                    <Text fontSize="md" color="gray.700">
+                      {formData.nextReviewDate
+                        ? new Date(formData.nextReviewDate).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })
+                        : 'Not set'}
+                    </Text>
+                  </FormControl>
+                  {!readOnly && (
+                    <Text fontSize="xs" color="gray.500" mt={1}>
+                      Review dates are updated when you update the document version.
+                    </Text>
+                  )}
+                </>
+              ) : (
+                // For new documents, show editable date inputs
+                <>
+                  <FormControl>
+                    <FormLabel>Last Review Date</FormLabel>
+                    <Input
+                      type="date"
+                      value={formData.lastReviewDate}
+                      onChange={(e) =>
+                        setFormData({ ...formData, lastReviewDate: e.target.value })
+                      }
+                      isReadOnly={readOnly}
+                    />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Next Review Date</FormLabel>
+                    <Input
+                      type="date"
+                      value={formData.nextReviewDate}
+                      onChange={(e) =>
+                        setFormData({ ...formData, nextReviewDate: e.target.value })
+                      }
+                      isReadOnly={readOnly}
+                    />
+                    {isReviewContext && !readOnly && (
+                      <Text fontSize="xs" color="blue.600" mt={1}>
+                        Next review date set to 1 year from today. You can change this if needed.
+                      </Text>
+                    )}
+                  </FormControl>
+                </>
+              )}
 
               <FormControl>
                 <Checkbox
@@ -841,13 +959,13 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                   onChange={(e) =>
                     setFormData({ ...formData, requiresAcknowledgement: e.target.checked })
                   }
-                  isDisabled={readOnly || formData.type === 'POLICY'}
+                  isDisabled={readOnly}
                 >
                   Requires Staff Acknowledgment
                 </Checkbox>
                 {formData.type === 'POLICY' && (
                   <Text fontSize="sm" color="gray.600" mt={1} ml={6}>
-                    Policy documents automatically require staff acknowledgment when changed.
+                    Policy documents default to requiring staff acknowledgment, but this can be changed if needed.
                   </Text>
                 )}
               </FormControl>
@@ -913,6 +1031,16 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
+
+      <VersionUpdateModal
+        isOpen={isVersionUpdateOpen}
+        onClose={onVersionUpdateClose}
+        currentVersion={formData.version}
+        documentId={document?.id || ''}
+        onSuccess={handleVersionUpdateSuccess}
+        currentLastReviewDate={document?.lastReviewDate ? new Date(document.lastReviewDate).toISOString().split('T')[0] : null}
+        currentNextReviewDate={document?.nextReviewDate ? new Date(document.nextReviewDate).toISOString().split('T')[0] : null}
+      />
     </Modal>
   );
 }

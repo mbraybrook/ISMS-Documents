@@ -107,7 +107,7 @@ model Control {
 }
 
 model Document {
-  id                      String            @id
+  id                      String                  @id
   title                   String
   type                    String
   storageLocation         String
@@ -121,17 +121,18 @@ model Document {
   ownerUserId             String
   lastReviewDate          DateTime?
   nextReviewDate          DateTime?
-  requiresAcknowledgement Boolean           @default(false)
+  requiresAcknowledgement Boolean                 @default(false)
   lastChangedDate         DateTime?
-  createdAt               DateTime          @default(now())
+  createdAt               DateTime                @default(now())
   updatedAt               DateTime
   documentUrl             String?
   Acknowledgment          Acknowledgment[]
-  owner                   User              @relation("DocumentOwner", fields: [ownerUserId], references: [id])
+  owner                   User                    @relation("DocumentOwner", fields: [ownerUserId], references: [id])
   DocumentControl         DocumentControl[]
   DocumentRisk            DocumentRisk[]
   ReviewTask              ReviewTask[]
   TrustDocSetting         TrustDocSetting?
+  DocumentVersionHistory  DocumentVersionHistory[]
 
   @@index([nextReviewDate])
   @@index([ownerUserId])
@@ -159,6 +160,27 @@ model DocumentRisk {
   @@id([documentId, riskId])
   @@index([riskId])
   @@index([documentId])
+}
+
+model DocumentVersionHistory {
+  id                String    @id @default(uuid())
+  documentId        String?   // Nullable to allow history retention after document deletion
+  version           String
+  notes             String?
+  // Store SharePoint IDs to enable history restoration when document is re-added
+  sharePointSiteId  String?
+  sharePointDriveId String?
+  sharePointItemId  String?
+  createdAt         DateTime  @default(now())
+  createdBy         String
+  updatedAt         DateTime  @updatedAt
+  updatedBy         String
+  document          Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@unique([documentId, version])
+  @@index([documentId])
+  @@index([version])
+  @@index([sharePointSiteId, sharePointDriveId, sharePointItemId]) // For restoration lookup
 }
 
 model InterestedParty {
