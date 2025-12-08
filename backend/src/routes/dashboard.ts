@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { getRiskLevel, hasPolicyNonConformance } from '../services/riskService';
+import { getRiskDashboardSummary } from '../services/riskDashboardService';
 
 const router = Router();
 
@@ -216,7 +217,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       // Total risk score
       totalRiskScore += risk.calculatedScore;
 
-      // Risk levels
+      // Risk levels (Initial - based on calculatedScore)
       const riskLevel = getRiskLevel(risk.calculatedScore);
       risksByLevel[riskLevel]++;
 
@@ -233,11 +234,13 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
             mitigatedScore: risk.mitigatedScore,
           });
         }
-
-        // Mitigated risk levels
-        const mitigatedLevel = getRiskLevel(risk.mitigatedScore);
-        mitigatedRisksByLevel[mitigatedLevel]++;
       }
+
+      // Mitigated risk levels - include ALL risks
+      // Use mitigatedScore if available, otherwise use calculatedScore (no mitigation applied)
+      const scoreForMitigatedLevel = risk.mitigatedScore !== null ? risk.mitigatedScore : risk.calculatedScore;
+      const mitigatedLevel = getRiskLevel(scoreForMitigatedLevel);
+      mitigatedRisksByLevel[mitigatedLevel]++;
 
       // Treatment categories
       const treatmentCategory = risk.residualRiskTreatmentCategory || risk.initialRiskTreatmentCategory || 'UNCATEGORIZED';
@@ -642,6 +645,17 @@ router.get('/staff', authenticateToken, async (req: AuthRequest, res: Response) 
   } catch (error) {
     console.error('Error fetching staff dashboard data:', error);
     res.status(500).json({ error: 'Failed to fetch staff dashboard data' });
+  }
+});
+
+// GET /api/risk-dashboard/summary - risk dashboard quarterly aggregation
+router.get('/risk-dashboard/summary', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const summary = await getRiskDashboardSummary();
+    res.json(summary);
+  } catch (error) {
+    console.error('Error fetching risk dashboard summary:', error);
+    res.status(500).json({ error: 'Failed to fetch risk dashboard summary' });
   }
 });
 

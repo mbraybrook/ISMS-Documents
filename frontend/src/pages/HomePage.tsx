@@ -33,7 +33,23 @@ import {
   InfoIcon,
   ArrowForwardIcon,
 } from '@chakra-ui/icons';
-import api from '../services/api';
+import api, { riskDashboardApi } from '../services/api';
+import { RiskDashboardSummary } from '../types/riskDashboard';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip as RechartsTooltip,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  BarChart,
+  Bar,
+} from 'recharts';
 
 interface DashboardData {
   documents: {
@@ -100,6 +116,7 @@ interface DashboardData {
 
 export function HomePage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [riskDashboardData, setRiskDashboardData] = useState<RiskDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
   const navigate = useNavigate();
@@ -117,8 +134,29 @@ export function HomePage() {
   const fetchDashboard = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/dashboard');
-      setDashboardData(response.data);
+      const [dashboardResponse, riskDashboardResponse] = await Promise.all([
+        api.get('/api/dashboard'),
+        riskDashboardApi.getSummary().catch((error) => {
+          console.error('Error fetching risk dashboard:', error);
+          console.error('Error details:', error.response?.data || error.message);
+          toast({
+            title: 'Warning',
+            description: 'Risk dashboard data unavailable. Showing basic statistics.',
+            status: 'warning',
+            duration: 3000,
+            isClosable: true,
+          });
+          return null; // Don't fail entire dashboard if risk dashboard fails
+        }),
+      ]);
+      setDashboardData(dashboardResponse.data);
+      setRiskDashboardData(riskDashboardResponse);
+      // Debug log
+      if (riskDashboardResponse) {
+        console.log('Risk dashboard data loaded:', riskDashboardResponse);
+      } else {
+        console.log('Risk dashboard data is null');
+      }
     } catch (error) {
       console.error('Error fetching dashboard:', error);
       toast({
@@ -190,104 +228,309 @@ export function HomePage() {
         <Heading size="md" mb={4}>Risk Statistics</Heading>
         <Box>
           <VStack spacing={4} align="stretch">
+            {/* KPI Tiles - Use risk dashboard data if available, fallback to dashboard data */}
             <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
               <Stat p={4} bg="blue.50" borderRadius="md" boxShadow="sm">
                 <StatLabel>Total Risk Score</StatLabel>
-                <StatNumber>{dashboardData.risks.totalRiskScore}</StatNumber>
+                <StatNumber>
+                  {riskDashboardData?.latest_snapshot?.total_risk_score?.toLocaleString() ?? 
+                   dashboardData.risks.totalRiskScore.toLocaleString()}
+                </StatNumber>
                 <StatHelpText>Sum of all risk scores</StatHelpText>
               </Stat>
 
               <Stat p={4} bg="green.50" borderRadius="md" boxShadow="sm">
                 <StatLabel>Implemented Mitigation Score</StatLabel>
                 <StatNumber color="green.600">
-                  {dashboardData.risks.implementedMitigationRiskScore}
+                  {riskDashboardData?.latest_snapshot?.implemented_mitigation_score?.toLocaleString() ?? 
+                   dashboardData.risks.implementedMitigationRiskScore.toLocaleString()}
                 </StatNumber>
                 <StatHelpText>Risks with implemented mitigations</StatHelpText>
               </Stat>
 
-              <Stat p={4} bg="red.50" borderRadius="md" boxShadow="sm">
+              <Stat p={4} bg="orange.50" borderRadius="md" boxShadow="sm">
                 <StatLabel>Non-Implemented Mitigation Score</StatLabel>
-                <StatNumber color="red.600">
-                  {dashboardData.risks.nonImplementedMitigationRiskScore}
+                <StatNumber color="orange.600">
+                  {riskDashboardData?.latest_snapshot?.non_implemented_mitigation_score?.toLocaleString() ?? 
+                   dashboardData.risks.nonImplementedMitigationRiskScore.toLocaleString()}
                 </StatNumber>
                 <StatHelpText>Risks with mitigations not implemented</StatHelpText>
               </Stat>
 
-              <Stat
-                p={4}
-                bg={
-                  dashboardData.risks.riskScoreDelta > 0 ? 'yellow.50' : 'green.50'
-                }
-                borderRadius="md"
-                boxShadow="sm"
-              >
-                <StatLabel>Risk Score Delta</StatLabel>
-                <StatNumber
-                  color={
-                    dashboardData.risks.riskScoreDelta > 0 ? 'yellow.600' : 'green.600'
-                  }
-                >
-                  {dashboardData.risks.riskScoreDelta}
+              <Stat p={4} bg="red.50" borderRadius="md" boxShadow="sm">
+                <StatLabel>No Mitigation Score</StatLabel>
+                <StatNumber color="red.600">
+                  {riskDashboardData?.latest_snapshot?.no_mitigation_score?.toLocaleString() ?? 
+                   (dashboardData.risks.totalRiskScore - 
+                    dashboardData.risks.implementedMitigationRiskScore - 
+                    dashboardData.risks.nonImplementedMitigationRiskScore).toLocaleString()}
                 </StatNumber>
-                <StatHelpText>
-                  Risks without mitigations defined
-                </StatHelpText>
+                <StatHelpText>Risks without mitigations</StatHelpText>
               </Stat>
             </SimpleGrid>
 
+            {/* Charts Section - Side by Side */}
+            {(riskDashboardData?.latest_snapshot || (riskDashboardData?.quarterly_series && riskDashboardData.quarterly_series.length > 0)) && (
+              <>
+                <Divider />
+                <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
+                  {/* Breakdown Chart */}
+                  {riskDashboardData?.latest_snapshot && (
+                    <Box>
+                      <Heading size="sm" mb={4}>Risk Score Breakdown</Heading>
+                      <Box height="250px">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={[
+                                {
+                                  name: 'Implemented',
+                                  value: riskDashboardData.latest_snapshot.implemented_mitigation_score,
+                                  color: '#48BB78',
+                                },
+                                {
+                                  name: 'Non-Implemented',
+                                  value: riskDashboardData.latest_snapshot.non_implemented_mitigation_score,
+                                  color: '#ED8936',
+                                },
+                                {
+                                  name: 'No Mitigation',
+                                  value: riskDashboardData.latest_snapshot.no_mitigation_score,
+                                  color: '#F56565',
+                                },
+                              ].filter((item) => item.value > 0)}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={({ name, percent }) =>
+                                `${name}: ${(percent * 100).toFixed(0)}%`
+                              }
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {[
+                                { name: 'Implemented', value: riskDashboardData.latest_snapshot.implemented_mitigation_score, color: '#48BB78' },
+                                { name: 'Non-Implemented', value: riskDashboardData.latest_snapshot.non_implemented_mitigation_score, color: '#ED8936' },
+                                { name: 'No Mitigation', value: riskDashboardData.latest_snapshot.no_mitigation_score, color: '#F56565' },
+                              ]
+                                .filter((item) => item.value > 0)
+                                .map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                            </Pie>
+                            <RechartsTooltip
+                              formatter={(value: number) => value.toLocaleString()}
+                            />
+                            <Legend
+                              formatter={(value, entry: any) => (
+                                <span style={{ color: entry.color }}>{value}</span>
+                              )}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </Box>
+                    </Box>
+                  )}
+
+                  {/* Quarterly Trend Chart */}
+                  {riskDashboardData?.quarterly_series && riskDashboardData.quarterly_series.length > 0 ? (
+                    <Box>
+                      <Heading size="sm" mb={4}>Quarterly Trend</Heading>
+                      <Box height="250px">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart
+                            data={riskDashboardData.quarterly_series.map((point) => ({
+                              quarter: `${point.year} Q${point.quarter}`,
+                              year: point.year,
+                              quarterNum: point.quarter,
+                              total_risk_score: point.total_risk_score,
+                              implemented_mitigation_score: point.implemented_mitigation_score,
+                              non_implemented_mitigation_score: point.non_implemented_mitigation_score,
+                              no_mitigation_score: point.no_mitigation_score,
+                            }))}
+                            margin={{ top: 10, right: 30, left: 0, bottom: 60 }}
+                          >
+                            <defs>
+                              <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3182CE" stopOpacity={0.8} />
+                                <stop offset="95%" stopColor="#3182CE" stopOpacity={0} />
+                              </linearGradient>
+                              <linearGradient id="colorImplemented" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#48BB78" stopOpacity={0.8} />
+                                <stop offset="95%" stopColor="#48BB78" stopOpacity={0} />
+                              </linearGradient>
+                              <linearGradient id="colorNonImplemented" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#ED8936" stopOpacity={0.8} />
+                                <stop offset="95%" stopColor="#ED8936" stopOpacity={0} />
+                              </linearGradient>
+                              <linearGradient id="colorNoMitigation" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#F56565" stopOpacity={0.8} />
+                                <stop offset="95%" stopColor="#F56565" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="quarter"
+                              angle={-45}
+                              textAnchor="end"
+                              height={80}
+                              interval={0}
+                            />
+                            <YAxis />
+                            <RechartsTooltip
+                              formatter={(value: number) => value.toLocaleString()}
+                            />
+                            <Legend />
+                            <Area
+                              type="monotone"
+                              dataKey="total_risk_score"
+                              stroke="#3182CE"
+                              fillOpacity={1}
+                              fill="url(#colorTotal)"
+                              name="Total Risk Score"
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="implemented_mitigation_score"
+                              stroke="#48BB78"
+                              fillOpacity={1}
+                              fill="url(#colorImplemented)"
+                              name="Implemented Mitigation Score"
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="non_implemented_mitigation_score"
+                              stroke="#ED8936"
+                              fillOpacity={1}
+                              fill="url(#colorNonImplemented)"
+                              name="Non-Implemented Mitigation Score"
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="no_mitigation_score"
+                              stroke="#F56565"
+                              fillOpacity={1}
+                              fill="url(#colorNoMitigation)"
+                              name="No Mitigation Score"
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Box>
+                      <Heading size="sm" mb={4}>Quarterly Trend</Heading>
+                      <Box p={6} bg="gray.50" borderRadius="md" height="250px" display="flex" alignItems="center" justifyContent="center">
+                        <Text color="gray.600" textAlign="center">
+                          No quarterly history available. Current snapshot metrics are shown in the breakdown chart.
+                        </Text>
+                      </Box>
+                    </Box>
+                  )}
+                </SimpleGrid>
+              </>
+            )}
+
             <Divider />
 
-            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
               <Box>
-                <Heading size="sm" mb={3}>
-                  Risk Distribution (Total)
+                <Heading size="sm" mb={4}>
+                  Risk Distribution (Initial)
                 </Heading>
-                <SimpleGrid columns={3} spacing={2}>
-                  <Stat p={3} bg="green.50" borderRadius="md">
-                    <StatLabel fontSize="xs">LOW</StatLabel>
-                    <StatNumber fontSize="lg">
-                      {dashboardData.risks.byLevel.LOW}
-                    </StatNumber>
-                  </Stat>
-                  <Stat p={3} bg="yellow.50" borderRadius="md">
-                    <StatLabel fontSize="xs">MEDIUM</StatLabel>
-                    <StatNumber fontSize="lg">
-                      {dashboardData.risks.byLevel.MEDIUM}
-                    </StatNumber>
-                  </Stat>
-                  <Stat p={3} bg="red.50" borderRadius="md">
-                    <StatLabel fontSize="xs">HIGH</StatLabel>
-                    <StatNumber fontSize="lg">
-                      {dashboardData.risks.byLevel.HIGH}
-                    </StatNumber>
-                  </Stat>
-                </SimpleGrid>
+                <Box height="200px">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        {
+                          level: 'LOW',
+                          count: dashboardData.risks.byLevel.LOW,
+                          color: '#48BB78',
+                        },
+                        {
+                          level: 'MEDIUM',
+                          count: dashboardData.risks.byLevel.MEDIUM,
+                          color: '#ED8936',
+                        },
+                        {
+                          level: 'HIGH',
+                          count: dashboardData.risks.byLevel.HIGH,
+                          color: '#F56565',
+                        },
+                      ]}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="level" />
+                      <YAxis />
+                      <RechartsTooltip
+                        formatter={(value: number) => [`${value} risks`, 'Count']}
+                      />
+                      <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                        {[
+                          { level: 'LOW', count: dashboardData.risks.byLevel.LOW, color: '#48BB78' },
+                          { level: 'MEDIUM', count: dashboardData.risks.byLevel.MEDIUM, color: '#ED8936' },
+                          { level: 'HIGH', count: dashboardData.risks.byLevel.HIGH, color: '#F56565' },
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
+                <Text fontSize="xs" color="gray.500" mt={2} textAlign="center">
+                  Total: {dashboardData.risks.byLevel.LOW + dashboardData.risks.byLevel.MEDIUM + dashboardData.risks.byLevel.HIGH} risks
+                </Text>
               </Box>
 
               <Box>
-                <Heading size="sm" mb={3}>
+                <Heading size="sm" mb={4}>
                   Risk Distribution (Mitigated)
                 </Heading>
-                <SimpleGrid columns={3} spacing={2}>
-                  <Stat p={3} bg="green.50" borderRadius="md">
-                    <StatLabel fontSize="xs">LOW</StatLabel>
-                    <StatNumber fontSize="lg">
-                      {dashboardData.risks.mitigatedByLevel.LOW}
-                    </StatNumber>
-                  </Stat>
-                  <Stat p={3} bg="yellow.50" borderRadius="md">
-                    <StatLabel fontSize="xs">MEDIUM</StatLabel>
-                    <StatNumber fontSize="lg">
-                      {dashboardData.risks.mitigatedByLevel.MEDIUM}
-                    </StatNumber>
-                  </Stat>
-                  <Stat p={3} bg="red.50" borderRadius="md">
-                    <StatLabel fontSize="xs">HIGH</StatLabel>
-                    <StatNumber fontSize="lg">
-                      {dashboardData.risks.mitigatedByLevel.HIGH}
-                    </StatNumber>
-                  </Stat>
-                </SimpleGrid>
+                <Box height="200px">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        {
+                          level: 'LOW',
+                          count: dashboardData.risks.mitigatedByLevel.LOW,
+                          color: '#48BB78',
+                        },
+                        {
+                          level: 'MEDIUM',
+                          count: dashboardData.risks.mitigatedByLevel.MEDIUM,
+                          color: '#ED8936',
+                        },
+                        {
+                          level: 'HIGH',
+                          count: dashboardData.risks.mitigatedByLevel.HIGH,
+                          color: '#F56565',
+                        },
+                      ]}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="level" />
+                      <YAxis />
+                      <RechartsTooltip
+                        formatter={(value: number) => [`${value} risks`, 'Count']}
+                      />
+                      <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                        {[
+                          { level: 'LOW', count: dashboardData.risks.mitigatedByLevel.LOW, color: '#48BB78' },
+                          { level: 'MEDIUM', count: dashboardData.risks.mitigatedByLevel.MEDIUM, color: '#ED8936' },
+                          { level: 'HIGH', count: dashboardData.risks.mitigatedByLevel.HIGH, color: '#F56565' },
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
+                <Text fontSize="xs" color="gray.500" mt={2} textAlign="center">
+                  Total: {dashboardData.risks.mitigatedByLevel.LOW + dashboardData.risks.mitigatedByLevel.MEDIUM + dashboardData.risks.mitigatedByLevel.HIGH} risks
+                </Text>
               </Box>
             </SimpleGrid>
 

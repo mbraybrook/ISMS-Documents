@@ -3,6 +3,7 @@ import { config } from '../config';
 import { authService } from './authService';
 import { SimilarRisk } from '../types/risk';
 import { Supplier } from '../types/supplier';
+import { RiskDashboardSummary } from '../types/riskDashboard';
 
 const api = axios.create({
   baseURL: config.apiUrl,
@@ -174,6 +175,17 @@ export const sharePointApi = {
       },
     });
     return response.data.sites || [];
+  },
+};
+
+// Risk Dashboard API functions
+export const riskDashboardApi = {
+  /**
+   * Get risk dashboard summary with quarterly aggregation
+   */
+  getSummary: async (): Promise<RiskDashboardSummary> => {
+    const response = await api.get('/api/dashboard/risk-dashboard/summary');
+    return response.data;
   },
 };
 
