@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { body, query, param, validationResult } from 'express-validator';
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -8,6 +9,7 @@ import { getSharePointItem, generateSharePointUrl } from '../services/sharePoint
 import { generateConfluenceUrl } from '../services/confluenceService';
 import { invalidateCache } from '../services/pdfCacheService';
 import { config } from '../config';
+import { generateEmbedding, cosineSimilarity, mapToScore } from '../services/llmService';
 
 const router = Router();
 
@@ -488,6 +490,21 @@ router.post(
         data.id = randomUUID();
       }
 
+      // Handle versionNotes separately (it belongs to DocumentVersionHistory, not Document)
+      const versionNotes = data.versionNotes;
+      delete data.versionNotes; // Remove from document creation data
+
+      // Get current user ID for version history
+      let currentUser = null;
+      if (req.user?.email) {
+        currentUser = await prisma.user.findUnique({
+          where: { email: req.user.email },
+          select: { id: true },
+        });
+      }
+
+      // Note: updatedAt is now handled automatically by Prisma via @updatedAt
+
       const document = await prisma.document.create({
         data,
         include: {
@@ -500,6 +517,30 @@ router.post(
           },
         },
       });
+
+      // Create initial version history entry if versionNotes provided
+      if (versionNotes && currentUser) {
+        try {
+          await prisma.documentVersionHistory.create({
+            data: {
+              id: randomUUID(),
+              documentId: document.id,
+              version: document.version,
+              notes: versionNotes || null,
+              createdAt: new Date(),
+              createdBy: currentUser.id,
+              updatedAt: new Date(),
+              updatedBy: currentUser.id,
+              sharePointSiteId: document.sharePointSiteId || null,
+              sharePointDriveId: document.sharePointDriveId || null,
+              sharePointItemId: document.sharePointItemId || null,
+            },
+          });
+        } catch (error) {
+          console.error('[Document Creation] Error creating version history:', error);
+          // Don't fail document creation if version history fails
+        }
+      }
 
       res.status(201).json(document);
     } catch (error) {
@@ -1195,6 +1236,344 @@ router.delete(
         error: 'Failed to delete document',
         details: error.message,
       });
+    }
+  }
+);
+
+// GET /api/documents/:id/controls - get all controls linked to a document
+router.get(
+  '/:id/controls',
+  authenticateToken,
+  [param('id').isUUID()],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Verify document exists
+      const document = await prisma.document.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!document) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Get all linked controls
+      const documentControls = await prisma.documentControl.findMany({
+        where: { documentId: id },
+        include: {
+          control: {
+            select: {
+              id: true,
+              code: true,
+              title: true,
+              category: true,
+              isStandardControl: true,
+            },
+          },
+        },
+      });
+
+      res.json(documentControls.map((dc) => dc.control));
+    } catch (error) {
+      console.error('Error fetching document controls:', error);
+      res.status(500).json({ error: 'Failed to fetch document controls' });
+    }
+  }
+);
+
+// POST /api/documents/:id/controls - link a control to a document
+router.post(
+  '/:id/controls',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    param('id').isUUID(),
+    body('controlId').isUUID(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { controlId } = req.body;
+
+      // Verify document exists
+      const document = await prisma.document.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!document) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Verify control exists
+      const control = await prisma.control.findUnique({
+        where: { id: controlId },
+        select: { id: true },
+      });
+
+      if (!control) {
+        return res.status(404).json({ error: 'Control not found' });
+      }
+
+      // Check if link already exists
+      const existingLink = await prisma.documentControl.findUnique({
+        where: {
+          documentId_controlId: {
+            documentId: id,
+            controlId: controlId,
+          },
+        },
+      });
+
+      if (existingLink) {
+        return res.status(400).json({ error: 'Control is already linked to this document' });
+      }
+
+      // Create link
+      await prisma.documentControl.create({
+        data: {
+          documentId: id,
+          controlId: controlId,
+        },
+      });
+
+      // Return the linked control
+      const linkedControl = await prisma.control.findUnique({
+        where: { id: controlId },
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          category: true,
+          isStandardControl: true,
+        },
+      });
+
+      res.status(201).json(linkedControl);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return res.status(400).json({ error: 'Control is already linked to this document' });
+      }
+      console.error('Error linking control to document:', error);
+      res.status(500).json({ error: 'Failed to link control to document' });
+    }
+  }
+);
+
+// POST /api/documents/suggest-controls - AI-based control suggestions for documents
+router.post(
+  '/suggest-controls',
+  authenticateToken,
+  [
+    body('title').optional().isString(),
+    body('type').optional().isString(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { title, type } = req.body;
+
+      if (!title || title.trim().length === 0) {
+        return res.status(400).json({ error: 'Document title is required' });
+      }
+
+      // Normalize document text for embedding
+      const documentText = `${title} ${type || ''}`.trim().toLowerCase();
+
+      // Generate embedding for the document text
+      const documentEmbedding = await generateEmbedding(documentText);
+      if (!documentEmbedding) {
+        console.warn('[Document Control Suggestions] Embedding generation failed, falling back to keyword matching');
+        // Fallback to keyword-based matching
+        const allControls = await prisma.control.findMany({
+          where: {
+            isStandardControl: true,
+          },
+          select: {
+            id: true,
+            code: true,
+            title: true,
+          },
+        });
+
+        const titleLower = title.toLowerCase();
+        const titleWords = titleLower.split(/\s+/).filter((word) => word.length > 3);
+        
+        const suggestedControlIds: string[] = [];
+        for (const control of allControls) {
+          const controlText = `${control.code} ${control.title || ''}`.toLowerCase();
+          let score = 0;
+          
+          // Check for word matches
+          for (const word of titleWords) {
+            if (controlText.includes(word)) {
+              score += word.length > 5 ? 3 : 2;
+            }
+          }
+          
+          if (score >= 2) {
+            suggestedControlIds.push(control.id);
+          }
+        }
+
+        return res.json({
+          suggestedControlIds: suggestedControlIds.slice(0, 8),
+          totalMatches: suggestedControlIds.length,
+        });
+      }
+
+      // Get all controls with their stored embeddings
+      const allControls = await prisma.control.findMany({
+        where: {
+          isStandardControl: true,
+          embedding: { not: Prisma.DbNull },
+        },
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          embedding: true,
+        },
+      });
+
+      // Extract keywords from document text for boosting
+      const documentTextLower = documentText.toLowerCase();
+      const documentWords = documentTextLower
+        .split(/\s+/)
+        .filter((word) => word.length > 3)
+        .map((word) => word.replace(/[^\w]/g, ''));
+
+      const controlScores: Array<{ id: string; score: number; code: string; title: string }> = [];
+
+      for (const control of allControls) {
+        if (!control.embedding || !Array.isArray(control.embedding)) {
+          continue;
+        }
+
+        // Calculate cosine similarity using stored embedding
+        const controlEmbedding = control.embedding as number[];
+        const cosineSim = cosineSimilarity(documentEmbedding, controlEmbedding);
+        let similarityScore = mapToScore(cosineSim);
+
+        // Keyword boosting: Check for word matches in control title/code
+        const controlTextLower = `${control.code} ${control.title || ''}`.toLowerCase();
+        let keywordBoost = 0;
+        
+        // Boost for word matches
+        for (const word of documentWords) {
+          if (word.length > 3 && controlTextLower.includes(word)) {
+            keywordBoost += word.length > 6 ? 8 : 5;
+          }
+        }
+        
+        // Special boost for important security terms
+        const importantTerms = ['awareness', 'training', 'education', 'security', 'policy', 
+                               'procedure', 'access', 'control', 'incident', 'monitoring'];
+        for (const term of importantTerms) {
+          if (documentTextLower.includes(term) && controlTextLower.includes(term)) {
+            keywordBoost += 10;
+          }
+        }
+
+        // Apply keyword boost
+        similarityScore = Math.min(100, similarityScore + Math.min(keywordBoost, 30));
+
+        if (similarityScore >= 55) {
+          controlScores.push({
+            id: control.id,
+            score: similarityScore,
+            code: control.code,
+            title: control.title || '',
+          });
+        }
+      }
+
+      // Sort by similarity score and limit to top 8 suggestions
+      const sortedSuggestions = controlScores
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8)
+        .map((item) => item.id);
+
+      res.json({
+        suggestedControlIds: sortedSuggestions,
+        totalMatches: controlScores.length,
+      });
+    } catch (error: any) {
+      console.error('Error suggesting controls for document:', error);
+      res.status(500).json({ error: 'Failed to generate control suggestions' });
+    }
+  }
+);
+
+// DELETE /api/documents/:id/controls/:controlId - unlink a control from a document
+router.delete(
+  '/:id/controls/:controlId',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    param('id').isUUID(),
+    param('controlId').isUUID(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id, controlId } = req.params;
+
+      // Verify document exists
+      const document = await prisma.document.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!document) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Verify control exists
+      const control = await prisma.control.findUnique({
+        where: { id: controlId },
+        select: { id: true },
+      });
+
+      if (!control) {
+        return res.status(404).json({ error: 'Control not found' });
+      }
+
+      // Check if link exists
+      const existingLink = await prisma.documentControl.findUnique({
+        where: {
+          documentId_controlId: {
+            documentId: id,
+            controlId: controlId,
+          },
+        },
+      });
+
+      if (!existingLink) {
+        return res.status(404).json({ error: 'Control is not linked to this document' });
+      }
+
+      // Delete link
+      await prisma.documentControl.delete({
+        where: {
+          documentId_controlId: {
+            documentId: id,
+            controlId: controlId,
+          },
+        },
+      });
+
+      res.status(204).send();
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'Link not found' });
+      }
+      console.error('Error unlinking control from document:', error);
+      res.status(500).json({ error: 'Failed to unlink control from document' });
     }
   }
 );

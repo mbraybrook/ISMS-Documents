@@ -29,13 +29,22 @@ import {
   Text,
   Link,
   Box,
+  Badge,
+  IconButton,
+  Tooltip,
+  Spinner,
+  Divider,
+  InputGroup,
+  InputLeftElement,
 } from '@chakra-ui/react';
+import { SearchIcon, DeleteIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
 import { SharePointFileBrowser } from './SharePointFileBrowser';
 import { VersionUpdateModal } from './VersionUpdateModal';
+import { ControlFormModal } from './ControlFormModal';
 
 interface DocumentFormModalProps {
   isOpen: boolean;
@@ -77,8 +86,20 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   const [loadingUsers, setLoadingUsers] = useState(false);
   const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose } = useDisclosure();
   const { isOpen: isVersionUpdateOpen, onOpen: onVersionUpdateOpen, onClose: onVersionUpdateClose } = useDisclosure();
+  const { isOpen: isControlModalOpen, onOpen: onControlModalOpen, onClose: onControlModalClose } = useDisclosure();
+  const [selectedControl, setSelectedControl] = useState<any>(null);
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  
+  // Control linking state
+  const [linkedControls, setLinkedControls] = useState<Array<{ id: string; code: string; title: string; category: string | null }>>([]);
+  const [controlSearchTerm, setControlSearchTerm] = useState('');
+  const [availableControls, setAvailableControls] = useState<Array<{ id: string; code: string; title: string; category: string | null }>>([]);
+  const [suggestedControls, setSuggestedControls] = useState<Array<{ id: string; code: string; title: string; category: string | null }>>([]);
+  const [searchingControls, setSearchingControls] = useState(false);
+  const [linkingControl, setLinkingControl] = useState(false);
+  const [loadingControls, setLoadingControls] = useState(false);
+  const [loadingSuggestedControls, setLoadingSuggestedControls] = useState(false);
 
   // Check if user can edit owner (Admin or Editor only)
   const canEditOwner = user?.role === 'ADMIN' || user?.role === 'EDITOR';
@@ -100,6 +121,36 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       fetchUsers();
     }
   }, [isOpen, canEditOwner]);
+
+  // Fetch linked controls when document is loaded
+  useEffect(() => {
+    if (isOpen && document?.id) {
+      fetchLinkedControls();
+    } else if (isOpen && !document) {
+      setLinkedControls([]);
+    }
+  }, [isOpen, document?.id]);
+
+  // Fetch suggested controls when title or type changes (with debounce)
+  useEffect(() => {
+    if (!isOpen) {
+      setSuggestedControls([]);
+      return;
+    }
+
+    // Only fetch suggestions if we have a title (for new documents) or if editing
+    if (!formData.title || formData.title.trim().length < 3) {
+      setSuggestedControls([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      fetchSuggestedControls();
+    }, 500); // Debounce for 500ms
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.title, formData.type, isOpen]);
 
   const fetchUsers = async () => {
     try {
@@ -518,6 +569,164 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       setPendingSubmit(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLinkedControls = async () => {
+    if (!document?.id) return;
+    try {
+      setLoadingControls(true);
+      const response = await api.get(`/api/documents/${document.id}/controls`);
+      setLinkedControls(response.data);
+    } catch (error: any) {
+      console.error('Error fetching linked controls:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load linked controls',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLoadingControls(false);
+    }
+  };
+
+  const fetchSuggestedControls = async () => {
+    if (!formData.title || formData.title.trim().length < 3) {
+      setSuggestedControls([]);
+      return;
+    }
+
+    try {
+      setLoadingSuggestedControls(true);
+      const response = await api.post('/api/documents/suggest-controls', {
+        title: formData.title,
+        type: formData.type,
+      });
+      
+      if (response.data.suggestedControlIds && response.data.suggestedControlIds.length > 0) {
+        // Fetch full control details for suggested IDs
+        const controlsResponse = await api.get('/api/controls', {
+          params: {
+            limit: 1000, // Get all to find the suggested ones
+          },
+        });
+        
+        // Get current linked control IDs
+        const linkedControlIds = new Set(linkedControls.map((c) => c.id));
+        const suggested = controlsResponse.data.data.filter(
+          (c: any) => 
+            response.data.suggestedControlIds.includes(c.id) && 
+            !linkedControlIds.has(c.id)
+        );
+        setSuggestedControls(suggested);
+      } else {
+        setSuggestedControls([]);
+      }
+    } catch (error: any) {
+      console.error('Error fetching suggested controls:', error);
+      // Don't show error toast for suggestions - it's not critical
+      setSuggestedControls([]);
+    } finally {
+      setLoadingSuggestedControls(false);
+    }
+  };
+
+  const searchControls = async () => {
+    if (!controlSearchTerm.trim()) {
+      setAvailableControls([]);
+      return;
+    }
+
+    try {
+      setSearchingControls(true);
+      const response = await api.get('/api/controls', {
+        params: {
+          limit: 100, // Get more controls for better word-based matching
+        },
+      });
+      // Filter out controls already linked and filter by search term using word-based matching
+      const linkedControlIds = new Set(linkedControls.map((c) => c.id));
+      const searchLower = controlSearchTerm.toLowerCase().trim();
+      const searchWords = searchLower.split(/\s+/).filter((word) => word.length > 0);
+      
+      setAvailableControls(
+        response.data.data.filter((c: any) => {
+          if (linkedControlIds.has(c.id)) {
+            return false;
+          }
+          
+          const controlText = `${c.code} ${c.title || ''}`.toLowerCase();
+          
+          // Word-based matching: check if any search word appears in the control text
+          // This allows "awareness" to match "Information security awareness, education and training"
+          return searchWords.some((word) => {
+            // Match whole words or as part of a larger word
+            const wordRegex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
+            return wordRegex.test(controlText) || controlText.includes(word);
+          });
+        })
+      );
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to search controls',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setSearchingControls(false);
+    }
+  };
+
+  const handleLinkControl = async (controlId: string) => {
+    if (!document?.id) return;
+    try {
+      setLinkingControl(true);
+      await api.post(`/api/documents/${document.id}/controls`, { controlId });
+      toast({
+        title: 'Success',
+        description: 'Control linked successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      setControlSearchTerm('');
+      setAvailableControls([]);
+      await fetchLinkedControls();
+      // Refresh suggested controls to remove the linked one
+      if (formData.title && formData.title.trim().length >= 3) {
+        fetchSuggestedControls();
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to link control',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLinkingControl(false);
+    }
+  };
+
+  const handleUnlinkControl = async (controlId: string) => {
+    if (!document?.id) return;
+    try {
+      await api.delete(`/api/documents/${document.id}/controls/${controlId}`);
+      toast({
+        title: 'Success',
+        description: 'Control unlinked successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      fetchLinkedControls();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to unlink control',
+        status: 'error',
+        duration: 3000,
+      });
     }
   };
 
@@ -969,6 +1178,320 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                   </Text>
                 )}
               </FormControl>
+
+              {document && (
+                <>
+                  <Divider />
+                  <Box>
+                    <FormLabel fontWeight="bold" color="blue.600" mb={2}>
+                      Linked Controls ({linkedControls.length})
+                    </FormLabel>
+                    {loadingControls ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <>
+                        {linkedControls.length > 0 && (
+                          <VStack align="stretch" spacing={2} mb={4}>
+                            {linkedControls.map((control) => (
+                              <Box
+                                key={control.id}
+                                p={2}
+                                bg="white"
+                                borderRadius="md"
+                                border="1px"
+                                borderColor="blue.200"
+                                _hover={{ bg: "blue.50", borderColor: "blue.400" }}
+                              >
+                                <HStack justify="space-between">
+                                  <HStack spacing={2} flex={1}>
+                                    <Badge 
+                                      colorScheme="blue" 
+                                      fontSize="xs"
+                                      cursor="pointer"
+                                      _hover={{ bg: "blue.600", color: "white" }}
+                                      onClick={async () => {
+                                        try {
+                                          // Fetch full control details
+                                          const response = await api.get(`/api/controls/${control.id}`);
+                                          setSelectedControl(response.data);
+                                          onControlModalOpen();
+                                        } catch (error) {
+                                          console.error('Error fetching control details:', error);
+                                          toast({
+                                            title: 'Error',
+                                            description: 'Failed to load control details',
+                                            status: 'error',
+                                            duration: 3000,
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      {control.code}
+                                    </Badge>
+                                    <Text 
+                                      fontWeight="medium" 
+                                      color="blue.700"
+                                      cursor="pointer"
+                                      _hover={{ textDecoration: "underline", color: "blue.900" }}
+                                      onClick={async () => {
+                                        try {
+                                          // Fetch full control details
+                                          const response = await api.get(`/api/controls/${control.id}`);
+                                          setSelectedControl(response.data);
+                                          onControlModalOpen();
+                                        } catch (error) {
+                                          console.error('Error fetching control details:', error);
+                                          toast({
+                                            title: 'Error',
+                                            description: 'Failed to load control details',
+                                            status: 'error',
+                                            duration: 3000,
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      {control.title}
+                                    </Text>
+                                    {control.category && (
+                                      <Badge fontSize="xs" colorScheme="gray">
+                                        {control.category}
+                                      </Badge>
+                                    )}
+                                  </HStack>
+                                  {!readOnly && (
+                                    <Tooltip label="Unlink control">
+                                      <IconButton
+                                        aria-label="Unlink control"
+                                        icon={<DeleteIcon />}
+                                        size="sm"
+                                        colorScheme="red"
+                                        variant="ghost"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleUnlinkControl(control.id);
+                                        }}
+                                      />
+                                    </Tooltip>
+                                  )}
+                                </HStack>
+                              </Box>
+                            ))}
+                          </VStack>
+                        )}
+                        {!readOnly && (
+                          <VStack align="stretch" spacing={2}>
+                            <InputGroup>
+                              <InputLeftElement pointerEvents="none">
+                                <SearchIcon color="gray.300" />
+                              </InputLeftElement>
+                              <Input
+                                placeholder="Search controls by code or title..."
+                                value={controlSearchTerm}
+                                onChange={(e) => {
+                                  setControlSearchTerm(e.target.value);
+                                  if (e.target.value.trim()) {
+                                    searchControls();
+                                  } else {
+                                    setAvailableControls([]);
+                                  }
+                                }}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter' && controlSearchTerm.trim()) {
+                                    e.preventDefault();
+                                    searchControls();
+                                  }
+                                }}
+                              />
+                            </InputGroup>
+                            {searchingControls && (
+                              <HStack>
+                                <Spinner size="sm" />
+                                <Text fontSize="sm" color="gray.500">Searching...</Text>
+                              </HStack>
+                            )}
+                            {availableControls.length > 0 && (
+                              <Box
+                                maxH="200px"
+                                overflowY="auto"
+                                border="1px"
+                                borderColor="gray.200"
+                                borderRadius="md"
+                                p={2}
+                              >
+                                <VStack align="stretch" spacing={2}>
+                                  {availableControls.map((control) => (
+                                    <Box
+                                      key={control.id}
+                                      p={2}
+                                      bg="gray.50"
+                                      borderRadius="md"
+                                      border="1px"
+                                      borderColor="gray.200"
+                                      _hover={{ bg: "gray.100", borderColor: "blue.300" }}
+                                    >
+                                      <HStack spacing={2} justify="space-between">
+                                        <HStack 
+                                          spacing={2} 
+                                          flex={1}
+                                          cursor="pointer"
+                                          onClick={async () => {
+                                            try {
+                                              // Fetch full control details
+                                              const response = await api.get(`/api/controls/${control.id}`);
+                                              setSelectedControl(response.data);
+                                              onControlModalOpen();
+                                            } catch (error) {
+                                              console.error('Error fetching control details:', error);
+                                              toast({
+                                                title: 'Error',
+                                                description: 'Failed to load control details',
+                                                status: 'error',
+                                                duration: 3000,
+                                              });
+                                            }
+                                          }}
+                                        >
+                                          <Badge 
+                                            colorScheme="blue" 
+                                            fontSize="xs"
+                                            _hover={{ bg: "blue.600", color: "white" }}
+                                          >
+                                            {control.code}
+                                          </Badge>
+                                          <Text 
+                                            fontSize="sm" 
+                                            fontWeight="medium"
+                                            _hover={{ textDecoration: "underline" }}
+                                          >
+                                            {control.title}
+                                          </Text>
+                                          {control.category && (
+                                            <Badge fontSize="xs" colorScheme="gray">
+                                              {control.category}
+                                            </Badge>
+                                          )}
+                                        </HStack>
+                                        <Button
+                                          size="xs"
+                                          colorScheme="blue"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleLinkControl(control.id);
+                                          }}
+                                        >
+                                          Link
+                                        </Button>
+                                      </HStack>
+                                    </Box>
+                                  ))}
+                                </VStack>
+                              </Box>
+                            )}
+                            {controlSearchTerm.trim() && availableControls.length === 0 && !searchingControls && (
+                              <Text fontSize="sm" color="gray.500">
+                                No controls found matching "{controlSearchTerm}"
+                              </Text>
+                            )}
+                            
+                            {/* Suggested Controls Section */}
+                            {!controlSearchTerm.trim() && suggestedControls.length > 0 && (
+                              <Box>
+                                <Text fontSize="sm" fontWeight="medium" color="gray.700" mb={2}>
+                                  Suggested Controls (based on document title):
+                                </Text>
+                                {loadingSuggestedControls ? (
+                                  <HStack>
+                                    <Spinner size="sm" />
+                                    <Text fontSize="sm" color="gray.500">Loading suggestions...</Text>
+                                  </HStack>
+                                ) : (
+                                  <Box
+                                    maxH="200px"
+                                    overflowY="auto"
+                                    border="1px"
+                                    borderColor="blue.200"
+                                    borderRadius="md"
+                                    p={2}
+                                    bg="blue.50"
+                                  >
+                                    <VStack align="stretch" spacing={2}>
+                                      {suggestedControls.map((control) => (
+                                        <Box
+                                          key={control.id}
+                                          p={2}
+                                          bg="white"
+                                          borderRadius="md"
+                                          border="1px"
+                                          borderColor="blue.200"
+                                          _hover={{ bg: "blue.50", borderColor: "blue.400" }}
+                                        >
+                                          <HStack spacing={2} justify="space-between">
+                                            <HStack 
+                                              spacing={2} 
+                                              flex={1}
+                                              cursor="pointer"
+                                              onClick={async () => {
+                                                try {
+                                                  // Fetch full control details
+                                                  const response = await api.get(`/api/controls/${control.id}`);
+                                                  setSelectedControl(response.data);
+                                                  onControlModalOpen();
+                                                } catch (error) {
+                                                  console.error('Error fetching control details:', error);
+                                                  toast({
+                                                    title: 'Error',
+                                                    description: 'Failed to load control details',
+                                                    status: 'error',
+                                                    duration: 3000,
+                                                  });
+                                                }
+                                              }}
+                                            >
+                                              <Badge 
+                                                colorScheme="blue" 
+                                                fontSize="xs"
+                                                _hover={{ bg: "blue.600", color: "white" }}
+                                              >
+                                                {control.code}
+                                              </Badge>
+                                              <Text 
+                                                fontSize="sm" 
+                                                fontWeight="medium"
+                                                _hover={{ textDecoration: "underline" }}
+                                              >
+                                                {control.title}
+                                              </Text>
+                                              {control.category && (
+                                                <Badge fontSize="xs" colorScheme="gray">
+                                                  {control.category}
+                                                </Badge>
+                                              )}
+                                            </HStack>
+                                            <Button
+                                              size="xs"
+                                              colorScheme="blue"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleLinkControl(control.id);
+                                              }}
+                                            >
+                                              Link
+                                            </Button>
+                                          </HStack>
+                                        </Box>
+                                      ))}
+                                    </VStack>
+                                  </Box>
+                                )}
+                              </Box>
+                            )}
+                          </VStack>
+                        )}
+                      </>
+                    )}
+                  </Box>
+                </>
+              )}
             </VStack>
           </ModalBody>
 
@@ -1040,6 +1563,15 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         onSuccess={handleVersionUpdateSuccess}
         currentLastReviewDate={document?.lastReviewDate ? new Date(document.lastReviewDate).toISOString().split('T')[0] : null}
         currentNextReviewDate={document?.nextReviewDate ? new Date(document.nextReviewDate).toISOString().split('T')[0] : null}
+      />
+
+      <ControlFormModal
+        isOpen={isControlModalOpen}
+        onClose={() => {
+          onControlModalClose();
+          setSelectedControl(null);
+        }}
+        control={selectedControl}
       />
     </Modal>
   );

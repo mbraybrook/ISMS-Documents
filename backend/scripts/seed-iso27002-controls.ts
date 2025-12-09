@@ -58,35 +58,29 @@ async function seedISO27002Controls() {
           // Always update standard controls to ensure they match the source document
           // This is important when the source document is corrected or updated
           if (existing.isStandardControl) {
-            // Check if any fields have changed
-            const hasChanges = 
-              existing.title !== control.title ||
-              existing.controlText !== control.controlText ||
-              existing.purpose !== control.purpose ||
-              existing.guidance !== control.guidance ||
-              existing.otherInformation !== control.otherInformation ||
-              existing.category !== control.category ||
-              existing.description !== control.controlText.substring(0, 500);
+            // Check if title doesn't match (indicates mis-numbered control)
+            const titleMismatch = existing.title !== control.title;
             
-            if (hasChanges) {
-              await prisma.control.update({
-                where: { code: control.code },
-                data: {
-                  title: control.title,
-                  description: control.controlText.substring(0, 500), // Use control text as description
-                  controlText: control.controlText,
-                  purpose: control.purpose,
-                  guidance: control.guidance,
-                  otherInformation: control.otherInformation,
-                  category: control.category,
-                  updatedAt: new Date(),
-                },
-              });
-              updated++;
-              console.log(`  ↻ Updated: ${control.code} - ${control.title}`);
+            // Always update standard controls to ensure correctness
+            // This catches cases where controls were mis-numbered in previous seeds
+            await prisma.control.update({
+              where: { code: control.code },
+              data: {
+                title: control.title,
+                description: control.controlText.substring(0, 500), // Use control text as description
+                controlText: control.controlText,
+                purpose: control.purpose,
+                guidance: control.guidance,
+                otherInformation: control.otherInformation,
+                category: control.category,
+                updatedAt: new Date(),
+              },
+            });
+            updated++;
+            if (titleMismatch) {
+              console.log(`  ↻ Updated (title fix): ${control.code} - "${existing.title}" → "${control.title}"`);
             } else {
-              skipped++;
-              console.log(`  ⊘ Skipped (no changes): ${control.code} - ${control.title}`);
+              console.log(`  ↻ Updated: ${control.code} - ${control.title}`);
             }
           } else {
             // Update non-standard control to become standard

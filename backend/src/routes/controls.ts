@@ -678,5 +678,198 @@ router.post(
   }
 );
 
+// GET /api/controls/:id/documents - get all documents linked to a control
+router.get(
+  '/:id/documents',
+  authenticateToken,
+  [param('id').isUUID()],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Verify control exists
+      const control = await prisma.control.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!control) {
+        return res.status(404).json({ error: 'Control not found' });
+      }
+
+      // Get all linked documents
+      const documentControls = await prisma.documentControl.findMany({
+        where: { controlId: id },
+        include: {
+          document: {
+            select: {
+              id: true,
+              title: true,
+              version: true,
+              type: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      res.json(documentControls.map((dc) => dc.document));
+    } catch (error) {
+      console.error('Error fetching control documents:', error);
+      res.status(500).json({ error: 'Failed to fetch control documents' });
+    }
+  }
+);
+
+// POST /api/controls/:id/documents - link a document to a control
+router.post(
+  '/:id/documents',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    param('id').isUUID(),
+    body('documentId').isUUID(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { documentId } = req.body;
+
+      // Verify control exists
+      const control = await prisma.control.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!control) {
+        return res.status(404).json({ error: 'Control not found' });
+      }
+
+      // Verify document exists
+      const document = await prisma.document.findUnique({
+        where: { id: documentId },
+        select: { id: true },
+      });
+
+      if (!document) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Check if link already exists
+      const existingLink = await prisma.documentControl.findUnique({
+        where: {
+          documentId_controlId: {
+            documentId: documentId,
+            controlId: id,
+          },
+        },
+      });
+
+      if (existingLink) {
+        return res.status(400).json({ error: 'Document is already linked to this control' });
+      }
+
+      // Create link
+      await prisma.documentControl.create({
+        data: {
+          documentId: documentId,
+          controlId: id,
+        },
+      });
+
+      // Return the linked document
+      const linkedDocument = await prisma.document.findUnique({
+        where: { id: documentId },
+        select: {
+          id: true,
+          title: true,
+          version: true,
+          type: true,
+          status: true,
+        },
+      });
+
+      res.status(201).json(linkedDocument);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return res.status(400).json({ error: 'Document is already linked to this control' });
+      }
+      console.error('Error linking document to control:', error);
+      res.status(500).json({ error: 'Failed to link document to control' });
+    }
+  }
+);
+
+// DELETE /api/controls/:id/documents/:documentId - unlink a document from a control
+router.delete(
+  '/:id/documents/:documentId',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    param('id').isUUID(),
+    param('documentId').isUUID(),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id, documentId } = req.params;
+
+      // Verify control exists
+      const control = await prisma.control.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!control) {
+        return res.status(404).json({ error: 'Control not found' });
+      }
+
+      // Verify document exists
+      const document = await prisma.document.findUnique({
+        where: { id: documentId },
+        select: { id: true },
+      });
+
+      if (!document) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Check if link exists
+      const existingLink = await prisma.documentControl.findUnique({
+        where: {
+          documentId_controlId: {
+            documentId: documentId,
+            controlId: id,
+          },
+        },
+      });
+
+      if (!existingLink) {
+        return res.status(404).json({ error: 'Document is not linked to this control' });
+      }
+
+      // Delete link
+      await prisma.documentControl.delete({
+        where: {
+          documentId_controlId: {
+            documentId: documentId,
+            controlId: id,
+          },
+        },
+      });
+
+      res.status(204).send();
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'Link not found' });
+      }
+      console.error('Error unlinking document from control:', error);
+      res.status(500).json({ error: 'Failed to unlink document from control' });
+    }
+  }
+);
+
 export { router as controlsRouter };
 

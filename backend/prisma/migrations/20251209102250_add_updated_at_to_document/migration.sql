@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "DocumentVersionHistory_sharePointSiteId_sharePointDriveId_share" RENAME TO "DocumentVersionHistory_sharePointSiteId_sharePointDriveId_s_idx";
