@@ -1,13 +1,21 @@
 # ISMS Document Management and Compliance Application
 
-A web application that provides a "single pane of glass" over an organisation's ISMS documentation stored primarily in Microsoft SharePoint, with links to selected Confluence content.
+A comprehensive Information Security Management System (ISMS) platform that centralizes document management, risk and control tracking, asset inventory, supplier management, and compliance workflows. The application provides a unified interface for managing all aspects of an organization's ISMS, with optional integrations to Microsoft SharePoint for document storage and Confluence for living documentation.
 
 ## Architecture
 
-- **Frontend**: React + TypeScript + Vite + Chakra UI
+- **Frontend**: React + TypeScript + Vite + Chakra UI + React Router
 - **Backend**: Node.js + Express + TypeScript
 - **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: Entra ID / Microsoft Identity Platform (MSAL)
+- **Authentication**: 
+  - Internal users: Entra ID / Microsoft Identity Platform (MSAL)
+  - External users (Trust Center): JWT-based email/password authentication
+- **AI/LLM Integration**: Ollama for semantic embeddings and similarity analysis
+- **External Integrations**: 
+  - Microsoft SharePoint (document storage and retrieval)
+  - Confluence (living documentation links)
+- **Document Processing**: PDF generation, watermarking, and conversion (LibreOffice)
+- **Testing**: Jest (backend), Vitest (frontend), Playwright (E2E)
 
 ## Prerequisites
 
@@ -34,11 +42,37 @@ A web application that provides a "single pane of glass" over an organisation's 
    **Required environment variables:**
    - `DATABASE_URL`: PostgreSQL connection string (format: `postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public`)
    - `SEED_SCOPE`: Controls seed data (`"full"` for local dev, `"reference"` for staging, `"none"` for production)
+   - `AUTH_TENANT_ID`: Azure AD Tenant ID
+   - `AUTH_CLIENT_ID`: Azure AD Application (Client) ID
+   - `AUTH_CLIENT_SECRET`: Azure AD Client Secret (for backend API calls)
+   - `AUTH_REDIRECT_URI`: OAuth redirect URI (e.g., `http://localhost:3000`)
+   - `AUTH_ALLOWED_EMAIL_DOMAIN`: Allowed email domain for user registration (default: `paythru.com`)
+   
+   **Optional environment variables:**
+   - `SHAREPOINT_SITE_ID`: SharePoint site ID for document integration
+   - `SHAREPOINT_DRIVE_ID`: SharePoint drive/document library ID
+   - `CONFLUENCE_BASE_URL`: Confluence base URL (e.g., `https://your-domain.atlassian.net`)
+   - `CONFLUENCE_USERNAME`: Confluence API username
+   - `CONFLUENCE_API_TOKEN`: Confluence API token
+   - `LLM_PROVIDER`: LLM provider (default: `ollama`)
+   - `LLM_BASE_URL`: Ollama base URL (default: `http://localhost:11434`)
+   - `LLM_EMBEDDING_MODEL`: Embedding model name (default: `nomic-embed-text`)
+   - `LLM_CHAT_MODEL`: Chat model name (default: `llama2`)
+   - `LLM_SIMILARITY_THRESHOLD`: Similarity threshold for AI suggestions (default: `70`)
+   - `TRUST_CENTER_JWT_SECRET`: JWT secret for Trust Center authentication (generate with `openssl rand -base64 32`)
+   - `CORS_TRUST_CENTER_ORIGINS`: Comma-separated list of allowed Trust Center origins (supports wildcards)
+   - `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USER`, `EMAIL_SMTP_PASS`, `EMAIL_FROM`: Email service configuration
    
    Example for local development:
    ```bash
    DATABASE_URL=postgresql://postgres:postgres@localhost:5432/isms_db?schema=public
    SEED_SCOPE=full
+   AUTH_TENANT_ID=your-tenant-id
+   AUTH_CLIENT_ID=your-client-id
+   AUTH_CLIENT_SECRET=your-client-secret
+   AUTH_REDIRECT_URI=http://localhost:3000
+   LLM_BASE_URL=http://localhost:11434
+   TRUST_CENTER_JWT_SECRET=your-jwt-secret-here
    ```
 
 3. **Set up database:**
@@ -151,11 +185,16 @@ A web application that provides a "single pane of glass" over an organisation's 
    - `SEED_SCOPE=reference` (for first-run) or `none` (subsequent deployments)
    - `AUTH_TENANT_ID`, `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`
    - `AUTH_REDIRECT_URI`: Production URL (e.g., `https://trust.paythru.com`)
+   - `AUTH_ALLOWED_EMAIL_DOMAIN`: Allowed email domain for user registration
    - `CORS_TRUST_CENTER_ORIGINS`: Comma-separated origins or wildcard pattern
      - Example: `https://trust.paythru.com,https://trust.*.paythru.com`
      - Wildcard support: `https://trust.*.paythru.com` matches all subdomains
    - `TRUST_CENTER_JWT_SECRET`: Strong random secret (minimum 32 characters)
      - Generate: `openssl rand -base64 32`
+   - `LLM_BASE_URL`: Ollama server URL (if using AI features)
+   - `LLM_EMBEDDING_MODEL`: Embedding model name
+   - `SHAREPOINT_SITE_ID`, `SHAREPOINT_DRIVE_ID`: SharePoint integration (if used)
+   - `CONFLUENCE_BASE_URL`, `CONFLUENCE_USERNAME`, `CONFLUENCE_API_TOKEN`: Confluence integration (if used)
 
    See `backend/.env.example` for complete list of variables.
 
@@ -451,6 +490,19 @@ Before deploying to production:
 - Verify database credentials
 - Check firewall rules
 
+**AI/Embedding features not working**:
+- Verify Ollama is running: `curl http://localhost:11434/api/tags`
+- Check `LLM_BASE_URL` matches your Ollama instance
+- Ensure embedding model is pulled: `ollama pull nomic-embed-text`
+- Check backend logs for embedding generation errors
+- Run embedding backfill scripts if embeddings are missing
+
+**Trust Center authentication errors**:
+- Verify `TRUST_CENTER_JWT_SECRET` is set and at least 32 characters
+- Check JWT token expiry configuration
+- Verify CORS origins include Trust Center domain
+- Check external user approval status in admin panel
+
 ### Rollback Procedure
 
 1. **Stop current deployment**:
@@ -472,21 +524,31 @@ Before deploying to production:
 
 ```
 .
-├── backend/          # Express backend
+├── backend/              # Express backend
 │   ├── src/
-│   │   ├── config.ts
-│   │   ├── index.ts
-│   │   ├── routes/
-│   │   └── middleware/
-│   └── prisma/       # Prisma schema and migrations
-├── frontend/         # React frontend
+│   │   ├── config.ts     # Configuration and environment variables
+│   │   ├── index.ts      # Express app entry point
+│   │   ├── routes/       # API route handlers
+│   │   ├── middleware/   # Express middleware (auth, rate limiting, etc.)
+│   │   ├── services/     # Business logic services
+│   │   ├── lib/          # Utilities and helpers
+│   │   └── types/        # TypeScript type definitions
+│   ├── prisma/           # Prisma schema and migrations
+│   └── scripts/          # Utility scripts (embeddings, imports, etc.)
+├── frontend/             # React frontend
 │   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   └── App.tsx
-│   └── vite.config.ts
-├── docs/             # Documentation
-└── docker-compose.yml
+│   │   ├── components/   # React components
+│   │   ├── pages/        # Page components
+│   │   ├── contexts/    # React contexts (auth, etc.)
+│   │   ├── services/     # API client services
+│   │   ├── hooks/        # Custom React hooks
+│   │   ├── utils/        # Utility functions
+│   │   └── App.tsx       # Main app component
+│   └── vite.config.ts    # Vite configuration
+├── docs/                  # Documentation and plans
+├── e2e/                   # End-to-end tests (Playwright)
+├── docker-compose.yml     # Docker Compose for development
+└── docker-compose.prod.yml # Docker Compose for production
 ```
 
 ## Available Scripts
@@ -507,6 +569,9 @@ Before deploying to production:
 - `npm run db:generate --workspace=backend` - Generate Prisma client
 - `npm run db:seed --workspace=backend` - Seed database with initial data
 - `npm run db:studio --workspace=backend` - Open Prisma Studio
+- `npm run backfill-embeddings --workspace=backend` - Backfill embeddings for risks
+- `npm run backfill-control-embeddings --workspace=backend` - Backfill embeddings for controls
+- `npm run check-control-embeddings --workspace=backend` - Check embedding status for controls
 
 ### Frontend
 - `npm run dev --workspace=frontend` - Start frontend dev server
@@ -575,6 +640,69 @@ Before deploying to production:
    CONFLUENCE_API_TOKEN=your-api-token
    ```
 
+### 4. Ollama Setup (for AI Features)
+
+The application uses Ollama for semantic embeddings and similarity analysis. This enables AI-powered control suggestions for risks and documents.
+
+1. **Install Ollama**:
+   - Visit https://ollama.ai and install Ollama for your platform
+   - Or use Docker: `docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama`
+
+2. **Pull the embedding model**:
+   ```bash
+   ollama pull nomic-embed-text
+   ```
+
+3. **Verify Ollama is running**:
+   ```bash
+   curl http://localhost:11434/api/tags
+   ```
+
+4. **Configure in `.env`** (optional, defaults shown):
+   ```
+   LLM_PROVIDER=ollama
+   LLM_BASE_URL=http://localhost:11434
+   LLM_EMBEDDING_MODEL=nomic-embed-text
+   LLM_CHAT_MODEL=llama2
+   LLM_SIMILARITY_THRESHOLD=70
+   ```
+
+5. **Backfill embeddings** (after initial setup):
+   ```bash
+   cd backend
+   npm run backfill-control-embeddings
+   npm run backfill-embeddings  # For risks
+   ```
+
+**Note**: AI features are optional. The application will work without Ollama, but control/risk suggestions will be disabled.
+
+### 5. Trust Center Setup
+
+The Trust Center module allows external users to access selected documents. It uses separate authentication from the main application.
+
+1. **Generate JWT Secret**:
+   ```bash
+   openssl rand -base64 32
+   ```
+
+2. **Add to `.env`**:
+   ```
+   TRUST_CENTER_JWT_SECRET=your-generated-secret-here
+   TRUST_CENTER_JWT_EXPIRY=24h
+   TRUST_CENTER_MAX_FILE_SIZE_MB=50
+   CORS_TRUST_CENTER_ORIGINS=http://localhost:3000,https://trust.paythru.com
+   ```
+
+3. **Configure document visibility**:
+   - Use the Trust Center Admin page to configure which documents are public/private
+   - Set document categories (certification, policy, report)
+   - Configure NDA requirements per document
+
+4. **User approval workflow**:
+   - External users register via the Trust Center
+   - Admins approve/deny users via the Trust Center Admin page
+   - Approved users can access private documents after accepting terms
+
 ## Development Phases
 
 This project is being built in phases:
@@ -589,6 +717,68 @@ This project is being built in phases:
 - **Phase 8**: Statement of Applicability (SoA) Export ✅
 - **Phase 9**: External Integrations (SharePoint, Confluence) ✅
 - **Phase 10**: Testing, Documentation & Polish ✅
+- **Phase 11**: Additional Entities (Assets, Asset Categories, Interested Parties, Legislation, Suppliers) ✅
+- **Phase 12**: AI-Powered Features (Semantic Search, Control/Risk Suggestions) ✅
+- **Phase 13**: Trust Center Module (Public Document Access) ✅
+- **Phase 14**: Mass Import Functionality ✅
+
+## Key Features
+
+### Core Document Management
+- Document CRUD operations with versioning
+- Document classification and status tracking
+- Review scheduling and workflow
+- Acknowledgment tracking for staff
+- Document linking to SharePoint and Confluence
+- Bulk document import from SharePoint
+- PDF generation, watermarking, and conversion
+
+### Risk & Control Management
+- Risk register with scoring and categorization
+- ISO 27002:2022 control library
+- Risk-control associations
+- Control applicability and implementation tracking
+- AI-powered control suggestions for risks and documents (semantic similarity)
+- Risk import from CSV
+
+### Additional Entities
+- **Assets**: IT asset inventory with classifications
+- **Asset Categories**: Categorization of assets
+- **Interested Parties**: Stakeholder management with requirements tracking
+- **Legislation**: Legal and regulatory requirements tracking
+- **Suppliers**: Third-party supplier management with risk and control links
+- **Supplier Exit Plans**: Exit strategy documentation
+- **Classifications**: Data classification scheme
+
+### AI/LLM Features
+- **Semantic Search**: Vector embeddings for intelligent document and control matching
+- **Control Suggestions**: AI-powered suggestions for linking controls to risks and documents
+- **Risk Suggestions**: Semantic similarity matching for supplier-risk associations
+- Uses Ollama for local LLM inference (embeddings and similarity analysis)
+- Pre-computed embeddings for controls and risks for fast similarity queries
+
+### Trust Center (Public-Facing Module)
+- Public document portal for external users
+- Email/password authentication (separate from internal Entra ID auth)
+- Document visibility controls (public/private)
+- NDA/terms acceptance workflow
+- Document download with watermarking
+- Audit logging for compliance
+- Admin interface for user approval and document management
+- Supplier information display
+
+### Dashboards & Reporting
+- Executive dashboard with key metrics
+- Review dashboard for scheduled reviews
+- Acknowledgment statistics
+- Statement of Applicability (SoA) Excel export
+- Risk and control analytics
+
+### Mass Import
+- Bulk import documents from SharePoint
+- CSV import for risks, assets, interested parties, and legislation
+- Progress tracking and error reporting
+- Automatic embedding computation for imported risks
 
 ## API Endpoints
 
@@ -605,6 +795,9 @@ This project is being built in phases:
 - `GET /api/documents/:id` - Get document details
 - `PUT /api/documents/:id` - Update document (Admin/Editor only)
 - `DELETE /api/documents/:id` - Soft delete document (Admin/Editor only)
+- `POST /api/documents/bulk-import` - Bulk import documents from SharePoint (Admin/Editor only)
+- `POST /api/documents/:id/suggest-controls` - AI-powered control suggestions for document (Admin/Editor only)
+- `GET /api/documents/:id/download` - Download document (with conversion/watermarking)
 
 ### Acknowledgments
 - `GET /api/acknowledgments/pending` - Get pending documents for current user
@@ -619,18 +812,83 @@ This project is being built in phases:
 - `GET /api/reviews/document/:documentId` - Review history for document
 
 ### Risks
-- `GET /api/risks` - List risks
-- `POST /api/risks` - Create risk (Admin/Editor only)
+- `GET /api/risks` - List risks with filtering and search
+- `POST /api/risks` - Create risk (Admin/Editor/Contributor)
 - `GET /api/risks/:id` - Get risk details
 - `PUT /api/risks/:id` - Update risk (Admin/Editor only)
+- `DELETE /api/risks/:id` - Archive risk (Admin/Editor only)
 - `POST /api/risks/:id/controls` - Set risk-control associations (Admin/Editor only)
+- `POST /api/risks/suggest-controls` - AI-powered control suggestions for risk (Admin/Editor only)
+- `POST /api/risks/import` - Import risks from CSV (Admin/Editor only)
 
 ### Controls
-- `GET /api/controls` - List controls
+- `GET /api/controls` - List controls with filtering
 - `POST /api/controls` - Create control (Admin/Editor only)
 - `GET /api/controls/:id` - Get control details
 - `PUT /api/controls/:id` - Update control (Admin/Editor only)
 - `GET /api/controls/:id/links` - Get linked risks and documents
+
+### Assets
+- `GET /api/assets` - List assets with filtering and search
+- `POST /api/assets` - Create asset (Admin/Editor only)
+- `GET /api/assets/:id` - Get asset details
+- `PUT /api/assets/:id` - Update asset (Admin/Editor only)
+- `DELETE /api/assets/:id` - Delete asset (Admin/Editor only)
+- `POST /api/assets/import` - Import assets from CSV (Admin/Editor only)
+
+### Asset Categories
+- `GET /api/asset-categories` - List asset categories
+- `POST /api/asset-categories` - Create asset category (Admin/Editor only)
+- `GET /api/asset-categories/:id` - Get asset category details
+- `PUT /api/asset-categories/:id` - Update asset category (Admin/Editor only)
+- `DELETE /api/asset-categories/:id` - Delete asset category (Admin/Editor only)
+
+### Interested Parties
+- `GET /api/interested-parties` - List interested parties
+- `POST /api/interested-parties` - Create interested party (Admin/Editor only)
+- `GET /api/interested-parties/:id` - Get interested party details
+- `PUT /api/interested-parties/:id` - Update interested party (Admin/Editor only)
+- `DELETE /api/interested-parties/:id` - Delete interested party (Admin/Editor only)
+- `POST /api/interested-parties/import` - Import interested parties from CSV (Admin/Editor only)
+
+### Legislation
+- `GET /api/legislation` - List legislation
+- `POST /api/legislation` - Create legislation (Admin/Editor only)
+- `GET /api/legislation/:id` - Get legislation details
+- `PUT /api/legislation/:id` - Update legislation (Admin/Editor only)
+- `DELETE /api/legislation/:id` - Delete legislation (Admin/Editor only)
+- `POST /api/legislation/import` - Import legislation from CSV (Admin/Editor only)
+
+### Suppliers
+- `GET /api/suppliers` - List suppliers with filtering and search
+- `POST /api/suppliers` - Create supplier (Admin/Editor only)
+- `GET /api/suppliers/:id` - Get supplier details
+- `PUT /api/suppliers/:id` - Update supplier (Admin/Editor only)
+- `DELETE /api/suppliers/:id` - Delete supplier (Admin/Editor only)
+- `POST /api/suppliers/:id/risks` - Link risks to supplier (Admin/Editor only)
+- `POST /api/suppliers/:id/controls` - Link controls to supplier (Admin/Editor only)
+- `GET /api/suppliers/:id/suggest-risks` - AI-powered risk suggestions for supplier (Admin/Editor only)
+
+### Supplier Exit Plans
+- `GET /api/suppliers/:supplierId/exit-plans` - List exit plans for supplier
+- `POST /api/suppliers/:supplierId/exit-plans` - Create exit plan (Admin/Editor only)
+- `PUT /api/suppliers/:supplierId/exit-plans/:id` - Update exit plan (Admin/Editor only)
+- `DELETE /api/suppliers/:supplierId/exit-plans/:id` - Delete exit plan (Admin/Editor only)
+
+### Classifications
+- `GET /api/classifications` - List data classifications
+- `POST /api/classifications` - Create classification (Admin/Editor only)
+- `PUT /api/classifications/:id` - Update classification (Admin/Editor only)
+- `DELETE /api/classifications/:id` - Delete classification (Admin/Editor only)
+
+### Users
+- `GET /api/users` - List users (Admin only)
+- `GET /api/users/:id` - Get user details (Admin only)
+- `PUT /api/users/:id` - Update user (Admin only)
+- `PUT /api/users/:id/role` - Update user role (Admin only)
+
+### Dashboard
+- `GET /api/dashboard` - Get executive dashboard data (Admin/Editor only)
 
 ### SoA Export
 - `POST /api/soa/export` - Generate SoA Excel export (Admin/Editor only)
@@ -645,6 +903,26 @@ This project is being built in phases:
 - `GET /api/confluence/pages` - List Confluence pages (Admin/Editor only)
 - `GET /api/confluence/pages/:pageId` - Get Confluence page metadata
 - `GET /api/confluence/url` - Generate Confluence URL
+
+### Trust Center (Public API)
+- `POST /api/trust/auth/register` - Register external user
+- `POST /api/trust/auth/login` - Login external user
+- `POST /api/trust/auth/logout` - Logout external user
+- `GET /api/trust/auth/me` - Get current external user
+- `POST /api/trust/auth/forgot-password` - Request password reset
+- `POST /api/trust/auth/reset-password` - Reset password with token
+- `GET /api/trust/documents` - Get public/private documents (grouped by category)
+- `GET /api/trust/documents/:id/download` - Download document (with watermarking)
+- `POST /api/trust/documents/:id/accept-terms` - Accept NDA/terms for document
+- `GET /api/trust/suppliers` - Get public supplier information
+
+### Trust Center Admin (Internal API)
+- `GET /api/trust/admin/users` - List external users (Admin only)
+- `PUT /api/trust/admin/users/:id/approve` - Approve external user (Admin only)
+- `PUT /api/trust/admin/users/:id/deny` - Deny external user (Admin only)
+- `GET /api/trust/admin/document-settings` - Get all document settings (Admin only)
+- `PUT /api/trust/admin/document-settings/:docId` - Update document settings (Admin only)
+- `GET /api/trust/admin/audit-log` - Get audit log (Admin only)
 
 ## License
 
