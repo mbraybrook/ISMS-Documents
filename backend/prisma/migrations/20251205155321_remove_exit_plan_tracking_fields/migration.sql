@@ -28,3 +28,4 @@ DROP COLUMN "completedAt",
 DROP COLUMN "status";
 
 
+
