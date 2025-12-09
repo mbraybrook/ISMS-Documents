@@ -23,27 +23,68 @@ export function parseISO27002Controls(filePath: string): ParsedControl[] {
   let currentControl: Partial<ParsedControl> | null = null;
   let currentSectionType: 'control' | 'purpose' | 'guidance' | 'other' | null = null;
   let sectionBuffer: string[] = [];
-  const controlCounters: Record<string, number> = { '5': 0, '6': 0, '7': 0, '8': 0 };
+  const controlCounters: Record<string, number> = { '5': 1, '6': 1, '7': 1, '8': 1 };
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     
     // Detect section start (5, 6, 7, 8)
+    // Save previous control before switching sections
     if (line.match(/^5\.\s+Organizational controls/)) {
+      // Save previous control if exists
+      if (currentControl && currentControl.code) {
+        if (sectionBuffer.length > 0) {
+          saveSection(currentControl, currentSectionType, sectionBuffer);
+        }
+        controls.push(currentControl as ParsedControl);
+      }
       currentSection = '5';
-      controlCounters['5'] = 0;
+      controlCounters['5'] = 1;
+      currentControl = null;
+      currentSectionType = null;
+      sectionBuffer = [];
       continue;
     } else if (line.match(/^6\.\s+People controls/)) {
+      // Save previous control if exists
+      if (currentControl && currentControl.code) {
+        if (sectionBuffer.length > 0) {
+          saveSection(currentControl, currentSectionType, sectionBuffer);
+        }
+        controls.push(currentControl as ParsedControl);
+      }
       currentSection = '6';
-      controlCounters['6'] = 0;
+      controlCounters['6'] = 1;
+      currentControl = null;
+      currentSectionType = null;
+      sectionBuffer = [];
       continue;
     } else if (line.match(/^7\.\s+Physical controls/)) {
+      // Save previous control if exists
+      if (currentControl && currentControl.code) {
+        if (sectionBuffer.length > 0) {
+          saveSection(currentControl, currentSectionType, sectionBuffer);
+        }
+        controls.push(currentControl as ParsedControl);
+      }
       currentSection = '7';
-      controlCounters['7'] = 0;
+      controlCounters['7'] = 1;
+      currentControl = null;
+      currentSectionType = null;
+      sectionBuffer = [];
       continue;
     } else if (line.match(/^8\.\s+Technological controls/)) {
+      // Save previous control if exists
+      if (currentControl && currentControl.code) {
+        if (sectionBuffer.length > 0) {
+          saveSection(currentControl, currentSectionType, sectionBuffer);
+        }
+        controls.push(currentControl as ParsedControl);
+      }
       currentSection = '8';
-      controlCounters['8'] = 0;
+      controlCounters['8'] = 1;
+      currentControl = null;
+      currentSectionType = null;
+      sectionBuffer = [];
       continue;
     }
     
@@ -67,12 +108,12 @@ export function parseISO27002Controls(filePath: string): ParsedControl[] {
           controls.push(currentControl as ParsedControl);
         }
         
-        // Increment counter for this section
-        controlCounters[currentSection]++;
+        // Use current counter value, then increment for next control
         const title = controlHeadingMatch[1].trim();
+        const controlNumber = controlCounters[currentSection];
         
         currentControl = {
-          code: `${currentSection}.${controlCounters[currentSection]}`,
+          code: `${currentSection}.${controlNumber}`,
           title,
           controlText: '',
           purpose: '',
@@ -80,6 +121,10 @@ export function parseISO27002Controls(filePath: string): ParsedControl[] {
           otherInformation: null,
           category: getCategory(currentSection),
         };
+        
+        // Increment counter for next control in this section
+        controlCounters[currentSection]++;
+        
         currentSectionType = null;
         sectionBuffer = [];
         continue;

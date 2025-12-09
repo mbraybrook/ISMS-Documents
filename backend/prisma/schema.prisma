@@ -124,7 +124,7 @@ model Document {
   requiresAcknowledgement Boolean                 @default(false)
   lastChangedDate         DateTime?
   createdAt               DateTime                @default(now())
-  updatedAt               DateTime
+  updatedAt               DateTime                @updatedAt
   documentUrl             String?
   Acknowledgment          Acknowledgment[]
   owner                   User                    @relation("DocumentOwner", fields: [ownerUserId], references: [id])

@@ -35,13 +35,17 @@ import {
   Td,
   IconButton,
   Text,
+  InputGroup,
+  InputLeftElement,
+  Spinner,
+  Tooltip,
 } from '@chakra-ui/react';
 import { useRef } from 'react';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { supplierApi } from '../services/api';
-import { DeleteIcon, AddIcon } from '@chakra-ui/icons';
+import { DeleteIcon, AddIcon, SearchIcon } from '@chakra-ui/icons';
 
 interface ControlFormModalProps {
   isOpen: boolean;
@@ -61,6 +65,14 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
   const [availableSuppliers, setAvailableSuppliers] = useState<any[]>([]);
   const [searchingSuppliers, setSearchingSuppliers] = useState(false);
   const [linkingSupplier, setLinkingSupplier] = useState(false);
+  
+  // Document linking state
+  const [linkedDocuments, setLinkedDocuments] = useState<Array<{ id: string; title: string; version: string; type: string; status: string }>>([]);
+  const [documentSearchTerm, setDocumentSearchTerm] = useState('');
+  const [availableDocuments, setAvailableDocuments] = useState<Array<{ id: string; title: string; version: string; type: string; status: string }>>([]);
+  const [searchingDocuments, setSearchingDocuments] = useState(false);
+  const [linkingDocument, setLinkingDocument] = useState(false);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [formData, setFormData] = useState({
     code: '',
     title: '',
@@ -93,6 +105,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
         implemented: control.implemented || false,
       });
       fetchLinkedSuppliers();
+      fetchLinkedDocuments();
     } else {
       setFormData({
         code: '',
@@ -190,6 +203,107 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       toast({
         title: 'Error',
         description: 'Failed to unlink supplier',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const fetchLinkedDocuments = async () => {
+    if (!control?.id) return;
+    try {
+      setLoadingDocuments(true);
+      const response = await api.get(`/api/controls/${control.id}/documents`);
+      setLinkedDocuments(response.data);
+    } catch (error: any) {
+      console.error('Error fetching linked documents:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load linked documents',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const searchDocuments = async () => {
+    if (!documentSearchTerm.trim()) {
+      setAvailableDocuments([]);
+      return;
+    }
+
+    try {
+      setSearchingDocuments(true);
+      const response = await api.get('/api/documents', {
+        params: {
+          limit: 20,
+        },
+      });
+      // Filter out documents already linked and filter by search term
+      const linkedDocumentIds = new Set(linkedDocuments.map((d) => d.id));
+      const searchLower = documentSearchTerm.toLowerCase();
+      setAvailableDocuments(
+        response.data.data.filter(
+          (d: any) =>
+            !linkedDocumentIds.has(d.id) &&
+            d.title.toLowerCase().includes(searchLower)
+        )
+      );
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to search documents',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setSearchingDocuments(false);
+    }
+  };
+
+  const handleLinkDocument = async (documentId: string) => {
+    if (!control?.id) return;
+    try {
+      setLinkingDocument(true);
+      await api.post(`/api/controls/${control.id}/documents`, { documentId });
+      toast({
+        title: 'Success',
+        description: 'Document linked successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      setDocumentSearchTerm('');
+      setAvailableDocuments([]);
+      fetchLinkedDocuments();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to link document',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLinkingDocument(false);
+    }
+  };
+
+  const handleUnlinkDocument = async (documentId: string) => {
+    if (!control?.id) return;
+    try {
+      await api.delete(`/api/controls/${control.id}/documents/${documentId}`);
+      toast({
+        title: 'Success',
+        description: 'Document unlinked successfully',
+        status: 'success',
+        duration: 3000,
+      });
+      fetchLinkedDocuments();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to unlink document',
         status: 'error',
         duration: 3000,
       });
@@ -701,6 +815,147 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                           </Box>
                         ))}
                       </VStack>
+                    )}
+                  </Box>
+
+                  <Divider />
+
+                  <Box>
+                    <FormLabel fontWeight="bold" color="blue.600" mb={2}>
+                      Linked Documents ({linkedDocuments.length})
+                    </FormLabel>
+                    {loadingDocuments ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <>
+                        {linkedDocuments.length > 0 && (
+                          <VStack align="stretch" spacing={2} mb={4}>
+                            {linkedDocuments.map((doc) => (
+                              <Box
+                                key={doc.id}
+                                p={2}
+                                bg="white"
+                                borderRadius="md"
+                                border="1px"
+                                borderColor="blue.200"
+                                _hover={{ bg: "blue.50", borderColor: "blue.400" }}
+                              >
+                                <HStack justify="space-between">
+                                  <Link
+                                    to={`/documents`}
+                                    onClick={() => {
+                                      sessionStorage.setItem('highlightDocumentId', doc.id);
+                                    }}
+                                    style={{ textDecoration: 'none', flex: 1 }}
+                                  >
+                                    <HStack spacing={2}>
+                                      <Badge colorScheme="blue" fontSize="xs">
+                                        {doc.type}
+                                      </Badge>
+                                      <Text fontWeight="medium" color="blue.700" _hover={{ textDecoration: "underline" }}>
+                                        {doc.title}
+                                      </Text>
+                                      <Badge fontSize="xs" colorScheme="gray">
+                                        v{doc.version}
+                                      </Badge>
+                                      <Badge fontSize="xs" colorScheme={doc.status === 'APPROVED' ? 'green' : 'gray'}>
+                                        {doc.status}
+                                      </Badge>
+                                    </HStack>
+                                  </Link>
+                                  <Tooltip label="Unlink document">
+                                    <IconButton
+                                      aria-label="Unlink document"
+                                      icon={<DeleteIcon />}
+                                      size="sm"
+                                      colorScheme="red"
+                                      variant="ghost"
+                                      onClick={() => handleUnlinkDocument(doc.id)}
+                                    />
+                                  </Tooltip>
+                                </HStack>
+                              </Box>
+                            ))}
+                          </VStack>
+                        )}
+                        <VStack align="stretch" spacing={2}>
+                          <InputGroup>
+                            <InputLeftElement pointerEvents="none">
+                              <SearchIcon color="gray.300" />
+                            </InputLeftElement>
+                            <Input
+                              placeholder="Search documents by title..."
+                              value={documentSearchTerm}
+                              onChange={(e) => {
+                                setDocumentSearchTerm(e.target.value);
+                                if (e.target.value.trim()) {
+                                  searchDocuments();
+                                } else {
+                                  setAvailableDocuments([]);
+                                }
+                              }}
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter' && documentSearchTerm.trim()) {
+                                  e.preventDefault();
+                                  searchDocuments();
+                                }
+                              }}
+                            />
+                          </InputGroup>
+                          {searchingDocuments && (
+                            <HStack>
+                              <Spinner size="sm" />
+                              <Text fontSize="sm" color="gray.500">Searching...</Text>
+                            </HStack>
+                          )}
+                          {availableDocuments.length > 0 && (
+                            <Box
+                              maxH="200px"
+                              overflowY="auto"
+                              border="1px"
+                              borderColor="gray.200"
+                              borderRadius="md"
+                              p={2}
+                            >
+                              <VStack align="stretch" spacing={2}>
+                                {availableDocuments.map((doc) => (
+                                  <Box
+                                    key={doc.id}
+                                    p={2}
+                                    bg="gray.50"
+                                    borderRadius="md"
+                                    border="1px"
+                                    borderColor="gray.200"
+                                    _hover={{ bg: "gray.100", borderColor: "blue.300" }}
+                                    cursor="pointer"
+                                    onClick={() => handleLinkDocument(doc.id)}
+                                  >
+                                    <HStack spacing={2}>
+                                      <Badge colorScheme="blue" fontSize="xs">
+                                        {doc.type}
+                                      </Badge>
+                                      <Text fontSize="sm" fontWeight="medium">
+                                        {doc.title}
+                                      </Text>
+                                      <Badge fontSize="xs" colorScheme="gray">
+                                        v{doc.version}
+                                      </Badge>
+                                      <Badge fontSize="xs" colorScheme={doc.status === 'APPROVED' ? 'green' : 'gray'}>
+                                        {doc.status}
+                                      </Badge>
+                                    </HStack>
+                                  </Box>
+                                ))}
+                              </VStack>
+                            </Box>
+                          )}
+                          {documentSearchTerm.trim() && availableDocuments.length === 0 && !searchingDocuments && (
+                            <Text fontSize="sm" color="gray.500">
+                              No documents found matching "{documentSearchTerm}"
+                            </Text>
+                          )}
+                        </VStack>
+                      </>
                     )}
                   </Box>
                 </>
