@@ -33,3 +33,4 @@ DROP TABLE IF EXISTS "SupplierRiskAssessment";
 DROP TABLE IF EXISTS "SupplierCriticalityAssessment";
 
 
+
