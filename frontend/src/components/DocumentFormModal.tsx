@@ -104,6 +104,58 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   // Check if user can edit owner (Admin or Editor only)
   const canEditOwner = user?.role === 'ADMIN' || user?.role === 'EDITOR';
 
+  const fetchUsers = useCallback(async () => {
+    try {
+      setLoadingUsers(true);
+      const response = await api.get('/api/users');
+      const allUsers = response.data.data || [];
+      // Filter to only Admin and Editor roles for owner assignment
+      const adminEditorUsers = allUsers.filter((u: any) => u.role === 'ADMIN' || u.role === 'EDITOR');
+      
+      // If editing a document, include the current owner even if they're not Admin/Editor
+      // This handles edge cases where a document might have a non-Admin/Editor owner
+      if (document?.ownerUserId) {
+        const currentOwner = allUsers.find((u: any) => u.id === document.ownerUserId);
+        if (currentOwner && !adminEditorUsers.find((u: any) => u.id === currentOwner.id)) {
+          adminEditorUsers.push(currentOwner);
+        }
+      }
+      
+      setUsers(adminEditorUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load users for owner selection',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+        position: 'top-right',
+      });
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, [document?.ownerUserId, toast]);
+
+  const fetchLinkedControls = useCallback(async () => {
+    if (!document?.id) return;
+    try {
+      setLoadingControls(true);
+      const response = await api.get(`/api/documents/${document.id}/controls`);
+      setLinkedControls(response.data);
+    } catch (error: any) {
+      console.error('Error fetching linked controls:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load linked controls',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLoadingControls(false);
+    }
+  }, [document?.id, toast]);
+
   // Handle Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -151,39 +203,6 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.title, formData.type, isOpen]);
-
-  const fetchUsers = useCallback(async () => {
-    try {
-      setLoadingUsers(true);
-      const response = await api.get('/api/users');
-      const allUsers = response.data.data || [];
-      // Filter to only Admin and Editor roles for owner assignment
-      const adminEditorUsers = allUsers.filter((u: any) => u.role === 'ADMIN' || u.role === 'EDITOR');
-      
-      // If editing a document, include the current owner even if they're not Admin/Editor
-      // This handles edge cases where a document might have a non-Admin/Editor owner
-      if (document?.ownerUserId) {
-        const currentOwner = allUsers.find((u: any) => u.id === document.ownerUserId);
-        if (currentOwner && !adminEditorUsers.find((u: any) => u.id === currentOwner.id)) {
-          adminEditorUsers.push(currentOwner);
-        }
-      }
-      
-      setUsers(adminEditorUsers);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load users for owner selection',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-        position: 'top-right',
-      });
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, [document?.ownerUserId, toast]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -571,25 +590,6 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       setLoading(false);
     }
   };
-
-  const fetchLinkedControls = useCallback(async () => {
-    if (!document?.id) return;
-    try {
-      setLoadingControls(true);
-      const response = await api.get(`/api/documents/${document.id}/controls`);
-      setLinkedControls(response.data);
-    } catch (error: any) {
-      console.error('Error fetching linked controls:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load linked controls',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setLoadingControls(false);
-    }
-  }, [document?.id, toast]);
 
   const fetchSuggestedControls = async () => {
     if (!formData.title || formData.title.trim().length < 3) {
