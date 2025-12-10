@@ -76,6 +76,7 @@ export function StaffAcknowledgmentPage() {
           continue;
         }
 
+        
         // Only generate URL if not stored
         const url = await getDocumentUrl(doc);
         if (url) {
@@ -97,6 +98,7 @@ export function StaffAcknowledgmentPage() {
       const response = await api.get('/api/acknowledgments/pending');
       const docs = response.data;
 
+      
       // Fetch version notes for each document
       const docsWithNotes = await Promise.all(
         docs.map(async (doc: Document) => {
@@ -116,6 +118,7 @@ export function StaffAcknowledgmentPage() {
         })
       );
 
+      
       setDocuments(docsWithNotes);
     } catch (error) {
       console.error('Error fetching pending documents:', error);
@@ -258,6 +261,7 @@ export function StaffAcknowledgmentPage() {
       if (doc.storageLocation === 'SHAREPOINT' && doc.sharePointSiteId && doc.sharePointDriveId && doc.sharePointItemId) {
         const graphToken = await authService.getGraphAccessToken();
 
+        
         if (graphToken) {
           try {
             const response = await api.get(`/api/sharepoint/items/${doc.sharePointItemId}`, {
@@ -318,6 +322,7 @@ export function StaffAcknowledgmentPage() {
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
+    
     if (diffDays === 0) return 'Changed today';
     if (diffDays === 1) return 'Changed 1 day ago';
     return `Changed ${diffDays} days ago`;
@@ -333,6 +338,10 @@ export function StaffAcknowledgmentPage() {
   };
 
 
+  const _getStorageLocationIcon = (_location: string) => {
+    // Simple text-based indicator
+    return null; // We'll just show the text
+  };
 
   if (loading) {
     return (
@@ -353,6 +362,7 @@ export function StaffAcknowledgmentPage() {
           Documents Requiring Your Acknowledgment
         </Heading>
 
+        
         {/* Encouragement to review documents */}
         {documents.length > 0 && (
           <Alert status="info" borderRadius="md" mb={4}>
@@ -363,12 +373,14 @@ export function StaffAcknowledgmentPage() {
               </Text>
               <Text fontSize="sm">
                 Click "Open" to review the document in SharePoint or Confluence.
+                Click "Open" to review the document in SharePoint or Confluence. 
                 Acknowledgment confirms you have read and understood the current version.
               </Text>
             </Box>
           </Alert>
         )}
 
+        
         {documents.length === 0 ? (
           <Alert status="success" borderRadius="md">
             <AlertIcon />

@@ -233,6 +233,24 @@ export interface Supplier {
   reviewDate: string | null;
   supplierRisks?: SupplierRisk[];
   supplierControls?: SupplierControl[];
+  supplierRisks?: Array<{
+    risk: {
+      id: string;
+      title: string;
+      calculatedScore: number;
+      status: string;
+      riskCategory: string | null;
+    };
+  }>;
+  supplierControls?: Array<{
+    control: {
+      id: string;
+      code: string;
+      title: string;
+      implemented: boolean;
+      category: string | null;
+    };
+  }>;
   // certificates?: SupplierCertificate[]; // TODO: SupplierCertificate type not yet defined
   exitPlan?: SupplierExitPlan | null;
   showInTrustCenter: boolean;

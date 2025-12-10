@@ -16,6 +16,14 @@ A comprehensive Information Security Management System (ISMS) platform that cent
   - Confluence (living documentation links)
 - **Document Processing**: PDF generation, watermarking, and conversion (LibreOffice)
 - **Testing**: Jest (backend), Vitest (frontend), Playwright (E2E)
+A web application that provides a "single pane of glass" over an organisation's ISMS documentation stored primarily in Microsoft SharePoint, with links to selected Confluence content.
+
+## Architecture
+
+- **Frontend**: React + TypeScript + Vite + Chakra UI
+- **Backend**: Node.js + Express + TypeScript
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: Entra ID / Microsoft Identity Platform (MSAL)
 
 ## Prerequisites
 
@@ -603,6 +611,23 @@ git commit --no-verify  # Not recommended!
 
 If you're using AI coding assistants (like Cursor/Composer), they will automatically read `.cursorrules` to understand and follow our linting standards. This ensures generated code passes linting checks from the start.
 
+├── backend/          # Express backend
+│   ├── src/
+│   │   ├── config.ts
+│   │   ├── index.ts
+│   │   ├── routes/
+│   │   └── middleware/
+│   └── prisma/       # Prisma schema and migrations
+├── frontend/         # React frontend
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   └── App.tsx
+│   └── vite.config.ts
+├── docs/             # Documentation
+└── docker-compose.yml
+```
+
 ## Available Scripts
 
 ### Root Level
@@ -616,6 +641,7 @@ If you're using AI coding assistants (like Cursor/Composer), they will automatic
 - `npm run lint:fix` - Auto-fix linting issues
 - `npm run lint:track` - Record current warning count
 - `npm run lint:report` - Show warning reduction progress
+- `npm run lint` - Lint both backend and frontend
 
 ### Backend
 - `npm run dev --workspace=backend` - Start backend dev server
@@ -879,6 +905,14 @@ This project is being built in phases:
 
 ### Controls
 - `GET /api/controls` - List controls with filtering
+- `GET /api/risks` - List risks
+- `POST /api/risks` - Create risk (Admin/Editor only)
+- `GET /api/risks/:id` - Get risk details
+- `PUT /api/risks/:id` - Update risk (Admin/Editor only)
+- `POST /api/risks/:id/controls` - Set risk-control associations (Admin/Editor only)
+
+### Controls
+- `GET /api/controls` - List controls
 - `POST /api/controls` - Create control (Admin/Editor only)
 - `GET /api/controls/:id` - Get control details
 - `PUT /api/controls/:id` - Update control (Admin/Editor only)

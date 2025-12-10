@@ -51,7 +51,7 @@ export function SupplierExitPlanTab({
       setLoading(true);
       const plan = await supplierApi.getExitPlan(supplierId);
       setExitPlan(plan); // Will be null if no exit plan exists
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching exit plan:', error);
       toast({
         title: 'Error',
@@ -76,7 +76,7 @@ export function SupplierExitPlanTab({
         status: 'success',
         duration: 3000,
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to create exit plan',
@@ -101,7 +101,7 @@ export function SupplierExitPlanTab({
         status: 'success',
         duration: 2000,
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: 'Failed to update exit plan',

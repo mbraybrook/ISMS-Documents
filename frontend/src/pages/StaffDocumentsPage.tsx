@@ -67,6 +67,10 @@ export function StaffDocumentsPage() {
   }, []);
 
     applyFilters();
+  useEffect(() => {
+    applyFilters();
+  }, [filters, allDocuments]);
+
   const fetchDocuments = async () => {
     try {
       setLoading(true);

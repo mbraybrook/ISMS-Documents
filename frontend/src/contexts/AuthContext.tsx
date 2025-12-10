@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const init = async () => {
       await authService.initialize();
 
+      
       // Handle redirect response (if user just came back from login)
       try {
         const response = await msalInstance.handleRedirectPromise();
@@ -68,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
       }
 
+      
       setLoading(false);
     };
 

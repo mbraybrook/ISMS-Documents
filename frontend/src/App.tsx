@@ -55,6 +55,7 @@ function App() {
           />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
+          
           {/* ISMS Admin routes - all under /admin prefix */}
           <Route path="/admin/login" element={<LoginPage />} />
           <Route

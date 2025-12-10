@@ -197,8 +197,8 @@ export function AssetCategoriesPage() {
       onClose();
       setLinkedRisks([]);
       fetchCategories();
-    } catch (error) {
-      const errorMessage = error.response?.data?.error || 'Failed to save asset category';
+    } catch (error: unknown) {
+      const errorMessage = (error as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to save asset category';
       toast({
         title: 'Error',
         description: errorMessage,
@@ -224,8 +224,8 @@ export function AssetCategoriesPage() {
       onDeleteClose();
       setCategoryToDelete(null);
       fetchCategories();
-    } catch (error) {
-      const errorMessage = error.response?.data?.error || 'Failed to delete asset category';
+    } catch (error: unknown) {
+      const errorMessage = (error as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to delete asset category';
       toast({
         title: 'Error',
         description: errorMessage,

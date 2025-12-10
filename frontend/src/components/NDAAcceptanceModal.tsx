@@ -33,10 +33,23 @@ export function NDAAcceptanceModal({ isOpen, onClose }: NDAAcceptanceModalProps)
         isClosable: true,
       });
       onClose();
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        error.response &&
+        typeof error.response === 'object' &&
+        'data' in error.response &&
+        error.response.data &&
+        typeof error.response.data === 'object' &&
+        'error' in error.response.data &&
+        typeof error.response.data.error === 'string'
+          ? error.response.data.error
+          : 'An error occurred';
       toast({
         title: 'Failed to accept terms',
-        description: error.response?.data?.error || 'An error occurred',
+        description: errorMessage,
         status: 'error',
         duration: 5000,
         isClosable: true,

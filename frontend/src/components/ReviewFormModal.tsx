@@ -82,7 +82,7 @@ export function ReviewFormModal({ isOpen, onClose, document }: ReviewFormModalPr
 
       await api.post('/api/reviews', payload);
       onClose(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating review:', error);
       toast({
         title: 'Error',

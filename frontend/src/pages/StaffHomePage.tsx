@@ -107,6 +107,7 @@ export function StaffHomePage() {
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
+    
     if (diffDays === 0) return 'Changed today';
     if (diffDays === 1) return 'Changed 1 day ago';
     return `Changed ${diffDays} days ago`;

@@ -8,7 +8,6 @@ import {
   Checkbox,
   Spinner,
   Divider,
-  useToast,
   IconButton,
   Tooltip,
   Progress,
@@ -39,7 +38,6 @@ export function SimilarRisksPanel({
   threshold = 70,
   progress,
 }: SimilarRisksPanelProps) {
-  const _toast = useToast();
 
   const getSimilarityColor = (score: number): string => {
     if (score >= 80) return 'red';

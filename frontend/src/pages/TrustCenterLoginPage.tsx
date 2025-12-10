@@ -18,7 +18,6 @@ import { useNavigate } from 'react-router-dom';
 import { useTrustAuth } from '../contexts/TrustAuthContext';
 import { trustApi } from '../services/trustApi';
 import { DataSensitivityFooter } from '../components/DataSensitivityFooter';
-import { AxiosError } from 'axios';
 
 export function TrustCenterLoginPage() {
   const navigate = useNavigate();
@@ -60,9 +59,9 @@ export function TrustCenterLoginPage() {
         setIsLogin(true);
         setFormData({ email: '', password: '', companyName: '' });
       }
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string; errors?: Record<string, string> }>;
-      const errorMessage = axiosError.response?.data?.error || 'An error occurred';
+    } catch (error: unknown) {
+      const errorObj = error as { response?: { data?: { error?: string; errors?: Record<string, string> } } };
+      const errorMessage = errorObj.response?.data?.error || 'An error occurred';
       toast({
         title: isLogin ? 'Login failed' : 'Registration failed',
         description: errorMessage,
@@ -70,8 +69,8 @@ export function TrustCenterLoginPage() {
         duration: 5000,
         isClosable: true,
       });
-      if (axiosError.response?.data?.errors) {
-        setErrors(axiosError.response.data.errors);
+      if (errorObj.response?.data?.errors) {
+        setErrors(errorObj.response.data.errors);
       }
     } finally {
       setLoading(false);

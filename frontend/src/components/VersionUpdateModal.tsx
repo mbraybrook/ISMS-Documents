@@ -41,9 +41,7 @@ export function VersionUpdateModal({
   currentLastReviewDate: _currentLastReviewDate,
   currentNextReviewDate: _currentNextReviewDate,
 }: VersionUpdateModalProps) {
-  // Unused parameters - kept for API compatibility
-  void _currentLastReviewDate;
-  void _currentNextReviewDate;
+  // Unused parameters - kept for API compatibility (prefixed with _)
   const toast = useToast();
   const [newVersion, setNewVersion] = useState('');
   const [notes, setNotes] = useState('');
@@ -128,7 +126,7 @@ export function VersionUpdateModal({
 
       onSuccess();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating version:', error);
       
       if (error.response?.status === 409) {

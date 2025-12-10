@@ -5,8 +5,6 @@ import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
-// Enums and validation functions are not directly used in this file
-// They are used in validation rules and type checking
 
 const router = Router();
 
@@ -25,9 +23,9 @@ const validate = (req: any, res: Response, next: any) => {
 };
 
 // Helper function to validate enum values (currently unused but may be needed for future validation)
-// const isValidEnum = (value: any, enumValues: string[]): boolean => {
-//   return value === null || value === undefined || enumValues.includes(value);
-// };
+const _isValidEnum = (value: any, enumValues: string[]): boolean => {
+  return value === null || value === undefined || enumValues.includes(value);
+};
 
 // GET /api/suppliers - list all suppliers with filters
 router.get(

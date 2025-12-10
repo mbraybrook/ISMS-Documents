@@ -21,3 +21,4 @@ export interface RiskDashboardSummary {
   quarterly_series: QuarterlyDataPoint[];
 }
 
+

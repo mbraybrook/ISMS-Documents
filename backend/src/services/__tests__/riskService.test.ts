@@ -34,9 +34,10 @@ const mockPrisma = prisma as any;
 describe('riskService', () => {
   describe('calculateRiskScore', () => {
     it('should calculate risk score correctly', () => {
-      expect(calculateRiskScore(3, 4, 5, 2)).toBe(24);
-      expect(calculateRiskScore(1, 1, 1, 1)).toBe(3);
-      expect(calculateRiskScore(5, 5, 5, 5)).toBe(75);
+      // (C + I + A) * likelihood
+      expect(calculateRiskScore(3, 4, 5, 2)).toBe(24); // (3+4+5) * 2 = 24
+      expect(calculateRiskScore(1, 1, 1, 1)).toBe(3); // (1+1+1) * 1 = 3
+      expect(calculateRiskScore(5, 5, 5, 5)).toBe(75); // (5+5+5) * 5 = 75
     });
 
     it('should handle edge cases', () => {
@@ -56,7 +57,8 @@ describe('riskService', () => {
     });
 
     it('should handle single control code', () => {
-      expect(parseControlCodes('A.8.3')).toEqual(['A.8.3']);
+      const result = parseControlCodes('A.8.3');
+      expect(result).toEqual(['A.8.3']);
     });
 
     it('should return empty array for null/undefined', () => {
@@ -66,7 +68,8 @@ describe('riskService', () => {
     });
 
     it('should filter out empty strings', () => {
-      expect(parseControlCodes('A.8.3, , A.5.9')).toEqual(['A.8.3', 'A.5.9']);
+      const result = parseControlCodes('A.8.3, , A.5.9');
+      expect(result).toEqual(['A.8.3', 'A.5.9']);
     });
   });
 
@@ -92,15 +95,19 @@ describe('riskService', () => {
 
     it('should allow ADMIN/EDITOR to archive ACTIVE risks', () => {
       expect(validateStatusTransition('ACTIVE', 'ARCHIVED', 'ADMIN')).toBe(true);
+      expect(validateStatusTransition('ACTIVE', 'ARCHIVED', 'EDITOR')).toBe(true);
     });
 
     it('should not allow CONTRIBUTOR to archive ACTIVE risks', () => {
+      // CONTRIBUTOR can only transition DRAFT -> PROPOSED
       expect(validateStatusTransition('ACTIVE', 'ARCHIVED', 'CONTRIBUTOR')).toBe(false);
     });
 
     it('should allow ADMIN/EDITOR to make any transition', () => {
+      // ADMIN and EDITOR have flexibility to set any status
       expect(validateStatusTransition('ACTIVE', 'DRAFT', 'ADMIN')).toBe(true);
       expect(validateStatusTransition('REJECTED', 'ACTIVE', 'ADMIN')).toBe(true);
+      expect(validateStatusTransition('ACTIVE', 'DRAFT', 'EDITOR')).toBe(true);
     });
   });
 

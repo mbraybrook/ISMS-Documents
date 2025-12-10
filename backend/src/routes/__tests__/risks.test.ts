@@ -2,6 +2,9 @@
 import request from 'supertest';
 import express from 'express';
 import { risksRouter } from '../risks';
+import request from 'supertest';
+import express from 'express';
+import { risksRouter } from '../risks';
 import { mockUsers } from '../../lib/test-helpers';
 
 // Mock authentication middleware

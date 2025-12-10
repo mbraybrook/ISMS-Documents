@@ -33,7 +33,6 @@ import { authService } from '../services/authService';
 import { DocumentFormModal } from '../components/DocumentFormModal';
 import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
 
-
 interface Document {
   id: string;
   title: string;
@@ -147,7 +146,7 @@ export function DocumentsPage() {
       // First, use stored URLs from the database
       let storedUrlCount = 0;
       let generatedUrlCount = 0;
-
+      
       for (const doc of documents) {
         // Use stored documentUrl if available
         if (doc.documentUrl) {
@@ -156,6 +155,7 @@ export function DocumentsPage() {
           continue;
         }
 
+        
         // Only generate URL if not stored and document has required IDs
         try {
           const url = await getDocumentUrl(doc);
@@ -174,7 +174,7 @@ export function DocumentsPage() {
               });
             }
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('[generateUrls] Error generating URL for document', doc.id, doc.title, error);
         }
       }
@@ -246,6 +246,7 @@ export function DocumentsPage() {
         // Get Graph token once and reuse it for both API calls
         const graphToken = await authService.getGraphAccessToken();
 
+        
         if (!graphToken) {
           // No token available - cannot generate URL
           console.warn('[getDocumentUrl] No Graph access token available for SharePoint document URL', {
@@ -283,7 +284,7 @@ export function DocumentsPage() {
             docId: doc.id,
             responseData: response.data,
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error('[getDocumentUrl] Error fetching SharePoint item:', {
             docId: doc.id,
             error: error.message,
@@ -321,7 +322,7 @@ export function DocumentsPage() {
             docId: doc.id,
             responseData: response.data,
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error('[getDocumentUrl] Error generating SharePoint URL:', {
             docId: doc.id,
             error: error.message,
@@ -342,7 +343,7 @@ export function DocumentsPage() {
         });
         return response.data.url;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[getDocumentUrl] Unexpected error generating document URL:', {
         error: error.message,
         status: error.response?.status,
@@ -376,7 +377,7 @@ export function DocumentsPage() {
       setDocumentToDelete(null);
       setSelectedDocuments(new Set());
       fetchDocuments();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to supersede document',
@@ -412,7 +413,7 @@ export function DocumentsPage() {
       setDocumentToHardDelete(null);
       setSelectedDocuments(new Set());
       fetchDocuments();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to delete document',
@@ -447,7 +448,7 @@ export function DocumentsPage() {
       });
       setSelectedDocuments(new Set());
       fetchDocuments();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: 'Failed to delete some documents',
@@ -485,7 +486,7 @@ export function DocumentsPage() {
       onBulkHardDeleteClose();
       setSelectedDocuments(new Set());
       fetchDocuments();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to delete some documents',
@@ -710,6 +711,7 @@ export function DocumentsPage() {
               return;
             }
 
+            
             const url = await getDocumentUrl(doc);
             if (url) {
               window.open(url, '_blank');
@@ -729,7 +731,7 @@ export function DocumentsPage() {
                 position: 'top-right',
               });
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error('[Open external link] Error:', error);
             const errorMessage = error.response?.data?.error || error.message || 'Unable to generate document URL';
             toast({

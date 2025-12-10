@@ -71,3 +71,7 @@ prisma/migrations/migration_lock.toml
 
 # Linting tracking data
 .warning-tracker.json
+.cursor/
+
+# Prisma
+prisma/migrations/migration_lock.toml

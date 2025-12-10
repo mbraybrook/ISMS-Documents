@@ -446,7 +446,7 @@ export function DataTable<T>({
   };
 
   // Render default row
-  const renderDefaultRow = (row: T) => {
+  const renderDefaultRow = (row: T, _index: number) => {
     const rowId = getRowId(row);
     const isSelected = selectedIds.has(rowId);
 
@@ -631,7 +631,7 @@ export function DataTable<T>({
                 ) : (
                   renderRow
                     ? paginatedData.map((row, index) => renderRow(row, index))
-                    : paginatedData.map((row) => renderDefaultRow(row))
+                    : paginatedData.map((row, index) => renderDefaultRow(row, index))
                 )}
               </Tbody>
             </Table>

@@ -27,7 +27,6 @@ import {
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supplierApi } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
 import { SharePointFileBrowser } from './SharePointFileBrowser';
 import {
   SupplierType,
@@ -46,7 +45,6 @@ interface SupplierOnboardingWizardProps {
 export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboardingWizardProps) {
   const navigate = useNavigate();
   const toast = useToast();
-  const { user: _user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -159,6 +157,8 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
   const handleSubmit = async () => {
     try {
       setLoading(true);
+
+      // Create supplier - convert isSaaS to serviceSubType for backend compatibility
       const { isSaaS, ...supplierData } = step1Data;
       const supplier = await supplierApi.createSupplier({
         ...supplierData,
@@ -167,14 +167,13 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
         lifecycleState: 'DRAFT',
       });
 
-
       // Update supplier with risk & criticality snapshot data first
       const snapshotUpdate: any = {};
       if (step2Data.riskRating) snapshotUpdate.overallRiskRating = step2Data.riskRating;
       if (step2Data.rationale) snapshotUpdate.riskRationale = step2Data.rationale;
       if (step3Data.criticality) snapshotUpdate.criticality = step3Data.criticality;
       if (step3Data.rationale) snapshotUpdate.criticalityRationale = step3Data.rationale;
-
+      
       if (Object.keys(snapshotUpdate).length > 0) {
         await supplierApi.updateSupplier(supplier.id, snapshotUpdate);
       }
@@ -227,12 +226,11 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
 
       onClose();
       navigate(`/admin/suppliers/${supplier.id}`);
-
-    } catch (error) {
+    } catch (error: any) {
       console.error('Supplier creation error:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.details || error.message || 'An error occurred';
       const errorDetails = error.response?.data?.errors ? JSON.stringify(error.response.data.errors) : '';
-
+      
       toast({
         title: 'Failed to create supplier',
         description: errorDetails ? `${errorMessage}\n${errorDetails}` : errorMessage,

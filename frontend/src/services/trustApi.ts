@@ -154,6 +154,9 @@ export const trustApi = {
 
 
 
+      
+      console.log('[TRUST-API] Downloading document:', { docId, url, hasToken: !!token });
+      
       const response = await axios.get(url, {
         responseType: 'blob',
         headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
@@ -162,6 +165,15 @@ export const trustApi = {
 
 
 
+      
+      console.log('[TRUST-API] Download response received:', {
+        status: response.status,
+        contentType: response.headers['content-type'],
+        contentLength: response.headers['content-length'],
+        dataType: response.data?.constructor?.name,
+        dataSize: response.data?.size || response.data?.length,
+      });
+      
       // Extract filename from Content-Disposition header
       let filename = 'document';
       const contentDisposition = response.headers['content-disposition'];
@@ -186,7 +198,7 @@ export const trustApi = {
       // Axios with responseType: 'blob' should return a Blob
       // However, we need to ensure it's properly created with the correct MIME type
       let blob: Blob;
-
+      
       if (response.data instanceof Blob) {
         // Already a Blob - but we should ensure it has the correct type
         // If the type is generic, update it from headers
@@ -210,10 +222,14 @@ export const trustApi = {
         throw new Error('Received empty file from server');
       }
 
-
-
+      console.log('[TRUST-API] Blob created successfully:', {
+        size: blob.size,
+        type: blob.type,
+        filename,
+      });
+      
       return { blob, filename };
-    } catch (error) {
+    } catch (error: unknown) {
       const axiosError = error as AxiosError;
       console.error('[TRUST-API] Download error:', axiosError);
       console.error('[TRUST-API] Error details:', {
@@ -225,7 +241,7 @@ export const trustApi = {
           headers: axiosError.response.headers,
         } : null,
       });
-
+      
       // If it's an error response with JSON data, try to extract the error message
       if (axiosError.response?.data) {
         // If the response is a blob (error response), try to read it as text
@@ -236,15 +252,15 @@ export const trustApi = {
             throw new Error(errorJson.error || errorJson.message || 'Download failed');
           } catch (parseError) {
             // If parsing fails, use the original error
-            throw new Error(axiosError.response.statusText || 'Download failed');
+            throw new Error(axiosError.response?.statusText || 'Download failed');
           }
         } else if (typeof axiosError.response.data === 'object' && axiosError.response.data && 'error' in axiosError.response.data) {
           const errorData = axiosError.response.data as { error: string };
           throw new Error(errorData.error);
         }
       }
-
-      throw axiosError;
+      
+      throw error;
     }
   },
 

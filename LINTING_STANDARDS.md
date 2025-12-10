@@ -562,3 +562,4 @@ npm run lint:report
 - `frontend/.eslintrc.cjs` - Frontend ESLint config
 - `backend/.eslintrc.json` - Backend ESLint config
 
+

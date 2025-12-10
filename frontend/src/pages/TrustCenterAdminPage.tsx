@@ -79,17 +79,17 @@ export function TrustCenterAdminPage() {
           }
         }, 0);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error loading admin data:', error);
-      const axiosError = error as AxiosError<{ error: string }>;
+      const errorObj = error as { response?: { status?: number; data?: { error?: string } } };
       // Don't redirect on 401 - let ProtectedRoute handle it
-      if (axiosError.response?.status === 401) {
+      if (errorObj.response?.status === 401) {
         // Authentication issue - ProtectedRoute will handle redirect
         return;
       }
       toast({
         title: 'Error',
-        description: axiosError.response?.data?.error || 'Failed to load admin data',
+        description: errorObj.response?.data?.error || 'Failed to load admin data',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -117,8 +117,8 @@ export function TrustCenterAdminPage() {
         duration: 3000,
         isClosable: true,
       });
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string }>;
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ error?: string }>;
       toast({
         title: 'Error',
         description: axiosError.response?.data?.error || 'Failed to update settings',
@@ -141,9 +141,8 @@ export function TrustCenterAdminPage() {
         isClosable: true,
       });
       loadData();
-      loadData();
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string }>;
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ error?: string }>;
       toast({
         title: 'Error',
         description: axiosError.response?.data?.error || 'Failed to approve user',
@@ -168,9 +167,8 @@ export function TrustCenterAdminPage() {
         isClosable: true,
       });
       loadData();
-      loadData();
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string }>;
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ error?: string }>;
       toast({
         title: 'Error',
         description: axiosError.response?.data?.error || 'Failed to deny user',
@@ -205,7 +203,7 @@ export function TrustCenterAdminPage() {
       // Only include fields that can be updated (exclude id, documentId, createdAt, updatedAt)
       const allowedFields = ['visibilityLevel', 'category', 'sharePointUrl', 'publicDescription', 'displayOrder', 'requiresNda', 'maxFileSizeMB'];
       const normalizedData: Partial<TrustDocSetting> = {};
-
+      
       // Only copy allowed fields
       allowedFields.forEach(field => {
         const value = editData[field as keyof TrustDocSetting];
@@ -225,6 +223,7 @@ export function TrustCenterAdminPage() {
         }
       });
 
+      
       console.log('Sending document settings update:', { docId, normalizedData });
       await trustApi.updateDocumentSettings(docId, normalizedData);
       toast({
@@ -239,13 +238,12 @@ export function TrustCenterAdminPage() {
       onClose();
       // Preserve tab index and scroll position
       loadData(true);
-      loadData(true);
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string, details?: string, errors?: Array<{ param: string, msg: string }> }>;
-      const errorMessage = axiosError.response?.data?.error ||
-        axiosError.response?.data?.details ||
-        axiosError.response?.data?.errors?.map((e) => `${e.param}: ${e.msg}`).join(', ') ||
-        'Failed to update settings';
+    } catch (error: unknown) {
+      const errorObj = error as { response?: { data?: { error?: string; details?: string; errors?: Array<{ param: string; msg: string }> } } };
+      const errorMessage = errorObj.response?.data?.error || 
+                          errorObj.response?.data?.details ||
+                          errorObj.response?.data?.errors?.map((e) => `${e.param}: ${e.msg}`).join(', ') ||
+                          'Failed to update settings';
       toast({
         title: 'Error',
         description: errorMessage,
@@ -284,12 +282,12 @@ export function TrustCenterAdminPage() {
           isClosable: true,
         });
         loadData();
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error disabling trust center:', error);
-        const axiosError = error as AxiosError<{ error: string }>;
+        const errorObj = error as { response?: { data?: { error?: string } } };
         toast({
           title: 'Error',
-          description: axiosError.response?.data?.error || 'Failed to remove document from Trust Center',
+          description: errorObj.response?.data?.error || 'Failed to remove document from Trust Center',
           status: 'error',
           duration: 5000,
           isClosable: true,
@@ -468,6 +466,7 @@ export function TrustCenterAdminPage() {
             <VStack spacing={6} align="stretch" maxW="800px">
               <Heading size="md">Trust Center Settings</Heading>
 
+              
               <FormControl>
                 <FormLabel>Watermark Prefix</FormLabel>
                 <Input

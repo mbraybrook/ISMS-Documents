@@ -47,7 +47,6 @@ import api, { supplierApi } from '../services/api';
 import { DeleteIcon, AddIcon, SearchIcon } from '@chakra-ui/icons';
 import { Control } from '../types/control';
 import { Supplier } from '../types/supplier';
-import { AxiosError } from 'axios';
 
 interface ControlFormModalProps {
   isOpen: boolean;
@@ -55,7 +54,7 @@ interface ControlFormModalProps {
   control: Control | null;
 }
 
-export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalProps) {
+export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalProps): JSX.Element | null {
   const toast = useToast();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
   const { isOpen: isSupplierModalOpen, onOpen: onSupplierModalOpen, onClose: onSupplierModalClose } = useDisclosure();
@@ -67,7 +66,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
   const [availableSuppliers, setAvailableSuppliers] = useState<Supplier[]>([]);
   const [searchingSuppliers, setSearchingSuppliers] = useState(false);
   const [linkingSupplier, setLinkingSupplier] = useState(false);
-
+  
   // Document linking state
   const [linkedDocuments, setLinkedDocuments] = useState<Array<{ id: string; title: string; version: string; type: string; status: string }>>([]);
   const [documentSearchTerm, setDocumentSearchTerm] = useState('');
@@ -75,7 +74,6 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
   const [searchingDocuments, setSearchingDocuments] = useState(false);
   const [_linkingDocument, setLinkingDocument] = useState(false);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
-
   const [formData, setFormData] = useState({
     code: '',
     title: '',
@@ -127,7 +125,6 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
     }
   }, [control?.id, toast]);
 
-  // UseEffect depends on fetch functions
   useEffect(() => {
     if (control) {
       setFormData({
@@ -175,7 +172,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       // Filter out suppliers already linked
       const linkedSupplierIds = new Set(linkedSuppliers.map((s) => s.id));
       setAvailableSuppliers(response.filter((s: Supplier) => !linkedSupplierIds.has(s.id)));
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: 'Failed to search suppliers',
@@ -202,11 +199,10 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       setSupplierSearchTerm('');
       setAvailableSuppliers([]);
       fetchLinkedSuppliers();
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string }>;
+    } catch (error: any) {
       toast({
         title: 'Error',
-        description: axiosError.response?.data?.error || 'Failed to link supplier',
+        description: error.response?.data?.error || 'Failed to link supplier',
         status: 'error',
         duration: 3000,
       });
@@ -226,13 +222,32 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
         duration: 3000,
       });
       fetchLinkedSuppliers();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: 'Failed to unlink supplier',
         status: 'error',
         duration: 3000,
       });
+    }
+  };
+
+  const fetchLinkedDocuments = async () => {
+    if (!control?.id) return;
+    try {
+      setLoadingDocuments(true);
+      const response = await api.get(`/api/controls/${control.id}/documents`);
+      setLinkedDocuments(response.data);
+    } catch (error: any) {
+      console.error('Error fetching linked documents:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load linked documents',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLoadingDocuments(false);
     }
   };
 
@@ -254,12 +269,12 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       const searchLower = documentSearchTerm.toLowerCase();
       setAvailableDocuments(
         response.data.data.filter(
-          (d: { id: string; title: string }) =>
+          (d: any) =>
             !linkedDocumentIds.has(d.id) &&
             d.title.toLowerCase().includes(searchLower)
         )
       );
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: 'Failed to search documents',
@@ -285,11 +300,10 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       setDocumentSearchTerm('');
       setAvailableDocuments([]);
       fetchLinkedDocuments();
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string }>;
+    } catch (error: any) {
       toast({
         title: 'Error',
-        description: axiosError.response?.data?.error || 'Failed to link document',
+        description: error.response?.data?.error || 'Failed to link document',
         status: 'error',
         duration: 3000,
       });
@@ -309,7 +323,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
         duration: 3000,
       });
       fetchLinkedDocuments();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: 'Failed to unlink document',
@@ -322,6 +336,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
 
+    
     if (!isStandardControl) {
       if (!formData.code.trim()) {
         newErrors.code = 'Code is required';
@@ -341,6 +356,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    
     if (!validateForm()) {
       return;
     }
@@ -350,6 +366,8 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
     try {
       let payload: any; // Keeping payload flexible for create/update logic
 
+      let payload: any;
+      
       if (isStandardControl && control) {
         // For standard controls, only send allowed fields
         payload = {
@@ -371,7 +389,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
         await api.put(`/api/controls/${control.id}`, payload);
         toast({
           title: 'Control updated',
-          description: isStandardControl
+          description: isStandardControl 
             ? 'Control applicability updated successfully'
             : 'Control updated successfully',
           status: 'success',
@@ -390,14 +408,10 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       }
 
       onClose();
-    } catch (error) {
-      const axiosError = error as AxiosError<{ details?: string, error?: string, errors?: { msg: string }[] }>;
-      console.error('Error saving control:', axiosError);
-      console.error('Error response:', axiosError.response?.data);
-      const errorMessage = axiosError.response?.data?.details ||
-        axiosError.response?.data?.error ||
-        axiosError.response?.data?.errors?.[0]?.msg ||
-        'Failed to save control';
+    } catch (error: any) {
+      console.error('Error saving control:', error);
+      console.error('Error response:', error.response?.data);
+      const errorMessage = error.response?.data?.details || error.response?.data?.error || error.response?.data?.errors?.[0]?.msg || 'Failed to save control';
       toast({
         title: 'Error',
         description: errorMessage,
@@ -425,12 +439,11 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       });
       onDeleteClose();
       onClose();
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string }>;
+    } catch (error: any) {
       console.error('Error deleting control:', error);
       toast({
         title: 'Error',
-        description: axiosError.response?.data?.error || 'Failed to delete control',
+        description: error.response?.data?.error || 'Failed to delete control',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -441,6 +454,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
   };
 
   return (
+    <>
     <Modal isOpen={isOpen} onClose={onClose} size="6xl" scrollBehavior="inside">
       <ModalOverlay />
       <ModalContent maxH="90vh" display="flex" flexDirection="column" overflow="hidden">
@@ -471,9 +485,9 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                           <FormLabel fontWeight="bold">Category</FormLabel>
                           <Badge colorScheme={
                             control.category === 'ORGANIZATIONAL' ? 'blue' :
-                              control.category === 'PEOPLE' ? 'purple' :
-                                control.category === 'PHYSICAL' ? 'orange' :
-                                  'teal'
+                            control.category === 'PEOPLE' ? 'purple' :
+                            control.category === 'PHYSICAL' ? 'orange' :
+                            'teal'
                           }>
                             {control.category}
                           </Badge>
@@ -542,9 +556,9 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                           Linked Risks ({control.riskControls?.length || 0}):
                         </FormLabel>
                         <VStack align="stretch" spacing={2}>
-                          {control.riskControls?.map((riskControl) => (
+                          {control.riskControls?.map((riskControl: any) => (
                             <Box
-                              key={riskControl.riskId}
+                              key={riskControl.riskId || riskControl.risk?.id}
                               p={2}
                               bg="white"
                               borderRadius="md"
@@ -556,7 +570,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                                 to={`/risks/risks`}
                                 onClick={() => {
                                   // Store risk ID to highlight it when risks page loads
-                                  sessionStorage.setItem('highlightRiskId', riskControl.riskId);
+                                  sessionStorage.setItem('highlightRiskId', riskControl.riskId || riskControl.risk?.id);
                                 }}
                                 style={{ textDecoration: 'none' }}
                               >
@@ -565,7 +579,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                                     Risk
                                   </Badge>
                                   <Box fontWeight="medium" color="blue.700" _hover={{ textDecoration: "underline" }}>
-                                    {riskControl.risk.title}
+                                    {riskControl.risk?.title || riskControl.risk.title}
                                   </Box>
                                 </HStack>
                               </Link>
@@ -669,9 +683,9 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                           Linked Risks ({control.riskControls?.length || 0}):
                         </FormLabel>
                         <VStack align="stretch" spacing={2}>
-                          {control.riskControls?.map((riskControl) => (
+                          {control.riskControls?.map((riskControl: any) => (
                             <Box
-                              key={riskControl.riskId}
+                              key={riskControl.riskId || riskControl.risk?.id}
                               p={2}
                               bg="white"
                               borderRadius="md"
@@ -683,7 +697,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                                 to={`/risks/risks`}
                                 onClick={() => {
                                   // Store risk ID to highlight it when risks page loads
-                                  sessionStorage.setItem('highlightRiskId', riskControl.riskId);
+                                  sessionStorage.setItem('highlightRiskId', riskControl.riskId || riskControl.risk?.id);
                                 }}
                                 style={{ textDecoration: 'none' }}
                               >
@@ -692,7 +706,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                                     Risk
                                   </Badge>
                                   <Box fontWeight="medium" color="blue.700" _hover={{ textDecoration: "underline" }}>
-                                    {riskControl.risk.title}
+                                    {riskControl.risk?.title || riskControl.risk.title}
                                   </Box>
                                 </HStack>
                               </Link>
@@ -1006,6 +1020,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
           </ModalFooter>
         </form>
       </ModalContent>
+    </Modal>
 
       <AlertDialog
         isOpen={isDeleteOpen}
@@ -1098,6 +1113,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
           </ModalFooter>
         </ModalContent>
       </Modal>
-    </Modal>
+    </>
   );
 }
+

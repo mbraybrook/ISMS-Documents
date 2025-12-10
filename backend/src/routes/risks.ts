@@ -542,6 +542,7 @@ router.post(
       let finalStatus = status || 'DRAFT';
       let finalDepartment = department;
       const finalWizardData = wizardData;
+      let finalWizardData = wizardData;
 
       if (wizardData) {
         try {

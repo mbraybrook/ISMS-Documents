@@ -22,6 +22,7 @@ import {
   HStack,
 } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
+import { AxiosError } from 'axios';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { getDepartmentDisplayName } from '../types/risk';
@@ -176,10 +177,11 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
         onSuccess();
       }
     } catch (error) {
-      console.error('Error creating risk:', error);
+      const axiosError = error as AxiosError<{ error?: string }>;
+      console.error('Error creating risk:', axiosError);
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to create risk',
+        description: axiosError.response?.data?.error || 'Failed to create risk',
         status: 'error',
         duration: 5000,
         isClosable: true,

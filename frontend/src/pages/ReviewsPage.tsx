@@ -140,6 +140,7 @@ export function ReviewsPage() {
   const [bulkSettingReviewDate, setBulkSettingReviewDate] = useState(false);
   const toast = useToast();
 
+  
   const canEdit = user?.role === 'ADMIN' || user?.role === 'EDITOR';
 
   // Initialize tab from URL parameter
@@ -305,9 +306,10 @@ export function ReviewsPage() {
       onBulkReviewClose();
       fetchDashboard();
     } catch (error) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to set review dates',
+        description: axiosError.response?.data?.error || 'Failed to set review dates',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -351,6 +353,14 @@ export function ReviewsPage() {
     return status;
   };
 
+  const _calculateDaysOverdue = (nextReviewDate: string | null): number => {
+    if (!nextReviewDate) return 0;
+    const reviewDate = new Date(nextReviewDate);
+    const now = new Date();
+    const diffTime = now.getTime() - reviewDate.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
   if (loading) {
     return (
       <VStack spacing={6} align="stretch">
@@ -362,8 +372,6 @@ export function ReviewsPage() {
     );
   }
 
-
-
   return (
     <VStack spacing={6} align="stretch">
       <Heading size="lg">Review Dashboard</Heading>
@@ -371,12 +379,12 @@ export function ReviewsPage() {
       {/* Summary Cards */}
       <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
         <Tooltip label="Click to view all overdue reviews" placement="top">
-          <Stat
-            p={4}
+          <Stat 
+            p={4} 
             bg={dashboardData?.overdueItems && dashboardData.overdueItems.length > 0 ? 'red.50' : 'white'}
             borderLeft={dashboardData?.overdueItems && dashboardData.overdueItems.length > 0 ? '4px solid' : 'none'}
             borderColor="red.500"
-            borderRadius="md"
+            borderRadius="md" 
             boxShadow="sm"
             cursor="pointer"
             _hover={{ bg: dashboardData?.overdueItems && dashboardData.overdueItems.length > 0 ? 'red.100' : 'gray.50', transform: 'translateY(-2px)', boxShadow: 'md' }}
@@ -390,18 +398,18 @@ export function ReviewsPage() {
               </StatLabel>
             </HStack>
             <StatNumber color={dashboardData?.overdueItems && dashboardData.overdueItems.length > 0 ? 'red.600' : 'gray.500'}>
-              {dashboardData?.overdueItems?.length ||
-                ((dashboardData?.overdueReviews?.length || 0) + (dashboardData?.overdueDocuments?.length || 0)) || 0}
+              {dashboardData?.overdueItems?.length || 
+               ((dashboardData?.overdueReviews?.length || 0) + (dashboardData?.overdueDocuments?.length || 0)) || 0}
             </StatNumber>
           </Stat>
         </Tooltip>
         <Tooltip label="Scheduled reviews + documents with upcoming review dates in next 30 days. Click to view scheduled reviews." placement="top">
-          <Stat
-            p={4}
+          <Stat 
+            p={4} 
             bg={((dashboardData?.upcomingReviews?.length || 0) + (dashboardData?.upcomingDocuments?.length || 0)) > 0 ? 'yellow.50' : 'white'}
             borderLeft={((dashboardData?.upcomingReviews?.length || 0) + (dashboardData?.upcomingDocuments?.length || 0)) > 0 ? '4px solid' : 'none'}
             borderColor="yellow.500"
-            borderRadius="md"
+            borderRadius="md" 
             boxShadow="sm"
             cursor="pointer"
             _hover={{ bg: ((dashboardData?.upcomingReviews?.length || 0) + (dashboardData?.upcomingDocuments?.length || 0)) > 0 ? 'yellow.100' : 'gray.50', transform: 'translateY(-2px)', boxShadow: 'md' }}
@@ -420,12 +428,12 @@ export function ReviewsPage() {
           </Stat>
         </Tooltip>
         <Tooltip label="Click to view documents needing review" placement="top">
-          <Stat
-            p={4}
+          <Stat 
+            p={4} 
             bg={dashboardData?.needsReviewDate && dashboardData.needsReviewDate.length > 0 ? 'orange.50' : 'white'}
             borderLeft={dashboardData?.needsReviewDate && dashboardData.needsReviewDate.length > 0 ? '4px solid' : 'none'}
             borderColor="orange.500"
-            borderRadius="md"
+            borderRadius="md" 
             boxShadow="sm"
             cursor="pointer"
             _hover={{ bg: dashboardData?.needsReviewDate && dashboardData.needsReviewDate.length > 0 ? 'orange.100' : 'gray.50', transform: 'translateY(-2px)', boxShadow: 'md' }}
@@ -448,8 +456,8 @@ export function ReviewsPage() {
       <Tabs index={tabIndex} onChange={setTabIndex} variant="enclosed" colorScheme="blue">
         <TabList>
           <Tab
-            _selected={{
-              color: 'blue.600',
+            _selected={{ 
+              color: 'blue.600', 
               bg: 'blue.50',
               fontWeight: 'semibold',
               borderBottom: '3px solid',
@@ -459,8 +467,8 @@ export function ReviewsPage() {
             Upcoming Reviews
           </Tab>
           <Tab
-            _selected={{
-              color: 'red.600',
+            _selected={{ 
+              color: 'red.600', 
               bg: 'red.50',
               fontWeight: 'semibold',
               borderBottom: '3px solid',
@@ -470,8 +478,8 @@ export function ReviewsPage() {
             Overdue Reviews
           </Tab>
           <Tab
-            _selected={{
-              color: 'green.600',
+            _selected={{ 
+              color: 'green.600', 
               bg: 'green.50',
               fontWeight: 'semibold',
               borderBottom: '3px solid',
@@ -481,8 +489,8 @@ export function ReviewsPage() {
             Recently Completed
           </Tab>
           <Tab
-            _selected={{
-              color: 'orange.600',
+            _selected={{ 
+              color: 'orange.600', 
               bg: 'orange.50',
               fontWeight: 'semibold',
               borderBottom: '3px solid',
@@ -598,10 +606,10 @@ export function ReviewsPage() {
                             <Td>
                               {doc.nextReviewDate
                                 ? new Date(doc.nextReviewDate).toLocaleDateString('en-GB', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                })
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                  })
                                 : 'N/A'}
                             </Td>
                             {canEdit && (
@@ -773,10 +781,10 @@ export function ReviewsPage() {
                       <Td>
                         {review.completedDate
                           ? new Date(review.completedDate).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                          })
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                            })
                           : 'N/A'}
                       </Td>
                       <Td>{review.changeNotes || 'N/A'}</Td>
@@ -835,10 +843,10 @@ export function ReviewsPage() {
                             <Td>
                               {doc.nextReviewDate
                                 ? new Date(doc.nextReviewDate).toLocaleDateString('en-GB', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                })
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                  })
                                 : 'N/A'}
                             </Td>
                             <Td>

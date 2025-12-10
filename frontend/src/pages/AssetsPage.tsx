@@ -144,6 +144,7 @@ export function AssetsPage() {
         setPagination(response.data.pagination);
       }
 
+      
       // Extract unique owners for dropdown
       const uniqueOwners = Array.from(new Set(response.data.data.map((a: Asset) => a.owner).filter(Boolean))) as string[];
       setOwners(uniqueOwners.sort());
@@ -271,7 +272,7 @@ export function AssetsPage() {
       setTimeout(() => {
         fetchAssets();
       }, 500);
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to save asset';
       toast({
         title: 'Error',
@@ -312,7 +313,7 @@ export function AssetsPage() {
       onDeleteClose();
       setAssetToDelete(null);
       fetchAssets();
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to delete asset';
       toast({
         title: 'Error',
@@ -333,6 +334,7 @@ export function AssetsPage() {
       );
       await Promise.all(deletePromises);
 
+      
       const deletedCount = selectedAssets.size;
       toast({
         title: 'Success',
@@ -344,7 +346,7 @@ export function AssetsPage() {
       onBulkDeleteClose();
       setSelectedAssets(new Set());
       fetchAssets();
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to delete assets';
       toast({
         title: 'Error',
@@ -359,6 +361,7 @@ export function AssetsPage() {
   const handleBulkExport = () => {
     const selectedAssetsList = assets.filter(a => selectedAssets.has(a.id));
 
+    
     const headers = [
       'Date',
       'Category',
@@ -454,7 +457,7 @@ export function AssetsPage() {
       fetchAssets();
       fetchCategories();
       fetchClassifications();
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to import assets';
       toast({
         title: 'Error',
@@ -476,6 +479,7 @@ export function AssetsPage() {
     try {
       setExporting(true);
 
+      
       // Fetch all assets for export (not just current page)
       const params = new URLSearchParams();
       if (filters.categoryId) params.append('categoryId', filters.categoryId);
@@ -544,7 +548,7 @@ export function AssetsPage() {
         duration: 3000,
         isClosable: true,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error exporting CSV:', error);
       toast({
         title: 'Export Failed',
@@ -562,8 +566,6 @@ export function AssetsPage() {
     const newOrder = filters.sortBy === field && filters.sortOrder === 'asc' ? 'desc' : 'asc';
     setFilters({ ...filters, sortBy: field, sortOrder: newOrder, page: 1 });
   };
-
-
 
   const clearAllFilters = () => {
     setFilters({
@@ -814,9 +816,9 @@ export function AssetsPage() {
               </Button>
             </>
           )}
-          <Button
-            leftIcon={<DownloadIcon />}
-            variant="outline"
+          <Button 
+            leftIcon={<DownloadIcon />} 
+            variant="outline" 
             onClick={exportToCSV}
             isLoading={exporting}
             loadingText="Exporting..."

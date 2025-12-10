@@ -144,7 +144,7 @@ export function DepartmentRiskTable() {
       if (response.data.pagination) {
         setPagination(response.data.pagination);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching risks:', error);
       toast({
         title: 'Error',

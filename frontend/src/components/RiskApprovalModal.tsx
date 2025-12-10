@@ -94,6 +94,7 @@ export function RiskApprovalModal({ isOpen, onClose, risk, onSuccess }: RiskAppr
 
     try {
       const calculatedScore = calculateScore();
+      const _riskLevel = getRiskLevel(calculatedScore);
 
       // Update risk with adjusted scores and set status to ACTIVE
       await api.put(`/api/risks/${risk.id}`, {
@@ -117,7 +118,7 @@ export function RiskApprovalModal({ isOpen, onClose, risk, onSuccess }: RiskAppr
       if (onSuccess) {
         onSuccess();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error approving risk:', error);
       toast({
         title: 'Error',
@@ -166,7 +167,7 @@ export function RiskApprovalModal({ isOpen, onClose, risk, onSuccess }: RiskAppr
       if (onSuccess) {
         onSuccess();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error rejecting risk:', error);
       toast({
         title: 'Error',
@@ -182,8 +183,8 @@ export function RiskApprovalModal({ isOpen, onClose, risk, onSuccess }: RiskAppr
 
   if (!risk) return null;
 
-      const calculatedScore = calculateScore();
-      const _riskLevel = getRiskLevel(calculatedScore);
+  const calculatedScore = calculateScore();
+  const riskLevel = getRiskLevel(calculatedScore);
   const levelColor = riskLevel === 'HIGH' ? 'red' : riskLevel === 'MEDIUM' ? 'orange' : 'green';
 
   return (

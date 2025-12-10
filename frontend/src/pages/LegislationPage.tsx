@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import {
   Box,
@@ -43,8 +43,9 @@ import {
   Link,
   Collapse,
   SimpleGrid,
-
-
+  Tag,
+  TagLabel,
+  TagCloseButton,
 } from '@chakra-ui/react';
 import { SearchIcon, EditIcon, DeleteIcon, AddIcon, ChevronDownIcon, ChevronUpIcon, DownloadIcon } from '@chakra-ui/icons';
 import { Link as RouterLink } from 'react-router-dom';
@@ -131,7 +132,7 @@ export function LegislationPage() {
               : [];
 
         allRisksData = [...allRisksData, ...risks];
-
+        
         // Check if there are more pages
         const totalPages = response.data.pagination?.totalPages || 1;
         hasMore = page < totalPages && risks.length > 0;
@@ -144,7 +145,7 @@ export function LegislationPage() {
       // Ensure we always set an array
       setAllRisks(Array.isArray(allRisksData) ? allRisksData : []);
       console.log(`Loaded ${allRisksData.length} risks`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching risks:', error);
       // If pagination fails, try a single request with max limit
       try {
@@ -238,7 +239,7 @@ export function LegislationPage() {
       // Fetch detailed legislation with risks when expanding
       try {
         const response = await api.get(`/api/legislation/${legislationId}`);
-        setLegislation(prev => prev.map(item =>
+        setLegislation(prev => prev.map(item => 
           item.id === legislationId ? response.data : item
         ));
       } catch (error) {
@@ -316,6 +317,7 @@ export function LegislationPage() {
         riskIds: formData.riskIds,
       };
 
+      
       if (formData.dateAdded) {
         payload.dateAdded = new Date(formData.dateAdded).toISOString();
       }
@@ -343,7 +345,7 @@ export function LegislationPage() {
       setRiskSearchTerm('');
       setSuggestedRiskIds([]);
       fetchLegislation();
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to save legislation';
       toast({
         title: 'Error',
@@ -386,12 +388,14 @@ export function LegislationPage() {
       const suggestedIds = response.data.suggestedRiskIds || [];
       setSuggestedRiskIds(suggestedIds);
 
+      
       // Auto-select suggested risks that aren't already selected
       setFormData(prev => ({
         ...prev,
         riskIds: [...new Set([...prev.riskIds, ...suggestedIds])],
       }));
 
+      
       toast({
         title: 'Suggestions generated',
         description: `Found ${suggestedIds.length} relevant risks and added them to your selection`,
@@ -399,7 +403,7 @@ export function LegislationPage() {
         duration: 3000,
         isClosable: true,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting risk suggestions:', error);
       toast({
         title: 'Error',
@@ -442,7 +446,7 @@ export function LegislationPage() {
       onDeleteClose();
       setLegislationToDelete(null);
       fetchLegislation();
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to delete legislation';
       toast({
         title: 'Error',
@@ -501,7 +505,7 @@ export function LegislationPage() {
 
       onImportModalClose();
       fetchLegislation();
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to import legislation';
       toast({
         title: 'Error',

@@ -52,11 +52,13 @@ function TrustDocumentCard({ document, onDownload }: TrustDocumentCardProps) {
       if (onDownload) {
         onDownload();
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Download error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to download document';
+      const apiError = error as { response?: { data?: { error?: string } } };
       toast({
         title: 'Download failed',
-        description: error.response?.data?.error || error.message || 'Failed to download document',
+        description: apiError.response?.data?.error || errorMessage,
         status: 'error',
         duration: 5000,
         isClosable: true,

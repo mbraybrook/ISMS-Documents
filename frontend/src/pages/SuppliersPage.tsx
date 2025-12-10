@@ -175,7 +175,7 @@ export function SuppliersPage() {
           comparison = 0;
         }
       }
-
+      
       return sortDirection === 'asc' ? comparison : -comparison;
     });
 
@@ -199,6 +199,7 @@ export function SuppliersPage() {
   const getComplianceStatus = (supplier: Supplier): 'PASS' | 'IN_PROGRESS' | 'FAIL' | 'UNKNOWN' => {
     const statuses: string[] = [];
 
+    
     // PCI Status
     if (supplier.pciStatus) {
       if (supplier.pciStatus === 'PASS' || supplier.pciStatus === 'NOT_APPLICABLE') {
@@ -210,6 +211,7 @@ export function SuppliersPage() {
       }
     }
 
+    
     // ISO 27001 Status
     if (supplier.iso27001Status) {
       if (supplier.iso27001Status === 'CERTIFIED' || supplier.iso27001Status === 'NOT_APPLICABLE') {
@@ -223,6 +225,7 @@ export function SuppliersPage() {
       }
     }
 
+    
     // GDPR Status
     if (supplier.gdprStatus) {
       if (supplier.gdprStatus === 'ADEQUATE' || supplier.gdprStatus === 'NOT_APPLICABLE') {
@@ -234,26 +237,31 @@ export function SuppliersPage() {
       }
     }
 
+    
     // If no statuses at all, return UNKNOWN
     if (statuses.length === 0) {
       return 'UNKNOWN';
     }
 
+    
     // Priority 1: Check for FAIL (any one is Fail/Not Certified/High Risk)
     if (statuses.includes('FAIL')) {
       return 'FAIL';
     }
 
+    
     // Priority 2: Check for IN_PROGRESS (any one is In Progress)
     if (statuses.includes('IN_PROGRESS')) {
       return 'IN_PROGRESS';
     }
 
+    
     // Priority 3: Check if all are PASS (all are Passed/Certified/Not Applicable)
     if (statuses.every(s => s === 'PASS')) {
       return 'PASS';
     }
 
+    
     // If mixed (some PASS, some UNKNOWN), return UNKNOWN
     return 'UNKNOWN';
   };
@@ -302,7 +310,7 @@ export function SuppliersPage() {
     if (reviewDateObj >= twelveMonthsAgo && reviewDateObj < elevenMonthsAgo) {
       return 'WARNING';
     }
-
+    
     return 'OK';
   };
 
@@ -729,12 +737,12 @@ export function SuppliersPage() {
                       const reviewStatus = getReviewStatus(supplier.reviewDate);
                       const reviewDate = supplier.reviewDate
                         ? new Date(supplier.reviewDate).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })
                         : '-';
-
+                      
                       return (
                         <HStack spacing={2}>
                           <Text>{reviewDate}</Text>

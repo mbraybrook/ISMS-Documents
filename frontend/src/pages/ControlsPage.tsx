@@ -2,14 +2,14 @@
 import { useState, useEffect } from 'react';
 import {
   Heading,
+  Tr,
+  Td,
   Button,
   HStack,
   VStack,
   Badge,
   useDisclosure,
   Checkbox,
-  Tr,
-  Td,
   Text,
   IconButton,
   Tooltip,
@@ -61,6 +61,7 @@ const naturalSort = (a: string, b: string): number => {
   const aParts = a.split('.').map(Number);
   const bParts = b.split('.').map(Number);
 
+  
   for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
     const aPart = aParts[i] || 0;
     const bPart = bParts[i] || 0;
@@ -69,6 +70,7 @@ const naturalSort = (a: string, b: string): number => {
     }
   }
 
+  
   // If numeric parts are equal, fall back to string comparison
   return a.localeCompare(b);
 };
@@ -154,6 +156,7 @@ export function ControlsPage() {
     filtered.sort((a, b) => {
       let comparison = 0;
 
+      
       switch (sortField) {
         case 'code':
           comparison = naturalSort(a.code, b.code);
@@ -171,12 +174,12 @@ export function ControlsPage() {
           comparison = Number(a.isStandardControl) - Number(b.isStandardControl);
           break;
         case 'selected': {
-          const aSelected =
+          const aSelected = 
             a.selectedForRiskAssessment ||
             a.selectedForContractualObligation ||
             a.selectedForLegalRequirement ||
             a.selectedForBusinessRequirement;
-          const bSelected =
+          const bSelected = 
             b.selectedForRiskAssessment ||
             b.selectedForContractualObligation ||
             b.selectedForLegalRequirement ||
@@ -185,7 +188,7 @@ export function ControlsPage() {
           break;
         }
       }
-
+      
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
@@ -266,7 +269,7 @@ export function ControlsPage() {
         isClosable: true,
       });
       fetchControls();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to delete control',
@@ -306,9 +309,9 @@ export function ControlsPage() {
           <Badge
             colorScheme={
               control.category === 'ORGANIZATIONAL' ? 'blue' :
-                control.category === 'PEOPLE' ? 'purple' :
-                  control.category === 'PHYSICAL' ? 'orange' :
-                    'teal'
+              control.category === 'PEOPLE' ? 'purple' :
+              control.category === 'PHYSICAL' ? 'orange' :
+              'teal'
             }
           >
             {formatCategory(control.category)}
@@ -355,6 +358,7 @@ export function ControlsPage() {
         if (control.selectedForLegalRequirement) reasons.push('Legal');
         if (control.selectedForBusinessRequirement) reasons.push('Business');
 
+        
         return reasons.length > 0 ? (
           <VStack align="start" spacing={1}>
             {reasons.map((reason, idx) => (
@@ -362,9 +366,9 @@ export function ControlsPage() {
                 key={idx}
                 colorScheme={
                   reason === 'Risk Assessment' ? 'blue' :
-                    reason === 'Contractual' ? 'purple' :
-                      reason === 'Legal' ? 'red' :
-                        'orange'
+                  reason === 'Contractual' ? 'purple' :
+                  reason === 'Legal' ? 'red' :
+                  'orange'
                 }
                 fontSize="xs"
               >
@@ -523,7 +527,7 @@ export function ControlsPage() {
     const filtered = getFilteredAndSortedControls();
     const rows = filtered.map(csvExportConfig.getRowData);
     generateCSV(csvExportConfig.headers, rows, csvExportConfig.filename);
-
+    
     if (csvExportConfig.onExport) {
       csvExportConfig.onExport();
     }
@@ -556,6 +560,7 @@ export function ControlsPage() {
           } else {
             const value = (control as any)[column.key];
             cellContent = value === null || value === undefined || value === ''
+            cellContent = value === null || value === undefined || value === '' 
               ? <Text color="gray.400" fontSize="xs">—</Text>
               : String(value);
           }

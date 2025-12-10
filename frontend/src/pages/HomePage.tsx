@@ -18,9 +18,7 @@ import {
   Button,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
-import {
-  ArrowForwardIcon,
-} from '@chakra-ui/icons';
+import { ArrowForwardIcon } from '@chakra-ui/icons';
 import api, { riskDashboardApi } from '../services/api';
 import { RiskDashboardSummary } from '../types/riskDashboard';
 import {
@@ -175,25 +173,6 @@ export function HomePage() {
       </VStack>
     );
   }
-
-  const _getRiskLevelColor = (level: 'LOW' | 'MEDIUM' | 'HIGH'): string => {
-    switch (level) {
-      case 'HIGH':
-        return 'red';
-      case 'MEDIUM':
-        return 'yellow';
-      case 'LOW':
-        return 'green';
-      default:
-        return 'gray';
-    }
-  };
-
-  const _getRiskLevel = (score: number): 'LOW' | 'MEDIUM' | 'HIGH' => {
-    if (score >= 36) return 'HIGH';
-    if (score >= 15) return 'MEDIUM';
-    return 'LOW';
-  };
 
   return (
     <VStack spacing={6} align="stretch">

@@ -325,7 +325,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         setSimilarRisksLoading(false);
         setSimilarityProgress({ current: 0, total: 0, percentage: 0 });
       }, 300);
-    } catch (error) {
+    } catch (error: any) {
       if (progressInterval) {
         clearInterval(progressInterval);
       }
@@ -416,7 +416,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         duration: 3000,
         isClosable: true,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading template risk:', error);
       toast({
         title: 'Error',
@@ -463,7 +463,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       // Remove deleted risks from the list
       setSimilarRisks((prev) => prev.filter((sr) => !selectedSimilarRiskIds.has(sr.risk.id)));
       setSelectedSimilarRiskIds(new Set());
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting risks:', error);
       toast({
         title: 'Error',
@@ -493,7 +493,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           } else {
             setShowSimilarityAlert(false);
           }
-        } catch (error) {
+        } catch (error: any) {
           // Silently fail - don't show error to user, just don't show alert
           console.error('Error checking similarity:', error);
           setShowSimilarityAlert(false);
@@ -755,7 +755,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       setLoadingSuppliers(true);
       const suppliers = await api.get(`/api/risks/${riskId}/suppliers`);
       setLinkedSuppliers(suppliers.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching linked suppliers:', error);
     } finally {
       setLoadingSuppliers(false);
@@ -774,7 +774,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       // Filter out suppliers already linked
       const linkedSupplierIds = new Set(linkedSuppliers.map((s) => s.id));
       setAvailableSuppliers(response.filter((s: any) => !linkedSupplierIds.has(s.id)));
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: 'Failed to search suppliers',
@@ -805,7 +805,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       if (!formData.isSupplierRisk) {
         setFormData({ ...formData, isSupplierRisk: true });
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to link supplier',
@@ -828,7 +828,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         duration: 3000,
       });
       fetchLinkedSuppliers(risk.id);
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: 'Failed to unlink supplier',
@@ -874,7 +874,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         duration: 3000,
         isClosable: true,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting suggestions:', error);
       toast({
         title: 'Error',
@@ -1026,7 +1026,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           await api.post(`/api/risks/${riskId}/controls`, {
             controlIds: controlIdsArray,
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error updating control associations:', error);
           console.error('Error response data:', error.response?.data);
           console.error('Error response status:', error.response?.status);
@@ -1046,7 +1046,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       setTimeout(() => {
         onClose();
       }, 500);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving risk:', error);
       let errorMessage = error.response?.data?.error || error.message || 'Failed to save risk';
 

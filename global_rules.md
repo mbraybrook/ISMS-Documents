@@ -242,3 +242,4 @@ const count = 0;
 - See `LINTING.md` for linting strategy and tools
 - ESLint configs: `frontend/.eslintrc.cjs`, `backend/.eslintrc.json`
 
+

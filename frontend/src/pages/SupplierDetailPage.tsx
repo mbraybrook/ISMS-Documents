@@ -42,7 +42,6 @@ import { supplierApi } from '../services/api';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Supplier, SupplierContact } from '../types/supplier';
-import { AxiosError } from 'axios';
 import {
   getLifecycleStateDisplayName,
 } from '../types/supplier';
@@ -73,6 +72,7 @@ export function SupplierDetailPage() {
   const isNew = id === 'new';
   const canEdit = user?.role === 'ADMIN' || user?.role === 'EDITOR';
 
+  
   // Determine edit mode: if mode query param is 'view', use view mode; if 'edit', use edit mode; otherwise default based on canEdit
   const modeParam = searchParams.get('mode');
   const [isEditing, setIsEditing] = useState<boolean>(() => {
@@ -194,11 +194,11 @@ export function SupplierDetailPage() {
         trustCenterCategory: data.trustCenterCategory || null,
         trustCenterComplianceSummary: data.trustCenterComplianceSummary || '',
       });
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string }>;
+    } catch (error: unknown) {
+      const errorMessage = (error as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to fetch supplier';
       toast({
         title: 'Error',
-        description: axiosError.response?.data?.error || 'Failed to fetch supplier',
+        description: errorMessage,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -262,11 +262,11 @@ export function SupplierDetailPage() {
         setSearchParams({ mode: 'view' });
         fetchSupplier();
       }
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string }>;
+    } catch (error: unknown) {
+      const errorMessage = (error as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to save supplier';
       toast({
         title: 'Error',
-        description: axiosError.response?.data?.error || 'Failed to save supplier',
+        description: errorMessage,
         status: 'error',
         duration: 5000,
         isClosable: true,

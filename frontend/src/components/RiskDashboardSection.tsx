@@ -57,7 +57,7 @@ export function RiskDashboardSection() {
       setLoading(true);
       const summary = await riskDashboardApi.getSummary();
       setData(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching risk dashboard data:', error);
       toast({
         title: 'Error',
@@ -127,6 +127,7 @@ export function RiskDashboardSection() {
     no_mitigation_score: point.no_mitigation_score,
   }));
 
+  // Custom tooltip for pie chart
   const CustomPieTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (

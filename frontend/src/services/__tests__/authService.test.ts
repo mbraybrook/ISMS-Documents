@@ -30,6 +30,7 @@ vi.mock('@azure/msal-browser', () => {
     getActiveAccount: vi.fn().mockReturnValue(null),
   };
 
+  
   return {
     PublicClientApplication: vi.fn().mockImplementation(() => mockMsalInstance),
     InteractionType: {
@@ -102,6 +103,7 @@ describe('authService', () => {
       username: 'test@paythru.com',
     };
 
+    
     // Set up a current account first
     vi.mocked(msalInstance.getActiveAccount).mockReturnValue(mockAccount as any);
     vi.mocked(msalInstance.logoutPopup).mockResolvedValue(undefined);
@@ -141,6 +143,7 @@ describe('authService', () => {
     vi.mocked(msalInstance.logoutPopup).mockResolvedValue(undefined);
     await authService.logout();
 
+    
     // Make sure acquireTokenSilent is not called when there's no account
     vi.mocked(msalInstance.acquireTokenSilent).mockClear();
 

@@ -25,6 +25,10 @@ import {
   Badge,
   Spinner,
   Center,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
   CloseButton,
   Modal,
   ModalOverlay,
@@ -49,10 +53,6 @@ import {
   Link,
   Collapse,
   SimpleGrid,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
   Flex,
   Tabs,
   TabList,
@@ -131,7 +131,29 @@ export function InterestedPartiesPage() {
     theirObligations: '',
   });
 
+  const initialFocusRef = useRef<HTMLInputElement>(null);
+  const finalFocusRef = useRef<HTMLButtonElement>(null);
+
   const canEdit = user?.role === 'ADMIN' || user?.role === 'EDITOR';
+
+  const fetchInterestedParties = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/api/interested-parties');
+      setInterestedParties(response.data);
+    } catch (error) {
+      console.error('Error fetching interested parties:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch interested parties',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchInterestedParties();
@@ -140,14 +162,6 @@ export function InterestedPartiesPage() {
   useEffect(() => {
     applyFilters();
   }, [interestedParties, searchQuery, sortConfig, selectedGroupFilter]);
-
-  const _expandAllRows = () => {
-    setExpandedRows(new Set(filteredParties.map(p => p.id)));
-  };
-
-  const _collapseAllRows = () => {
-    setExpandedRows(new Set());
-  };
 
   const toggleSelectParty = (partyId: string) => {
     setSelectedParties(prev => {
@@ -176,6 +190,7 @@ export function InterestedPartiesPage() {
       const allRisksData = response.data.data || response.data.risks || [];
       setAllRisks(allRisksData);
 
+      
       // Fetch risks currently linked to this party
       const partyRisks = allRisksData.filter((risk: any) => risk.interestedPartyId === partyId);
       setSelectedRiskIds(new Set(partyRisks.map((r: any) => r.id)));
@@ -201,17 +216,14 @@ export function InterestedPartiesPage() {
           interestedPartyId: partyForRiskManagement.id,
         });
       });
-
-      // Remove association from risks that were deselected
-      const currentPartyRisks = allRisks.filter((r: any) => r.interestedPartyId === partyForRiskManagement.id);
-      const _toRemove = currentPartyRisks.filter((r: any) => !selectedRiskIds.has(r.id));
-
+      
       // Note: We can't set interestedPartyId to null as it's required
       // Instead, we'd need a default "Unassigned" party or handle this differently
       // For now, we'll just update the selected ones
 
       await Promise.all(riskUpdates);
 
+      
       toast({
         title: 'Success',
         description: 'Risk associations updated successfully',
@@ -223,7 +235,7 @@ export function InterestedPartiesPage() {
       setIsRiskModalOpen(false);
       setPartyForRiskManagement(null);
       fetchInterestedParties();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to update risk associations',
@@ -231,25 +243,6 @@ export function InterestedPartiesPage() {
         duration: 5000,
         isClosable: true,
       });
-    }
-  };
-
-  const fetchInterestedParties = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/api/interested-parties');
-      setInterestedParties(response.data);
-    } catch (error) {
-      console.error('Error fetching interested parties:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch interested parties',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -415,6 +408,7 @@ export function InterestedPartiesPage() {
       );
       await Promise.all(deletePromises);
 
+      
       const deletedCount = selectedParties.size;
       toast({
         title: 'Success',
@@ -426,7 +420,7 @@ export function InterestedPartiesPage() {
       onBulkDeleteClose();
       setSelectedParties(new Set());
       fetchInterestedParties();
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to delete interested parties';
       toast({
         title: 'Error',
@@ -441,6 +435,7 @@ export function InterestedPartiesPage() {
   const handleBulkExport = () => {
     const selectedPartiesList = filteredParties.filter(p => selectedParties.has(p.id));
 
+    
     const headers = [
       'Name',
       'Group',
@@ -526,6 +521,7 @@ export function InterestedPartiesPage() {
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
+    
     const nameError = validateName(formData.name);
     if (nameError) {
       errors.name = nameError;
@@ -535,6 +531,11 @@ export function InterestedPartiesPage() {
       errors.sourceLink = 'Please enter a valid URL (e.g., https://example.com) or "N/A"';
     }
 
+    
+    if (formData.sourceLink && !validateURL(formData.sourceLink)) {
+      errors.sourceLink = 'Please enter a valid URL (e.g., https://example.com) or "N/A"';
+    }
+    
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -545,8 +546,8 @@ export function InterestedPartiesPage() {
     try {
       const response = await api.get('/api/interested-parties');
       const parties = response.data;
-      return parties.some((party: InterestedParty) =>
-        party.name.toLowerCase().trim() === name.toLowerCase().trim() &&
+      return parties.some((party: InterestedParty) => 
+        party.name.toLowerCase().trim() === name.toLowerCase().trim() && 
         party.id !== excludeId
       );
     } catch {
@@ -556,7 +557,7 @@ export function InterestedPartiesPage() {
 
   const handleNameChange = async (value: string) => {
     setFormData(prev => ({ ...prev, name: value }));
-
+    
     // Clear previous error
     if (formErrors.name) {
       setFormErrors(prev => {
@@ -566,12 +567,14 @@ export function InterestedPartiesPage() {
       });
     }
 
+    
     // Check for duplicates (debounced)
     if (value.trim() && (!selectedParty || value.trim().toLowerCase() !== selectedParty.name.toLowerCase())) {
       setCheckingDuplicate(true);
       const isDuplicate = await checkDuplicateName(value, selectedParty?.id);
       setCheckingDuplicate(false);
 
+      
       if (isDuplicate) {
         setFormErrors(prev => ({
           ...prev,
@@ -599,6 +602,7 @@ export function InterestedPartiesPage() {
         name: formData.name.trim(),
       };
 
+      
       // Only include optional fields if they have values
       if (formData.group && formData.group.trim()) {
         payload.group = formData.group.trim();
@@ -659,10 +663,10 @@ export function InterestedPartiesPage() {
       setFormErrors({});
       setCheckingDuplicate(false);
       fetchInterestedParties();
-    } catch (error) {
+    } catch (error: any) {
       let errorMessage = 'Failed to save interested party';
       const errorData = error.response?.data;
-
+      
       if (errorData?.errors && Array.isArray(errorData.errors)) {
         // Handle validation errors
         const validationErrors = errorData.errors.map((err: any) => err.msg || err.message).join(', ');
@@ -677,6 +681,7 @@ export function InterestedPartiesPage() {
         }
       }
 
+      
       toast({
         title: 'Error',
         description: errorMessage,
@@ -702,7 +707,7 @@ export function InterestedPartiesPage() {
       onDeleteClose();
       setPartyToDelete(null);
       fetchInterestedParties();
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to delete interested party';
       toast({
         title: 'Error',
@@ -1260,11 +1265,13 @@ export function InterestedPartiesPage() {
                 party._count?.risks || 0,
               ]);
 
+              
               const csvContent = [
                 headers.join(','),
                 ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
               ].join('\n');
 
+              
               const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
               const link = document.createElement('a');
               const url = URL.createObjectURL(blob);
@@ -1275,6 +1282,7 @@ export function InterestedPartiesPage() {
               link.click();
               document.body.removeChild(link);
 
+              
               toast({
                 title: 'Export Complete',
                 description: `Exported ${filteredParties.length} interested parties to CSV`,
@@ -1312,11 +1320,13 @@ export function InterestedPartiesPage() {
               party._count?.risks || 0,
             ]);
 
+            
             const csvContent = [
               headers.join(','),
               ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
             ].join('\n');
 
+            
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
@@ -1327,6 +1337,7 @@ export function InterestedPartiesPage() {
             link.click();
             document.body.removeChild(link);
 
+            
             toast({
               title: 'Export Complete',
               description: `Exported ${filteredParties.length} interested parties to CSV`,
@@ -1341,12 +1352,12 @@ export function InterestedPartiesPage() {
       </HStack>
 
       {/* Create/Edit Modal */}
-      <Modal
-        isOpen={isOpen}
-        onClose={onClose}
+      <Modal 
+        isOpen={isOpen} 
+        onClose={onClose} 
         size="4xl"
-        initialFocusRef={React.useRef<HTMLInputElement>(null)}
-        finalFocusRef={React.useRef<HTMLButtonElement>(null)}
+        initialFocusRef={initialFocusRef}
+        finalFocusRef={finalFocusRef}
         trapFocus={true}
         returnFocusOnClose={true}
       >

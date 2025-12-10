@@ -4,16 +4,25 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Heading,
-
+  Tr,
+  Td,
   Button,
   HStack,
   VStack,
   Badge,
   useDisclosure,
-  useToast, // Added
-  Checkbox, // Added
-  Text,     // Added
+  useToast,
+  Checkbox,
+  Text,
   Tooltip,
+  Input,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
+  IconButton,
   Popover,
   PopoverTrigger,
   PopoverContent,
@@ -31,16 +40,6 @@ import {
   ModalCloseButton,
   FormControl,
   FormLabel,
-  Input,
-  Tr,
-  Td,
-  IconButton,
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogContent,
-  AlertDialogOverlay,
 } from '@chakra-ui/react';
 import { DeleteIcon, DownloadIcon, HamburgerIcon } from '@chakra-ui/icons';
 import api from '../services/api';
@@ -184,7 +183,6 @@ export function RisksPage() {
 
   // Track if we've initialized filters from URL to avoid re-initializing
 
-
   // Separate search state for immediate UI updates (must be declared before useDebounce)
   const [searchInput, setSearchInput] = useState(filters.search);
 
@@ -312,7 +310,7 @@ export function RisksPage() {
         // Ignore error, use current pagination total as fallback
         setTotalRisksCount(response.data.pagination?.total || 0);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching risks:', error);
       toast({
         title: 'Error',
@@ -333,6 +331,7 @@ export function RisksPage() {
     const riskLevelParam = searchParams.get('riskLevel');
     const assetCategoryIdParam = searchParams.get('assetCategoryId');
 
+    
     // Skip if we're handling view/edit params (those are handled separately)
     const viewParam = searchParams.get('view');
     const editParam = searchParams.get('edit');
@@ -342,7 +341,7 @@ export function RisksPage() {
 
     // Check if we have filter params that differ from current filters
     const hasFilterParams = mitigationImplementedParam !== null || policyNonConformanceParam !== null || riskLevelParam !== null || assetCategoryIdParam !== null;
-
+    
     if (hasFilterParams) {
       // Always update filters when URL params are present to ensure they're applied
       setFilters(prev => ({
@@ -354,6 +353,7 @@ export function RisksPage() {
         page: 1, // Reset to first page when filter changes
       }));
 
+      
       // Remove the params from URL after a delay to ensure filters are applied first
       // Keep assetCategoryId in URL longer to ensure it's applied
       const timeoutId = setTimeout(() => {
@@ -367,6 +367,7 @@ export function RisksPage() {
         });
       }, 500);
 
+      
       return () => clearTimeout(timeoutId);
     }
   }, [searchParams, setSearchParams]);
@@ -384,6 +385,7 @@ export function RisksPage() {
     const riskId = editRiskId || viewRiskId;
     const shouldEdit = !!editRiskId;
 
+    
     if (riskId && viewRiskProcessedRef.current !== riskId) {
       // First check if risk is in current list
       const risk = risks.find(r => r.id === riskId);
@@ -414,7 +416,7 @@ export function RisksPage() {
               newSearchParams.delete('edit');
               setSearchParams(newSearchParams, { replace: true });
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error('Error fetching risk:', error);
             toast({
               title: 'Error',
@@ -543,7 +545,7 @@ export function RisksPage() {
       onDeleteClose();
       setRiskToDelete(null);
       fetchRisks();
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to delete risk';
       toast({
         title: 'Error',
@@ -570,8 +572,6 @@ export function RisksPage() {
     if (filters.dateAddedFrom || filters.dateAddedTo) count++;
     return count;
   };
-
-
 
   const handlePageChange = (newPage: number) => {
     setFilters({ ...filters, page: newPage });
@@ -662,7 +662,7 @@ export function RisksPage() {
       onBulkDeleteClose();
       setSelectedRiskIds(new Set());
       fetchRisks();
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to delete risks';
       toast({
         title: 'Error',
@@ -889,7 +889,7 @@ export function RisksPage() {
         header: 'Treatment',
         minW: '120px',
         render: (risk) => {
-          const hasMitigatedScores =
+          const hasMitigatedScores = 
             risk.mitigatedConfidentialityScore !== null ||
             risk.mitigatedIntegrityScore !== null ||
             risk.mitigatedAvailabilityScore !== null ||
@@ -901,7 +901,7 @@ export function RisksPage() {
             risk.initialRiskTreatmentCategory === 'MODIFY' &&
             risk.riskLevel !== 'LOW' &&
             !(hasMitigatedScores && hasMitigationDescription);
-
+          
           return risk.initialRiskTreatmentCategory ? (
             <HStack spacing={2}>
               <Badge
@@ -1302,7 +1302,7 @@ export function RisksPage() {
           duration: 3000,
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Export Failed',
         description: error.response?.data?.error || 'Failed to export risks',
@@ -1394,8 +1394,6 @@ export function RisksPage() {
       </Tr>
     );
   }, [user, selectedRiskIds, getRowBgColor, handleEdit, handleSelectRisk, buildColumns, risks]);
-
-
 
   // For Contributors, show simplified DepartmentRiskTable
   if (effectiveRole === 'CONTRIBUTOR') {

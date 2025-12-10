@@ -68,7 +68,7 @@ export function SetReviewDateModal({ isOpen, onClose, document }: SetReviewDateM
       });
       
       onClose(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error setting review date:', error);
       toast({
         title: 'Error',

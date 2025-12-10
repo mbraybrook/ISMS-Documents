@@ -45,6 +45,7 @@ import { authService } from '../services/authService';
 import { SharePointFileBrowser } from './SharePointFileBrowser';
 import { VersionUpdateModal } from './VersionUpdateModal';
 import { ControlFormModal } from './ControlFormModal';
+import { Control } from '../types/control';
 
 // Type definitions
 type UserForOwner = {
@@ -53,13 +54,6 @@ type UserForOwner = {
   email: string;
   role: string;
 };
-
-interface Control {
-  id: string;
-  code: string;
-  title: string;
-  category: string | null;
-}
 
 interface Document {
   id: string;
@@ -87,14 +81,6 @@ interface SharePointItem {
   driveId?: string;
 }
 
-interface ApiError {
-  response?: {
-    data?: {
-      error?: string;
-    };
-  };
-  message?: string;
-}
 
 interface DocumentFormModalProps {
   isOpen: boolean;
@@ -102,6 +88,39 @@ interface DocumentFormModalProps {
   document: Document | null;
   readOnly?: boolean;
   isReviewContext?: boolean; // Indicates if opened from review screen
+}
+
+// Helper function to extract error message from unknown error
+function getErrorMessage(error: unknown, defaultMessage: string): string {
+  if (error && typeof error === 'object') {
+    // Check for axios error structure
+    if ('response' in error && error.response && typeof error.response === 'object' && 'data' in error.response) {
+      const responseData = error.response.data;
+      if (responseData && typeof responseData === 'object' && 'error' in responseData) {
+        if (typeof responseData.error === 'string') {
+          return responseData.error;
+        }
+      }
+    }
+    // Check for standard Error message
+    if ('message' in error && typeof error.message === 'string') {
+      return error.message;
+    }
+  }
+  return defaultMessage;
+}
+
+// Helper function to extract error details for logging
+function getErrorDetails(error: unknown): unknown {
+  if (error && typeof error === 'object') {
+    if ('response' in error && error.response && typeof error.response === 'object' && 'data' in error.response) {
+      return error.response.data;
+    }
+    if ('message' in error) {
+      return error.message;
+    }
+  }
+  return error;
 }
 
 export function DocumentFormModal({ isOpen, onClose, document, readOnly = false, isReviewContext = false }: DocumentFormModalProps) {
@@ -134,13 +153,12 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [users, setUsers] = useState<UserForOwner[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const { isOpen: isConfirmOpen, onOpen: _onConfirmOpen, onClose: onConfirmClose } = useDisclosure();
+  const { isOpen: isConfirmOpen, onClose: onConfirmClose } = useDisclosure();
   const { isOpen: isVersionUpdateOpen, onOpen: onVersionUpdateOpen, onClose: onVersionUpdateClose } = useDisclosure();
   const { isOpen: isControlModalOpen, onOpen: onControlModalOpen, onClose: onControlModalClose } = useDisclosure();
   const [selectedControl, setSelectedControl] = useState<Control | null>(null);
-  const [_pendingSubmit, setPendingSubmit] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
-
+  
   // Control linking state
   const [linkedControls, setLinkedControls] = useState<Array<{ id: string; code: string; title: string; category: string | null }>>([]);
   const [controlSearchTerm, setControlSearchTerm] = useState('');
@@ -150,6 +168,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   const [_linkingControl, setLinkingControl] = useState(false);
   const [loadingControls, setLoadingControls] = useState(false);
   const [loadingSuggestedControls, setLoadingSuggestedControls] = useState(false);
+  const [_pendingSubmit, setPendingSubmit] = useState(false);
 
   // Check if user can edit owner (Admin or Editor only)
   const canEditOwner = user?.role === 'ADMIN' || user?.role === 'EDITOR';
@@ -288,6 +307,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         loadDocumentUrl(document);
       }
 
+      
       // Load version notes for current version
       const loadVersionNotes = async () => {
         try {
@@ -304,6 +324,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         ? new Date(document.nextReviewDate).toISOString().split('T')[0]
         : '';
 
+      
       if (isReviewContext && !readOnly) {
         const today = new Date();
         const nextYear = new Date(today);
@@ -311,6 +332,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         nextReviewDate = nextYear.toISOString().split('T')[0];
       }
 
+      
       // Set form data and load version notes
       loadVersionNotes().then((versionNotes) => {
         setFormData({
@@ -330,7 +352,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
             : '',
           nextReviewDate: nextReviewDate,
           // Default to true for POLICY documents, but allow existing value to be changed
-          requiresAcknowledgement: document.type === 'POLICY'
+          requiresAcknowledgement: document.type === 'POLICY' 
             ? (document.requiresAcknowledgement ?? true)
             : (document.requiresAcknowledgement ?? false),
           versionNotes: versionNotes,
@@ -342,6 +364,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       const nextYear = new Date(today);
       nextYear.setFullYear(today.getFullYear() + 1);
 
+      
       setFormData({
         title: '',
         type: 'POLICY',
@@ -423,11 +446,8 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         isClosable: true,
         position: 'top-right',
       });
-    } catch (error) {
-      const err = error as ApiError;
-      const errorMessage =
-        err.response?.data?.error ||
-        'Failed to parse SharePoint URL. Please check the URL and try again.';
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, 'Failed to parse SharePoint URL. Please check the URL and try again.');
       setUrlError(errorMessage);
       toast({
         title: 'Error',
@@ -450,6 +470,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       return;
     }
 
+    
     if (!doc.sharePointSiteId || !doc.sharePointDriveId || !doc.sharePointItemId) {
       console.log('[DocumentFormModal] Missing SharePoint IDs:', {
         siteId: doc.sharePointSiteId,
@@ -459,6 +480,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       return;
     }
 
+    
     setLoadingUrl(true);
     try {
       // Try to get webUrl from SharePoint item
@@ -480,20 +502,21 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
             setLoadingUrl(false);
             return;
           }
-        } catch (error) {
-          const err = error as ApiError;
-          console.warn('[DocumentFormModal] Error fetching SharePoint item from Graph API:', err.response?.data || err.message);
+        } catch (error: unknown) {
+          console.warn('[DocumentFormModal] Error fetching SharePoint item from Graph API:', getErrorDetails(error));
           // Continue to fallback
         }
       } else {
         console.warn('[DocumentFormModal] No Graph token available, using fallback URL');
       }
 
+      
       // Fallback to generated URL - try with access token first
       try {
         const fallbackToken = graphToken || await authService.getGraphAccessToken();
         const headers = fallbackToken ? { 'x-graph-token': fallbackToken } : {};
 
+        
         const response = await api.get('/api/sharepoint/url', {
           params: {
             siteId: doc.sharePointSiteId,
@@ -537,12 +560,11 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
           console.error('[DocumentFormModal] Fallback URL endpoint returned no URL:', response.data);
           setDocumentUrl(null);
         }
-      } catch (error) {
-        const err = error as ApiError;
-        console.error('[DocumentFormModal] Error generating fallback URL:', err.response?.data || err.message);
+      } catch (error: unknown) {
+        console.error('[DocumentFormModal] Error generating fallback URL:', getErrorDetails(error));
         setDocumentUrl(null);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[DocumentFormModal] Unexpected error loading document URL:', error);
       setDocumentUrl(null);
     } finally {
@@ -658,6 +680,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         type: formData.type,
       });
 
+      
       if (response.data.suggestedControlIds && response.data.suggestedControlIds.length > 0) {
         // Fetch full control details for suggested IDs
         const controlsResponse = await api.get('/api/controls', {
@@ -677,7 +700,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       } else {
         setSuggestedControls([]);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error fetching suggested controls:', error);
       // Don't show error toast for suggestions - it's not critical
       setSuggestedControls([]);
@@ -709,9 +732,9 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
           if (linkedControlIds.has(c.id)) {
             return false;
           }
-
+          
           const controlText = `${c.code} ${c.title || ''}`.toLowerCase();
-
+          
           // Word-based matching: check if any search word appears in the control text
           // This allows "awareness" to match "Information security awareness, education and training"
           return searchWords.some((word) => {
@@ -721,7 +744,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
           });
         })
       );
-    } catch (error) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
         description: 'Failed to search controls',
@@ -751,11 +774,10 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       if (formData.title && formData.title.trim().length >= 3) {
         fetchSuggestedControls();
       }
-    } catch (error) {
-      const err = error as ApiError;
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: err.response?.data?.error || 'Failed to link control',
+        description: getErrorMessage(error, 'Failed to link control'),
         status: 'error',
         duration: 3000,
       });
@@ -775,7 +797,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         duration: 3000,
       });
       fetchLinkedControls();
-    } catch (error) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
         description: 'Failed to unlink control',
@@ -797,6 +819,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         const response = await api.get(`/api/documents/${document.id}`);
         const updatedDocument = response.data;
 
+        
         // Update form data with new version and review dates
         setFormData((prev) => ({
           ...prev,
@@ -1157,10 +1180,10 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                     <Text fontSize="md" color="gray.700">
                       {formData.lastReviewDate
                         ? new Date(formData.lastReviewDate).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })
                         : 'Not set'}
                     </Text>
                   </FormControl>
@@ -1170,10 +1193,10 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                     <Text fontSize="md" color="gray.700">
                       {formData.nextReviewDate
                         ? new Date(formData.nextReviewDate).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })
                         : 'Not set'}
                     </Text>
                   </FormControl>
@@ -1448,6 +1471,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                               </Text>
                             )}
 
+                            
                             {/* Suggested Controls Section */}
                             {!controlSearchTerm.trim() && suggestedControls.length > 0 && (
                               <Box>

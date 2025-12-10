@@ -19,7 +19,6 @@ import {
 } from '@chakra-ui/react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { AxiosError } from 'axios';
 
 interface SoAExport {
   id: string;
@@ -36,7 +35,7 @@ export function SoAPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [exports, setExports] = useState<SoAExport[]>([]);
-  const [, setLoadingExports] = useState(false);
+  const [_loadingExports, setLoadingExports] = useState(false);
   const toast = useToast();
 
   const isAdminOrEditor = user?.role === 'ADMIN' || user?.role === 'EDITOR';
@@ -82,11 +81,10 @@ export function SoAPage() {
 
       // Refresh exports list
       loadExports();
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string }>;
-      console.error('Error generating SoA export:', axiosError);
+    } catch (error: unknown) {
+      console.error('Error generating SoA export:', error);
       const errorMessage =
-        axiosError.response?.data?.error || 'Failed to generate SoA export';
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to generate SoA export';
       toast({
         title: 'Error',
         description: errorMessage,
@@ -114,6 +112,8 @@ export function SoAPage() {
 
   // Load exports on mount
   useEffect(() => {
+    loadExports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!isAdminOrEditor) {

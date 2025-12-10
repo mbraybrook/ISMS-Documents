@@ -22,6 +22,14 @@ export interface SimilarRiskResult {
 //   return parts.join(' ');
 // }
 
+function _combineRiskText(risk: { title: string; threatDescription?: string | null; description?: string | null }): string {
+  const parts: string[] = [];
+  if (risk.title) parts.push(`Title: ${risk.title}`);
+  if (risk.threatDescription) parts.push(`Threat: ${risk.threatDescription}`);
+  if (risk.description) parts.push(`Description: ${risk.description}`);
+  return parts.join(' ');
+}
+
 /**
  * Find similar risks for an existing risk by ID
  */

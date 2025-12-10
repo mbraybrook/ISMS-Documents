@@ -29,7 +29,6 @@ import {
 } from '@chakra-ui/react';
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
-import { AxiosError } from 'axios';
 import { Department, getDepartmentDisplayName } from '../types/risk';
 
 type UserRole = 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR';
@@ -109,6 +108,7 @@ export function UsersPage() {
 
       await api.put(`/api/users/${selectedUser.id}`, updateData);
 
+      
       toast({
         title: 'Success',
         description: 'User updated successfully',
@@ -121,12 +121,12 @@ export function UsersPage() {
       await fetchUsers();
       onClose();
       setSelectedUser(null);
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error: string }>;
+    } catch (error: unknown) {
       console.error('Error updating user:', error);
+      const errorObj = error as { response?: { data?: { error?: string } } };
       toast({
         title: 'Error',
-        description: axiosError.response?.data?.error || 'Failed to update user',
+        description: errorObj.response?.data?.error || 'Failed to update user',
         status: 'error',
         duration: 3000,
         isClosable: true,

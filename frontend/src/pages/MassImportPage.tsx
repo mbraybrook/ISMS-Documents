@@ -56,7 +56,6 @@ interface ImportResult {
 }
 
 export function MassImportPage() {
-  // useAuth hook used for route protection context if needed, but currently unused variables removed
   useAuth();
   const navigate = useNavigate();
   const toast = useToast();
@@ -144,7 +143,7 @@ export function MassImportPage() {
         duration: 5000,
         isClosable: true,
       });
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage =
         error.response?.data?.error || 'Failed to import documents';
       toast({
@@ -208,6 +207,13 @@ export function MassImportPage() {
                           year: 'numeric',
                         })}
                       </Td>
+                            <Td>
+                              {new Date(file.lastModifiedDateTime).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })}
+                            </Td>
                       <Td>
                         <Button
                           size="xs"
@@ -369,6 +375,7 @@ export function MassImportPage() {
         isOpen={isOpen}
         onClose={onClose}
         onSelect={() => { }} // Not used in multi-select mode
+        onSelect={() => {}} // Not used in multi-select mode
         multiSelect={true}
         onMultiSelect={handleFileSelection}
       />
