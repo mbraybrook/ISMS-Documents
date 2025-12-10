@@ -14,3 +14,4 @@ ALTER TABLE "SupplierRiskAssessment" DROP COLUMN "ciaImpact";
 
 
 
+
