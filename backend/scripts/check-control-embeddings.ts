@@ -32,13 +32,15 @@ async function main() {
     console.log(`  npm run backfill-control-embeddings\n`);
     
     process.exit(0);
-  } catch (error: any) {
-    console.error('Error checking control embeddings:', error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error checking control embeddings:', errorMessage);
     process.exit(1);
   }
 }
 
 main();
+
 
 
 

@@ -47,12 +47,12 @@ import { VersionUpdateModal } from './VersionUpdateModal';
 import { ControlFormModal } from './ControlFormModal';
 
 // Type definitions
-interface User {
+type UserForOwner = {
   id: string;
   displayName: string;
   email: string;
   role: string;
-}
+};
 
 interface Control {
   id: string;
@@ -132,7 +132,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   const [showReplaceOptions, setShowReplaceOptions] = useState(false);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
   const [loadingUrl, setLoadingUrl] = useState(false);
-  const [users, setUsers] = useState<Array<{ id: string; displayName: string; email: string; role: string }>>([]);
+  const [users, setUsers] = useState<UserForOwner[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const { isOpen: isConfirmOpen, onOpen: _onConfirmOpen, onClose: onConfirmClose } = useDisclosure();
   const { isOpen: isVersionUpdateOpen, onOpen: onVersionUpdateOpen, onClose: onVersionUpdateClose } = useDisclosure();
@@ -154,24 +154,23 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   // Check if user can edit owner (Admin or Editor only)
   const canEditOwner = user?.role === 'ADMIN' || user?.role === 'EDITOR';
 
-  // Define fetch functions first so they can be used in useEffect hooks
   const fetchUsers = useCallback(async () => {
     try {
       setLoadingUsers(true);
-      const response = await api.get('/api/users');
+      const response = await api.get<{ data: UserForOwner[] }>('/api/users');
       const allUsers = response.data.data || [];
       // Filter to only Admin and Editor roles for owner assignment
-      const adminEditorUsers = allUsers.filter((u: User) => u.role === 'ADMIN' || u.role === 'EDITOR');
-
+      const adminEditorUsers = allUsers.filter((u: UserForOwner) => u.role === 'ADMIN' || u.role === 'EDITOR');
+      
       // If editing a document, include the current owner even if they're not Admin/Editor
       // This handles edge cases where a document might have a non-Admin/Editor owner
       if (document?.ownerUserId) {
-        const currentOwner = allUsers.find((u: User) => u.id === document.ownerUserId);
-        if (currentOwner && !adminEditorUsers.find((u: User) => u.id === currentOwner.id)) {
+        const currentOwner = allUsers.find((u: UserForOwner) => u.id === document.ownerUserId);
+        if (currentOwner && !adminEditorUsers.find((u: UserForOwner) => u.id === currentOwner.id)) {
           adminEditorUsers.push(currentOwner);
         }
       }
-
+      
       setUsers(adminEditorUsers);
     } catch (error) {
       console.error('Error fetching users:', error);

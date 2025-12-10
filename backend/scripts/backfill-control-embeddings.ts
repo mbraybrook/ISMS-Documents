@@ -63,13 +63,15 @@ async function main() {
     }
 
     process.exit(0);
-  } catch (error: any) {
-    console.error('\nError during backfill:', error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('\nError during backfill:', errorMessage);
     process.exit(1);
   }
 }
 
 main();
+
 
 
 
