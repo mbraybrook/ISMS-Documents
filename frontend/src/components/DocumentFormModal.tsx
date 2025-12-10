@@ -46,10 +46,60 @@ import { SharePointFileBrowser } from './SharePointFileBrowser';
 import { VersionUpdateModal } from './VersionUpdateModal';
 import { ControlFormModal } from './ControlFormModal';
 
+// Type definitions
+interface User {
+  id: string;
+  displayName: string;
+  email: string;
+  role: string;
+}
+
+interface Control {
+  id: string;
+  code: string;
+  title: string;
+  category: string | null;
+}
+
+interface Document {
+  id: string;
+  title: string;
+  type: string;
+  storageLocation: string;
+  version: string;
+  status: string;
+  lastReviewDate: string | null;
+  nextReviewDate: string | null;
+  requiresAcknowledgement?: boolean;
+  ownerUserId: string;
+  sharePointSiteId?: string;
+  sharePointDriveId?: string;
+  sharePointItemId?: string;
+  confluenceSpaceKey?: string;
+  confluencePageId?: string;
+  documentUrl?: string | null;
+}
+
+interface SharePointItem {
+  id: string;
+  name: string;
+  siteId?: string;
+  driveId?: string;
+}
+
+interface ApiError {
+  response?: {
+    data?: {
+      error?: string;
+    };
+  };
+  message?: string;
+}
+
 interface DocumentFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  document: any;
+  document: Document | null;
   readOnly?: boolean;
   isReviewContext?: boolean; // Indicates if opened from review screen
 }
@@ -87,10 +137,10 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   const { isOpen: isConfirmOpen, onOpen: _onConfirmOpen, onClose: onConfirmClose } = useDisclosure();
   const { isOpen: isVersionUpdateOpen, onOpen: onVersionUpdateOpen, onClose: onVersionUpdateClose } = useDisclosure();
   const { isOpen: isControlModalOpen, onOpen: onControlModalOpen, onClose: onControlModalClose } = useDisclosure();
-  const [selectedControl, setSelectedControl] = useState<any>(null);
+  const [selectedControl, setSelectedControl] = useState<Control | null>(null);
   const [_pendingSubmit, setPendingSubmit] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
-  
+
   // Control linking state
   const [linkedControls, setLinkedControls] = useState<Array<{ id: string; code: string; title: string; category: string | null }>>([]);
   const [controlSearchTerm, setControlSearchTerm] = useState('');
@@ -103,6 +153,59 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
 
   // Check if user can edit owner (Admin or Editor only)
   const canEditOwner = user?.role === 'ADMIN' || user?.role === 'EDITOR';
+
+  // Define fetch functions first so they can be used in useEffect hooks
+  const fetchUsers = useCallback(async () => {
+    try {
+      setLoadingUsers(true);
+      const response = await api.get('/api/users');
+      const allUsers = response.data.data || [];
+      // Filter to only Admin and Editor roles for owner assignment
+      const adminEditorUsers = allUsers.filter((u: User) => u.role === 'ADMIN' || u.role === 'EDITOR');
+
+      // If editing a document, include the current owner even if they're not Admin/Editor
+      // This handles edge cases where a document might have a non-Admin/Editor owner
+      if (document?.ownerUserId) {
+        const currentOwner = allUsers.find((u: User) => u.id === document.ownerUserId);
+        if (currentOwner && !adminEditorUsers.find((u: User) => u.id === currentOwner.id)) {
+          adminEditorUsers.push(currentOwner);
+        }
+      }
+
+      setUsers(adminEditorUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load users for owner selection',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+        position: 'top-right',
+      });
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, [document?.ownerUserId, toast]);
+
+  const fetchLinkedControls = useCallback(async () => {
+    if (!document?.id) return;
+    try {
+      setLoadingControls(true);
+      const response = await api.get(`/api/documents/${document.id}/controls`);
+      setLinkedControls(response.data);
+    } catch (error) {
+      console.error('Error fetching linked controls:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load linked controls',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLoadingControls(false);
+    }
+  }, [document?.id, toast]);
 
   // Handle Escape key
   useEffect(() => {
@@ -129,6 +232,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     } else if (isOpen && !document) {
       setLinkedControls([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, document?.id, fetchLinkedControls]);
 
   // Fetch suggested controls when title or type changes (with debounce)
@@ -151,39 +255,6 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.title, formData.type, isOpen]);
-
-  const fetchUsers = useCallback(async () => {
-    try {
-      setLoadingUsers(true);
-      const response = await api.get('/api/users');
-      const allUsers = response.data.data || [];
-      // Filter to only Admin and Editor roles for owner assignment
-      const adminEditorUsers = allUsers.filter((u: any) => u.role === 'ADMIN' || u.role === 'EDITOR');
-      
-      // If editing a document, include the current owner even if they're not Admin/Editor
-      // This handles edge cases where a document might have a non-Admin/Editor owner
-      if (document?.ownerUserId) {
-        const currentOwner = allUsers.find((u: any) => u.id === document.ownerUserId);
-        if (currentOwner && !adminEditorUsers.find((u: any) => u.id === currentOwner.id)) {
-          adminEditorUsers.push(currentOwner);
-        }
-      }
-      
-      setUsers(adminEditorUsers);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load users for owner selection',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-        position: 'top-right',
-      });
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, [document?.ownerUserId, toast]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -217,7 +288,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       if (document.storageLocation === 'SHAREPOINT' && document.sharePointSiteId && document.sharePointDriveId && document.sharePointItemId) {
         loadDocumentUrl(document);
       }
-      
+
       // Load version notes for current version
       const loadVersionNotes = async () => {
         try {
@@ -233,14 +304,14 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       let nextReviewDate = document.nextReviewDate
         ? new Date(document.nextReviewDate).toISOString().split('T')[0]
         : '';
-      
+
       if (isReviewContext && !readOnly) {
         const today = new Date();
         const nextYear = new Date(today);
         nextYear.setFullYear(today.getFullYear() + 1);
         nextReviewDate = nextYear.toISOString().split('T')[0];
       }
-      
+
       // Set form data and load version notes
       loadVersionNotes().then((versionNotes) => {
         setFormData({
@@ -260,7 +331,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
             : '',
           nextReviewDate: nextReviewDate,
           // Default to true for POLICY documents, but allow existing value to be changed
-          requiresAcknowledgement: document.type === 'POLICY' 
+          requiresAcknowledgement: document.type === 'POLICY'
             ? (document.requiresAcknowledgement ?? true)
             : (document.requiresAcknowledgement ?? false),
           versionNotes: versionNotes,
@@ -271,7 +342,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       const today = new Date();
       const nextYear = new Date(today);
       nextYear.setFullYear(today.getFullYear() + 1);
-      
+
       setFormData({
         title: '',
         type: 'POLICY',
@@ -353,9 +424,10 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         isClosable: true,
         position: 'top-right',
       });
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as ApiError;
       const errorMessage =
-        error.response?.data?.error ||
+        err.response?.data?.error ||
         'Failed to parse SharePoint URL. Please check the URL and try again.';
       setUrlError(errorMessage);
       toast({
@@ -371,14 +443,14 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     }
   };
 
-  const loadDocumentUrl = async (doc: any) => {
+  const loadDocumentUrl = async (doc: Partial<Document>) => {
     // Use stored documentUrl if available
     if (doc.documentUrl) {
       console.log('[DocumentFormModal] Using stored document URL:', doc.documentUrl);
       setDocumentUrl(doc.documentUrl);
       return;
     }
-    
+
     if (!doc.sharePointSiteId || !doc.sharePointDriveId || !doc.sharePointItemId) {
       console.log('[DocumentFormModal] Missing SharePoint IDs:', {
         siteId: doc.sharePointSiteId,
@@ -387,7 +459,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       });
       return;
     }
-    
+
     setLoadingUrl(true);
     try {
       // Try to get webUrl from SharePoint item
@@ -409,19 +481,20 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
             setLoadingUrl(false);
             return;
           }
-        } catch (error: any) {
-          console.warn('[DocumentFormModal] Error fetching SharePoint item from Graph API:', error.response?.data || error.message);
+        } catch (error) {
+          const err = error as ApiError;
+          console.warn('[DocumentFormModal] Error fetching SharePoint item from Graph API:', err.response?.data || err.message);
           // Continue to fallback
         }
       } else {
         console.warn('[DocumentFormModal] No Graph token available, using fallback URL');
       }
-      
+
       // Fallback to generated URL - try with access token first
       try {
         const fallbackToken = graphToken || await authService.getGraphAccessToken();
         const headers = fallbackToken ? { 'x-graph-token': fallbackToken } : {};
-        
+
         const response = await api.get('/api/sharepoint/url', {
           params: {
             siteId: doc.sharePointSiteId,
@@ -465,11 +538,12 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
           console.error('[DocumentFormModal] Fallback URL endpoint returned no URL:', response.data);
           setDocumentUrl(null);
         }
-      } catch (error: any) {
-        console.error('[DocumentFormModal] Error generating fallback URL:', error.response?.data || error.message);
+      } catch (error) {
+        const err = error as ApiError;
+        console.error('[DocumentFormModal] Error generating fallback URL:', err.response?.data || err.message);
         setDocumentUrl(null);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('[DocumentFormModal] Unexpected error loading document URL:', error);
       setDocumentUrl(null);
     } finally {
@@ -477,7 +551,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     }
   };
 
-  const handleFileSelect = (item: any) => {
+  const handleFileSelect = (item: SharePointItem) => {
     const selectedSiteId = item.siteId || formData.sharePointSiteId || '';
     setFormData({
       ...formData,
@@ -518,7 +592,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     setLoading(true);
 
     try {
-      const payload: any = { ...formData };
+      const payload: Record<string, unknown> = { ...formData };
       if (payload.lastReviewDate === '') delete payload.lastReviewDate;
       if (payload.nextReviewDate === '') delete payload.nextReviewDate;
       if (payload.sharePointSiteId === '') delete payload.sharePointSiteId;
@@ -572,25 +646,6 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     }
   };
 
-  const fetchLinkedControls = useCallback(async () => {
-    if (!document?.id) return;
-    try {
-      setLoadingControls(true);
-      const response = await api.get(`/api/documents/${document.id}/controls`);
-      setLinkedControls(response.data);
-    } catch (error: any) {
-      console.error('Error fetching linked controls:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load linked controls',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setLoadingControls(false);
-    }
-  }, [document?.id, toast]);
-
   const fetchSuggestedControls = async () => {
     if (!formData.title || formData.title.trim().length < 3) {
       setSuggestedControls([]);
@@ -603,7 +658,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         title: formData.title,
         type: formData.type,
       });
-      
+
       if (response.data.suggestedControlIds && response.data.suggestedControlIds.length > 0) {
         // Fetch full control details for suggested IDs
         const controlsResponse = await api.get('/api/controls', {
@@ -611,19 +666,19 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
             limit: 1000, // Get all to find the suggested ones
           },
         });
-        
+
         // Get current linked control IDs
         const linkedControlIds = new Set(linkedControls.map((c) => c.id));
         const suggested = controlsResponse.data.data.filter(
-          (c: any) => 
-            response.data.suggestedControlIds.includes(c.id) && 
+          (c: Control) =>
+            response.data.suggestedControlIds.includes(c.id) &&
             !linkedControlIds.has(c.id)
         );
         setSuggestedControls(suggested);
       } else {
         setSuggestedControls([]);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching suggested controls:', error);
       // Don't show error toast for suggestions - it's not critical
       setSuggestedControls([]);
@@ -649,15 +704,15 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       const linkedControlIds = new Set(linkedControls.map((c) => c.id));
       const searchLower = controlSearchTerm.toLowerCase().trim();
       const searchWords = searchLower.split(/\s+/).filter((word) => word.length > 0);
-      
+
       setAvailableControls(
-        response.data.data.filter((c: any) => {
+        response.data.data.filter((c: Control) => {
           if (linkedControlIds.has(c.id)) {
             return false;
           }
-          
+
           const controlText = `${c.code} ${c.title || ''}`.toLowerCase();
-          
+
           // Word-based matching: check if any search word appears in the control text
           // This allows "awareness" to match "Information security awareness, education and training"
           return searchWords.some((word) => {
@@ -667,7 +722,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
           });
         })
       );
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to search controls',
@@ -697,10 +752,11 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       if (formData.title && formData.title.trim().length >= 3) {
         fetchSuggestedControls();
       }
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as ApiError;
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to link control',
+        description: err.response?.data?.error || 'Failed to link control',
         status: 'error',
         duration: 3000,
       });
@@ -720,7 +776,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         duration: 3000,
       });
       fetchLinkedControls();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to unlink control',
@@ -741,7 +797,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
       try {
         const response = await api.get(`/api/documents/${document.id}`);
         const updatedDocument = response.data;
-        
+
         // Update form data with new version and review dates
         setFormData((prev) => ({
           ...prev,
@@ -811,7 +867,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
 
               <FormControl isRequired>
                 <FormLabel>Storage Location</FormLabel>
-                  <Select
+                <Select
                   value={formData.storageLocation}
                   onChange={(e) =>
                     setFormData({ ...formData, storageLocation: e.target.value })
@@ -1102,10 +1158,10 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                     <Text fontSize="md" color="gray.700">
                       {formData.lastReviewDate
                         ? new Date(formData.lastReviewDate).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                          })
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                        })
                         : 'Not set'}
                     </Text>
                   </FormControl>
@@ -1115,10 +1171,10 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                     <Text fontSize="md" color="gray.700">
                       {formData.nextReviewDate
                         ? new Date(formData.nextReviewDate).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                          })
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                        })
                         : 'Not set'}
                     </Text>
                   </FormControl>
@@ -1204,8 +1260,8 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                               >
                                 <HStack justify="space-between">
                                   <HStack spacing={2} flex={1}>
-                                    <Badge 
-                                      colorScheme="blue" 
+                                    <Badge
+                                      colorScheme="blue"
                                       fontSize="xs"
                                       cursor="pointer"
                                       _hover={{ bg: "blue.600", color: "white" }}
@@ -1228,8 +1284,8 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                                     >
                                       {control.code}
                                     </Badge>
-                                    <Text 
-                                      fontWeight="medium" 
+                                    <Text
+                                      fontWeight="medium"
                                       color="blue.700"
                                       cursor="pointer"
                                       _hover={{ textDecoration: "underline", color: "blue.900" }}
@@ -1330,8 +1386,8 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                                       _hover={{ bg: "gray.100", borderColor: "blue.300" }}
                                     >
                                       <HStack spacing={2} justify="space-between">
-                                        <HStack 
-                                          spacing={2} 
+                                        <HStack
+                                          spacing={2}
                                           flex={1}
                                           cursor="pointer"
                                           onClick={async () => {
@@ -1351,15 +1407,15 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                                             }
                                           }}
                                         >
-                                          <Badge 
-                                            colorScheme="blue" 
+                                          <Badge
+                                            colorScheme="blue"
                                             fontSize="xs"
                                             _hover={{ bg: "blue.600", color: "white" }}
                                           >
                                             {control.code}
                                           </Badge>
-                                          <Text 
-                                            fontSize="sm" 
+                                          <Text
+                                            fontSize="sm"
                                             fontWeight="medium"
                                             _hover={{ textDecoration: "underline" }}
                                           >
@@ -1392,7 +1448,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                                 No controls found matching "{controlSearchTerm}"
                               </Text>
                             )}
-                            
+
                             {/* Suggested Controls Section */}
                             {!controlSearchTerm.trim() && suggestedControls.length > 0 && (
                               <Box>
@@ -1426,8 +1482,8 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                                           _hover={{ bg: "blue.50", borderColor: "blue.400" }}
                                         >
                                           <HStack spacing={2} justify="space-between">
-                                            <HStack 
-                                              spacing={2} 
+                                            <HStack
+                                              spacing={2}
                                               flex={1}
                                               cursor="pointer"
                                               onClick={async () => {
@@ -1447,15 +1503,15 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                                                 }
                                               }}
                                             >
-                                              <Badge 
-                                                colorScheme="blue" 
+                                              <Badge
+                                                colorScheme="blue"
                                                 fontSize="xs"
                                                 _hover={{ bg: "blue.600", color: "white" }}
                                               >
                                                 {control.code}
                                               </Badge>
-                                              <Text 
-                                                fontSize="sm" 
+                                              <Text
+                                                fontSize="sm"
                                                 fontWeight="medium"
                                                 _hover={{ textDecoration: "underline" }}
                                               >

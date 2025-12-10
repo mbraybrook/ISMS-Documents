@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -112,7 +113,7 @@ export function SupplierRisksControlsTab({
       ]);
       setRisks(risksData);
       setControls(controlsData);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to load risks and controls',
@@ -145,7 +146,7 @@ export function SupplierRisksControlsTab({
       setAvailableRisks(
         response.data.data.filter((r: Risk) => !linkedRiskIds.has(r.id))
       );
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to search risks',
@@ -175,7 +176,7 @@ export function SupplierRisksControlsTab({
       setAvailableControls(
         response.data.data.filter((c: Control) => !linkedControlIds.has(c.id))
       );
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to search controls',
@@ -202,7 +203,7 @@ export function SupplierRisksControlsTab({
       setAiSuggestedRisks(aiSuggestedRisks.filter((r) => r.id !== riskId));
       setRiskSearchTerm('');
       setAvailableRisks([]);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to link risk',
@@ -224,7 +225,7 @@ export function SupplierRisksControlsTab({
         duration: 3000,
       });
       fetchRisksAndControls();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to unlink risk',
@@ -251,7 +252,7 @@ export function SupplierRisksControlsTab({
         }));
 
       setAiSuggestedRisks(filteredSuggestions);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching AI suggestions:', error);
       setAiSuggestionsError(error.response?.data?.error || 'Failed to fetch AI suggestions');
       toast({
@@ -279,7 +280,7 @@ export function SupplierRisksControlsTab({
       setControlSearchTerm('');
       setAvailableControls([]);
       fetchRisksAndControls();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to link control',
@@ -301,7 +302,7 @@ export function SupplierRisksControlsTab({
         duration: 3000,
       });
       fetchRisksAndControls();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to unlink control',

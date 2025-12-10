@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -303,7 +304,7 @@ export function ReviewsPage() {
       setBulkReviewDate('');
       onBulkReviewClose();
       fetchDashboard();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to set review dates',

@@ -1,5 +1,4 @@
 {
-  "_comment": "Backend ESLint Configuration - See LINTING_STANDARDS.md for examples and .cursorrules for AI tool guidance",
   "parser": "@typescript-eslint/parser",
   "extends": [
     "eslint:recommended",
@@ -14,11 +13,8 @@
     "es2022": true
   },
   "rules": {
-    "_comment_no_explicit_any": "Discourage use of 'any' type. Use proper types from types/ directory, 'unknown', or type assertions. Set to 'warn' for gradual migration.",
     "@typescript-eslint/no-explicit-any": "warn",
-    "_comment_explicit_return_type": "Explicit return types not required - TypeScript can infer return types. Set to 'off' for flexibility.",
     "@typescript-eslint/explicit-function-return-type": "off",
-    "_comment_no_unused_vars": "Error on unused variables/parameters. Prefix unused with '_' to ignore (e.g., _unusedParam).",
     "@typescript-eslint/no-unused-vars": [
       "error",
       {
@@ -28,4 +24,3 @@
     ]
   }
 }
-

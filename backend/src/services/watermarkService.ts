@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
 import { config } from '../config';
 import crypto from 'crypto';

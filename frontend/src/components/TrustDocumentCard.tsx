@@ -52,7 +52,7 @@ function TrustDocumentCard({ document, onDownload }: TrustDocumentCardProps) {
       if (onDownload) {
         onDownload();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Download error:', error);
       toast({
         title: 'Download failed',

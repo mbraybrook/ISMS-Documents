@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Response, NextFunction } from 'express';
 import { requireRole, requireDepartmentAccess } from '../authorize';
 import { AuthRequest } from '../auth';

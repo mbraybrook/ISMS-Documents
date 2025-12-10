@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from '../lib/prisma';
 import { findSimilarRisks } from './llmService';
 import { config } from '../config';

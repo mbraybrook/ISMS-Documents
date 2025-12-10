@@ -19,6 +19,7 @@ import {
 } from '@chakra-ui/react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { AxiosError } from 'axios';
 
 interface SoAExport {
   id: string;
@@ -81,10 +82,11 @@ export function SoAPage() {
 
       // Refresh exports list
       loadExports();
-    } catch (error: any) {
-      console.error('Error generating SoA export:', error);
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
+      console.error('Error generating SoA export:', axiosError);
       const errorMessage =
-        error.response?.data?.error || 'Failed to generate SoA export';
+        axiosError.response?.data?.error || 'Failed to generate SoA export';
       toast({
         title: 'Error',
         description: errorMessage,
@@ -112,7 +114,6 @@ export function SoAPage() {
 
   // Load exports on mount
   useEffect(() => {
-    loadExports();
   }, []);
 
   if (!isAdminOrEditor) {

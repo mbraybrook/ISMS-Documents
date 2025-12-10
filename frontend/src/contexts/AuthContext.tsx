@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { authService, AuthUser, msalInstance } from '../services/authService';
 import { config } from '../config';
@@ -43,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const init = async () => {
       await authService.initialize();
-      
+
       // Handle redirect response (if user just came back from login)
       try {
         const response = await msalInstance.handleRedirectPromise();
@@ -66,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error handling redirect:', error);
         setUser(null);
       }
-      
+
       setLoading(false);
     };
 

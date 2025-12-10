@@ -175,7 +175,7 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
       if (onSuccess) {
         onSuccess();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating risk:', error);
       toast({
         title: 'Error',

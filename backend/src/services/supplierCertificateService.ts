@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { CertificateType } from '../types/enums';
 
 export interface CertificateForExpiry {

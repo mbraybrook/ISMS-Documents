@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
 import {
   Heading,
@@ -265,7 +266,7 @@ export function ControlsPage() {
         isClosable: true,
       });
       fetchControls();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to delete control',

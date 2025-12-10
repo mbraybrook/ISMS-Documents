@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { generateSoAData, generateSoAExcel } from '../soaService';
 import { prisma } from '../../lib/prisma';
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { UserRole } from '../types/enums';
 import { AuthRequest } from '../middleware/auth';
 

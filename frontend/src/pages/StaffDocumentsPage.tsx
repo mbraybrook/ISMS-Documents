@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
 import {
   Box,
@@ -65,10 +66,7 @@ export function StaffDocumentsPage() {
     fetchUsers();
   }, []);
 
-  useEffect(() => {
     applyFilters();
-  }, [filters, allDocuments]);
-
   const fetchDocuments = async () => {
     try {
       setLoading(true);

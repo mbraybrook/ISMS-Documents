@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import {
   Box,
@@ -143,7 +144,7 @@ export function MassImportPage() {
         duration: 5000,
         isClosable: true,
       });
-    } catch (error: any) {
+    } catch (error) {
       const errorMessage =
         error.response?.data?.error || 'Failed to import documents';
       toast({

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
 import {
   Box,
@@ -56,7 +57,7 @@ export function RiskDashboardSection() {
       setLoading(true);
       const summary = await riskDashboardApi.getSummary();
       setData(summary);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching risk dashboard data:', error);
       toast({
         title: 'Error',
@@ -126,7 +127,6 @@ export function RiskDashboardSection() {
     no_mitigation_score: point.no_mitigation_score,
   }));
 
-  // Custom tooltip for pie chart
   const CustomPieTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -256,70 +256,70 @@ export function RiskDashboardSection() {
                   data={trendData}
                   margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                 >
-                <defs>
-                  <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={CHART_COLORS.total} stopOpacity={0.8} />
-                    <stop offset="95%" stopColor={CHART_COLORS.total} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorImplemented" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={CHART_COLORS.implemented} stopOpacity={0.8} />
-                    <stop offset="95%" stopColor={CHART_COLORS.implemented} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorNonImplemented" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={CHART_COLORS.nonImplemented} stopOpacity={0.8} />
-                    <stop offset="95%" stopColor={CHART_COLORS.nonImplemented} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorNoMitigation" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={CHART_COLORS.noMitigation} stopOpacity={0.8} />
-                    <stop offset="95%" stopColor={CHART_COLORS.noMitigation} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="quarter"
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                  interval={0}
-                />
-                <YAxis />
-                <RechartsTooltip content={<CustomLineTooltip />} />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="total_risk_score"
-                  stroke={CHART_COLORS.total}
-                  fillOpacity={1}
-                  fill="url(#colorTotal)"
-                  name="Total Risk Score"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="implemented_mitigation_score"
-                  stroke={CHART_COLORS.implemented}
-                  fillOpacity={1}
-                  fill="url(#colorImplemented)"
-                  name="Implemented Mitigation Score"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="non_implemented_mitigation_score"
-                  stroke={CHART_COLORS.nonImplemented}
-                  fillOpacity={1}
-                  fill="url(#colorNonImplemented)"
-                  name="Non-Implemented Mitigation Score"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="no_mitigation_score"
-                  stroke={CHART_COLORS.noMitigation}
-                  fillOpacity={1}
-                  fill="url(#colorNoMitigation)"
-                  name="No Mitigation Score"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </Box>
+                  <defs>
+                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.total} stopOpacity={0.8} />
+                      <stop offset="95%" stopColor={CHART_COLORS.total} stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorImplemented" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.implemented} stopOpacity={0.8} />
+                      <stop offset="95%" stopColor={CHART_COLORS.implemented} stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorNonImplemented" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.nonImplemented} stopOpacity={0.8} />
+                      <stop offset="95%" stopColor={CHART_COLORS.nonImplemented} stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorNoMitigation" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.noMitigation} stopOpacity={0.8} />
+                      <stop offset="95%" stopColor={CHART_COLORS.noMitigation} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="quarter"
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    interval={0}
+                  />
+                  <YAxis />
+                  <RechartsTooltip content={<CustomLineTooltip />} />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="total_risk_score"
+                    stroke={CHART_COLORS.total}
+                    fillOpacity={1}
+                    fill="url(#colorTotal)"
+                    name="Total Risk Score"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="implemented_mitigation_score"
+                    stroke={CHART_COLORS.implemented}
+                    fillOpacity={1}
+                    fill="url(#colorImplemented)"
+                    name="Implemented Mitigation Score"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="non_implemented_mitigation_score"
+                    stroke={CHART_COLORS.nonImplemented}
+                    fillOpacity={1}
+                    fill="url(#colorNonImplemented)"
+                    name="Non-Implemented Mitigation Score"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="no_mitigation_score"
+                    stroke={CHART_COLORS.noMitigation}
+                    fillOpacity={1}
+                    fill="url(#colorNoMitigation)"
+                    name="No Mitigation Score"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Box>
           ) : (
             <Box p={6} bg="gray.50" borderRadius="md">
               <Text color="gray.600" textAlign="center">

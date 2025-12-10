@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Router, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';

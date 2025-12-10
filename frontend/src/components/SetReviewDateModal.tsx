@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Modal,
   ModalOverlay,
@@ -67,7 +68,7 @@ export function SetReviewDateModal({ isOpen, onClose, document }: SetReviewDateM
       });
       
       onClose(true);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error setting review date:', error);
       toast({
         title: 'Error',

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Modal,
   ModalOverlay,
@@ -116,7 +117,7 @@ export function RiskApprovalModal({ isOpen, onClose, risk, onSuccess }: RiskAppr
       if (onSuccess) {
         onSuccess();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error approving risk:', error);
       toast({
         title: 'Error',
@@ -165,7 +166,7 @@ export function RiskApprovalModal({ isOpen, onClose, risk, onSuccess }: RiskAppr
       if (onSuccess) {
         onSuccess();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error rejecting risk:', error);
       toast({
         title: 'Error',

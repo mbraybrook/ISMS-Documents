@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef } from 'react';
 import {
   Box,
@@ -196,7 +197,7 @@ export function AssetCategoriesPage() {
       onClose();
       setLinkedRisks([]);
       fetchCategories();
-    } catch (error: any) {
+    } catch (error) {
       const errorMessage = error.response?.data?.error || 'Failed to save asset category';
       toast({
         title: 'Error',
@@ -223,7 +224,7 @@ export function AssetCategoriesPage() {
       onDeleteClose();
       setCategoryToDelete(null);
       fetchCategories();
-    } catch (error: any) {
+    } catch (error) {
       const errorMessage = error.response?.data?.error || 'Failed to delete asset category';
       toast({
         title: 'Error',

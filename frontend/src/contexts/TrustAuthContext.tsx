@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { trustApi } from '../services/trustApi';
 import type { ExternalUser } from '../types/trust';

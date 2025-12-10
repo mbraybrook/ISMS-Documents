@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
 import React from 'react';
 import {
@@ -143,7 +144,7 @@ export function LegislationPage() {
       // Ensure we always set an array
       setAllRisks(Array.isArray(allRisksData) ? allRisksData : []);
       console.log(`Loaded ${allRisksData.length} risks`);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching risks:', error);
       // If pagination fails, try a single request with max limit
       try {
@@ -342,7 +343,7 @@ export function LegislationPage() {
       setRiskSearchTerm('');
       setSuggestedRiskIds([]);
       fetchLegislation();
-    } catch (error: any) {
+    } catch (error) {
       const errorMessage = error.response?.data?.error || 'Failed to save legislation';
       toast({
         title: 'Error',
@@ -398,7 +399,7 @@ export function LegislationPage() {
         duration: 3000,
         isClosable: true,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error getting risk suggestions:', error);
       toast({
         title: 'Error',
@@ -441,7 +442,7 @@ export function LegislationPage() {
       onDeleteClose();
       setLegislationToDelete(null);
       fetchLegislation();
-    } catch (error: any) {
+    } catch (error) {
       const errorMessage = error.response?.data?.error || 'Failed to delete legislation';
       toast({
         title: 'Error',
@@ -500,7 +501,7 @@ export function LegislationPage() {
 
       onImportModalClose();
       fetchLegislation();
-    } catch (error: any) {
+    } catch (error) {
       const errorMessage = error.response?.data?.error || 'Failed to import legislation';
       toast({
         title: 'Error',

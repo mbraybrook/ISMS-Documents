@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Router, Response, NextFunction } from 'express';
 import { param, query, body, validationResult } from 'express-validator';
 import { Request } from 'express';

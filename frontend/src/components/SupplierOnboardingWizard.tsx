@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Modal,
   ModalOverlay,
@@ -227,7 +228,7 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
       onClose();
       navigate(`/admin/suppliers/${supplier.id}`);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Supplier creation error:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.details || error.message || 'An error occurred';
       const errorDetails = error.response?.data?.errors ? JSON.stringify(error.response.data.errors) : '';

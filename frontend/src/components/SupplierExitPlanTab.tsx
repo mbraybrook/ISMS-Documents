@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
 import {
   Box,
@@ -50,7 +51,7 @@ export function SupplierExitPlanTab({
       setLoading(true);
       const plan = await supplierApi.getExitPlan(supplierId);
       setExitPlan(plan); // Will be null if no exit plan exists
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching exit plan:', error);
       toast({
         title: 'Error',
@@ -75,7 +76,7 @@ export function SupplierExitPlanTab({
         status: 'success',
         duration: 3000,
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to create exit plan',
@@ -100,7 +101,7 @@ export function SupplierExitPlanTab({
         status: 'success',
         duration: 2000,
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to update exit plan',

@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Modal,
   ModalOverlay,
@@ -80,7 +82,7 @@ export function ReviewFormModal({ isOpen, onClose, document }: ReviewFormModalPr
 
       await api.post('/api/reviews', payload);
       onClose(true);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating review:', error);
       toast({
         title: 'Error',

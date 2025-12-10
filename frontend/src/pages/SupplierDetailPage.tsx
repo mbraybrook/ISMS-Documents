@@ -42,6 +42,7 @@ import { supplierApi } from '../services/api';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Supplier, SupplierContact } from '../types/supplier';
+import { AxiosError } from 'axios';
 import {
   getLifecycleStateDisplayName,
 } from '../types/supplier';
@@ -128,7 +129,7 @@ export function SupplierDetailPage() {
     if (!isNew) {
       fetchSupplier();
     }
-  }, [id, canEdit]);
+  }, [id, canEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update isEditing when mode query param changes
   useEffect(() => {
@@ -157,8 +158,8 @@ export function SupplierDetailPage() {
       setFormData({
         name: data.name || '',
         tradingName: data.tradingName || '',
-        status: data.status as any,
-        supplierType: data.supplierType as any,
+        status: data.status,
+        supplierType: data.supplierType,
         serviceSubType: data.serviceSubType,
         serviceDescription: data.serviceDescription || '',
         processesCardholderData: data.processesCardholderData,
@@ -193,10 +194,11 @@ export function SupplierDetailPage() {
         trustCenterCategory: data.trustCenterCategory || null,
         trustCenterComplianceSummary: data.trustCenterComplianceSummary || '',
       });
-    } catch (error: any) {
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to fetch supplier',
+        description: axiosError.response?.data?.error || 'Failed to fetch supplier',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -221,7 +223,7 @@ export function SupplierDetailPage() {
 
     try {
       setSaving(true);
-      const dataToSave: any = {
+      const dataToSave: Partial<Supplier> = {
         ...formData,
         hostingRegions: formData.hostingRegions.filter(r => r.trim()),
         complianceEvidenceLinks: formData.complianceEvidenceLinks.filter(l => l.trim()),
@@ -260,10 +262,11 @@ export function SupplierDetailPage() {
         setSearchParams({ mode: 'view' });
         fetchSupplier();
       }
-    } catch (error: any) {
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to save supplier',
+        description: axiosError.response?.data?.error || 'Failed to save supplier',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -327,7 +330,7 @@ export function SupplierDetailPage() {
     setFormData({ ...formData, contractReferences: newRefs });
   };
 
-  const handleContractFileSelect = (item: any) => {
+  const handleContractFileSelect = (item: { webUrl: string }) => {
     if (editingContractIndex !== null) {
       updateContractReference(editingContractIndex, item.webUrl);
     } else {
@@ -491,7 +494,7 @@ export function SupplierDetailPage() {
                     <FormLabel>Status</FormLabel>
                     <Select
                       value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as Supplier['status'] })}
                       isDisabled={!isEditing}
                     >
                       <option value="ACTIVE">Active</option>
@@ -523,7 +526,7 @@ export function SupplierDetailPage() {
                     <FormLabel>Supplier Type</FormLabel>
                     <Select
                       value={formData.supplierType}
-                      onChange={(e) => setFormData({ ...formData, supplierType: e.target.value as any })}
+                      onChange={(e) => setFormData({ ...formData, supplierType: e.target.value as Supplier['supplierType'] })}
                       isDisabled={!isEditing}
                     >
                       <option value="SERVICE_PROVIDER">Service Provider</option>

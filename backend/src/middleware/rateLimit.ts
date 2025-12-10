@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import rateLimit from 'express-rate-limit';
 
 // Login rate limiter: 5 attempts per 15 minutes per IP

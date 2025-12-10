@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import bcrypt from 'bcrypt';

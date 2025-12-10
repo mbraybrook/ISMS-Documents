@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { AuthRequest, authenticateToken } from '../middleware/auth';

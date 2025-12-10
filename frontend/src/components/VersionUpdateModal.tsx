@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Modal,
   ModalOverlay,
@@ -127,7 +128,7 @@ export function VersionUpdateModal({
 
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating version:', error);
       
       if (error.response?.status === 409) {

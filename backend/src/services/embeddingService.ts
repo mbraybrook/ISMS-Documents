@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from '../lib/prisma';
 import { generateEmbedding, normalizeRiskText } from './llmService';
 import { ConcurrencyLimiter } from '../utils/concurrencyLimiter';

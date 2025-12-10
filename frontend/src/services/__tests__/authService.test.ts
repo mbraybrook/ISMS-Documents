@@ -40,6 +40,13 @@ vi.mock('@azure/msal-browser', () => {
       LocalStorage: 'localStorage',
       SessionStorage: 'sessionStorage',
     },
+    LogLevel: {
+      Error: 0,
+      Warning: 1,
+      Info: 2,
+      Verbose: 3,
+      Trace: 4,
+    },
   };
 });
 

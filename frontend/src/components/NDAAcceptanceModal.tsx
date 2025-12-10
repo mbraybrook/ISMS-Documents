@@ -33,7 +33,7 @@ export function NDAAcceptanceModal({ isOpen, onClose }: NDAAcceptanceModalProps)
         isClosable: true,
       });
       onClose();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Failed to accept terms',
         description: error.response?.data?.error || 'An error occurred',
