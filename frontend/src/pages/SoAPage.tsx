@@ -35,7 +35,7 @@ export function SoAPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [exports, setExports] = useState<SoAExport[]>([]);
-  const [loadingExports, setLoadingExports] = useState(false);
+  const [, setLoadingExports] = useState(false);
   const toast = useToast();
 
   const isAdminOrEditor = user?.role === 'ADMIN' || user?.role === 'EDITOR';

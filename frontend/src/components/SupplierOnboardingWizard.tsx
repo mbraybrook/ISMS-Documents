@@ -17,7 +17,6 @@ import {
   Progress,
   HStack,
   Text,
-  Badge,
   Alert,
   AlertIcon,
   useToast,
@@ -46,7 +45,7 @@ interface SupplierOnboardingWizardProps {
 export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboardingWizardProps) {
   const navigate = useNavigate();
   const toast = useToast();
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -159,87 +158,80 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
   const handleSubmit = async () => {
     try {
       setLoading(true);
-      let supplierId: string | null = null;
+      const { isSaaS, ...supplierData } = step1Data;
+      const supplier = await supplierApi.createSupplier({
+        ...supplierData,
+        serviceSubType: isSaaS ? 'SAAS' : null, // Convert checkbox to enum value
+        status: 'IN_ONBOARDING',
+        lifecycleState: 'DRAFT',
+      });
 
-      try {
-        // Create supplier - convert isSaaS to serviceSubType for backend compatibility
-        const { isSaaS, ...supplierData } = step1Data;
-        const supplier = await supplierApi.createSupplier({
-          ...supplierData,
-          serviceSubType: isSaaS ? 'SAAS' : null, // Convert checkbox to enum value
-          status: 'IN_ONBOARDING',
-          lifecycleState: 'DRAFT',
-        });
-        supplierId = supplier.id;
 
-        // Update supplier with risk & criticality snapshot data first
-        const snapshotUpdate: any = {};
-        if (step2Data.riskRating) snapshotUpdate.overallRiskRating = step2Data.riskRating;
-        if (step2Data.rationale) snapshotUpdate.riskRationale = step2Data.rationale;
-        if (step3Data.criticality) snapshotUpdate.criticality = step3Data.criticality;
-        if (step3Data.rationale) snapshotUpdate.criticalityRationale = step3Data.rationale;
-        
-        if (Object.keys(snapshotUpdate).length > 0) {
-          await supplierApi.updateSupplier(supplier.id, snapshotUpdate);
-        }
+      // Update supplier with risk & criticality snapshot data first
+      const snapshotUpdate: any = {};
+      if (step2Data.riskRating) snapshotUpdate.overallRiskRating = step2Data.riskRating;
+      if (step2Data.rationale) snapshotUpdate.riskRationale = step2Data.rationale;
+      if (step3Data.criticality) snapshotUpdate.criticality = step3Data.criticality;
+      if (step3Data.rationale) snapshotUpdate.criticalityRationale = step3Data.rationale;
 
-        // Create risk assessment (non-blocking - continue even if it fails)
-        if (step2Data.riskRating) {
-          try {
-            await (supplierApi as any).createRiskAssessment(supplier.id, {
-              supplierType: step1Data.supplierType,
-              riskRating: step2Data.riskRating,
-              rationale: step2Data.rationale || null,
-              status: 'DRAFT',
-            });
-          } catch (assessmentError: any) {
-            console.warn('Failed to create risk assessment (non-critical):', assessmentError);
-            // Continue - assessment creation is not critical for supplier creation
-          }
-        }
-
-        // Create criticality assessment (non-blocking - continue even if it fails)
-        if (step3Data.criticality) {
-          try {
-            await (supplierApi as any).createCriticalityAssessment(supplier.id, {
-              criticality: step3Data.criticality,
-              rationale: step3Data.rationale || null,
-              status: 'DRAFT',
-            });
-          } catch (assessmentError: any) {
-            console.warn('Failed to create criticality assessment (non-critical):', assessmentError);
-            // Continue - assessment creation is not critical for supplier creation
-          }
-        }
-
-        // Update supplier with compliance data (non-blocking)
-        try {
-          await supplierApi.updateSupplier(supplier.id, {
-            ...step4Data,
-            complianceEvidenceLinks: step4Data.complianceEvidenceLinks.length > 0 ? step4Data.complianceEvidenceLinks : null,
-          });
-        } catch (complianceError: any) {
-          console.warn('Failed to update compliance data (non-critical):', complianceError);
-          // Continue - compliance update is not critical for supplier creation
-        }
-
-        toast({
-          title: 'Supplier created successfully',
-          status: 'success',
-          duration: 3000,
-        });
-
-        onClose();
-        navigate(`/admin/suppliers/${supplier.id}`);
-      } catch (supplierError: any) {
-        // If supplier creation failed, throw to be caught by outer catch
-        throw supplierError;
+      if (Object.keys(snapshotUpdate).length > 0) {
+        await supplierApi.updateSupplier(supplier.id, snapshotUpdate);
       }
+
+      // Create risk assessment (non-blocking - continue even if it fails)
+      if (step2Data.riskRating) {
+        try {
+          await (supplierApi as any).createRiskAssessment(supplier.id, {
+            supplierType: step1Data.supplierType,
+            riskRating: step2Data.riskRating,
+            rationale: step2Data.rationale || null,
+            status: 'DRAFT',
+          });
+        } catch (assessmentError: any) {
+          console.warn('Failed to create risk assessment (non-critical):', assessmentError);
+          // Continue - assessment creation is not critical for supplier creation
+        }
+      }
+
+      // Create criticality assessment (non-blocking - continue even if it fails)
+      if (step3Data.criticality) {
+        try {
+          await (supplierApi as any).createCriticalityAssessment(supplier.id, {
+            criticality: step3Data.criticality,
+            rationale: step3Data.rationale || null,
+            status: 'DRAFT',
+          });
+        } catch (assessmentError: any) {
+          console.warn('Failed to create criticality assessment (non-critical):', assessmentError);
+          // Continue - assessment creation is not critical for supplier creation
+        }
+      }
+
+      // Update supplier with compliance data (non-blocking)
+      try {
+        await supplierApi.updateSupplier(supplier.id, {
+          ...step4Data,
+          complianceEvidenceLinks: step4Data.complianceEvidenceLinks.length > 0 ? step4Data.complianceEvidenceLinks : null,
+        });
+      } catch (complianceError: any) {
+        console.warn('Failed to update compliance data (non-critical):', complianceError);
+        // Continue - compliance update is not critical for supplier creation
+      }
+
+      toast({
+        title: 'Supplier created successfully',
+        status: 'success',
+        duration: 3000,
+      });
+
+      onClose();
+      navigate(`/admin/suppliers/${supplier.id}`);
+
     } catch (error: any) {
       console.error('Supplier creation error:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.details || error.message || 'An error occurred';
       const errorDetails = error.response?.data?.errors ? JSON.stringify(error.response.data.errors) : '';
-      
+
       toast({
         title: 'Failed to create supplier',
         description: errorDetails ? `${errorMessage}\n${errorDetails}` : errorMessage,
@@ -252,7 +244,7 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
     }
   };
 
-  const addEvidenceLink = (step: 'step4') => {
+  const addEvidenceLink = (_step: 'step4') => {
     if (newEvidenceLink.trim()) {
       setStep4Data({
         ...step4Data,
@@ -262,7 +254,7 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
     }
   };
 
-  const removeEvidenceLink = (index: number, step: 'step4') => {
+  const removeEvidenceLink = (index: number, _step: 'step4') => {
     setStep4Data({
       ...step4Data,
       complianceEvidenceLinks: step4Data.complianceEvidenceLinks.filter((_, i) => i !== index),

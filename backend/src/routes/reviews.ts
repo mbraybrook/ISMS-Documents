@@ -187,7 +187,7 @@ router.post(
       const now = new Date();
       const status = dueDateObj < now ? 'OVERDUE' : 'PENDING';
 
-      let includeData: any = {
+      const includeData: any = {
         reviewer: {
           select: {
             id: true,

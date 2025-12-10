@@ -27,8 +27,9 @@ import {
   Select,
   Input,
 } from '@chakra-ui/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
+import { AxiosError } from 'axios';
 import { Department, getDepartmentDisplayName } from '../types/risk';
 
 type UserRole = 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR';
@@ -55,14 +56,10 @@ export function UsersPage() {
   const [editRole, setEditRole] = useState<UserRole>('STAFF');
   const [editDepartment, setEditDepartment] = useState<Department | null>(null);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [roleFilter]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const params: any = {};
+      const params: Record<string, string> = {};
       if (roleFilter) {
         params.role = roleFilter;
       }
@@ -80,7 +77,11 @@ export function UsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [roleFilter, toast]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleEdit = (user: User) => {
     setSelectedUser(user);
@@ -93,7 +94,7 @@ export function UsersPage() {
     if (!selectedUser) return;
 
     try {
-      const updateData: any = {};
+      const updateData: Partial<Pick<User, 'role' | 'department'>> = {};
       if (editRole !== selectedUser.role) {
         updateData.role = editRole;
       }
@@ -107,7 +108,7 @@ export function UsersPage() {
       }
 
       await api.put(`/api/users/${selectedUser.id}`, updateData);
-      
+
       toast({
         title: 'Success',
         description: 'User updated successfully',
@@ -120,11 +121,12 @@ export function UsersPage() {
       await fetchUsers();
       onClose();
       setSelectedUser(null);
-    } catch (error: any) {
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
       console.error('Error updating user:', error);
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to update user',
+        description: axiosError.response?.data?.error || 'Failed to update user',
         status: 'error',
         duration: 3000,
         isClosable: true,

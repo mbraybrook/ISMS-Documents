@@ -40,39 +40,41 @@ import {
   Spinner,
   Tooltip,
 } from '@chakra-ui/react';
-import { useRef } from 'react';
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import { supplierApi } from '../services/api';
+import { useRef, useCallback, useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import api, { supplierApi } from '../services/api';
 import { DeleteIcon, AddIcon, SearchIcon } from '@chakra-ui/icons';
+import { Control } from '../types/control';
+import { Supplier } from '../types/supplier';
+import { AxiosError } from 'axios';
 
 interface ControlFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  control: any;
+  control: Control | null;
 }
 
 export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalProps) {
   const toast = useToast();
-  const navigate = useNavigate();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
   const { isOpen: isSupplierModalOpen, onOpen: onSupplierModalOpen, onClose: onSupplierModalClose } = useDisclosure();
-  const cancelRef = useRef(null);
-  const [linkedSuppliers, setLinkedSuppliers] = useState<any[]>([]);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  const [linkedSuppliers, setLinkedSuppliers] = useState<Supplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
-  const [availableSuppliers, setAvailableSuppliers] = useState<any[]>([]);
+  const [availableSuppliers, setAvailableSuppliers] = useState<Supplier[]>([]);
   const [searchingSuppliers, setSearchingSuppliers] = useState(false);
   const [linkingSupplier, setLinkingSupplier] = useState(false);
-  
+
   // Document linking state
   const [linkedDocuments, setLinkedDocuments] = useState<Array<{ id: string; title: string; version: string; type: string; status: string }>>([]);
   const [documentSearchTerm, setDocumentSearchTerm] = useState('');
   const [availableDocuments, setAvailableDocuments] = useState<Array<{ id: string; title: string; version: string; type: string; status: string }>>([]);
   const [searchingDocuments, setSearchingDocuments] = useState(false);
-  const [linkingDocument, setLinkingDocument] = useState(false);
+  const [_linkingDocument, setLinkingDocument] = useState(false);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
+
   const [formData, setFormData] = useState({
     code: '',
     title: '',
@@ -88,8 +90,43 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
   const isStandardControl = control?.isStandardControl || false;
 
+  // Define fetch functions first so they can be dependencies for useEffect
+  const fetchLinkedSuppliers = useCallback(async () => {
+    if (!control?.id) return;
+    try {
+      setLoadingSuppliers(true);
+      const suppliers = await api.get(`/api/controls/${control.id}/suppliers`);
+      setLinkedSuppliers(suppliers.data);
+    } catch (error) {
+      console.error('Error fetching linked suppliers:', error);
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  }, [control?.id]);
+
+  const fetchLinkedDocuments = useCallback(async () => {
+    if (!control?.id) return;
+    try {
+      setLoadingDocuments(true);
+      const response = await api.get(`/api/controls/${control.id}/documents`);
+      setLinkedDocuments(response.data);
+    } catch (error) {
+      console.error('Error fetching linked documents:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load linked documents',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLoadingDocuments(false);
+    }
+  }, [control?.id, toast]);
+
+  // UseEffect depends on fetch functions
   useEffect(() => {
     if (control) {
       setFormData({
@@ -120,22 +157,10 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
         implemented: false,
       });
       setLinkedSuppliers([]);
+      setLinkedDocuments([]);
     }
     setErrors({});
-  }, [control]);
-
-  const fetchLinkedSuppliers = async () => {
-    if (!control?.id) return;
-    try {
-      setLoadingSuppliers(true);
-      const suppliers = await api.get(`/api/controls/${control.id}/suppliers`);
-      setLinkedSuppliers(suppliers.data);
-    } catch (error: any) {
-      console.error('Error fetching linked suppliers:', error);
-    } finally {
-      setLoadingSuppliers(false);
-    }
-  };
+  }, [control, fetchLinkedDocuments, fetchLinkedSuppliers]);
 
   const searchSuppliers = async () => {
     if (!supplierSearchTerm.trim()) {
@@ -148,8 +173,8 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       const response = await supplierApi.getSuppliers({ search: supplierSearchTerm });
       // Filter out suppliers already linked
       const linkedSupplierIds = new Set(linkedSuppliers.map((s) => s.id));
-      setAvailableSuppliers(response.filter((s: any) => !linkedSupplierIds.has(s.id)));
-    } catch (error: any) {
+      setAvailableSuppliers(response.filter((s: Supplier) => !linkedSupplierIds.has(s.id)));
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to search suppliers',
@@ -176,10 +201,11 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       setSupplierSearchTerm('');
       setAvailableSuppliers([]);
       fetchLinkedSuppliers();
-    } catch (error: any) {
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to link supplier',
+        description: axiosError.response?.data?.error || 'Failed to link supplier',
         status: 'error',
         duration: 3000,
       });
@@ -199,32 +225,13 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
         duration: 3000,
       });
       fetchLinkedSuppliers();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to unlink supplier',
         status: 'error',
         duration: 3000,
       });
-    }
-  };
-
-  const fetchLinkedDocuments = async () => {
-    if (!control?.id) return;
-    try {
-      setLoadingDocuments(true);
-      const response = await api.get(`/api/controls/${control.id}/documents`);
-      setLinkedDocuments(response.data);
-    } catch (error: any) {
-      console.error('Error fetching linked documents:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load linked documents',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setLoadingDocuments(false);
     }
   };
 
@@ -246,12 +253,12 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       const searchLower = documentSearchTerm.toLowerCase();
       setAvailableDocuments(
         response.data.data.filter(
-          (d: any) =>
+          (d: { id: string; title: string }) =>
             !linkedDocumentIds.has(d.id) &&
             d.title.toLowerCase().includes(searchLower)
         )
       );
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to search documents',
@@ -277,10 +284,11 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       setDocumentSearchTerm('');
       setAvailableDocuments([]);
       fetchLinkedDocuments();
-    } catch (error: any) {
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to link document',
+        description: axiosError.response?.data?.error || 'Failed to link document',
         status: 'error',
         duration: 3000,
       });
@@ -300,7 +308,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
         duration: 3000,
       });
       fetchLinkedDocuments();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to unlink document',
@@ -312,7 +320,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
-    
+
     if (!isStandardControl) {
       if (!formData.code.trim()) {
         newErrors.code = 'Code is required';
@@ -331,7 +339,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -339,8 +347,8 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
     setLoading(true);
 
     try {
-      let payload: any;
-      
+      let payload: any; // Keeping payload flexible for create/update logic
+
       if (isStandardControl && control) {
         // For standard controls, only send allowed fields
         payload = {
@@ -362,7 +370,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
         await api.put(`/api/controls/${control.id}`, payload);
         toast({
           title: 'Control updated',
-          description: isStandardControl 
+          description: isStandardControl
             ? 'Control applicability updated successfully'
             : 'Control updated successfully',
           status: 'success',
@@ -381,10 +389,14 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       }
 
       onClose();
-    } catch (error: any) {
-      console.error('Error saving control:', error);
-      console.error('Error response:', error.response?.data);
-      const errorMessage = error.response?.data?.details || error.response?.data?.error || error.response?.data?.errors?.[0]?.msg || 'Failed to save control';
+    } catch (error) {
+      const axiosError = error as AxiosError<{ details?: string, error?: string, errors?: { msg: string }[] }>;
+      console.error('Error saving control:', axiosError);
+      console.error('Error response:', axiosError.response?.data);
+      const errorMessage = axiosError.response?.data?.details ||
+        axiosError.response?.data?.error ||
+        axiosError.response?.data?.errors?.[0]?.msg ||
+        'Failed to save control';
       toast({
         title: 'Error',
         description: errorMessage,
@@ -412,11 +424,12 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       });
       onDeleteClose();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
       console.error('Error deleting control:', error);
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to delete control',
+        description: axiosError.response?.data?.error || 'Failed to delete control',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -457,9 +470,9 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                           <FormLabel fontWeight="bold">Category</FormLabel>
                           <Badge colorScheme={
                             control.category === 'ORGANIZATIONAL' ? 'blue' :
-                            control.category === 'PEOPLE' ? 'purple' :
-                            control.category === 'PHYSICAL' ? 'orange' :
-                            'teal'
+                              control.category === 'PEOPLE' ? 'purple' :
+                                control.category === 'PHYSICAL' ? 'orange' :
+                                  'teal'
                           }>
                             {control.category}
                           </Badge>
@@ -521,16 +534,16 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                         Automatically set when control is linked to identified risks
                       </Box>
                     </FormControl>
-                    
+
                     {control.riskControls && control.riskControls.length > 0 && (
                       <Box mt={4} pt={3} borderTop="1px" borderColor="blue.300">
                         <FormLabel fontWeight="semibold" fontSize="sm" mb={2}>
-                          Linked Risks ({control.riskControls.length}):
+                          Linked Risks ({control.riskControls?.length || 0}):
                         </FormLabel>
                         <VStack align="stretch" spacing={2}>
-                          {control.riskControls.map((riskControl: any) => (
+                          {control.riskControls?.map((riskControl) => (
                             <Box
-                              key={riskControl.risk.id}
+                              key={riskControl.riskId}
                               p={2}
                               bg="white"
                               borderRadius="md"
@@ -542,7 +555,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                                 to={`/risks/risks`}
                                 onClick={() => {
                                   // Store risk ID to highlight it when risks page loads
-                                  sessionStorage.setItem('highlightRiskId', riskControl.risk.id);
+                                  sessionStorage.setItem('highlightRiskId', riskControl.riskId);
                                 }}
                                 style={{ textDecoration: 'none' }}
                               >
@@ -648,16 +661,16 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                         Automatically set when control is linked to identified risks
                       </Box>
                     </FormControl>
-                    
+
                     {control?.riskControls && control.riskControls.length > 0 && (
                       <Box mt={4} pt={3} borderTop="1px" borderColor="blue.300">
                         <FormLabel fontWeight="semibold" fontSize="sm" mb={2}>
-                          Linked Risks ({control.riskControls.length}):
+                          Linked Risks ({control.riskControls?.length || 0}):
                         </FormLabel>
                         <VStack align="stretch" spacing={2}>
-                          {control.riskControls.map((riskControl: any) => (
+                          {control.riskControls?.map((riskControl) => (
                             <Box
-                              key={riskControl.risk.id}
+                              key={riskControl.riskId}
                               p={2}
                               bg="white"
                               borderRadius="md"
@@ -669,7 +682,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                                 to={`/risks/risks`}
                                 onClick={() => {
                                   // Store risk ID to highlight it when risks page loads
-                                  sessionStorage.setItem('highlightRiskId', riskControl.risk.id);
+                                  sessionStorage.setItem('highlightRiskId', riskControl.riskId);
                                 }}
                                 style={{ textDecoration: 'none' }}
                               >
@@ -1087,4 +1100,3 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
     </Modal>
   );
 }
-

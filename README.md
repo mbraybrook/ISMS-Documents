@@ -551,6 +551,58 @@ Before deploying to production:
 └── docker-compose.prod.yml # Docker Compose for production
 ```
 
+## Code Quality & Linting
+
+### Linting Standards
+
+This project enforces strict code quality standards through ESLint. All code must pass linting checks before being committed.
+
+**Key Rules**:
+- **No `any` types**: Use proper TypeScript types or `unknown`
+- **No unused variables**: Prefix unused variables/parameters with `_`
+- **React Hooks**: All dependencies must be included in `useEffect`, `useCallback`, and `useMemo`
+- **Prefer `const`**: Use `const` instead of `let` when variables aren't reassigned
+- **Remove unused imports**: Keep imports clean
+
+### Running Linting
+
+```bash
+# Strict linting (0 warnings allowed) - for CI/CD
+npm run lint
+
+# Check with warnings allowed - for local development
+npm run lint:check
+
+# Auto-fix linting issues
+npm run lint:fix
+
+# Track warning count over time
+npm run lint:track
+npm run lint:report
+```
+
+### Pre-commit Hook
+
+A pre-commit hook automatically runs ESLint on staged files before each commit:
+- **Prevents introducing new warnings** - commits are blocked if staged files have warnings
+- Only checks files you're committing (not the entire codebase)
+- Works for both frontend and backend files
+
+To bypass (emergency only):
+```bash
+git commit --no-verify  # Not recommended!
+```
+
+### Documentation
+
+- **`.cursorrules`** - Configuration for AI coding tools (Cursor/Composer) to follow linting rules
+- **`LINTING_STANDARDS.md`** - Comprehensive guide with examples and best practices
+- **`LINTING.md`** - Linting strategy, tools, and warning tracking
+
+### For AI Tools
+
+If you're using AI coding assistants (like Cursor/Composer), they will automatically read `.cursorrules` to understand and follow our linting standards. This ensures generated code passes linting checks from the start.
+
 ## Available Scripts
 
 ### Root Level
@@ -559,7 +611,11 @@ Before deploying to production:
 - `npm run test` - Run tests for both backend and frontend
 - `npm run test:e2e` - Run E2E tests with Playwright
 - `npm run test:e2e:ui` - Run E2E tests with Playwright UI mode
-- `npm run lint` - Lint both backend and frontend
+- `npm run lint` - Lint both backend and frontend (strict - 0 warnings)
+- `npm run lint:check` - Lint with warnings allowed (for tracking)
+- `npm run lint:fix` - Auto-fix linting issues
+- `npm run lint:track` - Record current warning count
+- `npm run lint:report` - Show warning reduction progress
 
 ### Backend
 - `npm run dev --workspace=backend` - Start backend dev server

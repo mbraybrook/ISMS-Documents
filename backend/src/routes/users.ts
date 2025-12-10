@@ -3,7 +3,6 @@ import { query, param, body, validationResult } from 'express-validator';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
-import { Department, UserRole } from '../types/enums';
 
 const router = Router();
 

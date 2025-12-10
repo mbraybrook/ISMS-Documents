@@ -51,7 +51,7 @@ export async function getRiskDashboardSummary(): Promise<RiskDashboardSummary> {
   });
 
   // Calculate current snapshot from all risks (fallback if no quarterly data)
-  let currentSnapshot: LatestSnapshot = {
+  const currentSnapshot: LatestSnapshot = {
     total_risk_score: 0,
     implemented_mitigation_score: 0,
     non_implemented_mitigation_score: 0,

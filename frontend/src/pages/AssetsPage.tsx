@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Heading,
-  Tr,
-  Td,
   Button,
   HStack,
   VStack,
@@ -20,7 +18,6 @@ import {
   ModalCloseButton,
   FormControl,
   FormLabel,
-  FormErrorMessage,
   AlertDialog,
   AlertDialogBody,
   AlertDialogFooter,
@@ -28,16 +25,15 @@ import {
   AlertDialogContent,
   AlertDialogOverlay,
   useDisclosure as useAlertDisclosure,
-  Checkbox,
   Input,
   Select,
 } from '@chakra-ui/react';
-import { SearchIcon, EditIcon, DeleteIcon, AddIcon, DownloadIcon, ChevronUpIcon, ChevronDownIcon, InfoIcon, HamburgerIcon } from '@chakra-ui/icons';
+import { EditIcon, DeleteIcon, AddIcon, DownloadIcon, InfoIcon, HamburgerIcon } from '@chakra-ui/icons';
 import { Menu, MenuButton, MenuList, MenuItem } from '@chakra-ui/react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
-import { formatBoolean, generateCSV } from '../utils/tableUtils';
+import { generateCSV } from '../utils/tableUtils';
 
 interface Asset {
   id: string;
@@ -105,7 +101,7 @@ export function AssetsPage() {
   const [exporting, setExporting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
-  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+
   const initialFormDataRef = useRef<string>('');
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useAlertDisclosure();
@@ -146,7 +142,7 @@ export function AssetsPage() {
       if (response.data.pagination) {
         setPagination(response.data.pagination);
       }
-      
+
       // Extract unique owners for dropdown
       const uniqueOwners = Array.from(new Set(response.data.data.map((a: Asset) => a.owner).filter(Boolean))) as string[];
       setOwners(uniqueOwners.sort());
@@ -335,7 +331,7 @@ export function AssetsPage() {
         api.delete(`/api/assets/${assetId}`)
       );
       await Promise.all(deletePromises);
-      
+
       const deletedCount = selectedAssets.size;
       toast({
         title: 'Success',
@@ -361,7 +357,7 @@ export function AssetsPage() {
 
   const handleBulkExport = () => {
     const selectedAssetsList = assets.filter(a => selectedAssets.has(a.id));
-    
+
     const headers = [
       'Date',
       'Category',
@@ -478,7 +474,7 @@ export function AssetsPage() {
   const exportToCSV = async () => {
     try {
       setExporting(true);
-      
+
       // Fetch all assets for export (not just current page)
       const params = new URLSearchParams();
       if (filters.categoryId) params.append('categoryId', filters.categoryId);
@@ -566,14 +562,7 @@ export function AssetsPage() {
     setFilters({ ...filters, sortBy: field, sortOrder: newOrder, page: 1 });
   };
 
-  const getActiveFilterCount = () => {
-    let count = 0;
-    if (filters.categoryId) count++;
-    if (filters.classificationId) count++;
-    if (filters.owner) count++;
-    if (filters.search) count++;
-    return count;
-  };
+
 
   const clearAllFilters = () => {
     setFilters({
@@ -698,19 +687,19 @@ export function AssetsPage() {
 
   const actions: ActionButton<Asset>[] = canEdit
     ? [
-        {
-          icon: <EditIcon />,
-          label: 'Edit',
-          onClick: handleEdit,
-          colorScheme: 'blue',
-        },
-        {
-          icon: <DeleteIcon />,
-          label: 'Delete',
-          onClick: handleDelete,
-          colorScheme: 'red',
-        },
-      ]
+      {
+        icon: <EditIcon />,
+        label: 'Edit',
+        onClick: handleEdit,
+        colorScheme: 'blue',
+      },
+      {
+        icon: <DeleteIcon />,
+        label: 'Delete',
+        onClick: handleDelete,
+        colorScheme: 'red',
+      },
+    ]
     : [];
 
   const paginationConfig: PaginationConfig = {
@@ -824,9 +813,9 @@ export function AssetsPage() {
               </Button>
             </>
           )}
-          <Button 
-            leftIcon={<DownloadIcon />} 
-            variant="outline" 
+          <Button
+            leftIcon={<DownloadIcon />}
+            variant="outline"
             onClick={exportToCSV}
             isLoading={exporting}
             loadingText="Exporting..."

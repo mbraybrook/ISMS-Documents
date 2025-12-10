@@ -58,7 +58,7 @@ const LIKELIHOOD_OPTIONS = [
 
 export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalProps) {
   const toast = useToast();
-  const { user, getUserDepartment } = useAuth();
+  const { getUserDepartment } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [wizardData, setWizardData] = useState<WizardData>({
@@ -285,7 +285,7 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
           </VStack>
         );
 
-      case 4:
+      case 4: {
         const score = calculateRiskScore();
         const level = getRiskLevel(score);
         const levelColor = level === 'HIGH' ? 'red' : level === 'MEDIUM' ? 'orange' : 'green';
@@ -329,6 +329,7 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
             </Box>
           </VStack>
         );
+      }
 
       default:
         return null;

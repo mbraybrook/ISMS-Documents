@@ -362,7 +362,7 @@ router.get(
       // Store variables for later use
       const isPdf = false; // We'll determine this after cache check or download
       const needsWatermark = isPrivate && externalUser;
-      const watermarkUserEmail = needsWatermark ? externalUser.email : undefined;
+      // const watermarkUserEmail = needsWatermark ? externalUser.email : undefined;
 
       // Check cache FIRST (before downloading from SharePoint)
       // Always check for unwatermarked PDF - we'll apply watermark after retrieval if needed

@@ -1,6 +1,5 @@
 import { Router, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
-import multer from 'multer';
 import * as fs from 'fs';
 import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
@@ -33,12 +32,6 @@ router.get(
           },
         },
       });
-
-      // Add createdBy and updatedBy info if available (from User relation if added later)
-      const partiesWithAudit = interestedParties.map(party => ({
-        ...party,
-        // createdAt and updatedAt are already included from the model
-      }));
 
       res.json(interestedParties);
     } catch (error) {

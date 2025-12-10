@@ -3,7 +3,6 @@ import { body, param, query, validationResult } from 'express-validator';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
-import { updateControlApplicability } from '../services/riskService';
 import { computeAndStoreControlEmbedding } from '../services/embeddingService';
 
 const router = Router();

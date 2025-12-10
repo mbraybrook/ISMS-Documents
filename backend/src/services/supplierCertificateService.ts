@@ -1,4 +1,3 @@
-import { prisma } from '../lib/prisma';
 import { CertificateType } from '../types/enums';
 
 export interface CertificateForExpiry {
@@ -19,7 +18,7 @@ export interface CertificateForExpiry {
  * @returns Array of certificates expiring soon
  */
 export async function findCertificatesExpiringSoon(
-  daysBeforeExpiry: number = 30
+  _daysBeforeExpiry: number = 30
 ): Promise<CertificateForExpiry[]> {
   // TODO: SupplierCertificate model doesn't exist in schema yet
   // Return empty array until model is added
@@ -68,8 +67,8 @@ export async function findCertificatesExpiringSoon(
  * @returns Created ReviewTask or null if creation failed
  */
 export async function createCertificateExpiryTask(
-  supplier: { id: string; name: string; relationshipOwnerUserId: string | null },
-  certificate: { id: string; certificateType: string; expiryDate: Date }
+  _supplier: { id: string; name: string; relationshipOwnerUserId: string | null },
+  _certificate: { id: string; certificateType: string; expiryDate: Date }
 ): Promise<any | null> {
   // TODO: ReviewTask doesn't have supplierId field - this needs schema update
   // Return null until schema is updated
@@ -159,7 +158,7 @@ export async function createCertificateExpiryTask(
  * @param links Array of evidence link URLs
  * @returns Array of parsed certificate info (if any can be extracted)
  */
-export function parseCertificateFromEvidenceLinks(links: string[] | null): Array<{
+export function parseCertificateFromEvidenceLinks(_links: string[] | null): Array<{
   type: CertificateType;
   expiryDate?: Date;
   evidenceLink: string;

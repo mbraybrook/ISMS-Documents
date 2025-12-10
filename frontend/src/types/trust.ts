@@ -44,6 +44,7 @@ export interface TrustDocument {
   publicDescription?: string | null;
   displayOrder?: number | null;
   requiresNda?: boolean;
+  sharePointItemId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

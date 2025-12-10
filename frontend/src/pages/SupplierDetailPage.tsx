@@ -43,15 +43,6 @@ import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Supplier, SupplierContact } from '../types/supplier';
 import {
-  getSupplierStatusDisplayName,
-  getSupplierTypeDisplayName,
-  getServiceSubTypeDisplayName,
-  getRiskRatingDisplayName,
-  getCriticalityDisplayName,
-  getPciStatusDisplayName,
-  getIsoStatusDisplayName,
-  getGdprStatusDisplayName,
-  getPerformanceRatingDisplayName,
   getLifecycleStateDisplayName,
 } from '../types/supplier';
 import { SupplierRisksControlsTab } from '../components/SupplierRisksControlsTab';
@@ -80,7 +71,7 @@ export function SupplierDetailPage() {
   const [editingEvidenceIndex, setEditingEvidenceIndex] = useState<number | null>(null);
   const isNew = id === 'new';
   const canEdit = user?.role === 'ADMIN' || user?.role === 'EDITOR';
-  
+
   // Determine edit mode: if mode query param is 'view', use view mode; if 'edit', use edit mode; otherwise default based on canEdit
   const modeParam = searchParams.get('mode');
   const [isEditing, setIsEditing] = useState<boolean>(() => {

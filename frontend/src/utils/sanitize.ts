@@ -15,7 +15,7 @@ export function sanitizeHtml(input: string | null | undefined): string {
       'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a',
     ],
     ALLOWED_ATTR: ['href', 'title', 'class'],
-    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
   });
 }
 

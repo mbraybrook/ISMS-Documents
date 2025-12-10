@@ -11,7 +11,6 @@ import {
   Button,
   Collapse,
   useDisclosure,
-  IconButton,
 } from '@chakra-ui/react';
 import { ChevronDownIcon, ChevronUpIcon, ViewIcon, CopyIcon } from '@chakra-ui/icons';
 import { SimilarRisk } from '../types/risk';

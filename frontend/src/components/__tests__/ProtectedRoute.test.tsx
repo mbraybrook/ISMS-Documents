@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { BrowserRouter, MemoryRouter } from 'react-router-dom';
+import { render } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { ProtectedRoute } from '../ProtectedRoute';
 import { AuthProvider } from '../../contexts/AuthContext';
 import { ChakraProvider } from '@chakra-ui/react';
@@ -38,7 +38,7 @@ describe('ProtectedRoute', () => {
 
   it('should render children when user is authenticated', () => {
     // Mock authenticated user
-    const mockUser = {
+    const _mockUser = {
       id: 'user-1',
       email: 'test@paythru.com',
       displayName: 'Test User',
@@ -47,13 +47,13 @@ describe('ProtectedRoute', () => {
 
     render(
       <ChakraProvider>
-        <BrowserRouter>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
             <ProtectedRoute>
               <div>Protected Content</div>
             </ProtectedRoute>
           </AuthProvider>
-        </BrowserRouter>
+        </MemoryRouter>
       </ChakraProvider>
     );
 
@@ -65,7 +65,7 @@ describe('ProtectedRoute', () => {
   it('should redirect to login when user is not authenticated', () => {
     render(
       <ChakraProvider>
-        <MemoryRouter initialEntries={['/protected']}>
+        <MemoryRouter initialEntries={['/protected']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
             <ProtectedRoute>
               <div>Protected Content</div>
@@ -83,7 +83,7 @@ describe('ProtectedRoute', () => {
   it('should check role requirements', () => {
     render(
       <ChakraProvider>
-        <MemoryRouter>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
             <ProtectedRoute requiredRole="ADMIN">
               <div>Admin Only Content</div>

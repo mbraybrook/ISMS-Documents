@@ -1,6 +1,5 @@
 import { Router, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
-import multer from 'multer';
 import * as fs from 'fs';
 import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
@@ -147,7 +146,7 @@ router.put(
       const { riskIds, ...updateData } = req.body;
       
       // First update the legislation
-      const legislation = await prisma.legislation.update({
+      await prisma.legislation.update({
         where: { id: req.params.id },
         data: updateData,
       });

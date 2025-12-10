@@ -327,7 +327,7 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
         
         // Create risk
         const riskId = randomUUID();
-        const risk = await prisma.risk.create({
+        await prisma.risk.create({
           data: {
             id: riskId,
             title: riskDescription || `Risk ${riskNumber}`,

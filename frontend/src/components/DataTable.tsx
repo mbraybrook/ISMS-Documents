@@ -24,13 +24,9 @@ import {
   Spinner,
   Wrap,
   WrapItem,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
 } from '@chakra-ui/react';
-import { SearchIcon, ChevronUpIcon, ChevronDownIcon, DownloadIcon, CloseIcon, HamburgerIcon } from '@chakra-ui/icons';
-import { formatBoolean, formatEmptyValue, generateCSV, DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from '../utils/tableUtils';
+import { SearchIcon, ChevronUpIcon, ChevronDownIcon, DownloadIcon, CloseIcon } from '@chakra-ui/icons';
+import { generateCSV, DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from '../utils/tableUtils';
 
 export interface Column<T> {
   key: string;
@@ -330,7 +326,7 @@ export function DataTable<T>({
                 if (!value || value === '' || value === false) return null;
 
                 let displayValue = String(value);
-                let filterLabel = filter.label || filter.key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                const filterLabel = filter.label || filter.key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 
                 if (filter.type === 'select' && filter.options) {
                   const option = filter.options.find((opt) => opt.value === value);
@@ -449,7 +445,7 @@ export function DataTable<T>({
   };
 
   // Render default row
-  const renderDefaultRow = (row: T, index: number) => {
+  const renderDefaultRow = (row: T) => {
     const rowId = getRowId(row);
     const isSelected = selectedIds.has(rowId);
 
@@ -634,7 +630,7 @@ export function DataTable<T>({
                 ) : (
                   renderRow
                     ? paginatedData.map((row, index) => renderRow(row, index))
-                    : paginatedData.map((row, index) => renderDefaultRow(row, index))
+                    : paginatedData.map((row) => renderDefaultRow(row))
                 )}
               </Tbody>
             </Table>

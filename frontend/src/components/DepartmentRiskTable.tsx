@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -8,7 +8,6 @@ import {
   Badge,
   useDisclosure,
   Text,
-  Spinner,
   useToast,
   Tooltip,
 } from '@chakra-ui/react';
@@ -32,8 +31,6 @@ const RISK_CATEGORIES = [
 ];
 
 const RISK_NATURES = ['STATIC', 'INSTANCE'];
-
-const TREATMENT_CATEGORIES = ['RETAIN', 'MODIFY', 'SHARE', 'AVOID'];
 
 const DEPARTMENTS = [
   { value: 'BUSINESS_STRATEGY', label: 'Business Strategy' },
@@ -96,7 +93,7 @@ export function DepartmentRiskTable() {
     if (debouncedSearch !== filters.search) {
       setFilters(prev => ({ ...prev, search: debouncedSearch, page: 1 }));
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, filters.search]);
 
   // Sync search input with filters.search when it changes externally
   useEffect(() => {
@@ -108,13 +105,9 @@ export function DepartmentRiskTable() {
     if (effectiveDepartment && !filters.department) {
       setFilters(prev => ({ ...prev, department: effectiveDepartment }));
     }
-  }, [effectiveDepartment]);
+  }, [effectiveDepartment, filters.department]);
 
-  useEffect(() => {
-    fetchRisks();
-  }, [filters]);
-
-  const fetchRisks = async () => {
+  const fetchRisks = useCallback(async () => {
     try {
       setLoading(true);
       const params: any = {
@@ -162,7 +155,11 @@ export function DepartmentRiskTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, testDepartment, toast]);
+
+  useEffect(() => {
+    fetchRisks();
+  }, [fetchRisks]);
 
   const handleEdit = useCallback((risk: Risk) => {
     setSelectedRisk(risk);

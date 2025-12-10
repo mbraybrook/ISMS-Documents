@@ -2,7 +2,6 @@ import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
-import multer from 'multer';
 import { Prisma } from '@prisma/client';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { csvUpload, handleMulterError } from '../lib/multerConfig';
@@ -180,7 +179,6 @@ router.get(
       
       // Handle search query - search in title and description
       if (search) {
-        const searchLower = (search as string).toLowerCase();
         where.OR = [
           { title: { contains: search as string } },
           { description: { contains: search as string } },
@@ -542,7 +540,7 @@ router.post(
       let finalLikelihood = likelihood ?? 1;
       let finalStatus = status || 'DRAFT';
       let finalDepartment = department;
-      let finalWizardData = wizardData;
+      const finalWizardData = wizardData;
 
       if (wizardData) {
         try {

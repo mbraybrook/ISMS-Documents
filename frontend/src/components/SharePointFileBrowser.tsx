@@ -12,7 +12,6 @@ import {
   Box,
   Text,
   Spinner,
-  IconButton,
   useToast,
   Checkbox,
   Table,
@@ -26,7 +25,7 @@ import {
   FormLabel,
 } from '@chakra-ui/react';
 import { useState, useEffect, useRef } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
+import { ChevronRightIcon } from '@chakra-ui/icons';
 import api from '../services/api';
 import { authService } from '../services/authService';
 import { sharePointApi } from '../services/api';

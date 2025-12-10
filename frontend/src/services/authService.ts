@@ -1,4 +1,4 @@
-import { PublicClientApplication, AccountInfo, Configuration, PopupRequest } from '@azure/msal-browser';
+import { PublicClientApplication, AccountInfo, Configuration, PopupRequest, LogLevel, AuthError } from '@azure/msal-browser';
 import { config } from '../config';
 
 const msalConfig: Configuration = {
@@ -20,7 +20,7 @@ const msalConfig: Configuration = {
         }
         console.log(`[MSAL ${level}]`, message);
       },
-      logLevel: 'Info' as any,
+      logLevel: LogLevel.Info,
     },
   },
 };
@@ -35,12 +35,7 @@ if (!config.auth.clientId || !config.auth.tenantId) {
   throw new Error('MSAL configuration is incomplete. Please check your environment variables.');
 }
 
-console.log('MSAL Config:', {
-  clientId: config.auth.clientId,
-  tenantId: config.auth.tenantId,
-  redirectUri: config.auth.redirectUri,
-  authority: msalConfig.auth.authority,
-});
+
 
 export const msalInstance = new PublicClientApplication(msalConfig);
 
@@ -65,11 +60,7 @@ export const authService = {
 
   async login(): Promise<void> {
     try {
-      console.log('Initiating login with config:', {
-        clientId: config.auth.clientId,
-        tenantId: config.auth.tenantId,
-        redirectUri: config.auth.redirectUri,
-      });
+
 
       const loginRequest: PopupRequest = {
         scopes: ['User.Read'],
@@ -79,11 +70,12 @@ export const authService = {
       // Try popup first, but handle errors gracefully
       try {
         const loginResponse = await msalInstance.loginPopup(loginRequest);
-        console.log('Login successful:', loginResponse);
+
         currentAccount = loginResponse.account;
-      } catch (popupError: any) {
+      } catch (error) {
+        const popupError = error as AuthError;
         console.warn('Popup login failed, trying redirect flow:', popupError);
-        
+
         // If popup fails (e.g., blocked), fall back to redirect
         if (popupError.errorCode === 'user_cancelled' || popupError.name === 'BrowserAuthError') {
           await msalInstance.loginRedirect({
@@ -95,15 +87,16 @@ export const authService = {
         }
         throw popupError;
       }
-    } catch (error: any) {
-      console.error('Login error:', error);
+    } catch (error) {
+      const authError = error as AuthError;
+      console.error('Login error:', authError);
       // Log more details about the error
-      if (error.errorCode) {
-        console.error('Error code:', error.errorCode);
-        console.error('Error message:', error.errorMessage);
-        console.error('Full error:', JSON.stringify(error, null, 2));
+      if (authError.errorCode) {
+        console.error('Error code:', authError.errorCode);
+        console.error('Error message:', authError.errorMessage);
+        console.error('Full error:', JSON.stringify(authError, null, 2));
       }
-      throw error;
+      throw authError;
     }
   },
 
@@ -127,12 +120,13 @@ export const authService = {
         account: currentAccount,
       });
       return response.accessToken;
-    } catch (error: any) {
+    } catch (error) {
+      const authError = error as AuthError;
       // If silent token acquisition fails, the token might be expired
       // This is expected and not an error - user needs to log in again
-      if (error.errorCode === 'interaction_required' || 
-          error.errorCode === 'consent_required' ||
-          error.errorCode === 'login_required') {
+      if (authError.errorCode === 'interaction_required' ||
+        authError.errorCode === 'consent_required' ||
+        authError.errorCode === 'login_required') {
         console.log('Token acquisition requires user interaction');
         // Clear the cached account since we can't get a token
         currentAccount = null;
@@ -154,12 +148,13 @@ export const authService = {
         account: currentAccount,
       });
       return response.accessToken;
-    } catch (error: any) {
+    } catch (error) {
+      const authError = error as AuthError;
       // If silent token acquisition fails, try interactive
-      if (error.errorCode === 'interaction_required' || 
-          error.errorCode === 'consent_required' ||
-          error.errorCode === 'login_required' ||
-          error.errorCode === 'invalid_grant') {
+      if (authError.errorCode === 'interaction_required' ||
+        authError.errorCode === 'consent_required' ||
+        authError.errorCode === 'login_required' ||
+        authError.errorCode === 'invalid_grant') {
         try {
           console.log('Attempting interactive token acquisition for scopes:', scopes);
           const response = await msalInstance.acquireTokenPopup({
@@ -168,7 +163,8 @@ export const authService = {
             prompt: 'consent', // Force consent prompt
           });
           return response.accessToken;
-        } catch (popupError: any) {
+        } catch (error) {
+          const popupError = error as AuthError;
           console.error('Interactive token acquisition failed:', popupError);
           // If popup is blocked, try redirect
           if (popupError.errorCode === 'user_cancelled' || popupError.name === 'BrowserAuthError') {

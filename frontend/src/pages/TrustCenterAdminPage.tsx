@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -39,7 +39,8 @@ import {
 } from '@chakra-ui/react';
 import { useAuth } from '../contexts/AuthContext';
 import { trustApi } from '../services/trustApi';
-import type { ExternalUser, TrustDocSetting } from '../types/trust';
+import type { ExternalUser, TrustDocSetting, TrustDocument } from '../types/trust';
+import { AxiosError } from 'axios';
 
 export function TrustCenterAdminPage() {
   const { user } = useAuth();
@@ -47,24 +48,17 @@ export function TrustCenterAdminPage() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [loading, setLoading] = useState(true);
   const [pendingUsers, setPendingUsers] = useState<ExternalUser[]>([]);
-  const [documents, setDocuments] = useState<Array<{ document: any; trustSetting: TrustDocSetting | null }>>([]);
+  const [documents, setDocuments] = useState<Array<{ document: TrustDocument; trustSetting: TrustDocSetting | null }>>([]);
   const [editingDoc, setEditingDoc] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<TrustDocSetting>>({});
-  const [editingDocument, setEditingDocument] = useState<any>(null);
+  const [editingDocument, setEditingDocument] = useState<{ document: TrustDocument; trustSetting: TrustDocSetting | null } | null>(null);
   const [settings, setSettings] = useState<{ watermarkPrefix: string }>({ watermarkPrefix: 'Paythru Confidential' });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [tabIndex, setTabIndex] = useState(0); // 0 = Document Management, 1 = Pending Requests, 2 = Settings
   const documentListRef = useRef<HTMLDivElement>(null);
   const savedScrollPosition = useRef<number>(0);
 
-  useEffect(() => {
-    // Only load data if user is authenticated and has the right role
-    if (user && (user.role === 'ADMIN' || user.role === 'EDITOR')) {
-      loadData();
-    }
-  }, [user]);
-
-  const loadData = async (preserveScroll = false) => {
+  const loadData = useCallback(async (preserveScroll = false) => {
     try {
       setLoading(true);
       const [users, docs, settingsData] = await Promise.all([
@@ -75,7 +69,7 @@ export function TrustCenterAdminPage() {
       setPendingUsers(users);
       setDocuments(docs);
       setSettings(settingsData);
-      
+
       // Restore scroll position if requested and we're on the document management tab
       if (preserveScroll && tabIndex === 0 && documentListRef.current) {
         // Use setTimeout to ensure DOM has updated
@@ -85,16 +79,17 @@ export function TrustCenterAdminPage() {
           }
         }, 0);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error loading admin data:', error);
+      const axiosError = error as AxiosError<{ error: string }>;
       // Don't redirect on 401 - let ProtectedRoute handle it
-      if (error.response?.status === 401) {
+      if (axiosError.response?.status === 401) {
         // Authentication issue - ProtectedRoute will handle redirect
         return;
       }
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to load admin data',
+        description: axiosError.response?.data?.error || 'Failed to load admin data',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -102,7 +97,14 @@ export function TrustCenterAdminPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tabIndex, toast]);
+
+  useEffect(() => {
+    // Only load data if user is authenticated and has the right role
+    if (user && (user.role === 'ADMIN' || user.role === 'EDITOR')) {
+      loadData();
+    }
+  }, [user, loadData]);
 
   const handleSaveSettings = async () => {
     try {
@@ -115,10 +117,11 @@ export function TrustCenterAdminPage() {
         duration: 3000,
         isClosable: true,
       });
-    } catch (error: any) {
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to update settings',
+        description: axiosError.response?.data?.error || 'Failed to update settings',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -138,10 +141,12 @@ export function TrustCenterAdminPage() {
         isClosable: true,
       });
       loadData();
-    } catch (error: any) {
+      loadData();
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to approve user',
+        description: axiosError.response?.data?.error || 'Failed to approve user',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -163,10 +168,12 @@ export function TrustCenterAdminPage() {
         isClosable: true,
       });
       loadData();
-    } catch (error: any) {
+      loadData();
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to deny user',
+        description: axiosError.response?.data?.error || 'Failed to deny user',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -174,7 +181,7 @@ export function TrustCenterAdminPage() {
     }
   };
 
-  const handleEditDoc = (doc: any) => {
+  const handleEditDoc = (doc: { document: TrustDocument; trustSetting: TrustDocSetting | null }) => {
     setEditingDocument(doc);
     setEditingDoc(doc.document.id);
     setEditData(doc.trustSetting || {
@@ -194,28 +201,30 @@ export function TrustCenterAdminPage() {
       if (tabIndex === 0 && documentListRef.current) {
         savedScrollPosition.current = documentListRef.current.scrollTop;
       }
-      
+
       // Only include fields that can be updated (exclude id, documentId, createdAt, updatedAt)
       const allowedFields = ['visibilityLevel', 'category', 'sharePointUrl', 'publicDescription', 'displayOrder', 'requiresNda', 'maxFileSizeMB'];
       const normalizedData: Partial<TrustDocSetting> = {};
-      
+
       // Only copy allowed fields
       allowedFields.forEach(field => {
         const value = editData[field as keyof TrustDocSetting];
         if (value !== undefined) {
           // Normalize empty strings to null for string fields
           if (field === 'publicDescription' && value === '') {
-            normalizedData[field as keyof TrustDocSetting] = null as any;
+            normalizedData.publicDescription = null;
           } else if (field === 'sharePointUrl' && value === '') {
             // Skip empty sharePointUrl - don't send it
           } else if (field === 'displayOrder' && (value === null || value === '')) {
             // Skip null/empty displayOrder
           } else {
+            // Safe cast as we know the field exists on TrustDocSetting
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (normalizedData as any)[field] = value;
           }
         }
       });
-      
+
       console.log('Sending document settings update:', { docId, normalizedData });
       await trustApi.updateDocumentSettings(docId, normalizedData);
       toast({
@@ -230,11 +239,13 @@ export function TrustCenterAdminPage() {
       onClose();
       // Preserve tab index and scroll position
       loadData(true);
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.details ||
-                          error.response?.data?.errors?.map((e: any) => `${e.param}: ${e.msg}`).join(', ') ||
-                          'Failed to update settings';
+      loadData(true);
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string, details?: string, errors?: Array<{ param: string, msg: string }> }>;
+      const errorMessage = axiosError.response?.data?.error ||
+        axiosError.response?.data?.details ||
+        axiosError.response?.data?.errors?.map((e) => `${e.param}: ${e.msg}`).join(', ') ||
+        'Failed to update settings';
       toast({
         title: 'Error',
         description: errorMessage,
@@ -252,7 +263,7 @@ export function TrustCenterAdminPage() {
     onClose();
   };
 
-  const handleToggleTrustCenter = async (doc: any, enabled: boolean) => {
+  const handleToggleTrustCenter = async (doc: { document: TrustDocument; trustSetting: TrustDocSetting | null }, enabled: boolean) => {
     if (enabled) {
       // Create new setting - open edit modal so user can configure
       handleEditDoc(doc);
@@ -273,11 +284,12 @@ export function TrustCenterAdminPage() {
           isClosable: true,
         });
         loadData();
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error disabling trust center:', error);
+        const axiosError = error as AxiosError<{ error: string }>;
         toast({
           title: 'Error',
-          description: error.response?.data?.error || 'Failed to remove document from Trust Center',
+          description: axiosError.response?.data?.error || 'Failed to remove document from Trust Center',
           status: 'error',
           duration: 5000,
           isClosable: true,
@@ -455,7 +467,7 @@ export function TrustCenterAdminPage() {
           <TabPanel>
             <VStack spacing={6} align="stretch" maxW="800px">
               <Heading size="md">Trust Center Settings</Heading>
-              
+
               <FormControl>
                 <FormLabel>Watermark Prefix</FormLabel>
                 <Input
@@ -514,7 +526,7 @@ export function TrustCenterAdminPage() {
                 <Select
                   value={editData.category || 'policy'}
                   onChange={(e) =>
-                    setEditData({ ...editData, category: e.target.value as any })
+                    setEditData({ ...editData, category: e.target.value as 'certification' | 'policy' | 'report' })
                   }
                 >
                   <option value="certification">Certification</option>

@@ -1,4 +1,4 @@
-import { Box, Card, CardBody, Heading, Text, Button, Badge, HStack, VStack, Spinner, Flex } from '@chakra-ui/react';
+import { Card, CardBody, Heading, Text, Button, Badge, HStack, VStack, Spinner } from '@chakra-ui/react';
 import { DownloadIcon, LockIcon } from '@chakra-ui/icons';
 import { trustApi } from '../services/trustApi';
 import { useToast } from '@chakra-ui/react';

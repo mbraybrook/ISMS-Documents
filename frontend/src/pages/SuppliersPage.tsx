@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -44,9 +44,13 @@ import {
 } from '../types/supplier';
 import { SupplierOnboardingWizard } from '../components/SupplierOnboardingWizard';
 import { useDisclosure } from '@chakra-ui/react';
+import { AxiosError } from 'axios';
 
 // Cloud icon SVG path
-const CloudIcon = (props: any) => (
+import { IconProps } from '@chakra-ui/react';
+
+// Cloud icon SVG path
+const CloudIcon = (props: IconProps) => (
   <Icon viewBox="0 0 24 24" {...props}>
     <path
       fill="currentColor"
@@ -56,7 +60,7 @@ const CloudIcon = (props: any) => (
 );
 
 // Credit card icon SVG path
-const CreditCardIcon = (props: any) => (
+const CreditCardIcon = (props: IconProps) => (
   <Icon viewBox="0 0 24 24" {...props}>
     <path
       fill="currentColor"
@@ -86,20 +90,10 @@ export function SuppliersPage() {
 
   const canEdit = user?.role === 'ADMIN' || user?.role === 'EDITOR';
 
-  // Fetch all suppliers once on mount and when filters change (excluding search)
-  useEffect(() => {
-    fetchSuppliers();
-  }, [supplierTypeFilter, criticalityFilter, statusFilter, lifecycleStateFilter]);
-
-  // Apply client-side filtering and sorting when search query or suppliers change
-  useEffect(() => {
-    applyFiltersAndSort();
-  }, [searchQuery, allSuppliers, supplierTypeFilter, criticalityFilter, statusFilter, lifecycleStateFilter, sortField, sortDirection]);
-
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     try {
       setLoading(true);
-      const filters: any = {};
+      const filters: Record<string, string | number> = {};
       if (supplierTypeFilter) filters.supplierType = supplierTypeFilter;
       if (criticalityFilter) filters.criticality = criticalityFilter;
       if (statusFilter) filters.status = statusFilter;
@@ -121,9 +115,14 @@ export function SuppliersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supplierTypeFilter, criticalityFilter, statusFilter, lifecycleStateFilter, toast]);
 
-  const applyFiltersAndSort = () => {
+  // Fetch all suppliers once on mount and when filters change (excluding search)
+  useEffect(() => {
+    fetchSuppliers();
+  }, [fetchSuppliers]);
+
+  const applyFiltersAndSort = useCallback(() => {
     let filtered = [...allSuppliers];
 
     // Apply search filter (client-side)
@@ -137,44 +136,56 @@ export function SuppliersPage() {
     // Apply sorting
     filtered.sort((a, b) => {
       let comparison = 0;
-      
+
       switch (sortField) {
-        case 'name':
+        case 'name': {
           comparison = a.name.localeCompare(b.name);
           break;
-        case 'criticality':
-          const criticalityOrder = { HIGH: 3, MEDIUM: 2, LOW: 1, null: 0 };
-          comparison = (criticalityOrder[a.criticality as keyof typeof criticalityOrder] || 0) - 
-                      (criticalityOrder[b.criticality as keyof typeof criticalityOrder] || 0);
+        }
+        case 'criticality': {
+          const criticalityOrder: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1, null: 0 };
+          comparison = (criticalityOrder[a.criticality as string] || 0) -
+            (criticalityOrder[b.criticality as string] || 0);
           break;
-        case 'riskRating':
-          const riskOrder = { HIGH: 3, MEDIUM: 2, LOW: 1, null: 0 };
-          comparison = (riskOrder[a.overallRiskRating as keyof typeof riskOrder] || 0) - 
-                      (riskOrder[b.overallRiskRating as keyof typeof riskOrder] || 0);
+        }
+        case 'riskRating': {
+          const riskOrder: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1, null: 0 };
+          comparison = (riskOrder[a.overallRiskRating as string] || 0) -
+            (riskOrder[b.overallRiskRating as string] || 0);
           break;
-        case 'status':
+        }
+        case 'status': {
           comparison = (a.status || '').localeCompare(b.status || '');
           break;
-        case 'complianceStatus':
+        }
+        case 'complianceStatus': {
           const complianceOrder = { PASS: 3, IN_PROGRESS: 2, FAIL: 1, UNKNOWN: 0 };
           const aCompliance = getComplianceStatus(a);
           const bCompliance = getComplianceStatus(b);
           comparison = (complianceOrder[aCompliance] || 0) - (complianceOrder[bCompliance] || 0);
           break;
-        case 'reviewDate':
+        }
+        case 'reviewDate': {
           const aDate = a.reviewDate ? new Date(a.reviewDate).getTime() : 0;
           const bDate = b.reviewDate ? new Date(b.reviewDate).getTime() : 0;
           comparison = aDate - bDate;
           break;
-        default:
+        }
+        default: {
           comparison = 0;
+        }
       }
-      
+
       return sortDirection === 'asc' ? comparison : -comparison;
     });
 
     setSuppliers(filtered);
-  };
+  }, [allSuppliers, searchQuery, sortField, sortDirection]);
+
+  // Apply client-side filtering and sorting when search query or suppliers change
+  useEffect(() => {
+    applyFiltersAndSort();
+  }, [applyFiltersAndSort]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -187,7 +198,7 @@ export function SuppliersPage() {
 
   const getComplianceStatus = (supplier: Supplier): 'PASS' | 'IN_PROGRESS' | 'FAIL' | 'UNKNOWN' => {
     const statuses: string[] = [];
-    
+
     // PCI Status
     if (supplier.pciStatus) {
       if (supplier.pciStatus === 'PASS' || supplier.pciStatus === 'NOT_APPLICABLE') {
@@ -198,7 +209,7 @@ export function SuppliersPage() {
         statuses.push('UNKNOWN');
       }
     }
-    
+
     // ISO 27001 Status
     if (supplier.iso27001Status) {
       if (supplier.iso27001Status === 'CERTIFIED' || supplier.iso27001Status === 'NOT_APPLICABLE') {
@@ -211,7 +222,7 @@ export function SuppliersPage() {
         statuses.push('UNKNOWN');
       }
     }
-    
+
     // GDPR Status
     if (supplier.gdprStatus) {
       if (supplier.gdprStatus === 'ADEQUATE' || supplier.gdprStatus === 'NOT_APPLICABLE') {
@@ -222,27 +233,27 @@ export function SuppliersPage() {
         statuses.push('UNKNOWN');
       }
     }
-    
+
     // If no statuses at all, return UNKNOWN
     if (statuses.length === 0) {
       return 'UNKNOWN';
     }
-    
+
     // Priority 1: Check for FAIL (any one is Fail/Not Certified/High Risk)
     if (statuses.includes('FAIL')) {
       return 'FAIL';
     }
-    
+
     // Priority 2: Check for IN_PROGRESS (any one is In Progress)
     if (statuses.includes('IN_PROGRESS')) {
       return 'IN_PROGRESS';
     }
-    
+
     // Priority 3: Check if all are PASS (all are Passed/Certified/Not Applicable)
     if (statuses.every(s => s === 'PASS')) {
       return 'PASS';
     }
-    
+
     // If mixed (some PASS, some UNKNOWN), return UNKNOWN
     return 'UNKNOWN';
   };
@@ -277,22 +288,21 @@ export function SuppliersPage() {
     if (!reviewDate) {
       return 'MISSING';
     }
-    
+
     const reviewDateObj = new Date(reviewDate);
-    const now = new Date();
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
     const elevenMonthsAgo = new Date();
     elevenMonthsAgo.setMonth(elevenMonthsAgo.getMonth() - 11);
-    
+
     if (reviewDateObj < twelveMonthsAgo) {
       return 'OVERDUE';
     }
-    
+
     if (reviewDateObj >= twelveMonthsAgo && reviewDateObj < elevenMonthsAgo) {
       return 'WARNING';
     }
-    
+
     return 'OK';
   };
 
@@ -321,10 +331,11 @@ export function SuppliersPage() {
       onArchiveClose();
       setSupplierToArchive(null);
       fetchSuppliers();
-    } catch (error: any) {
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to archive supplier',
+        description: axiosError.response?.data?.error || 'Failed to archive supplier',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -640,7 +651,7 @@ export function SuppliersPage() {
               </Tr>
             ) : (
               suppliers.map((supplier) => (
-                <Tr 
+                <Tr
                   key={supplier.id}
                   _hover={{ bg: 'blue.50', cursor: 'pointer' }}
                   transition="background-color 0.2s"
@@ -718,12 +729,12 @@ export function SuppliersPage() {
                       const reviewStatus = getReviewStatus(supplier.reviewDate);
                       const reviewDate = supplier.reviewDate
                         ? new Date(supplier.reviewDate).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                          })
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })
                         : '-';
-                      
+
                       return (
                         <HStack spacing={2}>
                           <Text>{reviewDate}</Text>

@@ -1,8 +1,9 @@
+
 import axios from 'axios';
 import { config } from '../config';
 import { authService } from './authService';
 import { SimilarRisk } from '../types/risk';
-import { Supplier } from '../types/supplier';
+import { Supplier, SupplierRisk, SupplierControl, SupplierExitPlan } from '../types/supplier';
 import { RiskDashboardSummary } from '../types/riskDashboard';
 
 const api = axios.create({
@@ -95,12 +96,12 @@ export const supplierApi = {
   },
 
   // Link methods
-  getSupplierRisks: async (supplierId: string): Promise<any[]> => {
+  getSupplierRisks: async (supplierId: string): Promise<SupplierRisk[]> => {
     const response = await api.get(`/api/suppliers/${supplierId}/risks`);
     return response.data;
   },
 
-  linkSupplierRisk: async (supplierId: string, riskId: string): Promise<any> => {
+  linkSupplierRisk: async (supplierId: string, riskId: string): Promise<{ success: boolean }> => {
     const response = await api.post(`/api/suppliers/${supplierId}/risks`, { riskId });
     return response.data;
   },
@@ -111,7 +112,12 @@ export const supplierApi = {
 
   suggestRisksForSupplier: async (supplierId: string, limit?: number): Promise<{
     suggestions: Array<{
-      risk: any;
+      risk: {
+        id: string;
+        title: string;
+        riskCategory: string | null;
+        [key: string]: unknown;
+      };
       similarityScore: number;
       matchedFields: string[];
     }>;
@@ -121,12 +127,12 @@ export const supplierApi = {
     return response.data;
   },
 
-  getSupplierControls: async (supplierId: string): Promise<any[]> => {
+  getSupplierControls: async (supplierId: string): Promise<SupplierControl[]> => {
     const response = await api.get(`/api/suppliers/${supplierId}/controls`);
     return response.data;
   },
 
-  linkSupplierControl: async (supplierId: string, controlId: string): Promise<any> => {
+  linkSupplierControl: async (supplierId: string, controlId: string): Promise<{ success: boolean }> => {
     const response = await api.post(`/api/suppliers/${supplierId}/controls`, { controlId });
     return response.data;
   },
@@ -139,17 +145,17 @@ export const supplierApi = {
   // Review status
 
   // Exit plan methods
-  getExitPlan: async (supplierId: string): Promise<any> => {
+  getExitPlan: async (supplierId: string): Promise<SupplierExitPlan> => {
     const response = await api.get(`/api/suppliers/${supplierId}/exit-plan`);
     return response.data;
   },
 
-  createExitPlan: async (supplierId: string, data: any): Promise<any> => {
+  createExitPlan: async (supplierId: string, data: Partial<SupplierExitPlan>): Promise<SupplierExitPlan> => {
     const response = await api.post(`/api/suppliers/${supplierId}/exit-plan`, data);
     return response.data;
   },
 
-  updateExitPlan: async (supplierId: string, data: any): Promise<any> => {
+  updateExitPlan: async (supplierId: string, data: Partial<SupplierExitPlan>): Promise<SupplierExitPlan> => {
     const response = await api.put(`/api/suppliers/${supplierId}/exit-plan`, data);
     return response.data;
   },
@@ -190,4 +196,3 @@ export const riskDashboardApi = {
 };
 
 export default api;
-

@@ -23,11 +23,6 @@ import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
 import { supplierApi } from '../services/api';
 import {
   SupplierExitPlan,
-  ImpactAssessment,
-  DataAndIpr,
-  ReplacementServiceAnalysis,
-  ContractClosure,
-  LessonsLearned,
 } from '../types/supplier';
 
 interface SupplierExitPlanTabProps {

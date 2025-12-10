@@ -18,7 +18,7 @@ healthRouter.get('/', async (req, res) => {
         connected: true,
         documentCount,
         userCount,
-        databaseUrl: config.databaseUrl.replace(/\/[^\/]+$/, '/***'), // Hide actual path
+        databaseUrl: config.databaseUrl.replace(/\/[^/]+$/, '/***'), // Hide actual path
       },
     });
   } catch (error: any) {
@@ -28,7 +28,7 @@ healthRouter.get('/', async (req, res) => {
       error: error.message,
       database: {
         connected: false,
-        databaseUrl: config.databaseUrl.replace(/\/[^\/]+$/, '/***'),
+        databaseUrl: config.databaseUrl.replace(/\/[^/]+$/, '/***'),
       },
     });
   }

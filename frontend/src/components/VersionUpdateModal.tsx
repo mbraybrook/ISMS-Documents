@@ -37,9 +37,12 @@ export function VersionUpdateModal({
   currentVersion,
   documentId,
   onSuccess,
-  currentLastReviewDate,
-  currentNextReviewDate,
+  currentLastReviewDate: _currentLastReviewDate,
+  currentNextReviewDate: _currentNextReviewDate,
 }: VersionUpdateModalProps) {
+  // Unused parameters - kept for API compatibility
+  void _currentLastReviewDate;
+  void _currentNextReviewDate;
   const toast = useToast();
   const [newVersion, setNewVersion] = useState('');
   const [notes, setNotes] = useState('');

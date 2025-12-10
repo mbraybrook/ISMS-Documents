@@ -39,7 +39,7 @@ export function SimilarRisksPanel({
   threshold = 70,
   progress,
 }: SimilarRisksPanelProps) {
-  const toast = useToast();
+  const _toast = useToast();
 
   const getSimilarityColor = (score: number): string => {
     if (score >= 80) return 'red';

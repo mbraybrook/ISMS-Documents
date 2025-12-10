@@ -1,7 +1,6 @@
 import request from 'supertest';
 import express from 'express';
 import { acknowledgmentsRouter } from '../acknowledgments';
-import { authenticateToken } from '../../middleware/auth';
 import { mockUsers } from '../../lib/test-helpers';
 
 // Mock authentication middleware
@@ -44,6 +43,7 @@ describe('Acknowledgments API', () => {
     app = express();
     app.use(express.json());
     app.use('/api/acknowledgments', acknowledgmentsRouter);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     prisma = require('../../lib/prisma').prisma;
     jest.clearAllMocks();
   });
@@ -116,20 +116,6 @@ describe('Acknowledgments API', () => {
 
     it('should only return APPROVED documents', async () => {
       const mockUser = mockUsers.staff();
-      const mockDocuments = [
-        {
-          id: 'doc-1',
-          title: 'Draft Document',
-          version: '1.0',
-          status: 'DRAFT',
-          requiresAcknowledgement: true,
-          owner: {
-            id: 'owner-1',
-            displayName: 'Owner',
-            email: 'owner@paythru.com',
-          },
-        },
-      ];
 
       prisma.user.findUnique.mockResolvedValue(mockUser);
       prisma.document.findMany.mockResolvedValue([]); // DRAFT documents filtered out
@@ -212,6 +198,7 @@ describe('Acknowledgments API', () => {
 
       prisma.user.findUnique.mockResolvedValue(mockUser);
       prisma.document.findMany.mockResolvedValue(mockDocuments);
+      // mockDocuments is used in the mock above
       prisma.acknowledgment.findMany.mockResolvedValue([]);
       prisma.acknowledgment.findUnique.mockResolvedValue({
         id: 'ack-existing',

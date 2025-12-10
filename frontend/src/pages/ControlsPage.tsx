@@ -1,29 +1,20 @@
 import { useState, useEffect } from 'react';
 import {
-  Box,
   Heading,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
   Button,
   HStack,
   VStack,
   Badge,
   useDisclosure,
-  Select,
-  Input,
-  InputGroup,
-  InputLeftElement,
   Checkbox,
+  Tr,
+  Td,
   Text,
   IconButton,
   Tooltip,
   useToast,
 } from '@chakra-ui/react';
-import { SearchIcon, ChevronUpIcon, ChevronDownIcon, DownloadIcon, EditIcon, ViewIcon, DeleteIcon } from '@chakra-ui/icons';
+import { DownloadIcon, EditIcon, ViewIcon, DeleteIcon } from '@chakra-ui/icons';
 import api from '../services/api';
 import { ControlFormModal } from '../components/ControlFormModal';
 import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
@@ -68,7 +59,7 @@ type SortOrder = 'asc' | 'desc';
 const naturalSort = (a: string, b: string): number => {
   const aParts = a.split('.').map(Number);
   const bParts = b.split('.').map(Number);
-  
+
   for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
     const aPart = aParts[i] || 0;
     const bPart = bParts[i] || 0;
@@ -76,7 +67,7 @@ const naturalSort = (a: string, b: string): number => {
       return aPart - bPart;
     }
   }
-  
+
   // If numeric parts are equal, fall back to string comparison
   return a.localeCompare(b);
 };
@@ -161,7 +152,7 @@ export function ControlsPage() {
     // Apply sorting
     filtered.sort((a, b) => {
       let comparison = 0;
-      
+
       switch (sortField) {
         case 'code':
           comparison = naturalSort(a.code, b.code);
@@ -169,29 +160,31 @@ export function ControlsPage() {
         case 'title':
           comparison = a.title.localeCompare(b.title);
           break;
-        case 'category':
+        case 'category': {
           const aCat = formatCategory(a.category);
           const bCat = formatCategory(b.category);
           comparison = aCat.localeCompare(bCat);
           break;
+        }
         case 'type':
           comparison = Number(a.isStandardControl) - Number(b.isStandardControl);
           break;
-        case 'selected':
-          const aSelected = 
+        case 'selected': {
+          const aSelected =
             a.selectedForRiskAssessment ||
             a.selectedForContractualObligation ||
             a.selectedForLegalRequirement ||
             a.selectedForBusinessRequirement;
-          const bSelected = 
+          const bSelected =
             b.selectedForRiskAssessment ||
             b.selectedForContractualObligation ||
             b.selectedForLegalRequirement ||
             b.selectedForBusinessRequirement;
           comparison = Number(aSelected) - Number(bSelected);
           break;
+        }
       }
-      
+
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
@@ -312,9 +305,9 @@ export function ControlsPage() {
           <Badge
             colorScheme={
               control.category === 'ORGANIZATIONAL' ? 'blue' :
-              control.category === 'PEOPLE' ? 'purple' :
-              control.category === 'PHYSICAL' ? 'orange' :
-              'teal'
+                control.category === 'PEOPLE' ? 'purple' :
+                  control.category === 'PHYSICAL' ? 'orange' :
+                    'teal'
             }
           >
             {formatCategory(control.category)}
@@ -360,7 +353,7 @@ export function ControlsPage() {
         if (control.selectedForContractualObligation) reasons.push('Contractual');
         if (control.selectedForLegalRequirement) reasons.push('Legal');
         if (control.selectedForBusinessRequirement) reasons.push('Business');
-        
+
         return reasons.length > 0 ? (
           <VStack align="start" spacing={1}>
             {reasons.map((reason, idx) => (
@@ -368,9 +361,9 @@ export function ControlsPage() {
                 key={idx}
                 colorScheme={
                   reason === 'Risk Assessment' ? 'blue' :
-                  reason === 'Contractual' ? 'purple' :
-                  reason === 'Legal' ? 'red' :
-                  'orange'
+                    reason === 'Contractual' ? 'purple' :
+                      reason === 'Legal' ? 'red' :
+                        'orange'
                 }
                 fontSize="xs"
               >
@@ -525,11 +518,11 @@ export function ControlsPage() {
 
   const exportToCSV = () => {
     if (!csvExportConfig) return;
-    
+
     const filtered = getFilteredAndSortedControls();
     const rows = filtered.map(csvExportConfig.getRowData);
     generateCSV(csvExportConfig.headers, rows, csvExportConfig.filename);
-    
+
     if (csvExportConfig.onExport) {
       csvExportConfig.onExport();
     }
@@ -537,7 +530,7 @@ export function ControlsPage() {
 
   const filteredData = getFilteredAndSortedControls();
 
-  const renderRow = (control: Control, index: number) => {
+  const renderRow = (control: Control, _index: number) => {
     return (
       <Tr
         key={control.id}
@@ -561,7 +554,7 @@ export function ControlsPage() {
             cellContent = column.render(control);
           } else {
             const value = (control as any)[column.key];
-            cellContent = value === null || value === undefined || value === '' 
+            cellContent = value === null || value === undefined || value === ''
               ? <Text color="gray.400" fontSize="xs">—</Text>
               : String(value);
           }

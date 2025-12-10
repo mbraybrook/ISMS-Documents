@@ -4,20 +4,8 @@ import { randomUUID } from 'crypto';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
-import {
-  SupplierStatus,
-  SupplierType,
-  ServiceSubType,
-  RiskRating,
-  Criticality,
-  PciStatus,
-  IsoStatus,
-  GdprStatus,
-  PerformanceRating,
-  SupplierLifecycleState,
-} from '../types/enums';
-// validateLifecycleTransition import removed - lifecycle transitions are now unrestricted
-import { validatePciApprovalRule } from '../services/supplierApprovalService';
+// Enums and validation functions are not directly used in this file
+// They are used in validation rules and type checking
 
 const router = Router();
 
@@ -35,10 +23,10 @@ const validate = (req: any, res: Response, next: any) => {
   next();
 };
 
-// Helper function to validate enum values
-const isValidEnum = (value: any, enumValues: string[]): boolean => {
-  return value === null || value === undefined || enumValues.includes(value);
-};
+// Helper function to validate enum values (currently unused but may be needed for future validation)
+// const isValidEnum = (value: any, enumValues: string[]): boolean => {
+//   return value === null || value === undefined || enumValues.includes(value);
+// };
 
 // GET /api/suppliers - list all suppliers with filters
 router.get(

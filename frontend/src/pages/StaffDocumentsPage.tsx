@@ -17,11 +17,10 @@ import {
   Select,
   Input,
   Button,
-  IconButton,
   useToast,
   Spinner,
 } from '@chakra-ui/react';
-import { ExternalLinkIcon, SearchIcon } from '@chakra-ui/icons';
+import { ExternalLinkIcon } from '@chakra-ui/icons';
 import api from '../services/api';
 
 interface Document {

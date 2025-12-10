@@ -185,28 +185,7 @@ router.get(
         return docData;
       });
 
-      // Log for debugging
-      const sharePointDocs = documents.filter(d => d.storageLocation === 'SHAREPOINT');
-      const sampleSharePointDoc = sharePointDocs[0];
-      console.log('[DOCUMENTS] Query result:', {
-        filters: where,
-        found: documents.length,
-        total,
-        page: pageNum,
-        limit: limitNum,
-        userRole,
-        sharePointDocsCount: sharePointDocs.length,
-        sampleSharePointDoc: sampleSharePointDoc ? {
-          id: sampleSharePointDoc.id,
-          title: sampleSharePointDoc.title,
-          storageLocation: sampleSharePointDoc.storageLocation,
-          sharePointSiteId: sampleSharePointDoc.sharePointSiteId,
-          sharePointDriveId: sampleSharePointDoc.sharePointDriveId,
-          sharePointItemId: sampleSharePointDoc.sharePointItemId,
-          documentUrl: sampleSharePointDoc.documentUrl,
-        } : null,
-        sampleTitles: documents.slice(0, 3).map(d => d.title),
-      });
+
 
       res.json({
         data: documentsWithComputedFields,
@@ -582,6 +561,7 @@ router.put(
 
       // Convert date strings to DateTime objects if provided
       const data: any = { ...req.body };
+      delete data.version; // Prevent version update via this endpoint
       if (data.lastReviewDate && typeof data.lastReviewDate === 'string') {
         // If it's just a date (YYYY-MM-DD), convert to full datetime
         if (data.lastReviewDate.length === 10) {
@@ -1401,20 +1381,20 @@ router.post(
         });
 
         const titleLower = title.toLowerCase();
-        const titleWords = titleLower.split(/\s+/).filter((word) => word.length > 3);
-        
+        const titleWords = titleLower.split(/\s+/).filter((word: string) => word.length > 3);
+
         const suggestedControlIds: string[] = [];
         for (const control of allControls) {
           const controlText = `${control.code} ${control.title || ''}`.toLowerCase();
           let score = 0;
-          
+
           // Check for word matches
           for (const word of titleWords) {
             if (controlText.includes(word)) {
               score += word.length > 5 ? 3 : 2;
             }
           }
-          
+
           if (score >= 2) {
             suggestedControlIds.push(control.id);
           }
@@ -1462,17 +1442,17 @@ router.post(
         // Keyword boosting: Check for word matches in control title/code
         const controlTextLower = `${control.code} ${control.title || ''}`.toLowerCase();
         let keywordBoost = 0;
-        
+
         // Boost for word matches
         for (const word of documentWords) {
           if (word.length > 3 && controlTextLower.includes(word)) {
             keywordBoost += word.length > 6 ? 8 : 5;
           }
         }
-        
+
         // Special boost for important security terms
-        const importantTerms = ['awareness', 'training', 'education', 'security', 'policy', 
-                               'procedure', 'access', 'control', 'incident', 'monitoring'];
+        const importantTerms = ['awareness', 'training', 'education', 'security', 'policy',
+          'procedure', 'access', 'control', 'incident', 'monitoring'];
         for (const term of importantTerms) {
           if (documentTextLower.includes(term) && controlTextLower.includes(term)) {
             keywordBoost += 10;

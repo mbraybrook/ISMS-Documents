@@ -34,7 +34,7 @@ import {
   TabPanels,
   Tab,
   TabPanel,
-  Tooltip,
+
   Link,
 } from '@chakra-ui/react';
 import { DeleteIcon, AddIcon } from '@chakra-ui/icons';
@@ -80,7 +80,7 @@ export function SupplierRisksControlsTab({
   const [aiSuggestedRisks, setAiSuggestedRisks] = useState<Risk[]>([]);
   const [loadingAiSuggestions, setLoadingAiSuggestions] = useState(false);
   const [aiSuggestionsError, setAiSuggestionsError] = useState<string | null>(null);
-  
+
   const {
     isOpen: isRiskModalOpen,
     onOpen: onRiskModalOpen,
@@ -119,6 +119,7 @@ export function SupplierRisksControlsTab({
         status: 'error',
         duration: 3000,
       });
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -238,7 +239,7 @@ export function SupplierRisksControlsTab({
       setLoadingAiSuggestions(true);
       setAiSuggestionsError(null);
       const response = await supplierApi.suggestRisksForSupplier(supplierId);
-      
+
       // Filter out already-linked risks
       const linkedRiskIds = new Set(risks.map((r) => r.id));
       const filteredSuggestions = response.suggestions
@@ -248,7 +249,7 @@ export function SupplierRisksControlsTab({
           similarityScore: suggestion.similarityScore,
           matchedFields: suggestion.matchedFields,
         }));
-      
+
       setAiSuggestedRisks(filteredSuggestions);
     } catch (error: any) {
       console.error('Error fetching AI suggestions:', error);
@@ -544,8 +545,8 @@ export function SupplierRisksControlsTab({
                                       risk.similarityScore && risk.similarityScore >= 80
                                         ? 'green'
                                         : risk.similarityScore && risk.similarityScore >= 60
-                                        ? 'orange'
-                                        : 'gray'
+                                          ? 'orange'
+                                          : 'gray'
                                     }
                                   >
                                     {risk.similarityScore}%

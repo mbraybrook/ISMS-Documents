@@ -5,10 +5,7 @@ import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
 import { importAssetsFromCSV } from '../services/assetImportService';
-import * as path from 'path';
-import multer from 'multer';
 import * as fs from 'fs';
-import * as os from 'os';
 import { csvUpload, handleMulterError } from '../lib/multerConfig';
 
 const router = Router();
@@ -60,7 +57,6 @@ router.get(
       if (owner) where.owner = { contains: owner as string };
       
       if (search) {
-        const searchLower = (search as string).toLowerCase();
         where.OR = [
           { nameSerialNo: { contains: search as string } },
           { model: { contains: search as string } },

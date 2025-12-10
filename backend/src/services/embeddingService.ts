@@ -51,6 +51,7 @@ export async function backfillRiskEmbeddings(
 
   console.log(`[Backfill] Starting backfill (batchSize=${batchSize}, concurrency=${concurrency}, dryRun=${dryRun})`);
 
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     // Always query with WHERE embedding IS NULL (idempotent, safe to re-run)
     // For JSON fields in Prisma, we need to use a raw query or check for DbNull
@@ -69,7 +70,7 @@ export async function backfillRiskEmbeddings(
     }
 
     // Process batch with concurrency limit
-    const results = await Promise.all(
+    await Promise.all(
       risks.map((risk) =>
         limiter.execute(async () => {
           try {
@@ -185,12 +186,12 @@ export async function backfillControlEmbeddings(
   let processed = 0;
   let succeeded = 0;
   let failed = 0;
-  let offset = 0;
 
   console.log(`[Backfill] Starting control embedding backfill (batchSize=${batchSize}, concurrency=${concurrency}, dryRun=${dryRun})`);
 
   let lastId: string | null = null;
 
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     // Use cursor-based pagination to avoid skipping rows as embeddings are added
     // This ensures we process all controls with NULL embeddings, even as the result set changes

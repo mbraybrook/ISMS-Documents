@@ -113,7 +113,7 @@ describe('AuthContext', () => {
     vi.mocked(authService.isAuthenticated).mockReturnValue(true);
     vi.mocked(axios.post).mockResolvedValue({ data: mockUser });
 
-    const { result } = renderHook(() => useAuth(), {
+    renderHook(() => useAuth(), {
       wrapper: ({ children }) => (
         <AuthProvider>{children}</AuthProvider>
       ),

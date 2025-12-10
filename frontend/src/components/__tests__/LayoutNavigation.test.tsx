@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { Layout } from '../Layout';
@@ -29,12 +29,12 @@ vi.mock('../../services/api', () => ({
 }));
 
 describe('Layout Navigation', () => {
-    it('renders the new navigation structure for ADMIN', () => {
+    it('renders the new navigation structure for ADMIN', async () => {
         mockGetEffectiveRole.mockReturnValue('ADMIN');
 
         render(
             <ChakraProvider>
-                <MemoryRouter>
+                <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                     <Layout>
                         <div>Content</div>
                     </Layout>
@@ -49,29 +49,38 @@ describe('Layout Navigation', () => {
         expect(screen.getByText('System')).toBeInTheDocument();
 
         // Check for specific items in Documents
-        fireEvent.click(screen.getByText('Documents'));
-        expect(screen.getByText('Library')).toBeInTheDocument();
-        expect(screen.getByText('Acknowledgments')).toBeInTheDocument();
-        expect(screen.getByText('Reviews')).toBeInTheDocument();
+        act(() => {
+            fireEvent.click(screen.getByText('Documents'));
+        });
+        // Use findByText to wait for the menu to open (async animation)
+        expect(await screen.findByText('Library')).toBeInTheDocument();
+        expect(await screen.findByText('Acknowledgments')).toBeInTheDocument();
+        expect(await screen.findByText('Reviews')).toBeInTheDocument();
 
         // Check for specific items in Risk Management
-        fireEvent.click(screen.getByText('Risk Management'));
-        expect(screen.getByText('Risk Register')).toBeInTheDocument();
-        expect(screen.getByText('Review Inbox')).toBeInTheDocument();
-        expect(screen.getByText('Controls')).toBeInTheDocument();
-        expect(screen.getByText('Statement of Applicability')).toBeInTheDocument();
+        act(() => {
+            fireEvent.click(screen.getByText('Risk Management'));
+        });
+        expect(await screen.findByText('Risk Register')).toBeInTheDocument();
+        expect(await screen.findByText('Review Inbox')).toBeInTheDocument();
+        expect(await screen.findByText('Controls')).toBeInTheDocument();
+        expect(await screen.findByText('Statement of Applicability')).toBeInTheDocument();
 
         // Check for specific items in Organization
-        fireEvent.click(screen.getByText('Organization'));
-        expect(screen.getByText('Assets')).toBeInTheDocument();
-        expect(screen.getByText('Asset Categories')).toBeInTheDocument();
-        expect(screen.getByText('Suppliers')).toBeInTheDocument();
-        expect(screen.getByText('Interested Parties')).toBeInTheDocument();
-        expect(screen.getByText('Legislation')).toBeInTheDocument();
+        act(() => {
+            fireEvent.click(screen.getByText('Organization'));
+        });
+        expect(await screen.findByText('Assets')).toBeInTheDocument();
+        expect(await screen.findByText('Asset Categories')).toBeInTheDocument();
+        expect(await screen.findByText('Suppliers')).toBeInTheDocument();
+        expect(await screen.findByText('Interested Parties')).toBeInTheDocument();
+        expect(await screen.findByText('Legislation')).toBeInTheDocument();
 
         // Check for specific items in System
-        fireEvent.click(screen.getByText('System'));
-        expect(screen.getByText('Trust Center')).toBeInTheDocument();
-        expect(screen.getByText('User Management')).toBeInTheDocument();
-    });
+        act(() => {
+            fireEvent.click(screen.getByText('System'));
+        });
+        expect(await screen.findByText('Trust Center')).toBeInTheDocument();
+        expect(await screen.findByText('User Management')).toBeInTheDocument();
+    }, 15000);
 });

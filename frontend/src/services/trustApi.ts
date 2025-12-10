@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { config } from '../config';
 import apiInternal from './api'; // Main API client for internal user auth (Entra ID)
 import type {
@@ -6,6 +6,7 @@ import type {
   TrustCategoryGroup,
   TrustDocSetting,
   TrustAuditLog,
+  TrustDocument,
 } from '../types/trust';
 
 const API_URL = `${config.apiUrl}/api/trust`;
@@ -150,23 +151,17 @@ export const trustApi = {
       const url = token
         ? `${API_URL}/download/${docId}?token=${token}`
         : `${API_URL}/download/${docId}`;
-      
-      console.log('[TRUST-API] Downloading document:', { docId, url, hasToken: !!token });
-      
+
+
+
       const response = await axios.get(url, {
         responseType: 'blob',
         headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
         timeout: 60000, // 60 second timeout for large files
       });
-      
-      console.log('[TRUST-API] Download response received:', {
-        status: response.status,
-        contentType: response.headers['content-type'],
-        contentLength: response.headers['content-length'],
-        dataType: response.data?.constructor?.name,
-        dataSize: response.data?.size || response.data?.length,
-      });
-      
+
+
+
       // Extract filename from Content-Disposition header
       let filename = 'document';
       const contentDisposition = response.headers['content-disposition'];
@@ -183,15 +178,15 @@ export const trustApi = {
           }
         }
       }
-      
+
       // Get content type from response headers
       // All documents are now converted to PDF, so default to PDF
       const contentType = response.headers['content-type'] || 'application/pdf';
-      
+
       // Axios with responseType: 'blob' should return a Blob
       // However, we need to ensure it's properly created with the correct MIME type
       let blob: Blob;
-      
+
       if (response.data instanceof Blob) {
         // Already a Blob - but we should ensure it has the correct type
         // If the type is generic, update it from headers
@@ -209,49 +204,47 @@ export const trustApi = {
           blob = new Blob([response.data], { type: contentType });
         }
       }
-      
+
       // Validate blob size
       if (blob.size === 0) {
         throw new Error('Received empty file from server');
       }
-      
-      console.log('[TRUST-API] Blob created successfully:', {
-        size: blob.size,
-        type: blob.type,
-        filename,
-      });
-      
+
+
+
       return { blob, filename };
-    } catch (error: any) {
-      console.error('[TRUST-API] Download error:', error);
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      console.error('[TRUST-API] Download error:', axiosError);
       console.error('[TRUST-API] Error details:', {
-        message: error.message,
-        response: error.response ? {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data,
-          headers: error.response.headers,
+        message: axiosError.message,
+        response: axiosError.response ? {
+          status: axiosError.response.status,
+          statusText: axiosError.response.statusText,
+          data: axiosError.response.data,
+          headers: axiosError.response.headers,
         } : null,
       });
-      
+
       // If it's an error response with JSON data, try to extract the error message
-      if (error.response?.data) {
+      if (axiosError.response?.data) {
         // If the response is a blob (error response), try to read it as text
-        if (error.response.data instanceof Blob) {
+        if (axiosError.response.data instanceof Blob) {
           try {
-            const errorText = await error.response.data.text();
+            const errorText = await axiosError.response.data.text();
             const errorJson = JSON.parse(errorText);
             throw new Error(errorJson.error || errorJson.message || 'Download failed');
           } catch (parseError) {
             // If parsing fails, use the original error
-            throw new Error(error.response.statusText || 'Download failed');
+            throw new Error(axiosError.response.statusText || 'Download failed');
           }
-        } else if (typeof error.response.data === 'object' && error.response.data.error) {
-          throw new Error(error.response.data.error);
+        } else if (typeof axiosError.response.data === 'object' && axiosError.response.data && 'error' in axiosError.response.data) {
+          const errorData = axiosError.response.data as { error: string };
+          throw new Error(errorData.error);
         }
       }
-      
-      throw error;
+
+      throw axiosError;
     }
   },
 
@@ -277,7 +270,7 @@ export const trustApi = {
   },
 
   async getDocumentSettings(): Promise<
-    Array<{ document: any; trustSetting: TrustDocSetting | null }>
+    Array<{ document: TrustDocument; trustSetting: TrustDocSetting | null }>
   > {
     const response = await apiInternal.get('/api/trust/admin/documents');
     return response.data;

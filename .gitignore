@@ -61,7 +61,13 @@ Thumbs.db
 cache/
 
 # Cursor/IDE specific
-.cursor/
+# Allow .cursor/rules/ to be committed (contains project rules)
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 
 # Prisma
 prisma/migrations/migration_lock.toml
+
+# Linting tracking data
+.warning-tracker.json

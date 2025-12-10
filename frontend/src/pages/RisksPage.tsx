@@ -3,36 +3,16 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Heading,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
+
   Button,
   HStack,
   VStack,
   Badge,
   useDisclosure,
-  Select,
-  Input,
-  Checkbox,
-  Flex,
-  Text,
-  Spinner,
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogContent,
-  AlertDialogOverlay,
-  useToast,
-  IconButton,
+  useToast, // Added
+  Checkbox, // Added
+  Text,     // Added
   Tooltip,
-  Wrap,
-  WrapItem,
-  InputGroup,
-  InputLeftElement,
   Popover,
   PopoverTrigger,
   PopoverContent,
@@ -50,15 +30,23 @@ import {
   ModalCloseButton,
   FormControl,
   FormLabel,
+  Input,
+  Tr,
+  Td,
+  IconButton,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
 } from '@chakra-ui/react';
-import { HamburgerIcon } from '@chakra-ui/icons';
-import { SearchIcon, ChevronUpIcon, ChevronDownIcon } from '@chakra-ui/icons';
-import { DeleteIcon, DownloadIcon, EditIcon, CopyIcon } from '@chakra-ui/icons';
+import { DeleteIcon, DownloadIcon, HamburgerIcon } from '@chakra-ui/icons';
 import api from '../services/api';
 import { RiskFormModal } from '../components/RiskFormModal';
 import { DepartmentRiskTable } from '../components/DepartmentRiskTable';
 import { useAuth } from '../contexts/AuthContext';
-import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
+import { DataTable, Column, FilterConfig, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
 import { formatBoolean, generateCSV } from '../utils/tableUtils';
 import { useDebounce } from '../hooks/useDebounce';
 
@@ -192,9 +180,9 @@ export function RisksPage() {
 
   // Filters and pagination
   const [filters, setFilters] = useState(getInitialFilters);
-  
+
   // Track if we've initialized filters from URL to avoid re-initializing
-  const filtersInitializedRef = useRef(false);
+
 
   // Separate search state for immediate UI updates (must be declared before useDebounce)
   const [searchInput, setSearchInput] = useState(filters.search);
@@ -343,17 +331,17 @@ export function RisksPage() {
     const policyNonConformanceParam = searchParams.get('policyNonConformance');
     const riskLevelParam = searchParams.get('riskLevel');
     const assetCategoryIdParam = searchParams.get('assetCategoryId');
-    
+
     // Skip if we're handling view/edit params (those are handled separately)
     const viewParam = searchParams.get('view');
     const editParam = searchParams.get('edit');
     if (viewParam || editParam) {
       return;
     }
-    
+
     // Check if we have filter params that differ from current filters
     const hasFilterParams = mitigationImplementedParam !== null || policyNonConformanceParam !== null || riskLevelParam !== null || assetCategoryIdParam !== null;
-    
+
     if (hasFilterParams) {
       // Always update filters when URL params are present to ensure they're applied
       setFilters(prev => ({
@@ -364,7 +352,7 @@ export function RisksPage() {
         assetCategoryId: assetCategoryIdParam !== null ? assetCategoryIdParam : prev.assetCategoryId,
         page: 1, // Reset to first page when filter changes
       }));
-      
+
       // Remove the params from URL after a delay to ensure filters are applied first
       // Keep assetCategoryId in URL longer to ensure it's applied
       const timeoutId = setTimeout(() => {
@@ -377,7 +365,7 @@ export function RisksPage() {
           return newSearchParams;
         });
       }, 500);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [searchParams, setSearchParams]);
@@ -394,7 +382,7 @@ export function RisksPage() {
     const editRiskId = searchParams.get('edit');
     const riskId = editRiskId || viewRiskId;
     const shouldEdit = !!editRiskId;
-    
+
     if (riskId && viewRiskProcessedRef.current !== riskId) {
       // First check if risk is in current list
       const risk = risks.find(r => r.id === riskId);
@@ -486,12 +474,7 @@ export function RisksPage() {
     onOpen();
   }, [onOpen]);
 
-  const handleView = useCallback((risk: Risk) => {
-    setSelectedRisk(risk);
-    setIsDuplicateMode(false);
-    setViewMode(true);
-    onOpen();
-  }, [onOpen]);
+
 
   const handleCreate = useCallback(() => {
     setSelectedRisk(null);
@@ -587,9 +570,7 @@ export function RisksPage() {
     return count;
   };
 
-  const handleSearchChange = (value: string) => {
-    setFilters({ ...filters, search: value, page: 1 }); // Reset to page 1 on search
-  };
+
 
   const handlePageChange = (newPage: number) => {
     setFilters({ ...filters, page: newPage });
@@ -907,7 +888,7 @@ export function RisksPage() {
         header: 'Treatment',
         minW: '120px',
         render: (risk) => {
-          const hasMitigatedScores = 
+          const hasMitigatedScores =
             risk.mitigatedConfidentialityScore !== null ||
             risk.mitigatedIntegrityScore !== null ||
             risk.mitigatedAvailabilityScore !== null ||
@@ -915,11 +896,11 @@ export function RisksPage() {
             risk.mitigatedScore !== null;
           const hasMitigationDescription = (risk as any).mitigationDescription && (risk as any).mitigationDescription.trim().length > 0;
           // Non-conformance only applies to MODIFY risks with MEDIUM or HIGH initial risk scores
-          const hasNonConformance = 
-            risk.initialRiskTreatmentCategory === 'MODIFY' && 
+          const hasNonConformance =
+            risk.initialRiskTreatmentCategory === 'MODIFY' &&
             risk.riskLevel !== 'LOW' &&
             !(hasMitigatedScores && hasMitigationDescription);
-          
+
           return risk.initialRiskTreatmentCategory ? (
             <HStack spacing={2}>
               <Badge
@@ -933,17 +914,17 @@ export function RisksPage() {
                 px={3}
                 py={1}
                 minW="80px"
-            >
-              {risk.initialRiskTreatmentCategory}
-            </Badge>
-            {hasNonConformance && (
-              <Tooltip label="Policy Non-Conformance: MODIFY risk without complete Additional Controls Assessment">
-                <Badge colorScheme="red" fontSize="xs" cursor="help">
-                  !
-                </Badge>
-              </Tooltip>
-            )}
-          </HStack>
+              >
+                {risk.initialRiskTreatmentCategory}
+              </Badge>
+              {hasNonConformance && (
+                <Tooltip label="Policy Non-Conformance: MODIFY risk without complete Additional Controls Assessment">
+                  <Badge colorScheme="red" fontSize="xs" cursor="help">
+                    !
+                  </Badge>
+                </Tooltip>
+              )}
+            </HStack>
           ) : (
             <Text fontSize="xs" color="gray.400" fontStyle="italic">N/A</Text>
           );
@@ -1413,11 +1394,7 @@ export function RisksPage() {
     );
   }, [user, selectedRiskIds, getRowBgColor, handleEdit, handleSelectRisk, buildColumns, risks]);
 
-  // Calculate available height for table (100vh - header - filters - pagination - padding)
-  const tableHeight = useMemo(() => {
-    // Approximate heights: header ~80px, filters ~120px, pagination ~60px, padding ~80px
-    return 'calc(100vh - 340px)';
-  }, []);
+
 
   // For Contributors, show simplified DepartmentRiskTable
   if (effectiveRole === 'CONTRIBUTOR') {

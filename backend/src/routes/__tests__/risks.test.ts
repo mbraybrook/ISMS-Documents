@@ -1,8 +1,6 @@
 import request from 'supertest';
 import express from 'express';
 import { risksRouter } from '../risks';
-import { authenticateToken } from '../../middleware/auth';
-import { requireRole, requireDepartmentAccess } from '../../middleware/authorize';
 import { mockUsers } from '../../lib/test-helpers';
 
 // Mock authentication middleware
@@ -93,6 +91,7 @@ describe('Risks API', () => {
     app = express();
     app.use(express.json());
     app.use('/api/risks', risksRouter);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     prisma = require('../../lib/prisma').prisma;
     jest.clearAllMocks();
   });
@@ -219,6 +218,7 @@ describe('Risks API', () => {
     });
 
     it('should calculate risk score automatically', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { calculateRiskScore } = require('../../services/riskService');
       const partyId = '550e8400-e29b-41d4-a716-446655440010';
       const newRisk = {
@@ -254,6 +254,7 @@ describe('Risks API', () => {
     });
 
     it('should handle wizard data for CONTRIBUTOR users', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { calculateCIAFromWizard } = require('../../services/riskService');
       const contributorUser = mockUsers.contributor('OPERATIONS');
       const partyId = '550e8400-e29b-41d4-a716-446655440010';
@@ -287,6 +288,7 @@ describe('Risks API', () => {
     });
 
     it('should parse and associate control codes', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { parseControlCodes } = require('../../services/riskService');
       const partyId = '550e8400-e29b-41d4-a716-446655440010';
       const newRisk = {

@@ -19,9 +19,9 @@ export interface SupplierWithAssessments {
  * NOTE: All transitions are now allowed - restrictions have been removed
  */
 export function validateLifecycleTransition(
-  currentState: SupplierLifecycleState,
-  newState: SupplierLifecycleState,
-  supplier?: SupplierWithAssessments
+  _currentState: SupplierLifecycleState,
+  _newState: SupplierLifecycleState,
+  _supplier?: SupplierWithAssessments
 ): boolean {
   // All transitions are now allowed
   return true;
@@ -36,7 +36,7 @@ export function validateLifecycleTransition(
  * to allow manual state management.
  */
 export async function determineNextState(
-  supplier: SupplierWithAssessments
+  _supplier: SupplierWithAssessments
 ): Promise<SupplierLifecycleState | null> {
   // Assessment-based auto-transitions have been removed
   // Lifecycle state is now managed manually

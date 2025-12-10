@@ -1,8 +1,6 @@
 import request from 'supertest';
 import express from 'express';
 import { documentsRouter } from '../documents';
-import { authenticateToken } from '../../middleware/auth';
-import { requireRole } from '../../middleware/authorize';
 import { mockUsers } from '../../lib/test-helpers';
 
 // Mock authentication middleware
@@ -69,6 +67,7 @@ describe('Documents API', () => {
     app = express();
     app.use(express.json());
     app.use('/api/documents', documentsRouter);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     prisma = require('../../lib/prisma').prisma;
     jest.clearAllMocks();
   });
@@ -630,7 +629,7 @@ describe('Documents API', () => {
       });
       prisma.document.update.mockResolvedValue(updatedDocument);
 
-      const response = await request(app)
+      await request(app)
         .post(`/api/documents/${docId}/version-updates`)
         .send({
           currentVersion: '1.0',
@@ -718,7 +717,7 @@ describe('Documents API', () => {
       prisma.documentVersionHistory.create.mockResolvedValue({});
       prisma.document.update.mockResolvedValue(updatedDocument);
 
-      const response = await request(app)
+      await request(app)
         .put(`/api/documents/${docId}`)
         .send({
           title: 'Updated Title',

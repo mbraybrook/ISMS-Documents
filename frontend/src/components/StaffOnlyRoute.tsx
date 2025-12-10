@@ -1,14 +1,14 @@
 import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Box, Spinner, Center } from '@chakra-ui/react';
+import { Center } from '@chakra-ui/react';
 
 interface StaffOnlyRouteProps {
   children: ReactNode;
 }
 
 export function StaffOnlyRoute({ children }: StaffOnlyRouteProps) {
-  const { isAuthenticated, user, loading, getEffectiveRole } = useAuth();
+  const { isAuthenticated, loading, getEffectiveRole } = useAuth();
 
   if (loading) {
     return (

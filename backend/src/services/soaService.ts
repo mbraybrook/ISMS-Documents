@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import { prisma } from '../lib/prisma';
 

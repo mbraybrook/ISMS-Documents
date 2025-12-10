@@ -24,10 +24,6 @@ import {
   Badge,
   Spinner,
   Center,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
   CloseButton,
   Modal,
   ModalOverlay,
@@ -51,16 +47,17 @@ import {
   Checkbox,
   Link,
   Collapse,
-  Divider,
   SimpleGrid,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  Flex,
   Tabs,
   TabList,
   TabPanels,
   Tab,
   TabPanel,
-  Flex,
-  Wrap,
-  WrapItem,
 } from '@chakra-ui/react';
 import { SearchIcon, EditIcon, DeleteIcon, AddIcon, ChevronDownIcon, ChevronUpIcon, HamburgerIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 import { Link as RouterLink } from 'react-router-dom';
@@ -143,11 +140,11 @@ export function InterestedPartiesPage() {
     applyFilters();
   }, [interestedParties, searchQuery, sortConfig, selectedGroupFilter]);
 
-  const expandAllRows = () => {
+  const _expandAllRows = () => {
     setExpandedRows(new Set(filteredParties.map(p => p.id)));
   };
 
-  const collapseAllRows = () => {
+  const _collapseAllRows = () => {
     setExpandedRows(new Set());
   };
 
@@ -177,7 +174,7 @@ export function InterestedPartiesPage() {
       const response = await api.get('/api/risks?limit=1000&page=1&archived=false');
       const allRisksData = response.data.data || response.data.risks || [];
       setAllRisks(allRisksData);
-      
+
       // Fetch risks currently linked to this party
       const partyRisks = allRisksData.filter((risk: any) => risk.interestedPartyId === partyId);
       setSelectedRiskIds(new Set(partyRisks.map((r: any) => r.id)));
@@ -206,14 +203,14 @@ export function InterestedPartiesPage() {
 
       // Remove association from risks that were deselected
       const currentPartyRisks = allRisks.filter((r: any) => r.interestedPartyId === partyForRiskManagement.id);
-      const toRemove = currentPartyRisks.filter((r: any) => !selectedRiskIds.has(r.id));
-      
+      const _toRemove = currentPartyRisks.filter((r: any) => !selectedRiskIds.has(r.id));
+
       // Note: We can't set interestedPartyId to null as it's required
       // Instead, we'd need a default "Unassigned" party or handle this differently
       // For now, we'll just update the selected ones
 
       await Promise.all(riskUpdates);
-      
+
       toast({
         title: 'Success',
         description: 'Risk associations updated successfully',
@@ -221,7 +218,7 @@ export function InterestedPartiesPage() {
         duration: 3000,
         isClosable: true,
       });
-      
+
       setIsRiskModalOpen(false);
       setPartyForRiskManagement(null);
       fetchInterestedParties();
@@ -416,7 +413,7 @@ export function InterestedPartiesPage() {
         api.delete(`/api/interested-parties/${partyId}`)
       );
       await Promise.all(deletePromises);
-      
+
       const deletedCount = selectedParties.size;
       toast({
         title: 'Success',
@@ -442,7 +439,7 @@ export function InterestedPartiesPage() {
 
   const handleBulkExport = () => {
     const selectedPartiesList = filteredParties.filter(p => selectedParties.has(p.id));
-    
+
     const headers = [
       'Name',
       'Group',
@@ -527,28 +524,28 @@ export function InterestedPartiesPage() {
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-    
+
     const nameError = validateName(formData.name);
     if (nameError) {
       errors.name = nameError;
     }
-    
+
     if (formData.sourceLink && !validateURL(formData.sourceLink)) {
       errors.sourceLink = 'Please enter a valid URL (e.g., https://example.com) or "N/A"';
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const checkDuplicateName = async (name: string, excludeId?: string): Promise<boolean> => {
     if (!name.trim()) return false;
-    
+
     try {
       const response = await api.get('/api/interested-parties');
       const parties = response.data;
-      return parties.some((party: InterestedParty) => 
-        party.name.toLowerCase().trim() === name.toLowerCase().trim() && 
+      return parties.some((party: InterestedParty) =>
+        party.name.toLowerCase().trim() === name.toLowerCase().trim() &&
         party.id !== excludeId
       );
     } catch {
@@ -557,8 +554,8 @@ export function InterestedPartiesPage() {
   };
 
   const handleNameChange = async (value: string) => {
-    setFormData(prev => ({ ...formData, name: value }));
-    
+    setFormData(prev => ({ ...prev, name: value }));
+
     // Clear previous error
     if (formErrors.name) {
       setFormErrors(prev => {
@@ -567,13 +564,13 @@ export function InterestedPartiesPage() {
         return newErrors;
       });
     }
-    
+
     // Check for duplicates (debounced)
     if (value.trim() && (!selectedParty || value.trim().toLowerCase() !== selectedParty.name.toLowerCase())) {
       setCheckingDuplicate(true);
       const isDuplicate = await checkDuplicateName(value, selectedParty?.id);
       setCheckingDuplicate(false);
-      
+
       if (isDuplicate) {
         setFormErrors(prev => ({
           ...prev,
@@ -600,7 +597,7 @@ export function InterestedPartiesPage() {
       const payload: any = {
         name: formData.name.trim(),
       };
-      
+
       // Only include optional fields if they have values
       if (formData.group && formData.group.trim()) {
         payload.group = formData.group.trim();
@@ -664,7 +661,7 @@ export function InterestedPartiesPage() {
     } catch (error: any) {
       let errorMessage = 'Failed to save interested party';
       const errorData = error.response?.data;
-      
+
       if (errorData?.errors && Array.isArray(errorData.errors)) {
         // Handle validation errors
         const validationErrors = errorData.errors.map((err: any) => err.msg || err.message).join(', ');
@@ -678,7 +675,7 @@ export function InterestedPartiesPage() {
           errorMessage = 'Name is required. Please enter a name for the interested party.';
         }
       }
-      
+
       toast({
         title: 'Error',
         description: errorMessage,
@@ -833,407 +830,407 @@ export function InterestedPartiesPage() {
           )}
           <Box overflowX="auto">
             <Table variant="simple">
-            <Thead>
-              <Tr>
-                <Th w="40px">
-                  <Checkbox
-                    isChecked={selectedParties.size > 0 && selectedParties.size === filteredParties.length}
-                    isIndeterminate={selectedParties.size > 0 && selectedParties.size < filteredParties.length}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        selectAllVisible();
-                      } else {
-                        clearSelection();
-                      }
-                    }}
-                  />
-                </Th>
-                <Th w="40px"></Th>
-                <Th 
-                  cursor="pointer" 
-                  userSelect="none"
-                  onClick={() => handleSort('name')}
-                  _hover={{ bg: 'gray.100' }}
-                >
-                  <HStack spacing={1}>
-                    <Text>Name</Text>
-                    {sortConfig?.field === 'name' && (
-                      <Text>{sortConfig.direction === 'asc' ? '▲' : '▼'}</Text>
-                    )}
-                  </HStack>
-                </Th>
-                <Th 
-                  cursor="pointer" 
-                  userSelect="none"
-                  onClick={() => handleSort('group')}
-                  _hover={{ bg: 'gray.100' }}
-                >
-                  <HStack spacing={1}>
-                    <Text>Group</Text>
-                    {sortConfig?.field === 'group' && (
-                      <Text>{sortConfig.direction === 'asc' ? '▲' : '▼'}</Text>
-                    )}
-                  </HStack>
-                </Th>
-                <Th 
-                  cursor="pointer" 
-                  userSelect="none"
-                  onClick={() => handleSort('risks')}
-                  _hover={{ bg: 'gray.100' }}
-                >
-                  <HStack spacing={1}>
-                    <Text>Risks</Text>
-                    {sortConfig?.field === 'risks' && (
-                      <Text>{sortConfig.direction === 'asc' ? '▲' : '▼'}</Text>
-                    )}
-                  </HStack>
-                </Th>
-                <Th>Actions</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {(() => {
-                const startIndex = (currentPage - 1) * itemsPerPage;
-                const endIndex = startIndex + itemsPerPage;
-                const paginatedParties = filteredParties.slice(startIndex, endIndex);
-                const totalPages = Math.ceil(filteredParties.length / itemsPerPage);
+              <Thead>
+                <Tr>
+                  <Th w="40px">
+                    <Checkbox
+                      isChecked={selectedParties.size > 0 && selectedParties.size === filteredParties.length}
+                      isIndeterminate={selectedParties.size > 0 && selectedParties.size < filteredParties.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          selectAllVisible();
+                        } else {
+                          clearSelection();
+                        }
+                      }}
+                    />
+                  </Th>
+                  <Th w="40px"></Th>
+                  <Th
+                    cursor="pointer"
+                    userSelect="none"
+                    onClick={() => handleSort('name')}
+                    _hover={{ bg: 'gray.100' }}
+                  >
+                    <HStack spacing={1}>
+                      <Text>Name</Text>
+                      {sortConfig?.field === 'name' && (
+                        <Text>{sortConfig.direction === 'asc' ? '▲' : '▼'}</Text>
+                      )}
+                    </HStack>
+                  </Th>
+                  <Th
+                    cursor="pointer"
+                    userSelect="none"
+                    onClick={() => handleSort('group')}
+                    _hover={{ bg: 'gray.100' }}
+                  >
+                    <HStack spacing={1}>
+                      <Text>Group</Text>
+                      {sortConfig?.field === 'group' && (
+                        <Text>{sortConfig.direction === 'asc' ? '▲' : '▼'}</Text>
+                      )}
+                    </HStack>
+                  </Th>
+                  <Th
+                    cursor="pointer"
+                    userSelect="none"
+                    onClick={() => handleSort('risks')}
+                    _hover={{ bg: 'gray.100' }}
+                  >
+                    <HStack spacing={1}>
+                      <Text>Risks</Text>
+                      {sortConfig?.field === 'risks' && (
+                        <Text>{sortConfig.direction === 'asc' ? '▲' : '▼'}</Text>
+                      )}
+                    </HStack>
+                  </Th>
+                  <Th>Actions</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {(() => {
+                  const startIndex = (currentPage - 1) * itemsPerPage;
+                  const endIndex = startIndex + itemsPerPage;
+                  const paginatedParties = filteredParties.slice(startIndex, endIndex);
+                  const totalPages = Math.ceil(filteredParties.length / itemsPerPage);
 
-                if (filteredParties.length === 0) {
-                  return (
-                    <Tr>
-                      <Td colSpan={6} textAlign="center" py={12}>
-                        <VStack spacing={4}>
-                          <Text color="gray.500" fontSize="lg" fontWeight="medium">
-                            {searchQuery || selectedGroupFilter
-                              ? `No interested parties found${searchQuery ? ` matching '${searchQuery}'` : ''}${selectedGroupFilter ? ` in ${selectedGroupFilter}` : ''}`
-                              : 'No interested parties yet'}
-                          </Text>
-                          {(searchQuery || selectedGroupFilter) && (
-                            <HStack spacing={2}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSearchQuery('');
-                                  setSelectedGroupFilter(null);
-                                }}
-                              >
-                                Clear Filters
-                              </Button>
-                            </HStack>
-                          )}
-                          {!searchQuery && !selectedGroupFilter && canEdit && (
-                            <Button
-                              size="sm"
-                              colorScheme="blue"
-                              leftIcon={<AddIcon />}
-                              onClick={handleCreate}
-                            >
-                              Create Your First Interested Party
-                            </Button>
-                          )}
-                        </VStack>
-                      </Td>
-                    </Tr>
-                  );
-                }
-
-                return (
-                  <>
-                    {paginatedParties.map((party) => {
-                      const isExpanded = expandedRows.has(party.id);
-                      return (
-                        <React.Fragment key={party.id}>
-                          <Tr
-                            transition="background-color 0.2s"
-                            borderLeft="3px solid"
-                            borderLeftColor="transparent"
-                            _hover={{ borderLeftColor: 'blue.500', bg: 'blue.50' }}
-                          >
-                            <Td>
-                              <Checkbox
-                                isChecked={selectedParties.has(party.id)}
-                                onChange={() => toggleSelectParty(party.id)}
-                              />
-                            </Td>
-                            <Td>
-                              <IconButton
-                                aria-label={isExpanded ? `Collapse details for ${party.name}` : `Expand details for ${party.name}`}
-                                icon={isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                                size="xs"
-                                variant="ghost"
-                                onClick={() => toggleRowExpansion(party.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    toggleRowExpansion(party.id);
-                                  }
-                                }}
-                              />
-                            </Td>
-                            <Td>
-                              <Text
-                                fontWeight="medium"
-                                cursor="pointer"
-                                onClick={() => toggleRowExpansion(party.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    toggleRowExpansion(party.id);
-                                  }
-                                }}
-                                tabIndex={0}
-                                _hover={{ color: 'blue.600', textDecoration: 'underline' }}
-                              >
-                                {party.name}
-                              </Text>
-                            </Td>
-                            <Td>
-                              {party.group ? (
-                                <Badge colorScheme={getGroupColor(party.group)}>{party.group}</Badge>
-                              ) : (
-                                <Text color="gray.400">—</Text>
-                              )}
-                            </Td>
-                            <Td>
-                              <Tooltip
-                                label={`${party._count?.risks || 0} associated risk${(party._count?.risks || 0) !== 1 ? 's' : ''}. Click to view.`}
-                                hasArrow
-                              >
-                                <Link
-                                  as={RouterLink}
-                                  to="/admin/risks/risks"
+                  if (filteredParties.length === 0) {
+                    return (
+                      <Tr>
+                        <Td colSpan={6} textAlign="center" py={12}>
+                          <VStack spacing={4}>
+                            <Text color="gray.500" fontSize="lg" fontWeight="medium">
+                              {searchQuery || selectedGroupFilter
+                                ? `No interested parties found${searchQuery ? ` matching '${searchQuery}'` : ''}${selectedGroupFilter ? ` in ${selectedGroupFilter}` : ''}`
+                                : 'No interested parties yet'}
+                            </Text>
+                            {(searchQuery || selectedGroupFilter) && (
+                              <HStack spacing={2}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                                   onClick={() => {
-                                    sessionStorage.setItem('filterInterestedPartyId', party.id);
+                                    setSearchQuery('');
+                                    setSelectedGroupFilter(null);
                                   }}
                                 >
-                                  <Badge
-                                    colorScheme={getRiskBadgeColor(party._count?.risks || 0)}
-                                    cursor="pointer"
-                                    _hover={{ transform: 'scale(1.1)' }}
-                                    transition="transform 0.2s"
+                                  Clear Filters
+                                </Button>
+                              </HStack>
+                            )}
+                            {!searchQuery && !selectedGroupFilter && canEdit && (
+                              <Button
+                                size="sm"
+                                colorScheme="blue"
+                                leftIcon={<AddIcon />}
+                                onClick={handleCreate}
+                              >
+                                Create Your First Interested Party
+                              </Button>
+                            )}
+                          </VStack>
+                        </Td>
+                      </Tr>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {paginatedParties.map((party) => {
+                        const isExpanded = expandedRows.has(party.id);
+                        return (
+                          <React.Fragment key={party.id}>
+                            <Tr
+                              transition="background-color 0.2s"
+                              borderLeft="3px solid"
+                              borderLeftColor="transparent"
+                              _hover={{ borderLeftColor: 'blue.500', bg: 'blue.50' }}
+                            >
+                              <Td>
+                                <Checkbox
+                                  isChecked={selectedParties.has(party.id)}
+                                  onChange={() => toggleSelectParty(party.id)}
+                                />
+                              </Td>
+                              <Td>
+                                <IconButton
+                                  aria-label={isExpanded ? `Collapse details for ${party.name}` : `Expand details for ${party.name}`}
+                                  icon={isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                                  size="xs"
+                                  variant="ghost"
+                                  onClick={() => toggleRowExpansion(party.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      toggleRowExpansion(party.id);
+                                    }
+                                  }}
+                                />
+                              </Td>
+                              <Td>
+                                <Text
+                                  fontWeight="medium"
+                                  cursor="pointer"
+                                  onClick={() => toggleRowExpansion(party.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      toggleRowExpansion(party.id);
+                                    }
+                                  }}
+                                  tabIndex={0}
+                                  _hover={{ color: 'blue.600', textDecoration: 'underline' }}
+                                >
+                                  {party.name}
+                                </Text>
+                              </Td>
+                              <Td>
+                                {party.group ? (
+                                  <Badge colorScheme={getGroupColor(party.group)}>{party.group}</Badge>
+                                ) : (
+                                  <Text color="gray.400">—</Text>
+                                )}
+                              </Td>
+                              <Td>
+                                <Tooltip
+                                  label={`${party._count?.risks || 0} associated risk${(party._count?.risks || 0) !== 1 ? 's' : ''}. Click to view.`}
+                                  hasArrow
+                                >
+                                  <Link
+                                    as={RouterLink}
+                                    to="/admin/risks/risks"
+                                    onClick={() => {
+                                      sessionStorage.setItem('filterInterestedPartyId', party.id);
+                                    }}
                                   >
-                                    {party._count?.risks || 0}
-                                  </Badge>
-                                </Link>
-                              </Tooltip>
-                            </Td>
-                        <Td>
-                          {canEdit && (
-                            <Menu>
-                              <MenuButton
-                                as={IconButton}
-                                icon={<HamburgerIcon />}
-                                variant="ghost"
-                                size="sm"
-                                aria-label={`Actions for ${party.name}`}
-                              />
-                              <MenuList>
-                                <MenuItem
-                                  icon={<EditIcon />}
-                                  onClick={() => handleEdit(party)}
-                                  aria-label={`Edit ${party.name}`}
-                                >
-                                  Edit
-                                </MenuItem>
-                                <MenuItem
-                                  icon={<AddIcon />}
-                                  onClick={() => handleDuplicate(party)}
-                                  aria-label={`Duplicate ${party.name}`}
-                                >
-                                  Duplicate
-                                </MenuItem>
-                                <MenuItem
-                                  icon={<DeleteIcon />}
-                                  onClick={() => handleDelete(party)}
-                                  aria-label={`Delete ${party.name}`}
-                                  color="red.500"
-                                >
-                                  Delete
-                                </MenuItem>
-                              </MenuList>
-                            </Menu>
-                          )}
-                        </Td>
-                      </Tr>
-                      <Tr>
-                        <Td colSpan={6} p={0}>
-                          <Collapse in={isExpanded} animateOpacity>
-                            <Box p={4} bg="gray.50" borderTop="1px solid" borderColor="gray.200" borderLeft="3px solid" borderLeftColor="blue.500">
-                              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                                {party.dateAdded && (
-                                  <Box>
-                                    <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
-                                      Partnership Start Date
-                                    </Text>
-                                    <Text fontSize="sm" color="gray.900">
-                                      {new Date(party.dateAdded).toLocaleDateString()}
-                                    </Text>
-                                  </Box>
-                                )}
-                                <Box>
-                                  <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
-                                    Created
-                                  </Text>
-                                  <Text fontSize="sm" color="gray.900">
-                                    {new Date(party.createdAt).toLocaleString()}
-                                  </Text>
-                                </Box>
-                                <Box>
-                                  <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
-                                    Last Modified
-                                  </Text>
-                                  <Text fontSize="sm" color="gray.900">
-                                    {new Date(party.updatedAt).toLocaleString()}
-                                  </Text>
-                                </Box>
-                                {party.requirements && (
-                                  <Box>
-                                    <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
-                                      Requirements
-                                    </Text>
-                                    <Text fontSize="sm" color="gray.900" whiteSpace="pre-wrap">
-                                      {party.requirements}
-                                    </Text>
-                                  </Box>
-                                )}
-                                {party.addressedThroughISMS !== null && (
-                                  <Box>
-                                    <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
-                                      Addressed Through ISMS
-                                    </Text>
-                                    <Text fontSize="sm" color="gray.900">
-                                      {party.addressedThroughISMS ? 'Yes' : 'No'}
-                                    </Text>
-                                  </Box>
-                                )}
-                                {party.howAddressedThroughISMS && (
-                                  <Box gridColumn={{ base: 1, md: 'span 2' }}>
-                                    <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
-                                      How Addressed Through ISMS
-                                    </Text>
-                                    <Text fontSize="sm" color="gray.900" whiteSpace="pre-wrap">
-                                      {party.howAddressedThroughISMS}
-                                    </Text>
-                                  </Box>
-                                )}
-                                {party.sourceLink && (
-                                  <Box>
-                                    <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
-                                      Source/Link
-                                    </Text>
-                                    <Link href={party.sourceLink} isExternal color="blue.500" fontSize="sm">
-                                      {party.sourceLink} <ExternalLinkIcon mx={1} />
-                                    </Link>
-                                  </Box>
-                                )}
-                                {party.keyProductsServices && (
-                                  <Box>
-                                    <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
-                                      Key Products / Services
-                                    </Text>
-                                    <Text fontSize="sm" color="gray.900" whiteSpace="pre-wrap">
-                                      {party.keyProductsServices}
-                                    </Text>
-                                  </Box>
-                                )}
-                                {party.ourObligations && (
-                                  <Box gridColumn={{ base: 1, md: 'span 2' }}>
-                                    <Text fontWeight="bold" fontSize="sm" color="gray.700" mb={2}>
-                                      Our Obligations
-                                    </Text>
-                                    <Text fontSize="sm" color="gray.900" whiteSpace="pre-wrap">
-                                      {party.ourObligations}
-                                    </Text>
-                                  </Box>
-                                )}
-                                {party.theirObligations && (
-                                  <Box gridColumn={{ base: 1, md: 'span 2' }}>
-                                    <Text fontWeight="bold" fontSize="sm" color="gray.700" mb={2}>
-                                      Their Obligations
-                                    </Text>
-                                    <Text fontSize="sm" color="gray.900" whiteSpace="pre-wrap">
-                                      {party.theirObligations}
-                                    </Text>
-                                  </Box>
-                                )}
-                                {canEdit && (
-                                  <Box gridColumn={{ base: 1, md: 'span 2' }} pt={2}>
-                                    <Button
-                                      size="sm"
-                                      colorScheme="blue"
-                                      variant="outline"
-                                      leftIcon={<ExternalLinkIcon />}
-                                      onClick={() => {
-                                        setPartyForRiskManagement(party);
-                                        setIsRiskModalOpen(true);
-                                        fetchRisksForParty(party.id);
-                                      }}
+                                    <Badge
+                                      colorScheme={getRiskBadgeColor(party._count?.risks || 0)}
+                                      cursor="pointer"
+                                      _hover={{ transform: 'scale(1.1)' }}
+                                      transition="transform 0.2s"
                                     >
-                                      Manage Associated Risks ({party._count?.risks || 0})
-                                    </Button>
-                                  </Box>
+                                      {party._count?.risks || 0}
+                                    </Badge>
+                                  </Link>
+                                </Tooltip>
+                              </Td>
+                              <Td>
+                                {canEdit && (
+                                  <Menu>
+                                    <MenuButton
+                                      as={IconButton}
+                                      icon={<HamburgerIcon />}
+                                      variant="ghost"
+                                      size="sm"
+                                      aria-label={`Actions for ${party.name}`}
+                                    />
+                                    <MenuList>
+                                      <MenuItem
+                                        icon={<EditIcon />}
+                                        onClick={() => handleEdit(party)}
+                                        aria-label={`Edit ${party.name}`}
+                                      >
+                                        Edit
+                                      </MenuItem>
+                                      <MenuItem
+                                        icon={<AddIcon />}
+                                        onClick={() => handleDuplicate(party)}
+                                        aria-label={`Duplicate ${party.name}`}
+                                      >
+                                        Duplicate
+                                      </MenuItem>
+                                      <MenuItem
+                                        icon={<DeleteIcon />}
+                                        onClick={() => handleDelete(party)}
+                                        aria-label={`Delete ${party.name}`}
+                                        color="red.500"
+                                      >
+                                        Delete
+                                      </MenuItem>
+                                    </MenuList>
+                                  </Menu>
                                 )}
-                              </SimpleGrid>
-                            </Box>
-                          </Collapse>
-                        </Td>
-                      </Tr>
-                    </React.Fragment>
+                              </Td>
+                            </Tr>
+                            <Tr>
+                              <Td colSpan={6} p={0}>
+                                <Collapse in={isExpanded} animateOpacity>
+                                  <Box p={4} bg="gray.50" borderTop="1px solid" borderColor="gray.200" borderLeft="3px solid" borderLeftColor="blue.500">
+                                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                                      {party.dateAdded && (
+                                        <Box>
+                                          <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
+                                            Partnership Start Date
+                                          </Text>
+                                          <Text fontSize="sm" color="gray.900">
+                                            {new Date(party.dateAdded).toLocaleDateString()}
+                                          </Text>
+                                        </Box>
+                                      )}
+                                      <Box>
+                                        <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
+                                          Created
+                                        </Text>
+                                        <Text fontSize="sm" color="gray.900">
+                                          {new Date(party.createdAt).toLocaleString()}
+                                        </Text>
+                                      </Box>
+                                      <Box>
+                                        <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
+                                          Last Modified
+                                        </Text>
+                                        <Text fontSize="sm" color="gray.900">
+                                          {new Date(party.updatedAt).toLocaleString()}
+                                        </Text>
+                                      </Box>
+                                      {party.requirements && (
+                                        <Box>
+                                          <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
+                                            Requirements
+                                          </Text>
+                                          <Text fontSize="sm" color="gray.900" whiteSpace="pre-wrap">
+                                            {party.requirements}
+                                          </Text>
+                                        </Box>
+                                      )}
+                                      {party.addressedThroughISMS !== null && (
+                                        <Box>
+                                          <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
+                                            Addressed Through ISMS
+                                          </Text>
+                                          <Text fontSize="sm" color="gray.900">
+                                            {party.addressedThroughISMS ? 'Yes' : 'No'}
+                                          </Text>
+                                        </Box>
+                                      )}
+                                      {party.howAddressedThroughISMS && (
+                                        <Box gridColumn={{ base: 1, md: 'span 2' }}>
+                                          <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
+                                            How Addressed Through ISMS
+                                          </Text>
+                                          <Text fontSize="sm" color="gray.900" whiteSpace="pre-wrap">
+                                            {party.howAddressedThroughISMS}
+                                          </Text>
+                                        </Box>
+                                      )}
+                                      {party.sourceLink && (
+                                        <Box>
+                                          <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
+                                            Source/Link
+                                          </Text>
+                                          <Link href={party.sourceLink} isExternal color="blue.500" fontSize="sm">
+                                            {party.sourceLink} <ExternalLinkIcon mx={1} />
+                                          </Link>
+                                        </Box>
+                                      )}
+                                      {party.keyProductsServices && (
+                                        <Box>
+                                          <Text fontWeight="semibold" fontSize="xs" color="gray.600" mb={1} textTransform="uppercase" letterSpacing="wide">
+                                            Key Products / Services
+                                          </Text>
+                                          <Text fontSize="sm" color="gray.900" whiteSpace="pre-wrap">
+                                            {party.keyProductsServices}
+                                          </Text>
+                                        </Box>
+                                      )}
+                                      {party.ourObligations && (
+                                        <Box gridColumn={{ base: 1, md: 'span 2' }}>
+                                          <Text fontWeight="bold" fontSize="sm" color="gray.700" mb={2}>
+                                            Our Obligations
+                                          </Text>
+                                          <Text fontSize="sm" color="gray.900" whiteSpace="pre-wrap">
+                                            {party.ourObligations}
+                                          </Text>
+                                        </Box>
+                                      )}
+                                      {party.theirObligations && (
+                                        <Box gridColumn={{ base: 1, md: 'span 2' }}>
+                                          <Text fontWeight="bold" fontSize="sm" color="gray.700" mb={2}>
+                                            Their Obligations
+                                          </Text>
+                                          <Text fontSize="sm" color="gray.900" whiteSpace="pre-wrap">
+                                            {party.theirObligations}
+                                          </Text>
+                                        </Box>
+                                      )}
+                                      {canEdit && (
+                                        <Box gridColumn={{ base: 1, md: 'span 2' }} pt={2}>
+                                          <Button
+                                            size="sm"
+                                            colorScheme="blue"
+                                            variant="outline"
+                                            leftIcon={<ExternalLinkIcon />}
+                                            onClick={() => {
+                                              setPartyForRiskManagement(party);
+                                              setIsRiskModalOpen(true);
+                                              fetchRisksForParty(party.id);
+                                            }}
+                                          >
+                                            Manage Associated Risks ({party._count?.risks || 0})
+                                          </Button>
+                                        </Box>
+                                      )}
+                                    </SimpleGrid>
+                                  </Box>
+                                </Collapse>
+                              </Td>
+                            </Tr>
+                          </React.Fragment>
+                        );
+                      })}
+                      {totalPages > 1 && (
+                        <Tr>
+                          <Td colSpan={7}>
+                            <Flex justify="space-between" align="center" p={4}>
+                              <HStack spacing={2}>
+                                <Text fontSize="sm" color="gray.600">
+                                  Showing {startIndex + 1}-{Math.min(endIndex, filteredParties.length)} of {filteredParties.length} entries
+                                </Text>
+                                <Select
+                                  size="sm"
+                                  value={itemsPerPage}
+                                  onChange={(e) => {
+                                    setItemsPerPage(Number(e.target.value));
+                                    setCurrentPage(1);
+                                  }}
+                                  w="100px"
+                                >
+                                  <option value={10}>10</option>
+                                  <option value={25}>25</option>
+                                  <option value={50}>50</option>
+                                  <option value={100}>100</option>
+                                </Select>
+                                <Text fontSize="sm" color="gray.600">per page</Text>
+                              </HStack>
+                              <HStack spacing={2}>
+                                <Button
+                                  size="sm"
+                                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                  isDisabled={currentPage === 1}
+                                >
+                                  Previous
+                                </Button>
+                                <Text fontSize="sm" color="gray.600">
+                                  Page {currentPage} of {totalPages}
+                                </Text>
+                                <Button
+                                  size="sm"
+                                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                  isDisabled={currentPage === totalPages}
+                                >
+                                  Next
+                                </Button>
+                              </HStack>
+                            </Flex>
+                          </Td>
+                        </Tr>
+                      )}
+                    </>
                   );
-                })}
-                    {totalPages > 1 && (
-                      <Tr>
-                        <Td colSpan={7}>
-                          <Flex justify="space-between" align="center" p={4}>
-                            <HStack spacing={2}>
-                              <Text fontSize="sm" color="gray.600">
-                                Showing {startIndex + 1}-{Math.min(endIndex, filteredParties.length)} of {filteredParties.length} entries
-                              </Text>
-                              <Select
-                                size="sm"
-                                value={itemsPerPage}
-                                onChange={(e) => {
-                                  setItemsPerPage(Number(e.target.value));
-                                  setCurrentPage(1);
-                                }}
-                                w="100px"
-                              >
-                                <option value={10}>10</option>
-                                <option value={25}>25</option>
-                                <option value={50}>50</option>
-                                <option value={100}>100</option>
-                              </Select>
-                              <Text fontSize="sm" color="gray.600">per page</Text>
-                            </HStack>
-                            <HStack spacing={2}>
-                              <Button
-                                size="sm"
-                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                                isDisabled={currentPage === 1}
-                              >
-                                Previous
-                              </Button>
-                              <Text fontSize="sm" color="gray.600">
-                                Page {currentPage} of {totalPages}
-                              </Text>
-                              <Button
-                                size="sm"
-                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                                isDisabled={currentPage === totalPages}
-                              >
-                                Next
-                              </Button>
-                            </HStack>
-                          </Flex>
-                        </Td>
-                      </Tr>
-                    )}
-                  </>
-                );
-              })()}
-            </Tbody>
-          </Table>
+                })()}
+              </Tbody>
+            </Table>
           </Box>
         </>
       )}
@@ -1261,12 +1258,12 @@ export function InterestedPartiesPage() {
                 party.theirObligations || '',
                 party._count?.risks || 0,
               ]);
-              
+
               const csvContent = [
                 headers.join(','),
                 ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
               ].join('\n');
-              
+
               const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
               const link = document.createElement('a');
               const url = URL.createObjectURL(blob);
@@ -1276,7 +1273,7 @@ export function InterestedPartiesPage() {
               document.body.appendChild(link);
               link.click();
               document.body.removeChild(link);
-              
+
               toast({
                 title: 'Export Complete',
                 description: `Exported ${filteredParties.length} interested parties to CSV`,
@@ -1313,12 +1310,12 @@ export function InterestedPartiesPage() {
               party.theirObligations || '',
               party._count?.risks || 0,
             ]);
-            
+
             const csvContent = [
               headers.join(','),
               ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
             ].join('\n');
-            
+
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
@@ -1328,7 +1325,7 @@ export function InterestedPartiesPage() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
+
             toast({
               title: 'Export Complete',
               description: `Exported ${filteredParties.length} interested parties to CSV`,
@@ -1343,9 +1340,9 @@ export function InterestedPartiesPage() {
       </HStack>
 
       {/* Create/Edit Modal */}
-      <Modal 
-        isOpen={isOpen} 
-        onClose={onClose} 
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
         size="4xl"
         initialFocusRef={React.useRef<HTMLInputElement>(null)}
         finalFocusRef={React.useRef<HTMLButtonElement>(null)}
@@ -1548,9 +1545,9 @@ export function InterestedPartiesPage() {
             </Tabs>
           </ModalBody>
           <ModalFooter>
-            <Button 
-              variant="outline" 
-              mr={3} 
+            <Button
+              variant="outline"
+              mr={3}
               onClick={onClose}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
@@ -1560,8 +1557,8 @@ export function InterestedPartiesPage() {
             >
               Cancel
             </Button>
-            <Button 
-              colorScheme="blue" 
+            <Button
+              colorScheme="blue"
               onClick={handleSave}
               isDisabled={!formData.name.trim() || !!formErrors.name || checkingDuplicate}
               isLoading={false}

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { ReactElement } from 'react';
 import { render, RenderOptions } from '@testing-library/react';
 import { ChakraProvider } from '@chakra-ui/react';
@@ -27,7 +28,7 @@ export * from '@testing-library/react';
 export { customRender as render };
 
 // Helper to create mock user data
-export const createMockUser = (overrides?: any) => ({
+export const createMockUser = (overrides?: Partial<{ id: string; email: string; displayName: string; role: string }>) => ({
   id: 'user-1',
   email: 'test@paythru.com',
   displayName: 'Test User',

@@ -34,7 +34,7 @@ import { TrustCenterAdminPage } from './pages/TrustCenterAdminPage'
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           {/* Trust Center routes - public-facing, separate auth context */}
           <Route
@@ -54,7 +54,7 @@ function App() {
             }
           />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
-          
+
           {/* ISMS Admin routes - all under /admin prefix */}
           <Route path="/admin/login" element={<LoginPage />} />
           <Route

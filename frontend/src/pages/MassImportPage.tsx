@@ -55,7 +55,8 @@ interface ImportResult {
 }
 
 export function MassImportPage() {
-  const { user } = useAuth();
+  // useAuth hook used for route protection context if needed, but currently unused variables removed
+  useAuth();
   const navigate = useNavigate();
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -199,13 +200,13 @@ export function MassImportPage() {
                     <Tr key={file.id}>
                       <Td>{file.name}</Td>
                       <Td>{formatFileSize(file.size)}</Td>
-                            <Td>
-                              {new Date(file.lastModifiedDateTime).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                              })}
-                            </Td>
+                      <Td>
+                        {new Date(file.lastModifiedDateTime).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                        })}
+                      </Td>
                       <Td>
                         <Button
                           size="xs"
@@ -366,7 +367,7 @@ export function MassImportPage() {
       <SharePointFileBrowser
         isOpen={isOpen}
         onClose={onClose}
-        onSelect={() => {}} // Not used in multi-select mode
+        onSelect={() => { }} // Not used in multi-select mode
         multiSelect={true}
         onMultiSelect={handleFileSelection}
       />

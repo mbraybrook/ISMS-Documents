@@ -13,7 +13,7 @@ export const formatBoolean = (value: boolean | null | undefined): string => {
 /**
  * Formats an empty/null value for display
  */
-export const formatEmptyValue = (value: any): string => {
+export const formatEmptyValue = (value: string | number | null | undefined): string => {
   if (value === null || value === undefined || value === '') {
     return '—';
   }

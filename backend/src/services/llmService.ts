@@ -120,14 +120,15 @@ export function mapToScore(cosineSimilarity: number): number {
 
 /**
  * Combine risk fields into a single text for comparison
+ * (Currently unused but may be needed for future functionality)
  */
-function combineRiskText(title: string, threatDescription?: string | null, description?: string | null): string {
-  const parts: string[] = [];
-  if (title) parts.push(`Title: ${title}`);
-  if (threatDescription) parts.push(`Threat: ${threatDescription}`);
-  if (description) parts.push(`Description: ${description}`);
-  return parts.join(' ');
-}
+// function combineRiskText(title: string, threatDescription?: string | null, description?: string | null): string {
+//   const parts: string[] = [];
+//   if (title) parts.push(`Title: ${title}`);
+//   if (threatDescription) parts.push(`Threat: ${threatDescription}`);
+//   if (description) parts.push(`Description: ${description}`);
+//   return parts.join(' ');
+// }
 
 /**
  * Simple text similarity using word overlap (for quick checks)
@@ -252,11 +253,11 @@ export async function calculateSimilarityScoreChat(
   
   // Use LLM for semantic comparison only if not exact match
   // Check if risks are too incomplete to compare meaningfully
-  const risk1Complete = risk1.title && (risk1.threatDescription || risk1.description);
-  const risk2Complete = risk2.title && (risk2.threatDescription || risk2.description);
+  // const risk1Complete = risk1.title && (risk1.threatDescription || risk1.description);
+  // const risk2Complete = risk2.title && (risk2.threatDescription || risk2.description);
   
   // If risks are incomplete, be more conservative
-  const completenessPenalty = (!risk1Complete || !risk2Complete) ? 20 : 0;
+  // const completenessPenalty = (!risk1Complete || !risk2Complete) ? 20 : 0;
   
   const prompt = `You are a risk management expert. Compare these two information security risks and determine if they describe the SAME SPECIFIC RISK or DIFFERENT risks.
 

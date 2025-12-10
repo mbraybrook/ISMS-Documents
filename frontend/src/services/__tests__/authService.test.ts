@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock config before importing authService (since it validates config at module load time)
@@ -28,7 +29,7 @@ vi.mock('@azure/msal-browser', () => {
     setActiveAccount: vi.fn(),
     getActiveAccount: vi.fn().mockReturnValue(null),
   };
-  
+
   return {
     PublicClientApplication: vi.fn().mockImplementation(() => mockMsalInstance),
     InteractionType: {
@@ -93,7 +94,7 @@ describe('authService', () => {
       homeAccountId: 'test-account-id',
       username: 'test@paythru.com',
     };
-    
+
     // Set up a current account first
     vi.mocked(msalInstance.getActiveAccount).mockReturnValue(mockAccount as any);
     vi.mocked(msalInstance.logoutPopup).mockResolvedValue(undefined);
@@ -132,7 +133,7 @@ describe('authService', () => {
     // Clear any existing account by calling logout first
     vi.mocked(msalInstance.logoutPopup).mockResolvedValue(undefined);
     await authService.logout();
-    
+
     // Make sure acquireTokenSilent is not called when there's no account
     vi.mocked(msalInstance.acquireTokenSilent).mockClear();
 

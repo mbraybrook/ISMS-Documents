@@ -13,24 +13,11 @@ import {
   Tooltip,
   useToast,
   Spinner,
-  Badge,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Link as ChakraLink,
   Divider,
   Button,
-  Alert,
-  AlertIcon,
 } from '@chakra-ui/react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  WarningIcon,
-  CheckCircleIcon,
-  InfoIcon,
   ArrowForwardIcon,
 } from '@chakra-ui/icons';
 import api, { riskDashboardApi } from '../services/api';
@@ -188,7 +175,7 @@ export function HomePage() {
     );
   }
 
-  const getRiskLevelColor = (level: 'LOW' | 'MEDIUM' | 'HIGH'): string => {
+  const _getRiskLevelColor = (level: 'LOW' | 'MEDIUM' | 'HIGH'): string => {
     switch (level) {
       case 'HIGH':
         return 'red';
@@ -201,7 +188,7 @@ export function HomePage() {
     }
   };
 
-  const getRiskLevel = (score: number): 'LOW' | 'MEDIUM' | 'HIGH' => {
+  const _getRiskLevel = (score: number): 'LOW' | 'MEDIUM' | 'HIGH' => {
     if (score >= 36) return 'HIGH';
     if (score >= 15) return 'MEDIUM';
     return 'LOW';
@@ -233,8 +220,8 @@ export function HomePage() {
               <Stat p={4} bg="blue.50" borderRadius="md" boxShadow="sm">
                 <StatLabel>Total Risk Score</StatLabel>
                 <StatNumber>
-                  {riskDashboardData?.latest_snapshot?.total_risk_score?.toLocaleString() ?? 
-                   dashboardData.risks.totalRiskScore.toLocaleString()}
+                  {riskDashboardData?.latest_snapshot?.total_risk_score?.toLocaleString() ??
+                    dashboardData.risks.totalRiskScore.toLocaleString()}
                 </StatNumber>
                 <StatHelpText>Sum of all risk scores</StatHelpText>
               </Stat>
@@ -242,8 +229,8 @@ export function HomePage() {
               <Stat p={4} bg="green.50" borderRadius="md" boxShadow="sm">
                 <StatLabel>Implemented Mitigation Score</StatLabel>
                 <StatNumber color="green.600">
-                  {riskDashboardData?.latest_snapshot?.implemented_mitigation_score?.toLocaleString() ?? 
-                   dashboardData.risks.implementedMitigationRiskScore.toLocaleString()}
+                  {riskDashboardData?.latest_snapshot?.implemented_mitigation_score?.toLocaleString() ??
+                    dashboardData.risks.implementedMitigationRiskScore.toLocaleString()}
                 </StatNumber>
                 <StatHelpText>Risks with implemented mitigations</StatHelpText>
               </Stat>
@@ -251,8 +238,8 @@ export function HomePage() {
               <Stat p={4} bg="orange.50" borderRadius="md" boxShadow="sm">
                 <StatLabel>Non-Implemented Mitigation Score</StatLabel>
                 <StatNumber color="orange.600">
-                  {riskDashboardData?.latest_snapshot?.non_implemented_mitigation_score?.toLocaleString() ?? 
-                   dashboardData.risks.nonImplementedMitigationRiskScore.toLocaleString()}
+                  {riskDashboardData?.latest_snapshot?.non_implemented_mitigation_score?.toLocaleString() ??
+                    dashboardData.risks.nonImplementedMitigationRiskScore.toLocaleString()}
                 </StatNumber>
                 <StatHelpText>Risks with mitigations not implemented</StatHelpText>
               </Stat>
@@ -260,10 +247,10 @@ export function HomePage() {
               <Stat p={4} bg="red.50" borderRadius="md" boxShadow="sm">
                 <StatLabel>No Mitigation Score</StatLabel>
                 <StatNumber color="red.600">
-                  {riskDashboardData?.latest_snapshot?.no_mitigation_score?.toLocaleString() ?? 
-                   (dashboardData.risks.totalRiskScore - 
-                    dashboardData.risks.implementedMitigationRiskScore - 
-                    dashboardData.risks.nonImplementedMitigationRiskScore).toLocaleString()}
+                  {riskDashboardData?.latest_snapshot?.no_mitigation_score?.toLocaleString() ??
+                    (dashboardData.risks.totalRiskScore -
+                      dashboardData.risks.implementedMitigationRiskScore -
+                      dashboardData.risks.nonImplementedMitigationRiskScore).toLocaleString()}
                 </StatNumber>
                 <StatHelpText>Risks without mitigations</StatHelpText>
               </Stat>

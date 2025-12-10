@@ -11,11 +11,6 @@ export function RoleSwitcher() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Only show for ADMIN users
-  if (user?.role !== 'ADMIN') {
-    return null;
-  }
-
   const effectiveRole = getEffectiveRole();
   const isOverridden = roleOverride !== null;
   const isContributor = effectiveRole === 'CONTRIBUTOR';
@@ -59,6 +54,11 @@ export function RoleSwitcher() {
       setDepartmentOverride('HR'); // Default to HR for testing
     }
   }, [isContributor, departmentOverride, setDepartmentOverride]);
+
+  // Only show for ADMIN users
+  if (user?.role !== 'ADMIN') {
+    return null;
+  }
 
   return (
     <VStack spacing={2} align="flex-start">

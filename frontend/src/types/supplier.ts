@@ -171,6 +171,26 @@ export interface SupplierExitPlan {
   updatedAt: string;
 }
 
+export interface SupplierRisk {
+  risk: {
+    id: string;
+    title: string;
+    calculatedScore: number;
+    status: string;
+    riskCategory: string | null;
+  };
+}
+
+export interface SupplierControl {
+  control: {
+    id: string;
+    code: string;
+    title: string;
+    implemented: boolean;
+    category: string | null;
+  };
+}
+
 // Supplier interface matching the backend model
 export interface Supplier {
   id: string;
@@ -211,24 +231,8 @@ export interface Supplier {
   lifecycleState: SupplierLifecycleState;
   cisoExemptionGranted: boolean;
   reviewDate: string | null;
-  supplierRisks?: Array<{
-    risk: {
-      id: string;
-      title: string;
-      calculatedScore: number;
-      status: string;
-      riskCategory: string | null;
-    };
-  }>;
-  supplierControls?: Array<{
-    control: {
-      id: string;
-      code: string;
-      title: string;
-      implemented: boolean;
-      category: string | null;
-    };
-  }>;
+  supplierRisks?: SupplierRisk[];
+  supplierControls?: SupplierControl[];
   // certificates?: SupplierCertificate[]; // TODO: SupplierCertificate type not yet defined
   exitPlan?: SupplierExitPlan | null;
   showInTrustCenter: boolean;

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
 import { config } from '../config';
 import { log } from '../lib/logger';
 
@@ -9,8 +9,7 @@ export interface AppError extends Error {
 export const errorHandler = (
   err: AppError,
   req: Request,
-  res: Response,
-  next: NextFunction
+  res: Response
 ) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';

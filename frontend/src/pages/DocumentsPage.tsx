@@ -24,14 +24,14 @@ import {
   Td,
   Checkbox,
 } from '@chakra-ui/react';
-import { BellIcon, WarningIcon, DeleteIcon, ViewIcon, ExternalLinkIcon, TimeIcon, EditIcon, RepeatIcon } from '@chakra-ui/icons';
+import { DeleteIcon, ViewIcon, ExternalLinkIcon, EditIcon, RepeatIcon, BellIcon, WarningIcon, TimeIcon } from '@chakra-ui/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { authService } from '../services/authService';
 import { DocumentFormModal } from '../components/DocumentFormModal';
 import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
-import { formatEmptyValue } from '../utils/tableUtils';
+
 
 interface Document {
   id: string;
@@ -142,11 +142,11 @@ export function DocumentsPage() {
       setLoadingUrls(true);
       const urlMap: Record<string, string> = {};
       console.log('[generateUrls] Starting URL processing for', documents.length, 'documents');
-      
+
       // First, use stored URLs from the database
       let storedUrlCount = 0;
       let generatedUrlCount = 0;
-      
+
       for (const doc of documents) {
         // Use stored documentUrl if available
         if (doc.documentUrl) {
@@ -154,7 +154,7 @@ export function DocumentsPage() {
           storedUrlCount++;
           continue;
         }
-        
+
         // Only generate URL if not stored and document has required IDs
         try {
           const url = await getDocumentUrl(doc);
@@ -244,7 +244,7 @@ export function DocumentsPage() {
       if (doc.storageLocation === 'SHAREPOINT' && doc.sharePointSiteId && doc.sharePointDriveId && doc.sharePointItemId) {
         // Get Graph token once and reuse it for both API calls
         const graphToken = await authService.getGraphAccessToken();
-        
+
         if (!graphToken) {
           // No token available - cannot generate URL
           console.warn('[getDocumentUrl] No Graph access token available for SharePoint document URL', {
@@ -708,7 +708,7 @@ export function DocumentsPage() {
               });
               return;
             }
-            
+
             const url = await getDocumentUrl(doc);
             if (url) {
               window.open(url, '_blank');
@@ -756,25 +756,25 @@ export function DocumentsPage() {
     },
     ...(canEdit
       ? [
-          {
-            icon: <EditIcon />,
-            label: 'Edit',
-            onClick: handleEdit,
-            colorScheme: 'blue',
-          } as ActionButton<Document>,
-          {
-            icon: <RepeatIcon />,
-            label: 'Supersede document',
-            onClick: handleDelete,
-            colorScheme: 'orange',
-          } as ActionButton<Document>,
-          {
-            icon: <DeleteIcon />,
-            label: 'Delete permanently',
-            onClick: handleHardDelete,
-            colorScheme: 'red',
-          } as ActionButton<Document>,
-        ]
+        {
+          icon: <EditIcon />,
+          label: 'Edit',
+          onClick: handleEdit,
+          colorScheme: 'blue',
+        } as ActionButton<Document>,
+        {
+          icon: <RepeatIcon />,
+          label: 'Supersede document',
+          onClick: handleDelete,
+          colorScheme: 'orange',
+        } as ActionButton<Document>,
+        {
+          icon: <DeleteIcon />,
+          label: 'Delete permanently',
+          onClick: handleHardDelete,
+          colorScheme: 'red',
+        } as ActionButton<Document>,
+      ]
       : []),
   ];
 

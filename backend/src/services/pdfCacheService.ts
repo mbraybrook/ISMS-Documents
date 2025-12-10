@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { config } from '../config';
 
 // Cache directory for converted PDFs
 const CACHE_DIR = path.join(process.cwd(), 'cache', 'pdf-conversions');

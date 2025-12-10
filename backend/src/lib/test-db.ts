@@ -90,7 +90,7 @@ export async function seedTestDatabase(): Promise<void> {
   const prisma = getTestPrisma();
   
   // Create test users
-  const adminUser = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: 'admin@paythru.com' },
     update: {},
     create: {
@@ -103,7 +103,7 @@ export async function seedTestDatabase(): Promise<void> {
     },
   });
   
-  const editorUser = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: 'editor@paythru.com' },
     update: {},
     create: {
@@ -116,7 +116,7 @@ export async function seedTestDatabase(): Promise<void> {
     },
   });
   
-  const staffUser = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: 'staff@paythru.com' },
     update: {},
     create: {

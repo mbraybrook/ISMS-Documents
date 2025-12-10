@@ -49,7 +49,6 @@ import {
   TabPanels,
   Tab,
   TabPanel,
-  Progress,
   useDisclosure,
   Table,
   Thead,
@@ -64,7 +63,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import { similarityApi, supplierApi } from '../services/api';
-import { SimilarRisk, Department, getDepartmentDisplayName } from '../types/risk';
+import { SimilarRisk, Department } from '../types/risk';
 import { SimilarRisksPanel } from './SimilarRisksPanel';
 import { SimilarityAlert } from './SimilarityAlert';
 import { useDebounce } from '../hooks/useDebounce';
@@ -739,7 +738,6 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         clearTimeout(assetSearchTimeoutRef.current);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assetSearchTerm]);
 
   const fetchAssetCategories = async () => {

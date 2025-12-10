@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import React from 'react';
 import {
   Box,
@@ -42,11 +42,8 @@ import {
   Link,
   Collapse,
   SimpleGrid,
-  Select,
-  Checkbox,
-  Tag,
-  TagLabel,
-  TagCloseButton,
+
+
 } from '@chakra-ui/react';
 import { SearchIcon, EditIcon, DeleteIcon, AddIcon, ChevronDownIcon, ChevronUpIcon, DownloadIcon } from '@chakra-ui/icons';
 import { Link as RouterLink } from 'react-router-dom';
@@ -120,29 +117,29 @@ export function LegislationPage() {
       let allRisksData: Risk[] = [];
       let page = 1;
       let hasMore = true;
-      
+
       while (hasMore) {
         const response = await api.get(`/api/risks?limit=100&page=${page}&archived=false`);
         // The API returns { data: [...], pagination: {...} }
-        const risks = Array.isArray(response.data.data) 
-          ? response.data.data 
-          : Array.isArray(response.data.risks) 
-          ? response.data.risks 
-          : Array.isArray(response.data) 
-          ? response.data 
-          : [];
-        
+        const risks = Array.isArray(response.data.data)
+          ? response.data.data
+          : Array.isArray(response.data.risks)
+            ? response.data.risks
+            : Array.isArray(response.data)
+              ? response.data
+              : [];
+
         allRisksData = [...allRisksData, ...risks];
-        
+
         // Check if there are more pages
         const totalPages = response.data.pagination?.totalPages || 1;
         hasMore = page < totalPages && risks.length > 0;
         page++;
-        
+
         // Safety limit to prevent infinite loops
         if (page > 50) break;
       }
-      
+
       // Ensure we always set an array
       setAllRisks(Array.isArray(allRisksData) ? allRisksData : []);
       console.log(`Loaded ${allRisksData.length} risks`);
@@ -151,13 +148,13 @@ export function LegislationPage() {
       // If pagination fails, try a single request with max limit
       try {
         const response = await api.get('/api/risks?limit=100&page=1&archived=false');
-        const risks = Array.isArray(response.data.data) 
-          ? response.data.data 
-          : Array.isArray(response.data.risks) 
-          ? response.data.risks 
-          : Array.isArray(response.data) 
-          ? response.data 
-          : [];
+        const risks = Array.isArray(response.data.data)
+          ? response.data.data
+          : Array.isArray(response.data.risks)
+            ? response.data.risks
+            : Array.isArray(response.data)
+              ? response.data
+              : [];
         setAllRisks(Array.isArray(risks) ? risks : []);
         console.log(`Loaded ${risks.length} risks (fallback)`);
       } catch (fallbackError: any) {
@@ -240,7 +237,7 @@ export function LegislationPage() {
       // Fetch detailed legislation with risks when expanding
       try {
         const response = await api.get(`/api/legislation/${legislationId}`);
-        setLegislation(prev => prev.map(item => 
+        setLegislation(prev => prev.map(item =>
           item.id === legislationId ? response.data : item
         ));
       } catch (error) {
@@ -317,7 +314,7 @@ export function LegislationPage() {
         howComplianceAchieved: formData.howComplianceAchieved || null,
         riskIds: formData.riskIds,
       };
-      
+
       if (formData.dateAdded) {
         payload.dateAdded = new Date(formData.dateAdded).toISOString();
       }
@@ -387,13 +384,13 @@ export function LegislationPage() {
       });
       const suggestedIds = response.data.suggestedRiskIds || [];
       setSuggestedRiskIds(suggestedIds);
-      
+
       // Auto-select suggested risks that aren't already selected
       setFormData(prev => ({
         ...prev,
         riskIds: [...new Set([...prev.riskIds, ...suggestedIds])],
       }));
-      
+
       toast({
         title: 'Suggestions generated',
         description: `Found ${suggestedIds.length} relevant risks and added them to your selection`,

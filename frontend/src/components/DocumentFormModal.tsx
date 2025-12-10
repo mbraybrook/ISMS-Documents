@@ -38,7 +38,7 @@ import {
   InputLeftElement,
 } from '@chakra-ui/react';
 import { SearchIcon, DeleteIcon } from '@chakra-ui/icons';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
@@ -84,11 +84,11 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [users, setUsers] = useState<Array<{ id: string; displayName: string; email: string; role: string }>>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose } = useDisclosure();
+  const { isOpen: isConfirmOpen, onOpen: _onConfirmOpen, onClose: onConfirmClose } = useDisclosure();
   const { isOpen: isVersionUpdateOpen, onOpen: onVersionUpdateOpen, onClose: onVersionUpdateClose } = useDisclosure();
   const { isOpen: isControlModalOpen, onOpen: onControlModalOpen, onClose: onControlModalClose } = useDisclosure();
   const [selectedControl, setSelectedControl] = useState<any>(null);
-  const [pendingSubmit, setPendingSubmit] = useState(false);
+  const [_pendingSubmit, setPendingSubmit] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
   
   // Control linking state
@@ -97,7 +97,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   const [availableControls, setAvailableControls] = useState<Array<{ id: string; code: string; title: string; category: string | null }>>([]);
   const [suggestedControls, setSuggestedControls] = useState<Array<{ id: string; code: string; title: string; category: string | null }>>([]);
   const [searchingControls, setSearchingControls] = useState(false);
-  const [linkingControl, setLinkingControl] = useState(false);
+  const [_linkingControl, setLinkingControl] = useState(false);
   const [loadingControls, setLoadingControls] = useState(false);
   const [loadingSuggestedControls, setLoadingSuggestedControls] = useState(false);
 
@@ -120,7 +120,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     if (isOpen && canEditOwner) {
       fetchUsers();
     }
-  }, [isOpen, canEditOwner]);
+  }, [isOpen, canEditOwner, fetchUsers]);
 
   // Fetch linked controls when document is loaded
   useEffect(() => {
@@ -129,7 +129,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     } else if (isOpen && !document) {
       setLinkedControls([]);
     }
-  }, [isOpen, document?.id]);
+  }, [isOpen, document?.id, fetchLinkedControls]);
 
   // Fetch suggested controls when title or type changes (with debounce)
   useEffect(() => {
@@ -152,7 +152,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.title, formData.type, isOpen]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoadingUsers(true);
       const response = await api.get('/api/users');
@@ -183,7 +183,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     } finally {
       setLoadingUsers(false);
     }
-  };
+  }, [document?.ownerUserId, toast]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -572,7 +572,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     }
   };
 
-  const fetchLinkedControls = async () => {
+  const fetchLinkedControls = useCallback(async () => {
     if (!document?.id) return;
     try {
       setLoadingControls(true);
@@ -589,7 +589,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     } finally {
       setLoadingControls(false);
     }
-  };
+  }, [document?.id, toast]);
 
   const fetchSuggestedControls = async () => {
     if (!formData.title || formData.title.trim().length < 3) {
