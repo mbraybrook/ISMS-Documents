@@ -127,4 +127,109 @@ export function createMockNext(): jest.Mock {
   return jest.fn();
 }
 
+/**
+ * Helper to create a test JWT token for Azure AD authentication
+ * @param payload - Token payload
+ * @param secret - Signing secret (optional, for testing)
+ * @param options - JWT signing options
+ */
+export function createMockJWT(
+  _payload: any,
+  _secret?: string,
+  _options?: { issuer?: string; audience?: string; expiresIn?: string | number }
+): string {
+  // This is a helper for creating test tokens
+  // In actual tests, we'll mock jwt.sign/jwt.verify
+  // This is mainly for documentation and type safety
+  return 'mock-jwt-token';
+}
+
+/**
+ * Helper to create a test JWT token for Trust Center authentication
+ * @param userId - User ID
+ * @param tokenVersion - Token version (optional)
+ * @param secret - JWT secret
+ * @param expiresIn - Expiration time (default: 24h)
+ */
+export function createMockTrustJWT(
+  userId: string,
+  tokenVersion?: number,
+  secret?: string,
+  _expiresIn: string | number = '24h'
+): string {
+  // This is a helper for creating test tokens
+  // In actual tests, we'll use jsonwebtoken directly
+  // This is mainly for documentation and type safety
+  return 'mock-trust-jwt-token';
+}
+
+/**
+ * Console suppression helpers
+ * 
+ * By default, console.error is suppressed during tests (see test-setup.ts).
+ * Use these helpers if you need to:
+ * - Verify that console.error was called in a specific test
+ * - Temporarily restore console methods for debugging
+ */
+
+/**
+ * Suppress console.error for a test (default behavior, but can be used explicitly)
+ * Returns a spy that can be used to verify error calls
+ * 
+ * @example
+ * ```typescript
+ * it('should log error when operation fails', () => {
+ *   const errorSpy = suppressConsoleError();
+ *   // ... test code that triggers error ...
+ *   expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Error message'));
+ * });
+ * ```
+ */
+export function suppressConsoleError(): jest.SpyInstance {
+  return jest.spyOn(console, 'error').mockImplementation(() => { });
+}
+
+/**
+ * Restore console.error to its original implementation
+ * Use this if you need to see actual error output during a specific test
+ * 
+ * @example
+ * ```typescript
+ * it('should show real error output', () => {
+ *   restoreConsoleError();
+ *   // ... test code ...
+ * });
+ * ```
+ */
+export function restoreConsoleError(): void {
+  // Get the original from global scope (set in test-setup.ts)
+  const original = (global as any).__originalConsoleError;
+  if (original) {
+    console.error = original;
+  }
+}
+
+/**
+ * Suppress multiple console methods at once
+ * Returns an object with spies for each method
+ * 
+ * @example
+ * ```typescript
+ * it('should suppress all console output', () => {
+ *   const spies = suppressConsole(['error', 'warn', 'log']);
+ *   // ... test code ...
+ *   expect(spies.error).toHaveBeenCalled();
+ * });
+ * ```
+ */
+export function suppressConsole(
+  methods: ('error' | 'warn' | 'log' | 'info' | 'debug')[] = ['error']
+): Record<string, jest.SpyInstance> {
+  const spies: Record<string, jest.SpyInstance> = {};
+  methods.forEach((method) => {
+    spies[method] = jest.spyOn(console, method).mockImplementation(() => { });
+  });
+  return spies;
+}
+
 

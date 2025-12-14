@@ -55,7 +55,6 @@ router.get(
 
       // Use provided IDs or fall back to config defaults
       const siteId = (req.query.siteId as string) || config.sharePoint.siteId;
-      let siteId = (req.query.siteId as string) || config.sharePoint.siteId;
 
       // Helper to compare IDs robustly (handles case sensitivity and potential hostname prefixes)
       const areIdsEqual = (id1: string, id2: string) => {

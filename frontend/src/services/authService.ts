@@ -1,4 +1,4 @@
-import { PublicClientApplication, AccountInfo, Configuration, PopupRequest, LogLevel } from '@azure/msal-browser';
+import { PublicClientApplication, AccountInfo, Configuration, PopupRequest, LogLevel, AuthError } from '@azure/msal-browser';
 import { config } from '../config';
 
 const msalConfig: Configuration = {
@@ -36,20 +36,13 @@ if (!config.auth.clientId || !config.auth.tenantId) {
 }
 
 
-console.log('MSAL Config:', {
-  clientId: config.auth.clientId,
-  tenantId: config.auth.tenantId,
-  redirectUri: config.auth.redirectUri,
-  authority: msalConfig.auth.authority,
-});
-
 export const msalInstance = new PublicClientApplication(msalConfig);
 
 export interface AuthUser {
   id: string;
   email: string;
   displayName: string;
-  role: 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR';
+  role: 'ADMIN' | 'EDITOR' | 'CONTRIBUTOR' | 'STAFF';
   department?: string | null;
 }
 
@@ -61,17 +54,13 @@ export const authService = {
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length > 0) {
       currentAccount = accounts[0];
+    } else {
+      currentAccount = null;
     }
   },
 
   async login(): Promise<void> {
     try {
-
-      console.log('Initiating login with config:', {
-        clientId: config.auth.clientId,
-        tenantId: config.auth.tenantId,
-        redirectUri: config.auth.redirectUri,
-      });
 
       const loginRequest: PopupRequest = {
         scopes: ['User.Read'],
@@ -81,13 +70,11 @@ export const authService = {
       // Try popup first, but handle errors gracefully
       try {
         const loginResponse = await msalInstance.loginPopup(loginRequest);
-
         currentAccount = loginResponse.account;
       } catch (popupError: unknown) {
-        console.warn('Popup login failed, trying redirect flow:', popupError);
-        
         // If popup fails (e.g., blocked), fall back to redirect
-        if ((popupError as { errorCode?: string; name?: string }).errorCode === 'user_cancelled' || (popupError as { errorCode?: string; name?: string }).name === 'BrowserAuthError') {
+        const error = popupError as { errorCode?: string; name?: string };
+        if (error.errorCode === 'user_cancelled' || error.name === 'BrowserAuthError') {
           await msalInstance.loginRedirect({
             scopes: ['User.Read'],
             prompt: 'select_account',
@@ -97,16 +84,16 @@ export const authService = {
         }
         throw popupError;
       }
-    } catch (error: unknown) {
-      console.error('Login error:', error);
+    } catch (error) {
+      const authError = error as AuthError;
+      console.error('Login error:', authError);
       // Log more details about the error
-      const errorObj = error as { errorCode?: string; errorMessage?: string };
-      if (errorObj.errorCode) {
-        console.error('Error code:', errorObj.errorCode);
-        console.error('Error message:', errorObj.errorMessage);
-        console.error('Full error:', JSON.stringify(error, null, 2));
+      if (authError.errorCode) {
+        console.error('Error code:', authError.errorCode);
+        console.error('Error message:', authError.errorMessage);
+        console.error('Full error:', JSON.stringify(authError, null, 2));
       }
-      throw error;
+      throw authError;
     }
   },
 
@@ -131,17 +118,17 @@ export const authService = {
       });
       return response.accessToken;
     } catch (error: unknown) {
+      const authError = error as AuthError;
       // If silent token acquisition fails, the token might be expired
       // This is expected and not an error - user needs to log in again
-      const errorObj = error as { errorCode?: string };
-      if (errorObj.errorCode === 'interaction_required' || 
-          errorObj.errorCode === 'consent_required' ||
-          errorObj.errorCode === 'login_required') {
+      if (authError.errorCode === 'interaction_required' ||
+          authError.errorCode === 'consent_required' ||
+          authError.errorCode === 'login_required') {
         console.log('Token acquisition requires user interaction');
         // Clear the cached account since we can't get a token
         currentAccount = null;
       } else {
-        console.error('Token acquisition error:', error);
+        console.error('Token acquisition error:', authError);
       }
       return null;
     }
@@ -158,13 +145,14 @@ export const authService = {
         account: currentAccount,
       });
       return response.accessToken;
-    } catch (error: unknown) {
+    } catch (error) {
+      const authError = error as AuthError;
       // If silent token acquisition fails, try interactive
-      const errorObj = error as { errorCode?: string };
-      if (errorObj.errorCode === 'interaction_required' || 
-          errorObj.errorCode === 'consent_required' ||
-          errorObj.errorCode === 'login_required' ||
-          errorObj.errorCode === 'invalid_grant') {
+      if (authError.errorCode === 'interaction_required' ||
+        authError.errorCode === 'consent_required' ||
+        authError.errorCode === 'login_required' ||
+        authError.errorCode === 'invalid_grant') {
+    
         try {
           console.log('Attempting interactive token acquisition for scopes:', scopes);
           const response = await msalInstance.acquireTokenPopup({
@@ -173,11 +161,11 @@ export const authService = {
             prompt: 'consent', // Force consent prompt
           });
           return response.accessToken;
-        } catch (popupError: unknown) {
+        } catch (error) {
+          const popupError = error as AuthError;
           console.error('Interactive token acquisition failed:', popupError);
           // If popup is blocked, try redirect
-          const popupErrorObj = popupError as { errorCode?: string; name?: string };
-          if (popupErrorObj.errorCode === 'user_cancelled' || popupErrorObj.name === 'BrowserAuthError') {
+          if (popupError.errorCode === 'user_cancelled' || popupError.name === 'BrowserAuthError') {
             try {
               console.log('Popup blocked, trying redirect flow');
               await msalInstance.acquireTokenRedirect({

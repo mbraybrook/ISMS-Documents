@@ -559,7 +559,6 @@ export function ControlsPage() {
             cellContent = column.render(control);
           } else {
             const value = (control as any)[column.key];
-            cellContent = value === null || value === undefined || value === ''
             cellContent = value === null || value === undefined || value === '' 
               ? <Text color="gray.400" fontSize="xs">—</Text>
               : String(value);

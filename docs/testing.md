@@ -207,6 +207,45 @@ test.describe('My Feature', () => {
 });
 ```
 
+## Console Error Suppression
+
+**By default, `console.error` is automatically suppressed during all tests** to prevent noise from expected error handling. This is configured globally in `backend/src/lib/test-setup.ts`.
+
+### Why Suppress Console Errors?
+
+When testing error paths (e.g., testing that a route handler returns 500 on database errors), the route handler may call `console.error()` to log the error. These logs are expected behavior and don't indicate test failures, but they can clutter test output.
+
+### Using Console Helpers
+
+If you need to verify that `console.error` was called in a specific test, use the helpers from `test-helpers.ts`:
+
+```typescript
+import { suppressConsoleError } from '../../lib/test-helpers';
+
+it('should log error when operation fails', () => {
+  const errorSpy = suppressConsoleError();
+  
+  // ... test code that triggers error ...
+  
+  expect(errorSpy).toHaveBeenCalledWith(
+    expect.stringContaining('Error message')
+  );
+});
+```
+
+If you need to see actual error output during a test (for debugging), you can restore it:
+
+```typescript
+import { restoreConsoleError } from '../../lib/test-helpers';
+
+it('should show real error output', () => {
+  restoreConsoleError();
+  // ... test code ...
+});
+```
+
+**Note**: You don't need to manually suppress `console.error` in your tests - it's already done globally. Only use the helpers if you need to verify error logging or temporarily restore it.
+
 ## Test Helpers
 
 ### Backend Helpers
@@ -218,6 +257,9 @@ Located in `backend/src/lib/test-helpers.ts`:
 - `createMockRequest()` - Create mock Express requests
 - `createMockResponse()` - Create mock Express responses
 - `mockUsers` - Pre-configured mock users for different roles
+- `suppressConsoleError()` - Suppress console.error and get a spy (for verification)
+- `restoreConsoleError()` - Restore console.error to original implementation
+- `suppressConsole()` - Suppress multiple console methods at once
 
 ### Frontend Helpers
 

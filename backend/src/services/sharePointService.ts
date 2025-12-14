@@ -61,15 +61,8 @@ export async function getSharePointItem(
   try {
     const client = createGraphClient(accessToken);
     const apiPath = `/sites/${siteId}/drives/${driveId}/items/${itemId}`;
-    console.log('[SharePointService] Fetching item from Graph API', { apiPath, itemId });
     
     const item = await client.api(apiPath).get();
-
-    console.log('[SharePointService] Successfully fetched item', {
-      itemId,
-      hasWebUrl: !!(item as any)?.webUrl,
-      name: (item as any)?.name,
-    });
 
     return item as SharePointItem;
   } catch (error: any) {
@@ -372,15 +365,11 @@ export async function getAppOnlyAccessToken(): Promise<string | null> {
     }
 
     // Cache the token (expires in ~60-90 minutes, cache for slightly less)
-    const expiresIn = (tokenResponse.expiresOnTimestamp - Date.now()) / 1000;
     cachedAppToken = {
       token: tokenResponse.token,
       expiresAt: tokenResponse.expiresOnTimestamp,
     };
 
-    console.log('[SharePointService] App-only token obtained and cached', {
-      expiresIn: Math.round(expiresIn / 60),
-    });
 
     return tokenResponse.token;
   } catch (error: any) {

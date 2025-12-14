@@ -708,7 +708,8 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         params.search = searchTerm;
       }
       const response = await api.get('/api/assets', { params });
-      const fetchedAssets = response.data.data || [];
+      // Ensure response.data.data is always an array
+      const fetchedAssets = Array.isArray(response.data?.data) ? response.data.data : [];
       setAssets(fetchedAssets);
       setFilteredAssets(fetchedAssets);
     } catch (error) {
@@ -744,9 +745,12 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   const fetchAssetCategories = async () => {
     try {
       const response = await api.get('/api/asset-categories');
-      setAssetCategories(response.data || []);
+      // Ensure response.data is always an array
+      setAssetCategories(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching asset categories:', error);
+      // Set empty array on error to prevent map errors
+      setAssetCategories([]);
     }
   };
 
@@ -841,9 +845,12 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   const fetchInterestedParties = async () => {
     try {
       const response = await api.get('/api/interested-parties');
-      setInterestedParties(response.data || []);
+      // Ensure response.data is always an array
+      setInterestedParties(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching interested parties:', error);
+      // Set empty array on error to prevent map errors
+      setInterestedParties([]);
     }
   };
 
@@ -1226,7 +1233,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                           placeholder="Select owner"
                           isDisabled={viewMode}
                         >
-                          {users.map((user) => (
+                          {Array.isArray(users) && users.map((user) => (
                             <option key={user.id} value={user.id}>
                               {user.displayName} ({user.email})
                             </option>
@@ -1242,7 +1249,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                           isReadOnly={viewMode}
                           placeholder="Select an interested party"
                         >
-                          {interestedParties.map((party) => (
+                          {Array.isArray(interestedParties) && interestedParties.map((party) => (
                             <option key={party.id} value={party.id}>
                               {party.name} {party.group ? `(${party.group})` : ''}
                             </option>
@@ -1464,7 +1471,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                                   </Text>
                                 </Box>
                               ) : (
-                                filteredAssets.slice(0, 20).map((asset) => (
+                                Array.isArray(filteredAssets) && filteredAssets.slice(0, 20).map((asset) => (
                                   <Box
                                     key={asset.id}
                                     p={3}
@@ -1524,7 +1531,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                           isDisabled={viewMode || !!formData.assetId}
                         >
                           <option value="">None</option>
-                          {assetCategories.map((cat) => (
+                          {Array.isArray(assetCategories) && assetCategories.map((cat) => (
                             <option key={cat.id} value={cat.id}>
                               {cat.name}
                             </option>
@@ -1595,7 +1602,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                               </Text>
                             ) : (
                               <VStack align="stretch" spacing={2}>
-                                {linkedSuppliers.map((supplier) => (
+                                {Array.isArray(linkedSuppliers) && linkedSuppliers.map((supplier) => (
                                   <Box
                                     key={supplier.id}
                                     p={2}
@@ -2720,7 +2727,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                         </Tr>
                       </Thead>
                       <Tbody>
-                        {availableSuppliers.map((supplier) => (
+                        {Array.isArray(availableSuppliers) && availableSuppliers.map((supplier) => (
                           <Tr key={supplier.id}>
                             <Td>{supplier.name}</Td>
                             <Td>{supplier.supplierType?.replace(/_/g, ' ')}</Td>

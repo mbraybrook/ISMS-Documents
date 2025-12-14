@@ -542,7 +542,6 @@ router.post(
       let finalStatus = status || 'DRAFT';
       let finalDepartment = department;
       const finalWizardData = wizardData;
-      let finalWizardData = wizardData;
 
       if (wizardData) {
         try {
@@ -1366,7 +1365,6 @@ router.post(
       try {
         const { updateControlApplicability } = await import('../services/riskService');
         await updateControlApplicability();
-        console.log(`[RISK-CONTROL] Updated control applicability after linking controls to risk ${id}`);
       } catch (updateError: any) {
         console.error('[RISK-CONTROL] Error updating control applicability:', updateError);
         console.error('[RISK-CONTROL] Error details:', {

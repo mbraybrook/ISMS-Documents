@@ -232,25 +232,6 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
     }
   };
 
-  const fetchLinkedDocuments = async () => {
-    if (!control?.id) return;
-    try {
-      setLoadingDocuments(true);
-      const response = await api.get(`/api/controls/${control.id}/documents`);
-      setLinkedDocuments(response.data);
-    } catch (error: any) {
-      console.error('Error fetching linked documents:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load linked documents',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setLoadingDocuments(false);
-    }
-  };
-
   const searchDocuments = async () => {
     if (!documentSearchTerm.trim()) {
       setAvailableDocuments([]);
@@ -365,8 +346,6 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
 
     try {
       let payload: any; // Keeping payload flexible for create/update logic
-
-      let payload: any;
       
       if (isStandardControl && control) {
         // For standard controls, only send allowed fields

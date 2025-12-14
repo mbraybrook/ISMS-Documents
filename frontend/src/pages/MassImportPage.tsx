@@ -207,13 +207,6 @@ export function MassImportPage() {
                           year: 'numeric',
                         })}
                       </Td>
-                            <Td>
-                              {new Date(file.lastModifiedDateTime).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                              })}
-                            </Td>
                       <Td>
                         <Button
                           size="xs"
@@ -375,7 +368,6 @@ export function MassImportPage() {
         isOpen={isOpen}
         onClose={onClose}
         onSelect={() => { }} // Not used in multi-select mode
-        onSelect={() => {}} // Not used in multi-select mode
         multiSelect={true}
         onMultiSelect={handleFileSelection}
       />

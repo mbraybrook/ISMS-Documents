@@ -141,7 +141,6 @@ export async function updateControlApplicability() {
         END
       )
     `;
-    console.log('[CONTROL-APPLICABILITY] Successfully updated control applicability flags');
   } catch (error: any) {
     console.error('[CONTROL-APPLICABILITY] Error updating control applicability:', error);
     throw error; // Re-throw so caller can handle it

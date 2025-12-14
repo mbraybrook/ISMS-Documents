@@ -14,7 +14,6 @@
     "lint": "eslint src --ext .ts --report-unused-disable-directives --max-warnings 0",
     "lint:check": "eslint src --ext .ts --report-unused-disable-directives --max-warnings 354",
     "lint:fix": "eslint src --ext .ts --fix",
-    "lint": "eslint src --ext .ts",
     "db:migrate": "npx prisma migrate dev",
     "db:migrate:deploy": "npx prisma migrate deploy",
     "db:migrate:create": "npx prisma migrate dev --create-only",

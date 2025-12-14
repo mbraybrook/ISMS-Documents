@@ -31,3 +31,9 @@ CREATE UNIQUE INDEX "DocumentVersionHistory_documentId_version_key" ON "Document
 ALTER TABLE "DocumentVersionHistory" ADD CONSTRAINT "DocumentVersionHistory_documentId_fkey" FOREIGN KEY ("documentId") REFERENCES "Document"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 
+
+
+
+
+
+

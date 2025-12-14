@@ -189,26 +189,8 @@ router.get(
 
       // Log for debugging
       const sharePointDocs = documents.filter(d => d.storageLocation === 'SHAREPOINT');
-      const sampleSharePointDoc = sharePointDocs[0];
-      console.log('[DOCUMENTS] Query result:', {
-        filters: where,
-        found: documents.length,
-        total,
-        page: pageNum,
-        limit: limitNum,
-        userRole,
-        sharePointDocsCount: sharePointDocs.length,
-        sampleSharePointDoc: sampleSharePointDoc ? {
-          id: sampleSharePointDoc.id,
-          title: sampleSharePointDoc.title,
-          storageLocation: sampleSharePointDoc.storageLocation,
-          sharePointSiteId: sampleSharePointDoc.sharePointSiteId,
-          sharePointDriveId: sampleSharePointDoc.sharePointDriveId,
-          sharePointItemId: sampleSharePointDoc.sharePointItemId,
-          documentUrl: sampleSharePointDoc.documentUrl,
-        } : null,
-        sampleTitles: documents.slice(0, 3).map(d => d.title),
-      });
+      const _sampleSharePointDoc = sharePointDocs[0];
+      
 
       res.json({
         data: documentsWithComputedFields,
@@ -460,7 +442,6 @@ router.post(
           );
           if (url) {
             data.documentUrl = url;
-            console.log('[Document Creation] Generated SharePoint URL:', url);
           } else {
             console.warn('[Document Creation] Could not generate SharePoint URL - access token may be missing');
           }
@@ -1405,8 +1386,6 @@ router.post(
 
         const titleLower = title.toLowerCase();
         const titleWords = titleLower.split(/\s+/).filter((word: string) => word.length > 3);
-
-        const titleWords = titleLower.split(/\s+/).filter((word) => word.length > 3);
         
         const suggestedControlIds: string[] = [];
         for (const control of allControls) {
@@ -1481,10 +1460,6 @@ router.post(
         // Special boost for important security terms
         const importantTerms = ['awareness', 'training', 'education', 'security', 'policy',
           'procedure', 'access', 'control', 'incident', 'monitoring'];
-        
-        // Special boost for important security terms
-        const importantTerms = ['awareness', 'training', 'education', 'security', 'policy', 
-                               'procedure', 'access', 'control', 'incident', 'monitoring'];
         for (const term of importantTerms) {
           if (documentTextLower.includes(term) && controlTextLower.includes(term)) {
             keywordBoost += 10;

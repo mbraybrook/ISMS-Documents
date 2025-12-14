@@ -243,3 +243,9 @@ const count = 0;
 - ESLint configs: `frontend/.eslintrc.cjs`, `backend/.eslintrc.json`
 
 
+
+
+
+
+
+
