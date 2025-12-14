@@ -147,6 +147,11 @@ router.post(
         return res.status(403).json({ error: 'Account pending approval' });
       }
 
+      // Check if user account is active
+      if (!user.isActive) {
+        return res.status(403).json({ error: 'Account access has been revoked. Please contact support.' });
+      }
+
       // Generate JWT token
       // Validate JWT secret
       const jwtSecretValue = config.trustCenter.jwtSecret;

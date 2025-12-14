@@ -795,6 +795,309 @@ router.post(
   }
 );
 
+// GET /api/trust/admin/users
+router.get(
+  '/admin/users',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    query('status').optional().isIn(['pending', 'approved', 'all']),
+    query('active').optional().isBoolean(),
+    query('search').optional().isString(),
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+    query('offset').optional().isInt({ min: 0 }),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const status = (req.query.status as string) || 'all';
+      const active = req.query.active !== undefined ? req.query.active === 'true' : undefined;
+      const search = req.query.search as string | undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
+
+      const where: any = {};
+
+      // Filter by approval status
+      if (status === 'pending') {
+        where.isApproved = false;
+      } else if (status === 'approved') {
+        where.isApproved = true;
+      }
+      // 'all' means no filter
+
+      // Filter by active status
+      if (active !== undefined) {
+        where.isActive = active;
+      }
+
+      // Search by email or company name
+      if (search) {
+        where.OR = [
+          { email: { contains: search, mode: 'insensitive' } },
+          { companyName: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+
+      const users = await prisma.externalUser.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          companyName: true,
+          isApproved: true,
+          isActive: true,
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: limit,
+        skip: offset,
+      });
+
+      res.json(users);
+    } catch (error: any) {
+      console.error('[TRUST] Error fetching users:', error);
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
+  }
+);
+
+// GET /api/trust/admin/users/:userId
+router.get(
+  '/admin/users/:userId',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [param('userId').isString().notEmpty()],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+
+      const user = await prisma.externalUser.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          companyName: true,
+          isApproved: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          termsAcceptedAt: true,
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Get last login date from audit logs
+      const lastLoginLog = await prisma.trustAuditLog.findFirst({
+        where: {
+          performedByExternalUserId: userId,
+          action: 'LOGIN_SUCCESS',
+        },
+        orderBy: {
+          timestamp: 'desc',
+        },
+        select: {
+          timestamp: true,
+        },
+      });
+
+      // Get total downloads count
+      const totalDownloads = await prisma.trustDownload.count({
+        where: {
+          externalUserId: userId,
+        },
+      });
+
+      // Get approval date and approver from audit logs
+      const approvalLog = await prisma.trustAuditLog.findFirst({
+        where: {
+          targetUserId: userId,
+          action: 'USER_APPROVED',
+        },
+        orderBy: {
+          timestamp: 'desc',
+        },
+        select: {
+          timestamp: true,
+          performedByUserId: true,
+        },
+      });
+
+      let approvedBy: string | null = null;
+      if (approvalLog?.performedByUserId) {
+        const approver = await prisma.user.findUnique({
+          where: { id: approvalLog.performedByUserId },
+          select: { email: true },
+        });
+        approvedBy = approver?.email || null;
+      }
+
+      res.json({
+        id: user.id,
+        email: user.email,
+        companyName: user.companyName,
+        isApproved: user.isApproved,
+        isActive: user.isActive,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+        termsAcceptedAt: user.termsAcceptedAt?.toISOString() || null,
+        lastLoginDate: lastLoginLog?.timestamp.toISOString() || null,
+        totalDownloads,
+        approvalDate: approvalLog?.timestamp.toISOString() || null,
+        approvedBy,
+      });
+    } catch (error: any) {
+      console.error('[TRUST] Error fetching user details:', error);
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.status(500).json({ error: 'Failed to fetch user details' });
+    }
+  }
+);
+
+// PUT /api/trust/admin/users/:userId/revoke
+router.put(
+  '/admin/users/:userId/revoke',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [param('userId').isString().notEmpty()],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      // Get internal user from database to get the ID
+      const internalUser = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
+
+      const user = await prisma.externalUser.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          companyName: true,
+          tokenVersion: true,
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Update user to set isActive = false and increment tokenVersion
+      const updatedUser = await prisma.externalUser.update({
+        where: { id: userId },
+        data: {
+          isActive: false,
+          tokenVersion: user.tokenVersion + 1, // Invalidate existing tokens
+        },
+        select: {
+          id: true,
+          email: true,
+          companyName: true,
+          isApproved: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+
+      // Log revocation
+      await logTrustAction(
+        'USER_ACCESS_REVOKED',
+        internalUser?.id,
+        undefined,
+        userId,
+        undefined,
+        { email: user.email, companyName: user.companyName },
+        getIpAddress(req)
+      );
+
+      res.json(updatedUser);
+    } catch (error: any) {
+      console.error('[TRUST] Error revoking user access:', error);
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.status(500).json({ error: 'Failed to revoke user access' });
+    }
+  }
+);
+
+// PUT /api/trust/admin/users/:userId/restore
+router.put(
+  '/admin/users/:userId/restore',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [param('userId').isString().notEmpty()],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      // Get internal user from database to get the ID
+      const internalUser = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
+
+      const user = await prisma.externalUser.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          companyName: true,
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Update user to set isActive = true
+      const updatedUser = await prisma.externalUser.update({
+        where: { id: userId },
+        data: {
+          isActive: true,
+        },
+        select: {
+          id: true,
+          email: true,
+          companyName: true,
+          isApproved: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+
+      // Log restoration
+      await logTrustAction(
+        'USER_ACCESS_RESTORED',
+        internalUser?.id,
+        undefined,
+        userId,
+        undefined,
+        { email: user.email, companyName: user.companyName },
+        getIpAddress(req)
+      );
+
+      res.json(updatedUser);
+    } catch (error: any) {
+      console.error('[TRUST] Error restoring user access:', error);
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.status(500).json({ error: 'Failed to restore user access' });
+    }
+  }
+);
+
 // GET /api/trust/admin/documents
 router.get(
   '/admin/documents',

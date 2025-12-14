@@ -7,6 +7,7 @@ import type {
   TrustDocSetting,
   TrustAuditLog,
   TrustDocument,
+  UserDetails,
 } from '../types/trust';
 
 const API_URL = `${config.apiUrl}/api/trust`;
@@ -263,6 +264,39 @@ export const trustApi = {
 
   async denyUser(userId: string, reason?: string): Promise<{ message: string }> {
     const response = await apiInternal.post(`/api/trust/admin/deny-user/${userId}`, { reason });
+    return response.data;
+  },
+
+  async getAllUsers(filters?: {
+    status?: 'pending' | 'approved' | 'all';
+    active?: boolean;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ExternalUser[]> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.active !== undefined) params.append('active', filters.active.toString());
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.limit) params.append('limit', filters.limit.toString());
+    if (filters?.offset) params.append('offset', filters.offset.toString());
+
+    const response = await apiInternal.get(`/api/trust/admin/users?${params.toString()}`);
+    return response.data;
+  },
+
+  async getUserDetails(userId: string): Promise<UserDetails> {
+    const response = await apiInternal.get(`/api/trust/admin/users/${userId}`);
+    return response.data;
+  },
+
+  async revokeUserAccess(userId: string): Promise<ExternalUser> {
+    const response = await apiInternal.put(`/api/trust/admin/users/${userId}/revoke`);
+    return response.data;
+  },
+
+  async restoreUserAccess(userId: string): Promise<ExternalUser> {
+    const response = await apiInternal.put(`/api/trust/admin/users/${userId}/restore`);
     return response.data;
   },
 

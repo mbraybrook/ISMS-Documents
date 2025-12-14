@@ -3,8 +3,17 @@ export interface ExternalUser {
   email: string;
   companyName: string;
   isApproved: boolean;
+  isActive?: boolean;
   termsAcceptedAt?: string | null;
   createdAt?: string;
+}
+
+export interface UserDetails extends ExternalUser {
+  updatedAt: string;
+  lastLoginDate: string | null;
+  totalDownloads: number;
+  approvalDate: string | null;
+  approvedBy: string | null;
 }
 
 export interface TrustDocSetting {

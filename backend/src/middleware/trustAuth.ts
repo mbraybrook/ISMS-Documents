@@ -40,6 +40,7 @@ export interface TrustAuthRequest extends Request {
     email: string;
     companyName: string;
     isApproved: boolean;
+    isActive: boolean;
     tokenVersion: number;
     termsAcceptedAt: Date | null;
   };
@@ -90,6 +91,7 @@ export const authenticateTrustToken = async (
         email: true,
         companyName: true,
         isApproved: true,
+        isActive: true,
         tokenVersion: true,
         termsAcceptedAt: true,
       },
@@ -102,6 +104,11 @@ export const authenticateTrustToken = async (
     // Check if user is approved
     if (!externalUser.isApproved) {
       return res.status(403).json({ error: 'User not approved' });
+    }
+
+    // Check if user account is active
+    if (!externalUser.isActive) {
+      return res.status(403).json({ error: 'Account access has been revoked' });
     }
 
     // Check token version (for invalidation on password change)

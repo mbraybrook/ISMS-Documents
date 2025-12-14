@@ -39,13 +39,14 @@ import {
 } from '@chakra-ui/react';
 import { useAuth } from '../contexts/AuthContext';
 import { trustApi } from '../services/trustApi';
-import type { ExternalUser, TrustDocSetting, TrustDocument } from '../types/trust';
+import type { ExternalUser, TrustDocSetting, TrustDocument, UserDetails } from '../types/trust';
 import { AxiosError } from 'axios';
 
 export function TrustCenterAdminPage() {
   const { user } = useAuth();
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen: isDetailsOpen, onOpen: onDetailsOpen, onClose: onDetailsClose } = useDisclosure();
   const [loading, setLoading] = useState(true);
   const [pendingUsers, setPendingUsers] = useState<ExternalUser[]>([]);
   const [documents, setDocuments] = useState<Array<{ document: TrustDocument; trustSetting: TrustDocSetting | null }>>([]);
@@ -54,9 +55,17 @@ export function TrustCenterAdminPage() {
   const [editingDocument, setEditingDocument] = useState<{ document: TrustDocument; trustSetting: TrustDocSetting | null } | null>(null);
   const [settings, setSettings] = useState<{ watermarkPrefix: string }>({ watermarkPrefix: 'Paythru Confidential' });
   const [settingsLoading, setSettingsLoading] = useState(false);
-  const [tabIndex, setTabIndex] = useState(0); // 0 = Document Management, 1 = Pending Requests, 2 = Settings
+  const [tabIndex, setTabIndex] = useState(0); // 0 = Document Management, 1 = Pending Requests, 2 = Settings, 3 = User Management
   const documentListRef = useRef<HTMLDivElement>(null);
   const savedScrollPosition = useRef<number>(0);
+  // User Management state
+  const [users, setUsers] = useState<ExternalUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
+  const [userDetailsLoading, setUserDetailsLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'approved' | 'all'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'revoked'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadData = useCallback(async (preserveScroll = false) => {
     try {
@@ -172,6 +181,108 @@ export function TrustCenterAdminPage() {
       toast({
         title: 'Error',
         description: axiosError.response?.data?.error || 'Failed to deny user',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const loadUsers = useCallback(async () => {
+    try {
+      setUsersLoading(true);
+      const activeFilterValue = activeFilter === 'all' ? undefined : activeFilter === 'active';
+      const usersData = await trustApi.getAllUsers({
+        status: statusFilter,
+        active: activeFilterValue,
+        search: searchQuery || undefined,
+      });
+      setUsers(usersData);
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ error?: string }>;
+      toast({
+        title: 'Error',
+        description: axiosError.response?.data?.error || 'Failed to load users',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [statusFilter, activeFilter, searchQuery, toast]);
+
+  useEffect(() => {
+    if (tabIndex === 3 && user && (user.role === 'ADMIN' || user.role === 'EDITOR')) {
+      loadUsers();
+    }
+  }, [tabIndex, user, loadUsers]);
+
+  const handleViewDetails = async (userId: string) => {
+    try {
+      setUserDetailsLoading(true);
+      const details = await trustApi.getUserDetails(userId);
+      setUserDetails(details);
+      onDetailsOpen();
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ error?: string }>;
+      toast({
+        title: 'Error',
+        description: axiosError.response?.data?.error || 'Failed to load user details',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setUserDetailsLoading(false);
+    }
+  };
+
+  const handleRevokeAccess = async (userId: string) => {
+    if (!confirm('Are you sure you want to revoke access for this user?')) {
+      return;
+    }
+
+    try {
+      await trustApi.revokeUserAccess(userId);
+      toast({
+        title: 'Access revoked',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+      loadUsers();
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ error?: string }>;
+      toast({
+        title: 'Error',
+        description: axiosError.response?.data?.error || 'Failed to revoke access',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleRestoreAccess = async (userId: string) => {
+    if (!confirm('Are you sure you want to restore access for this user?')) {
+      return;
+    }
+
+    try {
+      await trustApi.restoreUserAccess(userId);
+      toast({
+        title: 'Access restored',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+      loadUsers();
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ error?: string }>;
+      toast({
+        title: 'Error',
+        description: axiosError.response?.data?.error || 'Failed to restore access',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -325,6 +436,7 @@ export function TrustCenterAdminPage() {
           <Tab>Document Management</Tab>
           <Tab>Pending Requests</Tab>
           <Tab>Settings</Tab>
+          <Tab>User Management</Tab>
         </TabList>
 
         <TabPanels>
@@ -489,6 +601,139 @@ export function TrustCenterAdminPage() {
               </Button>
             </VStack>
           </TabPanel>
+
+          <TabPanel>
+            <VStack spacing={4} align="stretch">
+              <Heading size="md">User Management</Heading>
+              
+              {/* Filters */}
+              <HStack spacing={4}>
+                <FormControl>
+                  <FormLabel>Status</FormLabel>
+                  <Select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as 'pending' | 'approved' | 'all')}
+                  >
+                    <option value="all">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                  </Select>
+                </FormControl>
+                
+                <FormControl>
+                  <FormLabel>Active Status</FormLabel>
+                  <Select
+                    value={activeFilter}
+                    onChange={(e) => setActiveFilter(e.target.value as 'all' | 'active' | 'revoked')}
+                  >
+                    <option value="all">All</option>
+                    <option value="active">Active</option>
+                    <option value="revoked">Revoked</option>
+                  </Select>
+                </FormControl>
+                
+                <FormControl flex={1}>
+                  <FormLabel>Search</FormLabel>
+                  <Input
+                    placeholder="Search by email or company name"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </FormControl>
+              </HStack>
+
+              {usersLoading ? (
+                <Box textAlign="center" py={8}>
+                  <Spinner size="xl" />
+                </Box>
+              ) : users.length === 0 ? (
+                <Text color="gray.500">No users found</Text>
+              ) : (
+                <Box overflowX="auto">
+                  <Table variant="simple">
+                    <Thead>
+                      <Tr>
+                        <Th>Email</Th>
+                        <Th>Company</Th>
+                        <Th>Status</Th>
+                        <Th>Active</Th>
+                        <Th>Registered</Th>
+                        <Th>Actions</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {users.map((userItem) => (
+                        <Tr key={userItem.id}>
+                          <Td>{userItem.email}</Td>
+                          <Td>{userItem.companyName}</Td>
+                          <Td>
+                            <Badge colorScheme={userItem.isApproved ? 'green' : 'yellow'}>
+                              {userItem.isApproved ? 'Approved' : 'Pending'}
+                            </Badge>
+                          </Td>
+                          <Td>
+                            <Badge colorScheme={userItem.isActive !== false ? 'green' : 'red'}>
+                              {userItem.isActive !== false ? 'Active' : 'Revoked'}
+                            </Badge>
+                          </Td>
+                          <Td>{userItem.createdAt ? new Date(userItem.createdAt).toLocaleDateString() : '-'}</Td>
+                          <Td>
+                            <HStack spacing={2}>
+                              <Button
+                                size="sm"
+                                onClick={() => handleViewDetails(userItem.id)}
+                              >
+                                View Details
+                              </Button>
+                              {!userItem.isApproved && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    colorScheme="green"
+                                    onClick={() => handleApproveUser(userItem.id)}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    colorScheme="red"
+                                    onClick={() => handleDenyUser(userItem.id)}
+                                  >
+                                    Deny
+                                  </Button>
+                                </>
+                              )}
+                              {userItem.isApproved && (
+                                <>
+                                  {userItem.isActive !== false ? (
+                                    <Button
+                                      size="sm"
+                                      colorScheme="orange"
+                                      onClick={() => handleRevokeAccess(userItem.id)}
+                                    >
+                                      Revoke Access
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      colorScheme="green"
+                                      onClick={() => handleRestoreAccess(userItem.id)}
+                                    >
+                                      Restore Access
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+                            </HStack>
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                </Box>
+              )}
+            </VStack>
+          </TabPanel>
         </TabPanels>
       </Tabs>
 
@@ -601,6 +846,73 @@ export function TrustCenterAdminPage() {
             >
               Save Settings
             </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* User Details Modal */}
+      <Modal isOpen={isDetailsOpen} onClose={onDetailsClose} size="lg">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>User Details</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {userDetailsLoading ? (
+              <Box textAlign="center" py={8}>
+                <Spinner size="xl" />
+              </Box>
+            ) : userDetails ? (
+              <VStack spacing={4} align="stretch">
+                <Heading size="sm">Basic Information</Heading>
+                <Box>
+                  <Text fontWeight="bold">Email:</Text>
+                  <Text>{userDetails.email}</Text>
+                </Box>
+                <Box>
+                  <Text fontWeight="bold">Company:</Text>
+                  <Text>{userDetails.companyName}</Text>
+                </Box>
+                <Box>
+                  <Text fontWeight="bold">Registration Date:</Text>
+                  <Text>{new Date(userDetails.createdAt || '').toLocaleString()}</Text>
+                </Box>
+                <Box>
+                  <Text fontWeight="bold">Approval Status:</Text>
+                  <Badge colorScheme={userDetails.isApproved ? 'green' : 'yellow'}>
+                    {userDetails.isApproved ? 'Approved' : 'Pending'}
+                  </Badge>
+                </Box>
+                <Box>
+                  <Text fontWeight="bold">Active Status:</Text>
+                  <Badge colorScheme={userDetails.isActive !== false ? 'green' : 'red'}>
+                    {userDetails.isActive !== false ? 'Active' : 'Revoked'}
+                  </Badge>
+                </Box>
+
+                <Heading size="sm" mt={4}>Activity Summary</Heading>
+                <Box>
+                  <Text fontWeight="bold">Last Login:</Text>
+                  <Text>{userDetails.lastLoginDate ? new Date(userDetails.lastLoginDate).toLocaleString() : 'Never'}</Text>
+                </Box>
+                <Box>
+                  <Text fontWeight="bold">Total Downloads:</Text>
+                  <Text>{userDetails.totalDownloads}</Text>
+                </Box>
+                <Box>
+                  <Text fontWeight="bold">Approval Date:</Text>
+                  <Text>{userDetails.approvalDate ? new Date(userDetails.approvalDate).toLocaleString() : 'Not approved'}</Text>
+                </Box>
+                <Box>
+                  <Text fontWeight="bold">Approved By:</Text>
+                  <Text>{userDetails.approvedBy || 'N/A'}</Text>
+                </Box>
+              </VStack>
+            ) : (
+              <Text>No user details available</Text>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={onDetailsClose}>Close</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

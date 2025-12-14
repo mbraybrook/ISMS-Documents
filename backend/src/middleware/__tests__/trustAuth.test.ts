@@ -221,6 +221,7 @@ describe('authenticateTrustToken middleware', () => {
           email: true,
           companyName: true,
           isApproved: true,
+          isActive: true,
           tokenVersion: true,
           termsAcceptedAt: true,
         },
@@ -247,6 +248,7 @@ describe('authenticateTrustToken middleware', () => {
         email: 'test@example.com',
         companyName: 'Test Company',
         isApproved: false,
+        isActive: true,
         tokenVersion: 1,
         termsAcceptedAt: new Date(),
       });
@@ -260,6 +262,39 @@ describe('authenticateTrustToken middleware', () => {
       expect(mockResponse.status).toHaveBeenCalledWith(403);
       expect(mockResponse.json).toHaveBeenCalledWith({
         error: 'User not approved',
+      });
+      expect(nextFunction).not.toHaveBeenCalled();
+    });
+
+    it('should return 403 if user account is inactive', async () => {
+      const token = jwt.sign(
+        { userId: 'user-123', tokenVersion: 1 },
+        config.trustCenter.jwtSecret
+      );
+
+      mockRequest.headers = {
+        authorization: `Bearer ${token}`,
+      };
+
+      (prisma.externalUser.findUnique as jest.Mock).mockResolvedValue({
+        id: 'user-123',
+        email: 'test@example.com',
+        companyName: 'Test Company',
+        isApproved: true,
+        isActive: false,
+        tokenVersion: 1,
+        termsAcceptedAt: new Date(),
+      });
+
+      await authenticateTrustToken(
+        mockRequest as TrustAuthRequest,
+        mockResponse as Response,
+        nextFunction
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        error: 'Account access has been revoked',
       });
       expect(nextFunction).not.toHaveBeenCalled();
     });
@@ -279,6 +314,7 @@ describe('authenticateTrustToken middleware', () => {
         email: 'test@example.com',
         companyName: 'Test Company',
         isApproved: true,
+        isActive: true,
         tokenVersion: 2, // Different version
         termsAcceptedAt: new Date(),
       });
@@ -311,6 +347,7 @@ describe('authenticateTrustToken middleware', () => {
         email: 'test@example.com',
         companyName: 'Test Company',
         isApproved: true,
+        isActive: true,
         tokenVersion: 1,
         termsAcceptedAt: new Date(),
       });
@@ -340,6 +377,7 @@ describe('authenticateTrustToken middleware', () => {
         email: 'test@example.com',
         companyName: 'Test Company',
         isApproved: true,
+        isActive: true,
         tokenVersion: 1,
         termsAcceptedAt: new Date('2024-01-01'),
       };
@@ -372,6 +410,7 @@ describe('authenticateTrustToken middleware', () => {
         email: 'test@example.com',
         companyName: 'Test Company',
         isApproved: true,
+        isActive: true,
         tokenVersion: 1,
         termsAcceptedAt: null,
       };

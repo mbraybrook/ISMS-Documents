@@ -372,6 +372,7 @@ model ExternalUser {
   passwordHash         String
   companyName          String
   isApproved           Boolean         @default(false)
+  isActive             Boolean         @default(true)
   passwordResetToken   String?
   passwordResetExpires DateTime?
   tokenVersion         Int             @default(0)
@@ -383,6 +384,7 @@ model ExternalUser {
 
   @@index([email])
   @@index([isApproved])
+  @@index([isActive])
 }
 
 model TrustDocSetting {

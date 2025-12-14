@@ -290,6 +290,7 @@ describe('Trust Auth API', () => {
         passwordHash: 'hashed-password',
         companyName: 'Test Company',
         isApproved: true,
+        isActive: true,
         tokenVersion: 1,
         termsAcceptedAt: new Date(),
       };
@@ -430,6 +431,34 @@ describe('Trust Auth API', () => {
       // Assert
       expect(response.status).toBe(403);
       expect(response.body.error).toBe('Account pending approval');
+    });
+
+    it('should return 403 when user account is inactive', async () => {
+      // Arrange
+      const email = 'user@example.com';
+      const password = 'Password123';
+      const mockUser = {
+        id: 'user-id',
+        email,
+        passwordHash: 'hashed-password',
+        companyName: 'Test Company',
+        isApproved: true,
+        isActive: false,
+        tokenVersion: 1,
+        termsAcceptedAt: new Date(),
+      };
+
+      (prisma.externalUser.findUnique as jest.Mock).mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      // Act
+      const response = await request(app)
+        .post('/api/trust/login')
+        .send({ email, password });
+
+      // Assert
+      expect(response.status).toBe(403);
+      expect(response.body.error).toBe('Account access has been revoked. Please contact support.');
     });
 
     // Note: JWT secret validation tests (lines 154, 157) are difficult to test in isolation
