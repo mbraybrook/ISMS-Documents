@@ -20,7 +20,9 @@ import api from '../services/api';
 import { ControlFormModal } from '../components/ControlFormModal';
 import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
 import { formatBoolean, generateCSV } from '../utils/tableUtils';
+import { Control as ControlType } from '../types/control';
 
+// Local Control type that matches API response (without createdAt/updatedAt, and with null instead of undefined)
 interface Control {
   id: string;
   code: string;
@@ -52,6 +54,31 @@ interface Control {
     };
   }>;
 }
+
+// Helper to convert local Control to ControlType for the modal
+const toControlType = (control: Control | null): ControlType | null => {
+  if (!control) return null;
+  return {
+    ...control,
+    description: control.description ?? undefined,
+    justification: control.justification ?? undefined,
+    controlText: control.controlText ?? undefined,
+    purpose: control.purpose ?? undefined,
+    guidance: control.guidance ?? undefined,
+    otherInformation: control.otherInformation ?? undefined,
+    category: control.category ?? undefined,
+    createdAt: new Date().toISOString(), // Default value since API doesn't return it
+    updatedAt: new Date().toISOString(), // Default value since API doesn't return it
+    riskControls: control.riskControls?.map(rc => ({
+      riskId: rc.risk.id,
+      controlId: control.id,
+      risk: {
+        id: rc.risk.id,
+        title: rc.risk.title,
+      } as any, // Partial Risk type - modal doesn't need full Risk object
+    })),
+  };
+};
 
 type SortField = 'code' | 'title' | 'category' | 'type' | 'selected';
 type SortOrder = 'asc' | 'desc';
@@ -659,7 +686,7 @@ export function ControlsPage() {
       <ControlFormModal
         isOpen={isOpen}
         onClose={handleClose}
-        control={selectedControl}
+        control={toControlType(selectedControl)}
       />
     </VStack>
   );

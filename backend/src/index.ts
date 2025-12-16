@@ -1,11 +1,8 @@
-import { app } from './app';
 import { config } from './config';
 import { log } from './lib/logger';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { config } from './config';
-import { log } from './lib/logger';
 import { healthRouter } from './routes/health';
 import { authRouter } from './routes/auth';
 import { documentsRouter } from './routes/documents';

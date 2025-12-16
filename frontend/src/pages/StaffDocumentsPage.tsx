@@ -66,7 +66,6 @@ export function StaffDocumentsPage() {
     fetchUsers();
   }, []);
 
-    applyFilters();
   useEffect(() => {
     applyFilters();
   }, [filters, allDocuments]);

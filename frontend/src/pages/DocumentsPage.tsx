@@ -1046,7 +1046,11 @@ export function DocumentsPage() {
         renderRow={renderRow}
       />
 
-      <DocumentFormModal isOpen={isOpen} onClose={handleClose} document={selectedDocument} />
+      <DocumentFormModal 
+        isOpen={isOpen} 
+        onClose={handleClose} 
+        document={selectedDocument ? { ...selectedDocument, ownerUserId: selectedDocument.owner.id } : null} 
+      />
 
       <AlertDialog isOpen={isDeleteOpen} leastDestructiveRef={cancelRef} onClose={onDeleteClose}>
         <AlertDialogOverlay>
@@ -1160,7 +1164,12 @@ export function DocumentsPage() {
         </AlertDialogOverlay>
       </AlertDialog>
 
-      <DocumentFormModal isOpen={isViewOpen} onClose={onViewClose} document={selectedDocument} readOnly={true} />
+      <DocumentFormModal 
+        isOpen={isViewOpen} 
+        onClose={onViewClose} 
+        document={selectedDocument ? { ...selectedDocument, ownerUserId: selectedDocument.owner.id } : null} 
+        readOnly={true} 
+      />
     </VStack>
   );
 }

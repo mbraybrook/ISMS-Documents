@@ -23,7 +23,7 @@ const mockSetDepartmentOverride = vi.fn();
 const mockGetEffectiveRole = vi.fn();
 
 const createMockAuthContext = (overrides?: {
-  user?: { id: string; email: string; displayName: string; role: string } | null;
+  user?: { id: string; email: string; displayName: string; role: 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR' } | null;
   roleOverride?: 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR' | null;
   departmentOverride?: Department | null;
   getEffectiveRole?: () => 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR' | null;
@@ -32,7 +32,7 @@ const createMockAuthContext = (overrides?: {
     id: 'user-1',
     email: 'admin@paythru.com',
     displayName: 'Admin User',
-    role: 'ADMIN',
+    role: 'ADMIN' as const,
   },
   loading: false,
   login: vi.fn(),

@@ -116,7 +116,7 @@ beforeAll(() => {
     }
     // Re-throw other unhandled rejections
     if (originalUnhandledRejection) {
-      originalUnhandledRejection(reason);
+      originalUnhandledRejection(reason, Promise.resolve());
     } else {
       throw reason;
     }
@@ -138,7 +138,7 @@ beforeAll(() => {
     }
 
     if (originalUncaughtException) {
-      originalUncaughtException(error);
+      originalUncaughtException(error, 'uncaughtException');
     } else {
       console.error('Uncaught Exception:', error);
       process.exit(1);

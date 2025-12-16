@@ -144,7 +144,7 @@ const mockAuthContext = {
   isAuthenticated: false,
   roleOverride: null,
   setRoleOverride: vi.fn(),
-  getEffectiveRole: vi.fn(() => null),
+  getEffectiveRole: vi.fn<[], 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR' | null>(() => null),
   departmentOverride: null,
   setDepartmentOverride: vi.fn(),
   getUserDepartment: vi.fn(() => null),

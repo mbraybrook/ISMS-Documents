@@ -41,7 +41,7 @@ import { ArrowBackIcon, DeleteIcon, AddIcon, InfoIcon } from '@chakra-ui/icons';
 import { supplierApi } from '../services/api';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Supplier, SupplierContact } from '../types/supplier';
+import { Supplier, SupplierContact, SupplierStatus, SupplierType, ServiceSubType, RiskRating, PciStatus, IsoStatus, GdprStatus, PerformanceRating, SupplierLifecycleState, TrustCenterCategory } from '../types/supplier';
 import {
   getLifecycleStateDisplayName,
 } from '../types/supplier';
@@ -82,26 +82,64 @@ export function SupplierDetailPage() {
     return canEdit; // Default: edit if user can edit, view if not
   });
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    tradingName: string;
+    status: SupplierStatus;
+    supplierType: SupplierType;
+    serviceSubType: ServiceSubType | null;
+    serviceDescription: string;
+    processesCardholderData: boolean;
+    processesPersonalData: boolean;
+    hostingRegions: string[];
+    customerFacingImpact: boolean;
+    overallRiskRating: RiskRating | null;
+    criticality: RiskRating | null;
+    riskRationale: string;
+    criticalityRationale: string;
+    pciStatus: PciStatus | null;
+    iso27001Status: IsoStatus | null;
+    iso22301Status: IsoStatus | null;
+    iso9001Status: IsoStatus | null;
+    gdprStatus: GdprStatus | null;
+    reviewDate: string;
+    complianceEvidenceLinks: string[];
+    relationshipOwnerUserId: string | null;
+    primaryContacts: SupplierContact[];
+    contractReferences: string[];
+    dataProcessingAgreementRef: string;
+    contractStartDate: string;
+    contractEndDate: string;
+    autoRenewal: boolean;
+    performanceRating: PerformanceRating | null;
+    performanceNotes: string;
+    lifecycleState: SupplierLifecycleState;
+    cisoExemptionGranted: boolean;
+    showInTrustCenter: boolean;
+    trustCenterDisplayName: string;
+    trustCenterDescription: string;
+    trustCenterCategory: TrustCenterCategory | null;
+    trustCenterComplianceSummary: string;
+  }>({
     name: '',
     tradingName: '',
-    status: 'ACTIVE' as const,
-    supplierType: 'SERVICE_PROVIDER' as const,
-    serviceSubType: null as string | null,
+    status: 'ACTIVE',
+    supplierType: 'SERVICE_PROVIDER',
+    serviceSubType: null,
     serviceDescription: '',
     processesCardholderData: false,
     processesPersonalData: false,
     hostingRegions: [] as string[],
     customerFacingImpact: false,
-    overallRiskRating: null as string | null,
-    criticality: null as string | null,
+    overallRiskRating: null,
+    criticality: null,
     riskRationale: '',
     criticalityRationale: '',
-    pciStatus: null as string | null,
-    iso27001Status: null as string | null,
-    iso22301Status: null as string | null,
-    iso9001Status: null as string | null,
-    gdprStatus: null as string | null,
+    pciStatus: null,
+    iso27001Status: null,
+    iso22301Status: null,
+    iso9001Status: null,
+    gdprStatus: null,
     reviewDate: '',
     complianceEvidenceLinks: [] as string[],
     relationshipOwnerUserId: null as string | null,
@@ -111,14 +149,14 @@ export function SupplierDetailPage() {
     contractStartDate: '',
     contractEndDate: '',
     autoRenewal: false,
-    performanceRating: null as string | null,
+    performanceRating: null,
     performanceNotes: '',
-    lifecycleState: 'DRAFT' as string,
+    lifecycleState: 'DRAFT',
     cisoExemptionGranted: false,
     showInTrustCenter: false,
     trustCenterDisplayName: '',
     trustCenterDescription: '',
-    trustCenterCategory: null as string | null,
+    trustCenterCategory: null,
     trustCenterComplianceSummary: '',
   });
 
@@ -225,6 +263,15 @@ export function SupplierDetailPage() {
       setSaving(true);
       const dataToSave: Partial<Supplier> = {
         ...formData,
+        serviceSubType: formData.serviceSubType as ServiceSubType | null,
+        overallRiskRating: formData.overallRiskRating as RiskRating | null,
+        criticality: formData.criticality as RiskRating | null,
+        pciStatus: formData.pciStatus as PciStatus | null,
+        iso27001Status: formData.iso27001Status as IsoStatus | null,
+        iso22301Status: formData.iso22301Status as IsoStatus | null,
+        iso9001Status: formData.iso9001Status as IsoStatus | null,
+        gdprStatus: formData.gdprStatus as GdprStatus | null,
+        performanceRating: formData.performanceRating as PerformanceRating | null,
         hostingRegions: formData.hostingRegions.filter(r => r.trim()),
         complianceEvidenceLinks: formData.complianceEvidenceLinks.filter(l => l.trim()),
         contractReferences: formData.contractReferences.filter(r => r.trim()),
@@ -507,7 +554,7 @@ export function SupplierDetailPage() {
                     <FormLabel>Lifecycle State</FormLabel>
                     <Select
                       value={formData.lifecycleState}
-                      onChange={(e) => setFormData({ ...formData, lifecycleState: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, lifecycleState: e.target.value as SupplierLifecycleState })}
                       isDisabled={!isEditing}
                     >
                       <option value="DRAFT">Draft</option>
@@ -629,7 +676,7 @@ export function SupplierDetailPage() {
                   <FormLabel>Risk Rating</FormLabel>
                   <Select
                     value={formData.overallRiskRating || ''}
-                    onChange={(e) => setFormData({ ...formData, overallRiskRating: e.target.value || null })}
+                    onChange={(e) => setFormData({ ...formData, overallRiskRating: (e.target.value || null) as RiskRating | null })}
                     isDisabled={!isEditing}
                   >
                     <option value="">Not assessed</option>
@@ -642,7 +689,7 @@ export function SupplierDetailPage() {
                   <FormLabel>Criticality</FormLabel>
                   <Select
                     value={formData.criticality || ''}
-                    onChange={(e) => setFormData({ ...formData, criticality: e.target.value || null })}
+                    onChange={(e) => setFormData({ ...formData, criticality: (e.target.value || null) as RiskRating | null })}
                     isDisabled={!isEditing}
                   >
                     <option value="">Not assessed</option>
@@ -759,7 +806,7 @@ export function SupplierDetailPage() {
                   <FormLabel>PCI Status</FormLabel>
                   <Select
                     value={formData.pciStatus || ''}
-                    onChange={(e) => setFormData({ ...formData, pciStatus: e.target.value || null })}
+                    onChange={(e) => setFormData({ ...formData, pciStatus: (e.target.value || null) as PciStatus | null })}
                     isDisabled={!isEditing}
                   >
                     <option value="">Unknown</option>
@@ -772,7 +819,7 @@ export function SupplierDetailPage() {
                   <FormLabel>ISO 27001 Status</FormLabel>
                   <Select
                     value={formData.iso27001Status || ''}
-                    onChange={(e) => setFormData({ ...formData, iso27001Status: e.target.value || null })}
+                    onChange={(e) => setFormData({ ...formData, iso27001Status: (e.target.value || null) as IsoStatus | null })}
                     isDisabled={!isEditing}
                   >
                     <option value="">Unknown</option>
@@ -786,7 +833,7 @@ export function SupplierDetailPage() {
                   <FormLabel>ISO 22301 Status</FormLabel>
                   <Select
                     value={formData.iso22301Status || ''}
-                    onChange={(e) => setFormData({ ...formData, iso22301Status: e.target.value || null })}
+                    onChange={(e) => setFormData({ ...formData, iso22301Status: (e.target.value || null) as IsoStatus | null })}
                     isDisabled={!isEditing}
                   >
                     <option value="">Unknown</option>
@@ -800,7 +847,7 @@ export function SupplierDetailPage() {
                   <FormLabel>ISO 9001 Status</FormLabel>
                   <Select
                     value={formData.iso9001Status || ''}
-                    onChange={(e) => setFormData({ ...formData, iso9001Status: e.target.value || null })}
+                    onChange={(e) => setFormData({ ...formData, iso9001Status: (e.target.value || null) as IsoStatus | null })}
                     isDisabled={!isEditing}
                   >
                     <option value="">Unknown</option>
@@ -814,7 +861,7 @@ export function SupplierDetailPage() {
                   <FormLabel>GDPR Status</FormLabel>
                   <Select
                     value={formData.gdprStatus || ''}
-                    onChange={(e) => setFormData({ ...formData, gdprStatus: e.target.value || null })}
+                    onChange={(e) => setFormData({ ...formData, gdprStatus: (e.target.value || null) as GdprStatus | null })}
                     isDisabled={!isEditing}
                   >
                     <option value="">Unknown</option>
@@ -1196,7 +1243,7 @@ export function SupplierDetailPage() {
                   <FormLabel>Performance Rating</FormLabel>
                   <Select
                     value={formData.performanceRating || ''}
-                    onChange={(e) => setFormData({ ...formData, performanceRating: e.target.value || null })}
+                    onChange={(e) => setFormData({ ...formData, performanceRating: (e.target.value || null) as PerformanceRating | null })}
                     isDisabled={!isEditing}
                   >
                     <option value="">Not rated</option>

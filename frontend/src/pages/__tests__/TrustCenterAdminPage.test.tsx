@@ -39,11 +39,18 @@ describe('TrustCenterAdminPage', () => {
         id: 'test-user-id',
         email: 'admin@paythru.com',
         displayName: 'Test Admin',
-        role: 'ADMIN',
+        role: 'ADMIN' as const,
       },
       login: vi.fn(),
       logout: vi.fn(),
       loading: false,
+      isAuthenticated: true,
+      roleOverride: null,
+      setRoleOverride: vi.fn(),
+      getEffectiveRole: vi.fn(() => 'ADMIN' as const),
+      departmentOverride: null,
+      setDepartmentOverride: vi.fn(),
+      getUserDepartment: vi.fn(() => null),
     } as ReturnType<typeof useAuth>);
 
     vi.mocked(trustApi.getPendingRequests).mockResolvedValue([]);

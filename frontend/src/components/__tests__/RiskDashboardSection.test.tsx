@@ -5,7 +5,6 @@ import '@testing-library/jest-dom/vitest';
 import { RiskDashboardSection } from '../RiskDashboardSection';
 import { riskDashboardApi } from '../../services/api';
 import { RiskDashboardSummary } from '../../types/riskDashboard';
-import { useToast } from '@chakra-ui/react';
 
 // Mock the riskDashboardApi
 vi.mock('../../services/api', () => ({
@@ -20,7 +19,7 @@ vi.mock('@chakra-ui/react', async () => {
   const actual = await vi.importActual('@chakra-ui/react');
   return {
     ...actual,
-    useToast: vi.fn(),
+    useToast: () => mockToast,
   };
 });
 
@@ -66,7 +65,6 @@ describe('RiskDashboardSection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useToast).mockReturnValue(mockToast as ReturnType<typeof useToast>);
   });
 
   describe('Loading State', () => {

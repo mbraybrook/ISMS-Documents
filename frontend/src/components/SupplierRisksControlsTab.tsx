@@ -112,7 +112,11 @@ export function SupplierRisksControlsTab({
         supplierApi.getSupplierControls(supplierId),
       ]);
       setRisks(risksData);
-      setControls(controlsData);
+      // Map controls to convert undefined category to null
+      setControls(controlsData.map(control => ({
+        ...control,
+        category: control.category ?? null,
+      })));
     } catch (error: any) {
       toast({
         title: 'Error',

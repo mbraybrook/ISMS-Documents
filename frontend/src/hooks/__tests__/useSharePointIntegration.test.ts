@@ -29,7 +29,7 @@ vi.mock('@chakra-ui/react', async () => {
 
 describe('useSharePointIntegration', () => {
   const mockToast = vi.fn();
-  const mockFormData = {
+  let mockFormData = {
     title: 'Test Document',
     type: 'POLICY',
     storageLocation: 'SHAREPOINT',
