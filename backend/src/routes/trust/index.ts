@@ -118,7 +118,14 @@ router.get('/documents', conditionalTrustAuth, async (req: Request, res: Respons
             updatedAt: true,
           },
         },
-      },
+        certificate: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
+      } as any,
       orderBy: [
         { category: 'asc' },
         { displayOrder: 'asc' },
@@ -143,6 +150,13 @@ router.get('/documents', conditionalTrustAuth, async (req: Request, res: Respons
               status: true,
               createdAt: true,
               updatedAt: true,
+            },
+          },
+          certificate: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
             },
           },
         },
@@ -186,6 +200,12 @@ router.get('/documents', conditionalTrustAuth, async (req: Request, res: Respons
           publicDescription: item.publicDescription,
           displayOrder: item.displayOrder,
           requiresNda: item.requiresNda,
+          certificateId: item.certificateId,
+          certificate: item.certificate ? {
+            id: item.certificate.id,
+            name: item.certificate.name,
+            type: item.certificate.type,
+          } : null,
           createdAt: item.Document.createdAt,
           updatedAt: item.Document.updatedAt,
         });
@@ -229,6 +249,13 @@ router.get('/documents/private', authenticateTrustToken, async (req: TrustAuthRe
             updatedAt: true,
           },
         },
+        certificate: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
       },
       orderBy: [
         { category: 'asc' },
@@ -263,6 +290,12 @@ router.get('/documents/private', authenticateTrustToken, async (req: TrustAuthRe
           publicDescription: item.publicDescription,
           displayOrder: item.displayOrder,
           requiresNda: item.requiresNda,
+          certificateId: item.certificateId,
+          certificate: item.certificate ? {
+            id: item.certificate.id,
+            name: item.certificate.name,
+            type: item.certificate.type,
+          } : null,
           createdAt: item.Document.createdAt,
           updatedAt: item.Document.updatedAt,
         });
@@ -1107,7 +1140,17 @@ router.get(
     try {
       const documents = await prisma.document.findMany({
         include: {
-          TrustDocSetting: true,
+          TrustDocSetting: {
+            include: {
+              certificate: {
+                select: {
+                  id: true,
+                  name: true,
+                  type: true,
+                },
+              },
+            },
+          },
         },
         orderBy: {
           title: 'asc',
@@ -1130,6 +1173,12 @@ router.get(
             id: doc.TrustDocSetting.id,
             visibilityLevel: doc.TrustDocSetting.visibilityLevel,
             category: doc.TrustDocSetting.category,
+            certificateId: doc.TrustDocSetting.certificateId,
+            certificate: doc.TrustDocSetting.certificate ? {
+              id: doc.TrustDocSetting.certificate.id,
+              name: doc.TrustDocSetting.certificate.name,
+              type: doc.TrustDocSetting.certificate.type,
+            } : null,
             sharePointUrl: doc.TrustDocSetting.sharePointUrl,
             publicDescription: doc.TrustDocSetting.publicDescription,
             displayOrder: doc.TrustDocSetting.displayOrder,
@@ -1175,6 +1224,10 @@ router.put(
       const num = Number(value);
       return Number.isInteger(num) && num >= 0;
     }),
+    body('certificateId').optional().custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      return typeof value === 'string';
+    }),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -1188,6 +1241,7 @@ router.put(
         displayOrder,
         requiresNda,
         maxFileSizeMB,
+        certificateId,
       } = req.body;
       // Get internal user from database to get the ID
       const internalUserForLog = req.user?.email ? await prisma.user.findUnique({
@@ -1244,9 +1298,39 @@ router.put(
         where: { documentId: docId },
       });
 
+      // Validate certificateId if provided
+      if (certificateId !== undefined && certificateId !== null && certificateId !== '') {
+        const certificate = await prisma.trustCenterCertification.findUnique({
+          where: { id: certificateId },
+        });
+        if (!certificate) {
+          return res.status(400).json({ error: 'Certificate not found' });
+        }
+      }
+
       const updateData: any = {};
       if (visibilityLevel !== undefined) updateData.visibilityLevel = visibilityLevel;
-      if (category !== undefined) updateData.category = category;
+      
+      // Handle certificateId and category logic
+      if (certificateId !== undefined) {
+        if (certificateId === null || certificateId === '') {
+          // Clearing certificateId - allow manual category
+          updateData.certificateId = null;
+          if (category !== undefined) {
+            updateData.category = category;
+          }
+        } else {
+          // Setting certificateId - auto-set category to 'certification'
+          updateData.certificateId = certificateId;
+          updateData.category = 'certification';
+        }
+      } else if (category !== undefined) {
+        // If category is being changed manually and certificateId exists, clear certificateId
+        if (existingSetting?.certificateId && category !== 'certification') {
+          updateData.certificateId = null;
+        }
+        updateData.category = category;
+      }
       if (sharePointUrl !== undefined) updateData.sharePointUrl = sharePointUrl || null;
       if (sharePointSiteId !== undefined) updateData.sharePointSiteId = sharePointSiteId;
       if (sharePointDriveId !== undefined) updateData.sharePointDriveId = sharePointDriveId;
@@ -1265,11 +1349,13 @@ router.put(
         });
       } else {
         // Create new setting
+        const finalCategory = certificateId ? 'certification' : (category || 'policy');
         trustSetting = await prisma.trustDocSetting.create({
           data: {
             documentId: docId,
             visibilityLevel: visibilityLevel || 'public',
-            category: category || 'policy',
+            category: finalCategory,
+            certificateId: certificateId || null,
             sharePointUrl: sharePointUrl || null,
             sharePointSiteId: sharePointSiteId,
             sharePointDriveId: sharePointDriveId,
@@ -1282,6 +1368,20 @@ router.put(
         });
       }
 
+      // Fetch updated setting with certificate info
+      const updatedSetting = await prisma.trustDocSetting.findUnique({
+        where: { id: trustSetting.id },
+        include: {
+          certificate: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+            },
+          },
+        },
+      });
+
       // Log action
       const action = existingSetting ? 'DOC_SETTINGS_UPDATED' : 'DOC_SETTINGS_CREATED';
       await logTrustAction(
@@ -1293,11 +1393,12 @@ router.put(
         {
           visibilityLevel: trustSetting.visibilityLevel,
           category: trustSetting.category,
+          certificateId: trustSetting.certificateId,
         },
         getIpAddress(req)
       );
 
-      res.json(trustSetting);
+      res.json(updatedSetting);
     } catch (error: any) {
       console.error('[TRUST] Error updating document settings:', error);
       res.status(500).json({ error: 'Failed to update document settings' });
@@ -1421,12 +1522,15 @@ router.get(
           data: {
             key: 'global',
             watermarkPrefix: 'Paythru Confidential',
+            uptimeSLA: '99.9%',
           },
         });
       }
 
       res.json({
         watermarkPrefix: settings.watermarkPrefix,
+        uptimeSLA: settings.uptimeSLA || '99.9%',
+        activeCertifications: settings.activeCertifications,
       });
     } catch (error: any) {
       console.error('[TRUST] Error fetching settings:', error);
@@ -1442,11 +1546,13 @@ router.put(
   requireRole('ADMIN', 'EDITOR'),
   [
     body('watermarkPrefix').optional().isString().isLength({ min: 1, max: 100 }),
+    body('uptimeSLA').optional().isString().isLength({ min: 1, max: 50 }),
+    body('activeCertifications').optional().isInt({ min: 0 }),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
-      const { watermarkPrefix } = req.body;
+      const { watermarkPrefix, uptimeSLA, activeCertifications } = req.body;
       // Get internal user from database to get the ID
       const internalUserSettings = req.user?.email ? await prisma.user.findUnique({
         where: { email: req.user.email },
@@ -1458,13 +1564,27 @@ router.put(
         where: { key: 'global' },
       });
 
+      const updateData: {
+        watermarkPrefix?: string;
+        uptimeSLA?: string | null;
+        activeCertifications?: number | null;
+      } = {};
+
+      if (watermarkPrefix !== undefined) {
+        updateData.watermarkPrefix = watermarkPrefix;
+      }
+      if (uptimeSLA !== undefined) {
+        updateData.uptimeSLA = uptimeSLA || null;
+      }
+      if (activeCertifications !== undefined) {
+        updateData.activeCertifications = activeCertifications !== null && activeCertifications !== undefined ? activeCertifications : null;
+      }
+
       if (settings) {
         // Update existing settings
         settings = await prisma.trustCenterSettings.update({
           where: { id: settings.id },
-          data: {
-            watermarkPrefix: watermarkPrefix || settings.watermarkPrefix,
-          },
+          data: updateData,
         });
       } else {
         // Create new settings
@@ -1472,6 +1592,8 @@ router.put(
           data: {
             key: 'global',
             watermarkPrefix: watermarkPrefix || 'Paythru Confidential',
+            uptimeSLA: uptimeSLA || '99.9%',
+            activeCertifications: activeCertifications !== undefined ? activeCertifications : null,
           },
         });
       }
@@ -1485,12 +1607,16 @@ router.put(
         undefined,
         {
           watermarkPrefix: settings.watermarkPrefix,
+          uptimeSLA: settings.uptimeSLA,
+          activeCertifications: settings.activeCertifications,
         },
         getIpAddress(req)
       );
 
       res.json({
         watermarkPrefix: settings.watermarkPrefix,
+        uptimeSLA: settings.uptimeSLA || '99.9%',
+        activeCertifications: settings.activeCertifications,
       });
     } catch (error: any) {
       console.error('[TRUST] Error updating settings:', error);
@@ -1543,6 +1669,334 @@ router.get(
     } catch (error: any) {
       console.error('[TRUST] Error fetching suppliers:', error);
       res.status(500).json({ error: 'Failed to fetch suppliers' });
+    }
+  }
+);
+
+// GET /api/trust/stats - Get Trust Center statistics
+router.get('/stats', async (req: Request, res: Response) => {
+  try {
+    // Get configurable stats from settings
+    const settings = await prisma.trustCenterSettings.findUnique({
+      where: { key: 'global' },
+    });
+
+    // Use configured activeCertifications if set, otherwise calculate from certificates
+    let activeCertifications: number;
+    if (settings?.activeCertifications !== null && settings?.activeCertifications !== undefined) {
+      activeCertifications = settings.activeCertifications;
+    } else {
+      // Count certificates that have at least one linked document with visibility='public' and status='APPROVED'
+      activeCertifications = await prisma.trustCenterCertification.count({
+        where: {
+          TrustDocSettings: {
+            some: {
+              visibilityLevel: 'public',
+              Document: {
+                status: 'APPROVED',
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // Count policies and procedures (documents with category='policy' and visibility='public')
+    // Only count documents that exist and are APPROVED
+    const policiesAndProcedures = await prisma.trustDocSetting.count({
+      where: {
+        category: 'policy',
+        visibilityLevel: 'public',
+        Document: {
+          status: 'APPROVED',
+        },
+      },
+    });
+
+    const uptimeSLA = settings?.uptimeSLA || '99.9%';
+    // Security Monitoring is static
+    const securityMonitoring = '24/7';
+
+    res.json({
+      activeCertifications,
+      policiesAndProcedures,
+      uptimeSLA,
+      securityMonitoring,
+    });
+  } catch (error: any) {
+    console.error('[TRUST] Error fetching stats:', error);
+    // Return default values on error
+    res.json({
+      activeCertifications: 5,
+      policiesAndProcedures: 24,
+      uptimeSLA: '99.9%',
+      securityMonitoring: '24/7',
+    });
+  }
+});
+
+// GET /api/trust/certifications - Get showcase certifications
+router.get('/certifications', async (req: Request, res: Response) => {
+  try {
+    const certifications = await prisma.trustCenterCertification.findMany({
+      include: {
+        TrustDocSettings: {
+          where: {
+            Document: {
+              status: 'APPROVED',
+            },
+          },
+          include: {
+            Document: {
+              select: {
+                id: true,
+                title: true,
+                type: true,
+                version: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { displayOrder: 'asc' },
+    });
+    
+    // Transform to include document count and basic document info
+    const result = certifications.map((cert) => ({
+      id: cert.id,
+      name: cert.name,
+      type: cert.type,
+      description: cert.description,
+      validUntil: cert.validUntil,
+      displayOrder: cert.displayOrder,
+      createdAt: cert.createdAt,
+      updatedAt: cert.updatedAt,
+      documentCount: cert.TrustDocSettings.length,
+      documents: cert.TrustDocSettings.map((setting) => ({
+        id: setting.Document.id,
+        title: setting.Document.title,
+        type: setting.Document.type,
+        version: setting.Document.version,
+        status: setting.Document.status,
+        visibilityLevel: setting.visibilityLevel,
+      })),
+    }));
+    
+    res.json(result);
+  } catch (error: any) {
+    console.error('[TRUST] Error fetching certifications:', error);
+    res.json([]);
+  }
+});
+
+// GET /api/trust/admin/certifications - Get all certifications (admin)
+router.get(
+  '/admin/certifications',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const certifications = await prisma.trustCenterCertification.findMany({
+        include: {
+          TrustDocSettings: {
+            include: {
+              Document: {
+                select: {
+                  id: true,
+                  title: true,
+                  type: true,
+                  version: true,
+                  status: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { displayOrder: 'asc' },
+      });
+      
+      // Transform to include document info
+      const result = certifications.map((cert) => ({
+        id: cert.id,
+        name: cert.name,
+        type: cert.type,
+        description: cert.description,
+        validUntil: cert.validUntil,
+        displayOrder: cert.displayOrder,
+        createdAt: cert.createdAt,
+        updatedAt: cert.updatedAt,
+        documentCount: cert.TrustDocSettings.length,
+        documents: cert.TrustDocSettings.map((setting) => ({
+          id: setting.Document.id,
+          title: setting.Document.title,
+          type: setting.Document.type,
+          version: setting.Document.version,
+          status: setting.Document.status,
+          visibilityLevel: setting.visibilityLevel,
+          category: setting.category,
+        })),
+      }));
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('[TRUST] Error fetching certifications:', error);
+      res.status(500).json({ error: 'Failed to fetch certifications' });
+    }
+  }
+);
+
+// POST /api/trust/admin/certifications - Create certification
+router.post(
+  '/admin/certifications',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    body('name').isString().isLength({ min: 1, max: 100 }),
+    body('type').isIn(['certified', 'compliant']),
+    body('description').isString().isLength({ min: 1, max: 500 }),
+    body('validUntil').optional().custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      return !isNaN(Date.parse(value));
+    }).withMessage('validUntil must be a valid date or null'),
+    body('displayOrder').optional().isInt({ min: 0 }),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { name, type, description, validUntil, displayOrder } = req.body;
+      const internalUser = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
+
+      const certification = await prisma.trustCenterCertification.create({
+        data: {
+          name,
+          type,
+          description,
+          validUntil: validUntil ? new Date(validUntil) : null,
+          displayOrder: displayOrder || 0,
+        },
+      });
+
+      await logTrustAction(
+        'TRUST_CERTIFICATION_CREATED',
+        internalUser?.id,
+        undefined,
+        undefined,
+        undefined,
+        { certificationId: certification.id, name: certification.name },
+        getIpAddress(req)
+      );
+
+      res.json(certification);
+    } catch (error: any) {
+      console.error('[TRUST] Error creating certification:', error);
+      res.status(500).json({ error: 'Failed to create certification' });
+    }
+  }
+);
+
+// PUT /api/trust/admin/certifications/:id - Update certification
+router.put(
+  '/admin/certifications/:id',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [
+    param('id').isUUID(),
+    body('name').optional().isString().isLength({ min: 1, max: 100 }),
+    body('type').optional().isIn(['certified', 'compliant']),
+    body('description').optional().isString().isLength({ min: 1, max: 500 }),
+    body('validUntil').optional().custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      return !isNaN(Date.parse(value));
+    }).withMessage('validUntil must be a valid date or null'),
+    body('displayOrder').optional().isInt({ min: 0 }),
+  ],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { name, type, description, validUntil, displayOrder } = req.body;
+      const internalUser = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
+
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (type !== undefined) updateData.type = type;
+      if (description !== undefined) updateData.description = description;
+      if (validUntil !== undefined) {
+        updateData.validUntil = validUntil ? new Date(validUntil) : null;
+      }
+      if (displayOrder !== undefined) updateData.displayOrder = displayOrder;
+
+      const certification = await prisma.trustCenterCertification.update({
+        where: { id },
+        data: updateData,
+      });
+
+      await logTrustAction(
+        'TRUST_CERTIFICATION_UPDATED',
+        internalUser?.id,
+        undefined,
+        undefined,
+        undefined,
+        { certificationId: certification.id, name: certification.name },
+        getIpAddress(req)
+      );
+
+      res.json(certification);
+    } catch (error: any) {
+      console.error('[TRUST] Error updating certification:', error);
+      if (error.code === 'P2025') {
+        res.status(404).json({ error: 'Certification not found' });
+      } else {
+        res.status(500).json({ error: 'Failed to update certification' });
+      }
+    }
+  }
+);
+
+// DELETE /api/trust/admin/certifications/:id - Delete certification
+router.delete(
+  '/admin/certifications/:id',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  [param('id').isUUID()],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const internalUser = req.user?.email ? await prisma.user.findUnique({
+        where: { email: req.user.email },
+        select: { id: true },
+      }) : null;
+
+      const certification = await prisma.trustCenterCertification.delete({
+        where: { id },
+      });
+
+      await logTrustAction(
+        'TRUST_CERTIFICATION_DELETED',
+        internalUser?.id,
+        undefined,
+        undefined,
+        undefined,
+        { certificationId: id, name: certification.name },
+        getIpAddress(req)
+      );
+
+      res.json({ message: 'Certification deleted' });
+    } catch (error: any) {
+      console.error('[TRUST] Error deleting certification:', error);
+      if (error.code === 'P2025') {
+        res.status(404).json({ error: 'Certification not found' });
+      } else {
+        res.status(500).json({ error: 'Failed to delete certification' });
+      }
     }
   }
 );

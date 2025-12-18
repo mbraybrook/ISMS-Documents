@@ -21,6 +21,7 @@ export interface TrustDocSetting {
   documentId: string;
   visibilityLevel: 'public' | 'private';
   category: 'certification' | 'policy' | 'report';
+  certificateId?: string | null;
   sharePointUrl?: string | null;
   sharePointSiteId?: string | null;
   sharePointDriveId?: string | null;
@@ -31,6 +32,11 @@ export interface TrustDocSetting {
   maxFileSizeMB?: number | null;
   createdAt: string;
   updatedAt: string;
+  certificate?: {
+    id: string;
+    name: string;
+    type: string;
+  } | null;
 }
 
 export interface TrustDownload {
@@ -54,6 +60,12 @@ export interface TrustDocument {
   displayOrder?: number | null;
   requiresNda?: boolean;
   sharePointItemId?: string | null;
+  certificateId?: string | null;
+  certificate?: {
+    id: string;
+    name: string;
+    type: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

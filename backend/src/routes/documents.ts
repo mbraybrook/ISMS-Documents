@@ -28,7 +28,7 @@ router.get(
   '/',
   authenticateToken,
   [
-    query('type').optional().isIn(['POLICY', 'PROCEDURE', 'MANUAL', 'RECORD', 'TEMPLATE', 'OTHER']),
+    query('type').optional().isIn(['POLICY', 'PROCEDURE', 'MANUAL', 'RECORD', 'TEMPLATE', 'CERTIFICATE', 'OTHER']),
     query('status').optional().isIn(['DRAFT', 'IN_REVIEW', 'APPROVED', 'SUPERSEDED']),
     query('ownerId').optional().isUUID(),
     query('nextReviewFrom').optional().isISO8601(),
@@ -388,7 +388,7 @@ router.post(
   requireRole('ADMIN', 'EDITOR'),
   [
     body('title').notEmpty().trim(),
-    body('type').isIn(['POLICY', 'PROCEDURE', 'MANUAL', 'RECORD', 'TEMPLATE', 'OTHER']),
+    body('type').isIn(['POLICY', 'PROCEDURE', 'MANUAL', 'RECORD', 'TEMPLATE', 'CERTIFICATE', 'OTHER']),
     body('storageLocation').isIn(['SHAREPOINT', 'CONFLUENCE']),
     body('version').notEmpty().trim(),
     body('status').isIn(['DRAFT', 'IN_REVIEW', 'APPROVED', 'SUPERSEDED']),
@@ -541,7 +541,7 @@ router.put(
   [
     param('id').isUUID(),
     body('title').optional().notEmpty().trim(),
-    body('type').optional().isIn(['POLICY', 'PROCEDURE', 'MANUAL', 'RECORD', 'TEMPLATE', 'OTHER']),
+    body('type').optional().isIn(['POLICY', 'PROCEDURE', 'MANUAL', 'RECORD', 'TEMPLATE', 'CERTIFICATE', 'OTHER']),
     body('storageLocation').optional().isIn(['SHAREPOINT', 'CONFLUENCE']),
     body('status').optional().isIn(['DRAFT', 'IN_REVIEW', 'APPROVED', 'SUPERSEDED']),
     body('ownerUserId').optional().isUUID(),
@@ -949,7 +949,7 @@ router.post(
     body('items.*.siteId').optional().isString(),
     body('items.*.driveId').optional().isString(),
     body('defaults').optional().isObject(),
-    body('defaults.type').optional().isIn(['POLICY', 'PROCEDURE', 'MANUAL', 'RECORD', 'TEMPLATE', 'OTHER']),
+    body('defaults.type').optional().isIn(['POLICY', 'PROCEDURE', 'MANUAL', 'RECORD', 'TEMPLATE', 'CERTIFICATE', 'OTHER']),
     body('defaults.status').optional().isIn(['DRAFT', 'IN_REVIEW', 'APPROVED', 'SUPERSEDED']),
     body('defaults.version').optional().isString(),
   ],

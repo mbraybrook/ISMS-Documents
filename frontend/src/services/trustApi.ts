@@ -336,12 +336,12 @@ export const trustApi = {
     return response.data;
   },
 
-  async getSettings(): Promise<{ watermarkPrefix: string }> {
+  async getSettings(): Promise<{ watermarkPrefix: string; uptimeSLA?: string; activeCertifications?: number | null }> {
     const response = await apiInternal.get('/api/trust/admin/settings');
     return response.data;
   },
 
-  async updateSettings(settings: { watermarkPrefix: string }): Promise<{ watermarkPrefix: string }> {
+  async updateSettings(settings: { watermarkPrefix?: string; uptimeSLA?: string; activeCertifications?: number | null }): Promise<{ watermarkPrefix: string; uptimeSLA?: string; activeCertifications?: number | null }> {
     const response = await apiInternal.put('/api/trust/admin/settings', settings);
     return response.data;
   },
@@ -356,6 +356,123 @@ export const trustApi = {
   }>> {
     const response = await axios.get(`${API_URL}/suppliers`);
     return response.data.suppliers;
+  },
+
+  // Stats - public endpoint
+  async getStats(): Promise<{
+    activeCertifications: number;
+    policiesAndProcedures: number;
+    uptimeSLA: string;
+    securityMonitoring: string;
+  }> {
+    try {
+      const response = await axios.get(`${API_URL}/stats`);
+      return response.data;
+    } catch (error) {
+      // Return default values if API fails
+      return {
+        activeCertifications: 5,
+        policiesAndProcedures: 24,
+        uptimeSLA: '99.9%',
+        securityMonitoring: '24/7',
+      };
+    }
+  },
+
+  // Certifications showcase - public endpoint
+  async getCertifications(): Promise<Array<{
+    id: string;
+    name: string;
+    type: 'certified' | 'compliant';
+    description: string;
+    validUntil: string | null;
+    displayOrder: number;
+    documentCount: number;
+    documents: Array<{
+      id: string;
+      title: string;
+      type: string;
+      version: string;
+      status: string;
+      visibilityLevel: string;
+    }>;
+  }>> {
+    try {
+      const response = await axios.get(`${API_URL}/certifications`);
+      return response.data;
+    } catch (error) {
+      // Return empty array if API fails
+      return [];
+    }
+  },
+
+  // Admin certifications management
+  async getCertificationsAdmin(): Promise<Array<{
+    id: string;
+    name: string;
+    type: 'certified' | 'compliant';
+    description: string;
+    validUntil: string | null;
+    displayOrder: number;
+    createdAt: string;
+    updatedAt: string;
+    documentCount: number;
+    documents: Array<{
+      id: string;
+      title: string;
+      type: string;
+      version: string;
+      status: string;
+      visibilityLevel: string;
+      category: string;
+    }>;
+  }>> {
+    const response = await apiInternal.get('/api/trust/admin/certifications');
+    return response.data;
+  },
+
+  async createCertification(data: {
+    name: string;
+    type: 'certified' | 'compliant';
+    description: string;
+    validUntil?: string | null;
+    displayOrder?: number;
+  }): Promise<{
+    id: string;
+    name: string;
+    type: 'certified' | 'compliant';
+    description: string;
+    validUntil: string | null;
+    displayOrder: number;
+  }> {
+    const response = await apiInternal.post('/api/trust/admin/certifications', data);
+    return response.data;
+  },
+
+  async updateCertification(
+    id: string,
+    data: {
+      name?: string;
+      type?: 'certified' | 'compliant';
+      description?: string;
+      validUntil?: string | null;
+      displayOrder?: number;
+    }
+  ): Promise<{
+    id: string;
+    name: string;
+    type: 'certified' | 'compliant';
+    description: string;
+    validUntil: string | null;
+    displayOrder: number;
+  }> {
+    const response = await apiInternal.put(`/api/trust/admin/certifications/${id}`, data);
+    return response.data;
+  },
+
+  async deleteCertification(id: string): Promise<{ message: string }> {
+    const response = await apiInternal.delete(`/api/trust/admin/certifications/${id}`);
+    return response.data;
   },
 
   // Token helpers

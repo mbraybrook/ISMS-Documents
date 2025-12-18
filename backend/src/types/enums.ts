@@ -5,7 +5,7 @@
 
 export type UserRole = 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR';
 
-export type DocumentType = 'POLICY' | 'PROCEDURE' | 'MANUAL' | 'RECORD' | 'TEMPLATE' | 'OTHER';
+export type DocumentType = 'POLICY' | 'PROCEDURE' | 'MANUAL' | 'RECORD' | 'TEMPLATE' | 'CERTIFICATE' | 'OTHER';
 
 export type StorageLocation = 'SHAREPOINT' | 'CONFLUENCE';
 

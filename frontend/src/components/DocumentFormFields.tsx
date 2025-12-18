@@ -56,6 +56,7 @@ export function DocumentFormFields({
           <option value="MANUAL">Manual</option>
           <option value="RECORD">Record</option>
           <option value="TEMPLATE">Template</option>
+          <option value="CERTIFICATE">Certificate</option>
           <option value="OTHER">Other</option>
         </Select>
       </FormControl>

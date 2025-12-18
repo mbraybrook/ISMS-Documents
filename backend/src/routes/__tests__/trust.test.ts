@@ -1148,14 +1148,17 @@ describe('Trust Routes', () => {
         displayOrder: 1,
         requiresNda: false,
       };
-      (prisma.document.findUnique as jest.Mock).mockResolvedValueOnce(mockDocument);
-      (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({ id: 'internal-user-id' });
-      (prisma.trustDocSetting.findUnique as jest.Mock).mockResolvedValueOnce(null);
-      (prisma.trustDocSetting.create as jest.Mock).mockResolvedValueOnce({
+      const createdSetting = {
         id: 'setting-1',
         documentId: mockDocId,
         ...newSettings,
-      });
+      };
+      (prisma.document.findUnique as jest.Mock).mockResolvedValueOnce(mockDocument);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({ id: 'internal-user-id' });
+      (prisma.trustDocSetting.findUnique as jest.Mock)
+        .mockResolvedValueOnce(null) // First call: check if setting exists
+        .mockResolvedValueOnce({ ...createdSetting, certificate: null }); // Second call: fetch with certificate relation
+      (prisma.trustDocSetting.create as jest.Mock).mockResolvedValueOnce(createdSetting);
       (logTrustAction as jest.Mock).mockResolvedValueOnce(undefined);
 
       // Act
@@ -1181,13 +1184,16 @@ describe('Trust Routes', () => {
         visibilityLevel: 'private',
         category: 'policy',
       };
-      (prisma.document.findUnique as jest.Mock).mockResolvedValueOnce(mockDocument);
-      (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({ id: 'internal-user-id' });
-      (prisma.trustDocSetting.findUnique as jest.Mock).mockResolvedValueOnce(existingSetting);
-      (prisma.trustDocSetting.update as jest.Mock).mockResolvedValueOnce({
+      const updatedSetting = {
         ...existingSetting,
         ...updateData,
-      });
+      };
+      (prisma.document.findUnique as jest.Mock).mockResolvedValueOnce(mockDocument);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({ id: 'internal-user-id' });
+      (prisma.trustDocSetting.findUnique as jest.Mock)
+        .mockResolvedValueOnce(existingSetting) // First call: check if setting exists
+        .mockResolvedValueOnce({ ...updatedSetting, certificate: null }); // Second call: fetch with certificate relation
+      (prisma.trustDocSetting.update as jest.Mock).mockResolvedValueOnce(updatedSetting);
       (logTrustAction as jest.Mock).mockResolvedValueOnce(undefined);
 
       // Act
@@ -1219,19 +1225,7 @@ describe('Trust Routes', () => {
       (prisma.trustDocSetting.create as jest.Mock).mockReset();
       (logTrustAction as jest.Mock).mockReset();
 
-      (prisma.document.findUnique as jest.Mock).mockResolvedValue({
-        id: mockDocId,
-        title: 'Test Document',
-        sharePointSiteId: null,
-        sharePointDriveId: null,
-        sharePointItemId: null,
-      });
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'internal-user-id' });
-      (prisma.trustDocSetting.findUnique as jest.Mock).mockResolvedValue(null);
-      (parseSharePointUrlToIds as jest.Mock).mockResolvedValue(parsedIds);
-      (getAppOnlyAccessToken as jest.Mock).mockResolvedValue('mock-token');
-      (verifySharePointFileAccess as jest.Mock).mockResolvedValue(true);
-      (prisma.trustDocSetting.create as jest.Mock).mockResolvedValue({
+      const createdSetting = {
         id: 'setting-1',
         documentId: mockDocId,
         sharePointUrl,
@@ -1240,7 +1234,22 @@ describe('Trust Routes', () => {
         sharePointItemId: parsedIds.itemId,
         visibilityLevel: 'public',
         category: 'policy',
+      };
+      (prisma.document.findUnique as jest.Mock).mockResolvedValue({
+        id: mockDocId,
+        title: 'Test Document',
+        sharePointSiteId: null,
+        sharePointDriveId: null,
+        sharePointItemId: null,
       });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'internal-user-id' });
+      (prisma.trustDocSetting.findUnique as jest.Mock)
+        .mockResolvedValueOnce(null) // First call: check if setting exists
+        .mockResolvedValueOnce({ ...createdSetting, certificate: null }); // Second call: fetch with certificate relation
+      (parseSharePointUrlToIds as jest.Mock).mockResolvedValue(parsedIds);
+      (getAppOnlyAccessToken as jest.Mock).mockResolvedValue('mock-token');
+      (verifySharePointFileAccess as jest.Mock).mockResolvedValue(true);
+      (prisma.trustDocSetting.create as jest.Mock).mockResolvedValue(createdSetting);
       (logTrustAction as jest.Mock).mockResolvedValue(undefined);
 
       // Act

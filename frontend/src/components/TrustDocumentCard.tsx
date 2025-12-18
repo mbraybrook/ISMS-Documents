@@ -68,26 +68,66 @@ function TrustDocumentCard({ document, onDownload }: TrustDocumentCardProps) {
     }
   };
 
+  const handleRequestAccess = () => {
+    toast({
+      title: 'Access Request',
+      description: 'Please login or register to request access to this document.',
+      status: 'info',
+      duration: 5000,
+      isClosable: true,
+    });
+  };
+
   const isPrivate = document.visibilityLevel === 'private';
+  const isRestricted = document.status?.toUpperCase() === 'RESTRICTED' || isPrivate;
+  
+  // Get document type badge text
+  const getDocumentTypeBadge = () => {
+    if (document.category === 'policy') return 'POLICY';
+    if (document.category === 'certification') return 'CERTIFICATION';
+    if (document.category === 'report') return 'REPORT';
+    return document.type?.toUpperCase() || 'DOCUMENT';
+  };
+
+  // Get status badge color
+  const getStatusColor = () => {
+    const status = document.status?.toUpperCase();
+    if (status === 'APPROVED') return 'green';
+    if (status === 'RESTRICTED') return 'red';
+    return 'gray';
+  };
 
   return (
     <Card
-      bg={isPrivate ? 'purple.50' : 'white'}
-      borderColor={isPrivate ? 'purple.200' : 'gray.200'}
-      borderWidth={isPrivate ? '2px' : '1px'}
+      bg="white"
+      borderWidth="1px"
+      borderColor="gray.200"
+      borderRadius="lg"
+      _hover={{
+        boxShadow: 'md',
+        borderColor: 'blue.300',
+      }}
+      transition="all 0.2s"
     >
       <CardBody>
         <VStack align="stretch" spacing={4}>
+          {/* Title and Type Badge */}
           <HStack justify="space-between" align="start">
             <VStack align="start" spacing={2} flex={1}>
-              <HStack spacing={2}>
-                <Heading size="md">{document.title}</Heading>
-                {isPrivate && (
-                  <Badge colorScheme="purple" display="inline-flex" alignItems="center" gap={1}>
-                    <LockIcon boxSize={3} />
-                    Private
-                  </Badge>
-                )}
+              <HStack spacing={2} flexWrap="wrap">
+                <Heading size="sm" color="gray.900">
+                  {document.title}
+                </Heading>
+                <Badge
+                  colorScheme="blue"
+                  fontSize="xs"
+                  px={2}
+                  py={0.5}
+                  borderRadius="md"
+                  fontWeight="semibold"
+                >
+                  {getDocumentTypeBadge()}
+                </Badge>
               </HStack>
               {document.publicDescription && (
                 <Text color="gray.600" fontSize="sm">
@@ -95,33 +135,52 @@ function TrustDocumentCard({ document, onDownload }: TrustDocumentCardProps) {
                 </Text>
               )}
             </VStack>
-            <Badge colorScheme={document.category === 'certification' ? 'green' : document.category === 'policy' ? 'blue' : 'purple'}>
-              {document.category}
-            </Badge>
           </HStack>
 
-          <HStack justify="space-between">
-            <Text fontSize="sm" color="gray.500">
-              Version {document.version} • {document.status}
+          {/* Version and Status */}
+          <HStack spacing={2} flexWrap="wrap">
+            <Text fontSize="xs" color="gray.500">
+              Version {document.version}
             </Text>
-            <Button
-              leftIcon={isDownloading ? <Spinner size="sm" /> : <DownloadIcon />}
-              colorScheme="blue"
-              size="sm"
-              onClick={handleDownload}
-              isLoading={isDownloading}
-              loadingText="Preparing..."
-              isDisabled={isDownloading}
+            <Text fontSize="xs" color="gray.400">•</Text>
+            <Badge
+              colorScheme={getStatusColor()}
+              fontSize="xs"
+              px={2}
+              py={0.5}
+              borderRadius="md"
             >
-              Download
-            </Button>
+              {document.status?.toUpperCase() || 'UNKNOWN'}
+            </Badge>
           </HStack>
 
-          {document.requiresNda && (
-            <Badge colorScheme="orange" size="sm">
-              Requires NDA
-            </Badge>
-          )}
+          {/* Action Button */}
+          <HStack justify="flex-end">
+            {isRestricted ? (
+              <Button
+                leftIcon={<LockIcon />}
+                colorScheme="gray"
+                size="sm"
+                variant="outline"
+                onClick={handleRequestAccess}
+                isDisabled
+              >
+                Request Access
+              </Button>
+            ) : (
+              <Button
+                leftIcon={isDownloading ? <Spinner size="sm" /> : <DownloadIcon />}
+                colorScheme="blue"
+                size="sm"
+                onClick={handleDownload}
+                isLoading={isDownloading}
+                loadingText="Preparing..."
+                isDisabled={isDownloading}
+              >
+                Download
+              </Button>
+            )}
+          </HStack>
         </VStack>
       </CardBody>
     </Card>

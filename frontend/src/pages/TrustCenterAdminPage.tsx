@@ -42,6 +42,128 @@ import { trustApi } from '../services/trustApi';
 import type { ExternalUser, TrustDocSetting, TrustDocument, UserDetails } from '../types/trust';
 import { AxiosError } from 'axios';
 
+// Certification Form Component
+function CertificationForm({
+  certification,
+  onSave,
+  onCancel,
+}: {
+  certification: {
+    id: string;
+    name: string;
+    type: 'certified' | 'compliant';
+    description: string;
+    validUntil: string | null;
+    displayOrder: number;
+  } | null;
+  onSave: (data: {
+    name: string;
+    type: 'certified' | 'compliant';
+    description: string;
+    validUntil?: string | null;
+    displayOrder?: number;
+  }) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(certification?.name || '');
+  const [type, setType] = useState<'certified' | 'compliant'>(certification?.type || 'certified');
+  const [description, setDescription] = useState(certification?.description || '');
+  const [validUntil, setValidUntil] = useState(
+    certification?.validUntil ? new Date(certification.validUntil).toISOString().split('T')[0] : ''
+  );
+  const [displayOrder, setDisplayOrder] = useState(certification?.displayOrder || 0);
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !description.trim()) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave({
+        name: name.trim(),
+        type,
+        description: description.trim(),
+        validUntil: validUntil || null,
+        displayOrder,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <VStack spacing={4} align="stretch">
+      <FormControl isRequired>
+        <FormLabel>Name</FormLabel>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="ISO 27001"
+        />
+      </FormControl>
+
+      <FormControl isRequired>
+        <FormLabel>Type</FormLabel>
+        <Select value={type} onChange={(e) => setType(e.target.value as 'certified' | 'compliant')}>
+          <option value="certified">Certified</option>
+          <option value="compliant">Compliant</option>
+        </Select>
+      </FormControl>
+
+      <FormControl isRequired>
+        <FormLabel>Description</FormLabel>
+        <Textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Information Security Management"
+          rows={3}
+        />
+      </FormControl>
+
+      <FormControl>
+        <FormLabel>Valid Until (Optional)</FormLabel>
+        <Input
+          type="date"
+          value={validUntil}
+          onChange={(e) => setValidUntil(e.target.value)}
+        />
+        <Text fontSize="xs" color="gray.500" mt={1}>
+          Leave empty for ongoing certifications
+        </Text>
+      </FormControl>
+
+      <FormControl>
+        <FormLabel>Display Order</FormLabel>
+        <NumberInput
+          value={displayOrder}
+          onChange={(_, value) => setDisplayOrder(isNaN(value) ? 0 : value)}
+          min={0}
+        >
+          <NumberInputField />
+        </NumberInput>
+        <Text fontSize="xs" color="gray.500" mt={1}>
+          Lower numbers appear first
+        </Text>
+      </FormControl>
+
+      <HStack justify="flex-end" spacing={3} mt={4}>
+        <Button variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          colorScheme="blue"
+          onClick={handleSubmit}
+          isLoading={saving}
+          isDisabled={!name.trim() || !description.trim()}
+        >
+          {certification ? 'Update' : 'Create'}
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
+
 export function TrustCenterAdminPage() {
   const { user } = useAuth();
   const toast = useToast();
@@ -53,9 +175,42 @@ export function TrustCenterAdminPage() {
   const [editingDoc, setEditingDoc] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<TrustDocSetting>>({});
   const [editingDocument, setEditingDocument] = useState<{ document: TrustDocument; trustSetting: TrustDocSetting | null } | null>(null);
-  const [settings, setSettings] = useState<{ watermarkPrefix: string }>({ watermarkPrefix: 'Paythru Confidential' });
+  const [settings, setSettings] = useState<{ watermarkPrefix: string; uptimeSLA?: string; activeCertifications?: number | null }>({ 
+    watermarkPrefix: 'Paythru Confidential',
+    uptimeSLA: '99.9%',
+    activeCertifications: null,
+  });
   const [settingsLoading, setSettingsLoading] = useState(false);
-  const [tabIndex, setTabIndex] = useState(0); // 0 = Document Management, 1 = Pending Requests, 2 = Settings, 3 = User Management
+  const [tabIndex, setTabIndex] = useState(0); // 0 = Document Management, 1 = Pending Requests, 2 = Settings, 3 = Certifications, 4 = User Management
+  // Certifications management state
+  const [certifications, setCertifications] = useState<Array<{
+    id: string;
+    name: string;
+    type: 'certified' | 'compliant';
+    description: string;
+    validUntil: string | null;
+    displayOrder: number;
+    documentCount: number;
+    documents: Array<{
+      id: string;
+      title: string;
+      type: string;
+      version: string;
+      status: string;
+      visibilityLevel: string;
+      category: string;
+    }>;
+  }>>([]);
+  const [_certificationsLoading, _setCertificationsLoading] = useState(false);
+  const { isOpen: isCertModalOpen, onOpen: onCertModalOpen, onClose: onCertModalClose } = useDisclosure();
+  const [editingCert, setEditingCert] = useState<{
+    id: string;
+    name: string;
+    type: 'certified' | 'compliant';
+    description: string;
+    validUntil: string | null;
+    displayOrder: number;
+  } | null>(null);
   const documentListRef = useRef<HTMLDivElement>(null);
   const savedScrollPosition = useRef<number>(0);
   // User Management state
@@ -70,14 +225,16 @@ export function TrustCenterAdminPage() {
   const loadData = useCallback(async (preserveScroll = false) => {
     try {
       setLoading(true);
-      const [users, docs, settingsData] = await Promise.all([
+      const [users, docs, settingsData, certs] = await Promise.all([
         trustApi.getPendingRequests(),
         trustApi.getDocumentSettings(),
         trustApi.getSettings().catch(() => ({ watermarkPrefix: 'Paythru Confidential' })), // Fallback on error
+        trustApi.getCertificationsAdmin().catch(() => []), // Fallback on error
       ]);
       setPendingUsers(users);
       setDocuments(docs);
       setSettings(settingsData);
+      setCertifications(certs);
 
       // Restore scroll position if requested and we're on the document management tab
       if (preserveScroll && tabIndex === 0 && documentListRef.current) {
@@ -213,7 +370,7 @@ export function TrustCenterAdminPage() {
   }, [statusFilter, activeFilter, searchQuery, toast]);
 
   useEffect(() => {
-    if (tabIndex === 3 && user && (user.role === 'ADMIN' || user.role === 'EDITOR')) {
+    if (tabIndex === 4 && user && (user.role === 'ADMIN' || user.role === 'EDITOR')) {
       loadUsers();
     }
   }, [tabIndex, user, loadUsers]);
@@ -296,6 +453,7 @@ export function TrustCenterAdminPage() {
     setEditData(doc.trustSetting || {
       visibilityLevel: 'public',
       category: 'policy',
+      certificateId: null,
       requiresNda: false,
       publicDescription: '',
       displayOrder: undefined,
@@ -436,6 +594,7 @@ export function TrustCenterAdminPage() {
           <Tab>Document Management</Tab>
           <Tab>Pending Requests</Tab>
           <Tab>Settings</Tab>
+          <Tab>Certifications</Tab>
           <Tab>User Management</Tab>
         </TabList>
 
@@ -578,18 +737,53 @@ export function TrustCenterAdminPage() {
             <VStack spacing={6} align="stretch" maxW="800px">
               <Heading size="md">Trust Center Settings</Heading>
 
-              
-              <FormControl>
-                <FormLabel>Watermark Prefix</FormLabel>
-                <Input
-                  value={settings.watermarkPrefix}
-                  onChange={(e) => setSettings({ ...settings, watermarkPrefix: e.target.value })}
-                  placeholder="Paythru Confidential"
-                />
-                <Text fontSize="xs" color="gray.500" mt={1}>
-                  This text will appear in watermarks on private documents. Example: "Paythru Confidential - Prepared for user@example.com"
+              <Box>
+                <Heading size="sm" mb={4}>Document Settings</Heading>
+                <FormControl mb={4}>
+                  <FormLabel>Watermark Prefix</FormLabel>
+                  <Input
+                    value={settings.watermarkPrefix}
+                    onChange={(e) => setSettings({ ...settings, watermarkPrefix: e.target.value })}
+                    placeholder="Paythru Confidential"
+                  />
+                  <Text fontSize="xs" color="gray.500" mt={1}>
+                    This text will appear in watermarks on private documents. Example: "Paythru Confidential - Prepared for user@example.com"
+                  </Text>
+                </FormControl>
+              </Box>
+
+              <Box>
+                <Heading size="sm" mb={4}>Statistics Display</Heading>
+                <Text fontSize="sm" color="gray.600" mb={4}>
+                  Configure the statistics displayed on the public Trust Center page. Leave Active Certifications empty to automatically calculate from your documents.
                 </Text>
-              </FormControl>
+                
+                <FormControl mb={4}>
+                  <FormLabel>Active Certifications</FormLabel>
+                  <NumberInput
+                    value={settings.activeCertifications ?? ''}
+                    onChange={(_, value) => setSettings({ ...settings, activeCertifications: isNaN(value) ? null : value })}
+                    min={0}
+                  >
+                    <NumberInputField placeholder="Auto-calculate from documents" />
+                  </NumberInput>
+                  <Text fontSize="xs" color="gray.500" mt={1}>
+                    Override the automatic count. Leave empty to use the count from your public certification documents.
+                  </Text>
+                </FormControl>
+
+                <FormControl mb={4}>
+                  <FormLabel>Uptime SLA</FormLabel>
+                  <Input
+                    value={settings.uptimeSLA || '99.9%'}
+                    onChange={(e) => setSettings({ ...settings, uptimeSLA: e.target.value })}
+                    placeholder="99.9%"
+                  />
+                  <Text fontSize="xs" color="gray.500" mt={1}>
+                    Displayed in the stats section (e.g., "99.9%", "99.99%")
+                  </Text>
+                </FormControl>
+              </Box>
 
               <Button
                 colorScheme="blue"
@@ -599,6 +793,114 @@ export function TrustCenterAdminPage() {
               >
                 Save Settings
               </Button>
+            </VStack>
+          </TabPanel>
+
+          <TabPanel>
+            <VStack spacing={6} align="stretch">
+              <HStack justify="space-between">
+                <Heading size="md">Certifications Showcase</Heading>
+                <Button
+                  colorScheme="blue"
+                  onClick={() => {
+                    setEditingCert(null);
+                    onCertModalOpen();
+                  }}
+                >
+                  Add Certification
+                </Button>
+              </HStack>
+              <Text fontSize="sm" color="gray.600">
+                Manage the certifications displayed in the "Certifications & Compliance" section on the public Trust Center page.
+              </Text>
+
+              {certifications.length === 0 ? (
+                <Box textAlign="center" py={8}>
+                  <Text color="gray.500">No certifications configured. Add one to get started.</Text>
+                </Box>
+              ) : (
+                <Table variant="simple">
+                  <Thead>
+                    <Tr>
+                      <Th>Name</Th>
+                      <Th>Type</Th>
+                      <Th>Description</Th>
+                      <Th>Valid Until</Th>
+                      <Th>Linked Documents</Th>
+                      <Th>Order</Th>
+                      <Th>Actions</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {certifications.map((cert) => (
+                      <Tr key={cert.id}>
+                        <Td fontWeight="semibold">{cert.name}</Td>
+                        <Td>
+                          <Badge colorScheme={cert.type === 'certified' ? 'green' : 'blue'}>
+                            {cert.type}
+                          </Badge>
+                        </Td>
+                        <Td>{cert.description}</Td>
+                        <Td>
+                          {cert.validUntil
+                            ? new Date(cert.validUntil).toLocaleDateString()
+                            : 'Ongoing'}
+                        </Td>
+                        <Td>
+                          <Badge colorScheme={cert.documentCount > 0 ? 'green' : 'gray'}>
+                            {cert.documentCount} document{cert.documentCount !== 1 ? 's' : ''}
+                          </Badge>
+                        </Td>
+                        <Td>{cert.displayOrder}</Td>
+                        <Td>
+                          <HStack spacing={2}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingCert(cert);
+                                onCertModalOpen();
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              colorScheme="red"
+                              variant="outline"
+                              onClick={async () => {
+                                if (window.confirm(`Delete ${cert.name}?`)) {
+                                  try {
+                                    await trustApi.deleteCertification(cert.id);
+                                    toast({
+                                      title: 'Certification deleted',
+                                      status: 'success',
+                                      duration: 3000,
+                                      isClosable: true,
+                                    });
+                                    loadData();
+                                  } catch (error: unknown) {
+                                    const axiosError = error as AxiosError<{ error?: string }>;
+                                    toast({
+                                      title: 'Error',
+                                      description: axiosError.response?.data?.error || 'Failed to delete certification',
+                                      status: 'error',
+                                      duration: 5000,
+                                      isClosable: true,
+                                    });
+                                  }
+                                }
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </HStack>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              )}
             </VStack>
           </TabPanel>
 
@@ -766,17 +1068,49 @@ export function TrustCenterAdminPage() {
               </FormControl>
 
               <FormControl>
-                <FormLabel>Category</FormLabel>
+                <FormLabel>Certificate</FormLabel>
+                <Select
+                  value={editData.certificateId || ''}
+                  onChange={(e) => {
+                    const certId = e.target.value || null;
+                    setEditData({
+                      ...editData,
+                      certificateId: certId,
+                      // Auto-set category to 'certification' when certificate is selected
+                      category: certId ? 'certification' : (editData.category || 'policy'),
+                    });
+                  }}
+                >
+                  <option value="">None - Manual Category</option>
+                  {certifications.map((cert) => (
+                    <option key={cert.id} value={cert.id}>
+                      {cert.name}
+                    </option>
+                  ))}
+                </Select>
+                <Text fontSize="xs" color="gray.500" mt={1}>
+                  Link this document to a certificate. Category will be automatically set to "Certification".
+                </Text>
+              </FormControl>
+
+              <FormControl isDisabled={!!editData.certificateId}>
+                <FormLabel>Category {editData.certificateId && '(Auto-set to Certification)'}</FormLabel>
                 <Select
                   value={editData.category || 'policy'}
                   onChange={(e) =>
-                    setEditData({ ...editData, category: e.target.value as 'certification' | 'policy' | 'report' })
+                    setEditData({ ...editData, category: e.target.value as 'certification' | 'policy' | 'report', certificateId: null })
                   }
+                  isDisabled={!!editData.certificateId}
                 >
                   <option value="certification">Certification</option>
                   <option value="policy">Policy</option>
                   <option value="report">Report</option>
                 </Select>
+                {editData.certificateId && (
+                  <Text fontSize="xs" color="blue.500" mt={1}>
+                    Category is automatically set when linked to a certificate. Clear the certificate to set manually.
+                  </Text>
+                )}
               </FormControl>
 
               <FormControl>
@@ -847,6 +1181,59 @@ export function TrustCenterAdminPage() {
               Save Settings
             </Button>
           </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Certification Modal */}
+      <Modal isOpen={isCertModalOpen} onClose={onCertModalClose} size="lg">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            {editingCert ? 'Edit Certification' : 'Add Certification'}
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <CertificationForm
+              certification={editingCert}
+              onSave={async (data) => {
+                try {
+                  if (editingCert) {
+                    await trustApi.updateCertification(editingCert.id, data);
+                    toast({
+                      title: 'Certification updated',
+                      status: 'success',
+                      duration: 3000,
+                      isClosable: true,
+                    });
+                  } else {
+                    await trustApi.createCertification(data);
+                    toast({
+                      title: 'Certification created',
+                      status: 'success',
+                      duration: 3000,
+                      isClosable: true,
+                    });
+                  }
+                  onCertModalClose();
+                  setEditingCert(null);
+                  loadData();
+                } catch (error: unknown) {
+                  const axiosError = error as AxiosError<{ error?: string }>;
+                  toast({
+                    title: 'Error',
+                    description: axiosError.response?.data?.error || 'Failed to save certification',
+                    status: 'error',
+                    duration: 5000,
+                    isClosable: true,
+                  });
+                }
+              }}
+              onCancel={() => {
+                onCertModalClose();
+                setEditingCert(null);
+              }}
+            />
+          </ModalBody>
         </ModalContent>
       </Modal>
 
