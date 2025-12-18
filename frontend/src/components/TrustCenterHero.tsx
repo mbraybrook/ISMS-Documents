@@ -1,20 +1,6 @@
-import { Box, Badge, Heading, Text, SimpleGrid, Card, CardBody, VStack, HStack, Icon } from '@chakra-ui/react';
-import { LockIcon, CheckCircleIcon } from '@chakra-ui/icons';
+import { Box, Badge, Heading, Text, VStack } from '@chakra-ui/react';
 
 export function TrustCenterHero() {
-  const features = [
-    {
-      icon: LockIcon,
-      title: 'Data Encryption',
-      description: 'AES-256 at rest',
-    },
-    {
-      icon: CheckCircleIcon,
-      title: 'GDPR',
-      description: 'Compliant',
-    },
-  ];
-
   return (
     <Box
       id="overview"
@@ -42,7 +28,7 @@ export function TrustCenterHero() {
               color="gray.900"
               fontWeight="bold"
             >
-              Your Trust is Our Priority
+              Paythru Trust Centre
             </Heading>
             <Text
               fontSize="lg"
@@ -52,46 +38,6 @@ export function TrustCenterHero() {
               Access our security policies, certifications, and compliance documentation. We are committed to protecting your data with industry-leading security practices.
             </Text>
           </VStack>
-
-          {/* Feature Cards */}
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6} mt={8}>
-            {features.map((feature, index) => (
-              <Card
-                key={index}
-                bg="white"
-                borderWidth="1px"
-                borderColor="gray.200"
-                borderRadius="lg"
-                _hover={{
-                  boxShadow: 'md',
-                  borderColor: 'blue.300',
-                  transform: 'translateY(-2px)',
-                }}
-                transition="all 0.2s"
-              >
-                <CardBody>
-                  <HStack spacing={4} align="start">
-                    <Box
-                      p={3}
-                      bg="blue.50"
-                      borderRadius="md"
-                      color="blue.600"
-                    >
-                      <Icon as={feature.icon} boxSize={6} />
-                    </Box>
-                    <VStack align="start" spacing={1}>
-                      <Text fontWeight="semibold" color="gray.900" fontSize="md">
-                        {feature.title}
-                      </Text>
-                      <Text color="gray.600" fontSize="sm">
-                        {feature.description}
-                      </Text>
-                    </VStack>
-                  </HStack>
-                </CardBody>
-              </Card>
-            ))}
-          </SimpleGrid>
         </VStack>
       </Box>
     </Box>

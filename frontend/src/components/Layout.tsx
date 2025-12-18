@@ -1,4 +1,4 @@
-import { Box, Container, Flex, Heading, Link, Button, Text, Menu, MenuButton, MenuList, MenuItem, Badge } from '@chakra-ui/react'
+import { Box, Container, Flex, Heading, Link, Button, Text, Menu, MenuButton, MenuList, MenuItem, Badge, Image } from '@chakra-ui/react'
 import { ChevronDownIcon } from '@chakra-ui/icons'
 import { ReactNode, useEffect, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { RoleSwitcher } from './RoleSwitcher'
 import { DataSensitivityFooter } from './DataSensitivityFooter'
 import api from '../services/api'
+import bannerImage from '../assets/banner.png'
 
 interface LayoutProps {
   children: ReactNode
@@ -41,7 +42,9 @@ export function Layout({ children }: LayoutProps) {
         <Container maxW="container.xl">
           <Flex py={4} justify="space-between" align="center">
             <Link as={RouterLink} to={effectiveRole === 'STAFF' || effectiveRole === 'CONTRIBUTOR' ? '/admin/staff' : '/admin'}>
-              <Heading size="md">ISMS Document Management</Heading>
+              <Heading size="md">
+                <Image src={bannerImage} height={100} alt="Paythru Trust Centre" />
+              </Heading>
             </Link>
             <Flex gap={4} align="center">
               {user && (
@@ -188,7 +191,7 @@ export function Layout({ children }: LayoutProps) {
                         </MenuButton>
                         <MenuList>
                           <MenuItem as={RouterLink} to="/admin/trust">
-                            Trust Center
+                            Trust Centre
                           </MenuItem>
                           {effectiveRole === 'ADMIN' && (
                             <MenuItem as={RouterLink} to="/admin/users">

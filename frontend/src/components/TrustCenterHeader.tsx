@@ -1,6 +1,7 @@
-import { Box, HStack, Link, Button, Flex, Text } from '@chakra-ui/react';
+import { Box, HStack, Link, Button, Flex, Text, Image } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { useTrustAuth } from '../contexts/TrustAuthContext';
+import bannerImage from '../assets/banner.png';
 
 export function TrustCenterHeader() {
   const navigate = useNavigate();
@@ -41,24 +42,7 @@ export function TrustCenterHeader() {
       >
         {/* Logo and Branding */}
         <HStack spacing={3}>
-          {/* Placeholder for logo - can be replaced with actual logo */}
-          <Box
-            w={8}
-            h={8}
-            bg="blue.600"
-            borderRadius="md"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            color="white"
-            fontWeight="bold"
-            fontSize="lg"
-          >
-            TC
-          </Box>
-          <Text fontSize="xl" fontWeight="bold" color="gray.800">
-            Trust Center
-          </Text>
+          <Image src={bannerImage} height={100} alt="Paythru Trust Centre" />
         </HStack>
 
         {/* Navigation Links */}

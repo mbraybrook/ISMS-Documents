@@ -1419,7 +1419,7 @@ describe('Trust Routes', () => {
         .expect(200);
 
       // Assert
-      expect(response.body).toHaveProperty('message', 'Document removed from Trust Center');
+      expect(response.body).toHaveProperty('message', 'Document removed from Trust Centre');
       expect(prisma.document.findUnique).toHaveBeenCalledWith({
         where: { id: mockDocId },
       });
@@ -1462,7 +1462,7 @@ describe('Trust Routes', () => {
         .expect(200);
 
       // Assert
-      expect(response.body).toHaveProperty('message', 'Document removed from Trust Center');
+      expect(response.body).toHaveProperty('message', 'Document removed from Trust Centre');
       expect(prisma.trustDocSetting.delete).not.toHaveBeenCalled();
     });
   });
@@ -1650,7 +1650,7 @@ describe('Trust Routes', () => {
   });
 
   describe('GET /api/trust/suppliers', () => {
-    it('should return suppliers visible in Trust Center', async () => {
+    it('should return suppliers visible in Trust Centre', async () => {
       // Arrange
       const mockSuppliers = [
         {

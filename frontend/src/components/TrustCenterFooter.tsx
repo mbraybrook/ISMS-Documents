@@ -36,7 +36,7 @@ export function TrustCenterFooter() {
                 TC
               </Box>
               <Text fontSize="lg" fontWeight="bold" color="white">
-                Trust Center
+                Trust Centre
               </Text>
             </HStack>
             <Text fontSize="sm" color="gray.400">

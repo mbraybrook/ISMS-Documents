@@ -1,4 +1,4 @@
-import { Card, CardBody, Heading, Text, Button, Badge, HStack, VStack, Spinner } from '@chakra-ui/react';
+import { Card, CardBody, Heading, IconButton, HStack, Spinner, Tooltip, Box } from '@chakra-ui/react';
 import { DownloadIcon, LockIcon } from '@chakra-ui/icons';
 import { trustApi } from '../services/trustApi';
 import { useToast } from '@chakra-ui/react';
@@ -15,7 +15,10 @@ function TrustDocumentCard({ document, onDownload, isAuthenticated = false }: Tr
   const toast = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const handleDownload = async () => {
+  const handleDownload = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation(); // Prevent card click when clicking download icon
+    }
     if (isDownloading) return; // Prevent multiple simultaneous downloads
     
     setIsDownloading(true);
@@ -69,10 +72,13 @@ function TrustDocumentCard({ document, onDownload, isAuthenticated = false }: Tr
     }
   };
 
-  const handleRequestAccess = () => {
+  const handleRequestAccess = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation(); // Prevent card click when clicking lock icon
+    }
     toast({
       title: 'Access Request',
-      description: 'Please login or register to request access to this document.',
+      description: 'Please login or register to access to this document.',
       status: 'info',
       duration: 5000,
       isClosable: true,
@@ -83,110 +89,81 @@ function TrustDocumentCard({ document, onDownload, isAuthenticated = false }: Tr
   const isRestricted = document.status?.toUpperCase() === 'RESTRICTED';
   const canDownload = !isRestricted && (!isPrivate || isAuthenticated);
   
-  // Get document type badge text
-  const getDocumentTypeBadge = () => {
-    if (document.category === 'policy') return 'POLICY';
-    if (document.category === 'certification') return 'CERTIFICATION';
-    if (document.category === 'report') return 'REPORT';
-    return document.type?.toUpperCase() || 'DOCUMENT';
+  const handleCardClick = () => {
+    if (canDownload) {
+      handleDownload();
+    } else {
+      handleRequestAccess();
+    }
   };
 
-  // Get status badge color
-  const getStatusColor = () => {
-    const status = document.status?.toUpperCase();
-    if (status === 'APPROVED') return 'green';
-    if (status === 'RESTRICTED') return 'red';
-    return 'gray';
+  // Format date for tooltip
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-GB', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return 'Unknown';
+    }
   };
+
+  // Build tooltip content as string
+  const tooltipContent = `${document.title}\nVersion ${document.version} • ${document.status?.toUpperCase() || 'UNKNOWN'}\nLast Modified: ${formatDate(document.updatedAt)}`;
 
   return (
-    <Card
-      bg="white"
-      borderWidth="1px"
-      borderColor="gray.200"
-      borderRadius="lg"
-      _hover={{
-        boxShadow: 'md',
-        borderColor: 'blue.300',
-      }}
-      transition="all 0.2s"
-    >
-      <CardBody>
-        <VStack align="stretch" spacing={4}>
-          {/* Title and Type Badge */}
-          <HStack justify="space-between" align="start">
-            <VStack align="start" spacing={2} flex={1}>
-              <HStack spacing={2} flexWrap="wrap">
-                <Heading size="sm" color="gray.900">
-                  {document.title}
-                </Heading>
-                <Badge
+    <Tooltip label={tooltipContent} placement="top" hasArrow whiteSpace="pre-line">
+      <Card
+        bg="white"
+        borderWidth="1px"
+        borderColor="gray.200"
+        borderRadius="lg"
+        cursor={canDownload ? 'pointer' : 'not-allowed'}
+        onClick={handleCardClick}
+        _hover={{
+          boxShadow: 'md',
+          borderColor: canDownload ? 'blue.300' : 'gray.300',
+        }}
+        transition="all 0.2s"
+      >
+        <CardBody p={3}>
+          <HStack justify="space-between" align="center" spacing={3}>
+            {/* Title */}
+            <Heading size="sm" color="gray.900" noOfLines={1} flex={1}>
+              {document.title}
+            </Heading>
+
+            {/* Icon Button */}
+            <Box flexShrink={0}>
+              {isRestricted || !canDownload ? (
+                <IconButton
+                  aria-label="Access restricted"
+                  icon={<LockIcon />}
+                  colorScheme="gray"
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleRequestAccess}
+                  isDisabled={isRestricted}
+                />
+              ) : (
+                <IconButton
+                  aria-label="Download document"
+                  icon={isDownloading ? <Spinner size="sm" /> : <DownloadIcon />}
                   colorScheme="blue"
-                  fontSize="xs"
-                  px={2}
-                  py={0.5}
-                  borderRadius="md"
-                  fontWeight="semibold"
-                >
-                  {getDocumentTypeBadge()}
-                </Badge>
-              </HStack>
-              {document.publicDescription && (
-                <Text color="gray.600" fontSize="sm">
-                  {document.publicDescription}
-                </Text>
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleDownload}
+                  isLoading={isDownloading}
+                  isDisabled={isDownloading}
+                />
               )}
-            </VStack>
+            </Box>
           </HStack>
-
-          {/* Version and Status */}
-          <HStack spacing={2} flexWrap="wrap">
-            <Text fontSize="xs" color="gray.500">
-              Version {document.version}
-            </Text>
-            <Text fontSize="xs" color="gray.400">•</Text>
-            <Badge
-              colorScheme={getStatusColor()}
-              fontSize="xs"
-              px={2}
-              py={0.5}
-              borderRadius="md"
-            >
-              {document.status?.toUpperCase() || 'UNKNOWN'}
-            </Badge>
-          </HStack>
-
-          {/* Action Button */}
-          <HStack justify="flex-end">
-            {isRestricted ? (
-              <Button
-                leftIcon={<LockIcon />}
-                colorScheme="gray"
-                size="sm"
-                variant="outline"
-                onClick={handleRequestAccess}
-                isDisabled
-              >
-                Request Access
-              </Button>
-            ) : (
-              <Button
-                leftIcon={isDownloading ? <Spinner size="sm" /> : (canDownload ? <DownloadIcon /> : <LockIcon />)}
-                colorScheme={canDownload ? "blue" : "gray"}
-                size="sm"
-                variant={canDownload ? "solid" : "outline"}
-                onClick={canDownload ? handleDownload : handleRequestAccess}
-                isLoading={isDownloading}
-                loadingText="Preparing..."
-                isDisabled={isDownloading || !canDownload}
-              >
-                Download
-              </Button>
-            )}
-          </HStack>
-        </VStack>
-      </CardBody>
-    </Card>
+        </CardBody>
+      </Card>
+    </Tooltip>
   );
 }
 

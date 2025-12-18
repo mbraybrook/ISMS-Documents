@@ -145,7 +145,7 @@ export function createMockJWT(
 }
 
 /**
- * Helper to create a test JWT token for Trust Center authentication
+ * Helper to create a test JWT token for Trust Centre authentication
  * @param userId - User ID
  * @param tokenVersion - Token version (optional)
  * @param secret - JWT secret

@@ -170,7 +170,7 @@ export function TrustCenterLoginPage() {
 
           <HStack justify="center">
             <Link color="blue.500" onClick={() => navigate('/')}>
-              Back to Trust Center
+              Back to Trust Centre
             </Link>
           </HStack>
         </VStack>

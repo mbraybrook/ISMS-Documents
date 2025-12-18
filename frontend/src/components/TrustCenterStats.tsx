@@ -44,7 +44,7 @@ export function TrustCenterStats() {
       icon: AttachmentIcon,
       value: stats.policiesAndProcedures.toString(),
       title: 'Policies',
-      description: 'Available for download via Trust Center',
+      description: 'Available for download via Trust Centre',
       color: 'blue',
     },
   ];

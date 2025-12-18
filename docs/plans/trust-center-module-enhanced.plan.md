@@ -1,8 +1,8 @@
-# Trust Center Module - Enhanced Implementation Plan
+# Trust Centre Module - Enhanced Implementation Plan
 
 ## Overview
 
-This plan implements a Trust Center module that exposes specific documents to external users via a public-facing route (`/trust`). External users authenticate with email/password (separate from Entra ID), while internal staff manage document visibility and approve access requests.
+This plan implements a Trust Centre module that exposes specific documents to external users via a public-facing route (`/trust`). External users authenticate with email/password (separate from Entra ID), while internal staff manage document visibility and approve access requests.
 
 **This enhanced version addresses all critical gaps and recommendations identified in the review.**
 
@@ -38,7 +38,7 @@ Add four new models:
 - `sharePointSiteId` (String?) - **Cached site ID from URL parsing**
 - `sharePointDriveId` (String?) - **Cached drive ID from URL parsing**
 - `sharePointItemId` (String?) - **Cached item ID from URL parsing**
-- `publicDescription` (String?) - User-friendly description for Trust Center
+- `publicDescription` (String?) - User-friendly description for Trust Centre
 - `displayOrder` (Int?) - Control document ordering within categories
 - `requiresNda` (Boolean, default: false) - Require NDA acceptance before download
 - `maxFileSizeMB` (Int?) - Override default file size limit (default: 50MB)
@@ -100,7 +100,7 @@ Note: Using Node.js PDF libraries (`pdf-lib`, `pdfkit`) instead of Python librar
 
 ### 4. Update Configuration (`backend/src/config.ts`)
 
-Add Trust Center and Azure app-only auth configuration:
+Add Trust Centre and Azure app-only auth configuration:
 
 - `trustCenter.jwtSecret` - Secret for external user JWT tokens (min 32 chars)
 - `trustCenter.jwtExpiry` - Token expiry (e.g., '24h' - shorter for security)
@@ -109,7 +109,7 @@ Add Trust Center and Azure app-only auth configuration:
 - `azure.appClientId` - Azure AD App Registration Client ID for app-only auth
 - `azure.appClientSecret` - Azure AD App Registration Client Secret
 - `azure.tenantId` - Azure AD Tenant ID
-- `cors.trustCenterOrigins` - Array of allowed origins for Trust Center subdomain
+- `cors.trustCenterOrigins` - Array of allowed origins for Trust Centre subdomain
 - `email` (optional) - Email service configuration (SMTP settings for notifications)
 
 ### 5. Create Rate Limiting Middleware (`backend/src/middleware/rateLimit.ts`)
@@ -256,9 +256,9 @@ Add app-only authentication support with token caching:
 
 - Creates TrustAuditLog entry
 - Records action type, performer (internal or external user), target, details (JSON), IP address
-- Used throughout Trust Center routes for compliance tracking
+- Used throughout Trust Centre routes for compliance tracking
 
-### 11. Create Trust Center Routes (`backend/src/routes/trust/index.ts`)
+### 11. Create Trust Centre Routes (`backend/src/routes/trust/index.ts`)
 
 **GET /api/trust/documents**
 
@@ -341,8 +341,8 @@ Add app-only authentication support with token caching:
 **GET /api/trust/admin/documents**
 
 - Protected (requires internal staff auth)
-- Returns all documents with their Trust Center settings
-- Includes documents without Trust Center settings (for management UI)
+- Returns all documents with their Trust Centre settings
+- Includes documents without Trust Centre settings (for management UI)
 - Returns: `{ document: Document, trustSetting: TrustDocSetting | null }[]`
 
 **PUT /api/trust/admin/documents/:docId/settings**
@@ -367,12 +367,12 @@ Add app-only authentication support with token caching:
 
 ### 12. Update CORS Configuration (`backend/src/index.ts`)
 
-- Update CORS middleware to allow Trust Center subdomain
+- Update CORS middleware to allow Trust Centre subdomain
 - Add `trustCenterOrigins` from config to allowed origins
 - Configure credentials if needed for cross-subdomain cookies
 - Example: `origin: function (origin, callback) { if (allowedOrigins.includes(origin) || !origin) callback(null, true); else callback(new Error('Not allowed by CORS')); }`
 
-### 13. Register Trust Center Routes (`backend/src/index.ts`)
+### 13. Register Trust Centre Routes (`backend/src/index.ts`)
 
 - Import trust router: `import { trustRouter } from './routes/trust'`
 - Mount at `/api/trust`: `app.use('/api/trust', trustRouter)`
@@ -380,7 +380,7 @@ Add app-only authentication support with token caching:
 
 ## Frontend Implementation
 
-### 14. Create Trust Center Types (`frontend/src/types/trust.ts`)
+### 14. Create Trust Centre Types (`frontend/src/types/trust.ts`)
 
 Define TypeScript interfaces:
 
@@ -391,7 +391,7 @@ Define TypeScript interfaces:
 - `TrustCategory` enum
 - `TrustAuditLog` (for admin audit log view)
 
-### 15. Create Trust Center API Service (`frontend/src/services/trustApi.ts`)
+### 15. Create Trust Centre API Service (`frontend/src/services/trustApi.ts`)
 
 API client functions:
 
@@ -412,7 +412,7 @@ API client functions:
 - `updateDocumentSettings(docId, settings)` - Admin: Update document settings
 - `getAuditLog(filters?)` - Admin: Get audit log with filters
 
-### 16. Create Trust Center Auth Context (`frontend/src/contexts/TrustAuthContext.tsx`)
+### 16. Create Trust Centre Auth Context (`frontend/src/contexts/TrustAuthContext.tsx`)
 
 - Manages external user authentication state
 - Stores JWT token in localStorage with expiry check
@@ -422,9 +422,9 @@ API client functions:
 - Auto-logout if token expired
 - Checks `tokenVersion` on token refresh (handles invalidation)
 
-### 17. Create Trust Center Pages
+### 17. Create Trust Centre Pages
 
-**Public Trust Center Page (`frontend/src/pages/TrustCenterPage.tsx`)**
+**Public Trust Centre Page (`frontend/src/pages/TrustCenterPage.tsx`)**
 
 - Lists public documents grouped by category
 - Shows login/register buttons if not authenticated
@@ -432,7 +432,7 @@ API client functions:
 - Displays `publicDescription` for each document
 - Simple, clean UI suitable for external users
 
-**Trust Center Login Page (`frontend/src/pages/TrustCenterLoginPage.tsx`)**
+**Trust Centre Login Page (`frontend/src/pages/TrustCenterLoginPage.tsx`)**
 
 - Login form (email, password)
 - Register form (email, password, company name)
@@ -441,7 +441,7 @@ API client functions:
 - Shows message if registration successful but pending approval
 - Shows rate limit warnings if applicable
 
-**Trust Center Private Documents Page (`frontend/src/pages/TrustCenterPrivatePage.tsx`)**
+**Trust Centre Private Documents Page (`frontend/src/pages/TrustCenterPrivatePage.tsx`)**
 
 - Protected route (requires external user auth)
 - Lists private documents grouped by category
@@ -449,15 +449,15 @@ API client functions:
 - Download buttons for each document
 - Shows download confirmation if document requires NDA
 
-**Trust Center Admin Page (`frontend/src/pages/TrustCenterAdminPage.tsx`)**
+**Trust Centre Admin Page (`frontend/src/pages/TrustCenterAdminPage.tsx`)**
 
 - Protected route (requires internal staff auth)
 - Three sections:
 
   1. **Pending Access Requests**: Table with Approve/Deny buttons, reason field for denial
-  2. **Trust Center Management**: Table of all documents with:
+  2. **Trust Centre Management**: Table of all documents with:
 
-     - Toggle: "Show in Trust Center" (creates/removes TrustDocSetting)
+     - Toggle: "Show in Trust Centre" (creates/removes TrustDocSetting)
      - Dropdown: "Access Level" (public/private)
      - Dropdown: "Category" (certification/policy/report)
      - Text field: "Public Description" (user-friendly description)
@@ -466,18 +466,18 @@ API client functions:
      - SharePoint URL field (optional, pre-filled from document metadata, validates on save)
      - Status indicator: Shows if SharePoint file is accessible
 
-  1. **Audit Log**: Table showing recent Trust Center actions (filterable by action type, date range)
+  1. **Audit Log**: Table showing recent Trust Centre actions (filterable by action type, date range)
 
 ### 18. Update App Routes (`frontend/src/App.tsx`)
 
 Add new routes:
 
-- `/trust` - Public Trust Center page
-- `/trust/login` - Trust Center login/register
+- `/trust` - Public Trust Centre page
+- `/trust/login` - Trust Centre login/register
 - `/trust/private` - Private documents (protected)
 - `/trust/admin` - Admin management (protected, internal staff only)
 
-### 19. Create Trust Center Components
+### 19. Create Trust Centre Components
 
 **TrustDocumentCard (`frontend/src/components/TrustDocumentCard.tsx`)**
 
@@ -535,7 +535,7 @@ Add new routes:
 5. Click **Grant admin consent** for your organization (required for app-only permissions)
 6. Verify both permissions show "Granted for [Your Organization]"
 
-**Note:** These are **Application permissions** (not Delegated), which allow the app to access SharePoint files on behalf of the application itself, not a specific user. This is required for the Trust Center to download files for external users who don't have their own Microsoft accounts.
+**Note:** These are **Application permissions** (not Delegated), which allow the app to access SharePoint files on behalf of the application itself, not a specific user. This is required for the Trust Centre to download files for external users who don't have their own Microsoft accounts.
 
 **Environment Variables:**
 
@@ -549,13 +549,13 @@ The code is configured to reuse your existing Azure App Registration credentials
 **Option 2: Use separate variables (if you prefer)**
 
 ```
-# Azure App-Only Authentication (for Trust Center SharePoint access)
+# Azure App-Only Authentication (for Trust Centre SharePoint access)
 # Optional - if not set, will use AUTH_* variables instead
 AZURE_APP_CLIENT_ID=<your-client-id>
 AZURE_APP_CLIENT_SECRET=<your-client-secret>
 AZURE_TENANT_ID=<your-tenant-id>
 
-# Trust Center Configuration
+# Trust Centre Configuration
 TRUST_CENTER_JWT_SECRET=<random-secret-for-jwt-min-32-chars>
 TRUST_CENTER_JWT_EXPIRY=24h
 TRUST_CENTER_MAX_FILE_SIZE_MB=50
@@ -636,7 +636,7 @@ EMAIL_FROM=noreply@yourdomain.com
 
 **Security:**
 
-- CORS configured correctly for Trust Center subdomain
+- CORS configured correctly for Trust Centre subdomain
 - CSP headers set for PDF downloads
 - JWT tokens expire correctly
 - Password hashing uses bcrypt correctly
@@ -645,9 +645,9 @@ EMAIL_FROM=noreply@yourdomain.com
 
 ## Migration Notes
 
-- Existing documents will NOT have Trust Center settings (defaults to not visible)
+- Existing documents will NOT have Trust Centre settings (defaults to not visible)
 - Documents must be explicitly enabled via admin interface
-- No automatic migration of existing documents to Trust Center
+- No automatic migration of existing documents to Trust Centre
 - External users table starts empty
 - TrustAuditLog table starts empty
 - SharePoint IDs will be parsed and cached on first access (if sharePointUrl provided)

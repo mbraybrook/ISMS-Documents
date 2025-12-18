@@ -1453,7 +1453,7 @@ router.delete(
         );
       }
 
-      res.json({ message: 'Document removed from Trust Center' });
+      res.json({ message: 'Document removed from Trust Centre' });
     } catch (error: any) {
       console.error('[TRUST] Error deleting document settings:', error);
       if (error.code === 'P2025') {
@@ -1606,13 +1606,13 @@ router.put(
   }
 );
 
-// GET /api/trust/suppliers - Get suppliers visible in Trust Center
+// GET /api/trust/suppliers - Get suppliers visible in Trust Centre
 router.get(
   '/suppliers',
   conditionalTrustAuth,
   async (req: Request, res: Response) => {
     try {
-      // Only return suppliers that are marked for Trust Center display and are Active/Approved
+      // Only return suppliers that are marked for Trust Centre display and are Active/Approved
       const suppliers = await prisma.supplier.findMany({
         where: {
           showInTrustCenter: true,
@@ -1654,7 +1654,7 @@ router.get(
   }
 );
 
-// GET /api/trust/stats - Get Trust Center statistics
+// GET /api/trust/stats - Get Trust Centre statistics
 router.get('/stats', async (req: Request, res: Response) => {
   try {
     // Always calculate activeCertifications from certificates
@@ -1668,7 +1668,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       },
     });
 
-    // Count only Policies (not procedures) that are available for download via Trust Center
+    // Count only Policies (not procedures) that are available for download via Trust Centre
     // Count both public and private documents that have SharePoint information
     const policiesAndProcedures = await prisma.trustDocSetting.count({
       where: {

@@ -36,7 +36,7 @@ function App() {
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-          {/* Trust Center routes - public-facing, separate auth context */}
+          {/* Trust Centre routes - public-facing, separate auth context */}
           <Route
             path="/"
             element={

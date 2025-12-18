@@ -29,7 +29,7 @@ import { globalLimiter } from './middleware/rateLimit';
 
 const app = express();
 
-// CORS configuration - allow Trust Center subdomain
+// CORS configuration - allow Trust Centre subdomain
 // Supports wildcard patterns like: https://trust.*.paythru.com
 const corsOptions = {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
@@ -101,7 +101,7 @@ app.use('/api', globalLimiter);
 
 // CSP headers middleware for PDF downloads
 app.use((req, res, next) => {
-    // Only set CSP for trust center routes
+    // Only set CSP for trust centre routes
     if (req.path.startsWith('/api/trust')) {
         res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';");
     }

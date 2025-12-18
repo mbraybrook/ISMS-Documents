@@ -84,7 +84,7 @@ describe('Layout Navigation', () => {
         act(() => {
             fireEvent.click(screen.getByText('System'));
         });
-        expect(await screen.findByText('Trust Center')).toBeInTheDocument();
+        expect(await screen.findByText('Trust Centre')).toBeInTheDocument();
         expect(await screen.findByText('User Management')).toBeInTheDocument();
     }, 15000);
 });

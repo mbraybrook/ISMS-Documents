@@ -5,9 +5,9 @@
 
 Restructure the application routing to support deployment at `https://trust.<domain.com>/` where:
 
-- `/` serves the public Trust Center
+- `/` serves the public Trust Centre
 - `/admin/*` contains all ISMS document management and admin functionality
-- Trust Center routes are simplified (remove `/trust` prefix)
+- Trust Centre routes are simplified (remove `/trust` prefix)
 
 ## Current vs. Target Structure
 
@@ -41,7 +41,7 @@ Restructure the application routing to support deployment at `https://trust.<dom
 
 ### 1. Update Main Routing (`frontend/src/App.tsx`)
 
-- Move Trust Center routes to root level (remove `/trust` prefix)
+- Move Trust Centre routes to root level (remove `/trust` prefix)
 - Move all ISMS routes under `/admin` prefix
 - Add redirect from `/admin` to `/admin/dashboard` or keep as dashboard
 - Consider adding redirects from old routes to new ones for backwards compatibility
@@ -69,7 +69,7 @@ Update hardcoded route references in:
 - `frontend/src/components/ProtectedRoute.tsx` - Update redirect to `/admin/login`
 - `frontend/src/components/StaffOnlyRoute.tsx` - Update redirect to `/admin/login`
 
-### 4. Update Trust Center Components
+### 4. Update Trust Centre Components
 
 - `frontend/src/pages/TrustCenterPage.tsx` - Update `/trust/login` → `/login`
 - `frontend/src/pages/TrustCenterLoginPage.tsx` - Update `/trust/private` → `/private`, `/trust` → `/`
@@ -79,12 +79,12 @@ Update hardcoded route references in:
 ### 5. Update Authentication Redirects
 
 - Ensure ISMS auth redirects to `/admin/login` instead of `/login`
-- Ensure Trust Center auth redirects to `/login` (root level)
+- Ensure Trust Centre auth redirects to `/login` (root level)
 - Update any auth context redirects
 
 ### 6. Testing Considerations
 
-- Test public access to `/` (Trust Center)
+- Test public access to `/` (Trust Centre)
 - Test ISMS admin access at `/admin/*`
 - Test authentication flows for both systems
 - Test navigation between trust center and admin sections
@@ -112,7 +112,7 @@ Update hardcoded route references in:
 - `frontend/src/pages/LoginPage.tsx`
 - `frontend/src/pages/UnauthorizedPage.tsx`
 
-### Trust Center Components
+### Trust Centre Components
 
 - `frontend/src/pages/TrustCenterPage.tsx`
 - `frontend/src/pages/TrustCenterLoginPage.tsx`
@@ -130,13 +130,13 @@ Update hardcoded route references in:
 - Backend API routes remain unchanged (they use `/api/*` prefix)
 - Consider adding route redirects for old paths during transition period
 - The Layout component should conditionally show navigation based on whether user is in admin section
-- Trust Center pages should not use the ISMS Layout component
+- Trust Centre pages should not use the ISMS Layout component
 
 ### To-dos
 
-- [ ] Update App.tsx to restructure routes: move Trust Center to root (/), move all ISMS routes under /admin
+- [ ] Update App.tsx to restructure routes: move Trust Centre to root (/), move all ISMS routes under /admin
 - [ ] Update Layout.tsx navigation links to use /admin/* prefix for all ISMS routes
 - [ ] Update all hardcoded route references in page components (HomePage, DocumentsPage, etc.) to use /admin/* prefix
-- [ ] Update Trust Center components to use simplified routes (remove /trust prefix)
+- [ ] Update Trust Centre components to use simplified routes (remove /trust prefix)
 - [ ] Update authentication redirects in ProtectedRoute, StaffOnlyRoute, and auth contexts to use correct login paths
 - [ ] Update trustApi.ts service to use new /login route instead of /trust/login

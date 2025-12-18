@@ -354,7 +354,7 @@ describe('Config', () => {
       expect(config.llm.maxEmbeddingTextLength).toBe(2048);
     });
 
-    it('should configure Trust Center settings with defaults', async () => {
+    it('should configure Trust Centre settings with defaults', async () => {
       // Arrange
       delete process.env.TRUST_CENTER_JWT_SECRET;
       delete process.env.TRUST_CENTER_JWT_EXPIRY;
@@ -371,7 +371,7 @@ describe('Config', () => {
       expect(config.trustCenter.downloadTokenExpiry).toBe('1h');
     });
 
-    it('should use Trust Center settings from environment variables', async () => {
+    it('should use Trust Centre settings from environment variables', async () => {
       // Arrange
       process.env.TRUST_CENTER_JWT_SECRET = 'secret-key';
       process.env.TRUST_CENTER_JWT_EXPIRY = '48h';

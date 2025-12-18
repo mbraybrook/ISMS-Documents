@@ -76,14 +76,14 @@ export const config = {
     similarityThreshold: parseFloat(process.env.LLM_SIMILARITY_THRESHOLD || '70'),
     maxEmbeddingTextLength: parseInt(process.env.LLM_MAX_EMBEDDING_TEXT_LENGTH || '1024', 10),
   },
-  // Trust Center configuration
+  // Trust Centre configuration
   trustCenter: {
     jwtSecret: process.env.TRUST_CENTER_JWT_SECRET || '',
     jwtExpiry: process.env.TRUST_CENTER_JWT_EXPIRY || '24h',
     maxFileSizeMB: parseInt(process.env.TRUST_CENTER_MAX_FILE_SIZE_MB || '50', 10),
     downloadTokenExpiry: process.env.TRUST_CENTER_DOWNLOAD_TOKEN_EXPIRY || '1h',
   },
-  // Azure app-only authentication for Trust Center
+  // Azure app-only authentication for Trust Centre
   // Reuses the same Azure App Registration as user authentication
   azure: {
     appClientId: process.env.AZURE_APP_CLIENT_ID || process.env.AUTH_CLIENT_ID || '',

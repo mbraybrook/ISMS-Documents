@@ -72,7 +72,7 @@ This review assesses the application's readiness for first-run deployment to a l
 - `CONFLUENCE_USERNAME` - Confluence username
 - `CONFLUENCE_API_TOKEN` - Confluence API token
 - `CORS_TRUST_CENTER_ORIGINS` - Comma-separated list of allowed origins
-- `TRUST_CENTER_JWT_SECRET` - JWT secret for Trust Center (min 32 chars)
+- `TRUST_CENTER_JWT_SECRET` - JWT secret for Trust Centre (min 32 chars)
 - `TRUST_CENTER_JWT_EXPIRY` - JWT expiry (default: 24h)
 - `TRUST_CENTER_MAX_FILE_SIZE_MB` - Max file size (default: 50)
 - `LLM_PROVIDER` - LLM provider (default: ollama)

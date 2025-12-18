@@ -295,7 +295,7 @@ describe('App', () => {
     );
   };
 
-  describe('Trust Center Routes (Public-facing)', () => {
+  describe('Trust Centre Routes (Public-facing)', () => {
     it('should render TrustCenterPage at root path "/"', () => {
       // Arrange & Act
       renderApp('/');
@@ -870,7 +870,7 @@ describe('App', () => {
       expect(screen.getByTestId('redirect-to-login')).toBeInTheDocument();
     });
 
-    it('should not wrap Trust Center routes with Layout', () => {
+    it('should not wrap Trust Centre routes with Layout', () => {
       // Arrange & Act
       renderApp('/');
 

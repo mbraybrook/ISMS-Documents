@@ -1367,12 +1367,12 @@ describe('Suppliers API', () => {
       expect(updateCall.data.supplierType).toBeUndefined();
     });
 
-    it('should handle trust center fields', async () => {
+    it('should handle trust centre fields', async () => {
       const updatedSupplier = {
         ...mockSupplier,
         showInTrustCenter: true,
-        trustCenterDisplayName: 'Trust Center Name',
-        trustCenterDescription: 'Trust Center Description',
+        trustCenterDisplayName: 'Trust Centre Name',
+        trustCenterDescription: 'Trust Centre Description',
         trustCenterCategory: 'Category',
         trustCenterComplianceSummary: 'Summary',
         relationshipOwner: null,
@@ -1386,8 +1386,8 @@ describe('Suppliers API', () => {
         .put(`/api/suppliers/${supplierId}`)
         .send({
           showInTrustCenter: true,
-          trustCenterDisplayName: 'Trust Center Name',
-          trustCenterDescription: 'Trust Center Description',
+          trustCenterDisplayName: 'Trust Centre Name',
+          trustCenterDescription: 'Trust Centre Description',
           trustCenterCategory: 'Category',
           trustCenterComplianceSummary: 'Summary',
         })

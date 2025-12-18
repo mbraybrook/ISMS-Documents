@@ -210,7 +210,7 @@ describe('App Configuration', () => {
   });
 
   describe('Security Headers', () => {
-    it('should set Content-Security-Policy header for trust center routes', async () => {
+    it('should set Content-Security-Policy header for trust centre routes', async () => {
       // Arrange & Act
       const response = await request(app)
         .get('/api/trust/test')

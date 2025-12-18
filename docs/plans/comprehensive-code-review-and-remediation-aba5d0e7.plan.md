@@ -242,9 +242,9 @@ Backend:
 
 - Error handler tests
 
-- Trust Center authentication tests
+- Trust Centre authentication tests
 
-- Missing route tests: Controls, Reviews, Users, Dashboard, Trust Center
+- Missing route tests: Controls, Reviews, Users, Dashboard, Trust Centre
 
 - Missing service tests: Similarity, Watermark, Document Conversion, PDF Cache, Trust Audit
 
@@ -270,7 +270,7 @@ E2E:
 
 - Rate limiting behavior
 
-- Trust Center workflows
+- Trust Centre workflows
 
 Security testing:
 

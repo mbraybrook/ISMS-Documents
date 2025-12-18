@@ -32,7 +32,7 @@ export function LoginPage() {
   return (
     <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
       <VStack spacing={6} p={8} bg="white" borderRadius="md" boxShadow="md">
-        <Heading size="lg">ISMS Document Management</Heading>
+        <Heading size="lg">Paythru Trust Centre</Heading>
         <Text color="gray.600">Sign in with your Microsoft account</Text>
         <Button colorScheme="blue" size="lg" onClick={handleLogin}>
           Sign In

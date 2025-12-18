@@ -24,7 +24,7 @@ Modify `frontend/src/components/Layout.tsx`:
 - Add it at the end of the Layout component's JSX, after the Container with children
 - Ensure it appears on all admin pages that use Layout
 
-### 3. Add Footer to Trust Center Pages
+### 3. Add Footer to Trust Centre Pages
 
 Add the footer to pages that don't use Layout:
 

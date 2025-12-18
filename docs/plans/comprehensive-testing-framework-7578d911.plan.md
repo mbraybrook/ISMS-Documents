@@ -78,7 +78,7 @@
 - Control applicability logic
 - Linked risks and documents counting
 
-### 8. Trust Center
+### 8. Trust Centre
 
 - External user registration and approval
 - NDA acceptance workflow

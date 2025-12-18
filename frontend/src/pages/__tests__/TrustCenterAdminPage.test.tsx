@@ -61,11 +61,11 @@ describe('TrustCenterAdminPage', () => {
     vi.mocked(trustApi.getCertificationsAdmin).mockResolvedValue([]);
   });
 
-  it('should render Trust Center Administration heading', async () => {
+  it('should render Trust Centre Administration heading', async () => {
     render(<TrustCenterAdminPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Trust Center Administration')).toBeInTheDocument();
+      expect(screen.getByText('Trust Centre Administration')).toBeInTheDocument();
     });
   });
 
@@ -73,7 +73,7 @@ describe('TrustCenterAdminPage', () => {
     render(<TrustCenterAdminPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Trust Center Administration')).toBeInTheDocument();
+      expect(screen.getByText('Trust Centre Administration')).toBeInTheDocument();
     });
 
     // Wait for loading to complete

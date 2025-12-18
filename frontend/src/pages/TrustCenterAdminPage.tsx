@@ -537,7 +537,7 @@ export function TrustCenterAdminPage() {
       handleEditDoc(doc);
     } else {
       // Remove setting - delete the TrustDocSetting
-      if (!confirm('Are you sure you want to remove this document from the Trust Center?')) {
+      if (!confirm('Are you sure you want to remove this document from the Trust Centre?')) {
         // Reset the toggle if user cancels
         loadData();
         return;
@@ -546,7 +546,7 @@ export function TrustCenterAdminPage() {
         await trustApi.deleteDocumentSettings(doc.document.id);
         toast({
           title: 'Success',
-          description: 'Document removed from Trust Center',
+          description: 'Document removed from Trust Centre',
           status: 'success',
           duration: 3000,
           isClosable: true,
@@ -557,7 +557,7 @@ export function TrustCenterAdminPage() {
         const errorObj = error as { response?: { data?: { error?: string } } };
         toast({
           title: 'Error',
-          description: errorObj.response?.data?.error || 'Failed to remove document from Trust Center',
+          description: errorObj.response?.data?.error || 'Failed to remove document from Trust Centre',
           status: 'error',
           duration: 5000,
           isClosable: true,
@@ -587,7 +587,7 @@ export function TrustCenterAdminPage() {
   return (
     <Box p={8}>
       <Heading size="lg" mb={6}>
-        Trust Center Administration
+        Trust Centre Administration
       </Heading>
 
       <Tabs index={tabIndex} onChange={setTabIndex}>
@@ -602,7 +602,7 @@ export function TrustCenterAdminPage() {
         <TabPanels>
           <TabPanel>
             <VStack spacing={4} align="stretch">
-              <Heading size="md">Trust Center Document Management</Heading>
+              <Heading size="md">Trust Centre Document Management</Heading>
               {documents.length === 0 ? (
                 <Text color="gray.500">No documents found</Text>
               ) : (
@@ -611,7 +611,7 @@ export function TrustCenterAdminPage() {
                     <Thead>
                       <Tr>
                         <Th>Document</Th>
-                        <Th>Show in Trust Center</Th>
+                        <Th>Show in Trust Centre</Th>
                         <Th>Access Level</Th>
                         <Th>Category</Th>
                         <Th>Public Description</Th>
@@ -736,7 +736,7 @@ export function TrustCenterAdminPage() {
 
           <TabPanel>
             <VStack spacing={6} align="stretch" maxW="800px">
-              <Heading size="md">Trust Center Settings</Heading>
+              <Heading size="md">Trust Centre Settings</Heading>
 
               <Box>
                 <Heading size="sm" mb={4}>Document Settings</Heading>
@@ -779,7 +779,7 @@ export function TrustCenterAdminPage() {
                 </Button>
               </HStack>
               <Text fontSize="sm" color="gray.600">
-                Manage the certifications displayed in the "Certifications & Compliance" section on the public Trust Center page.
+                Manage the certifications displayed in the "Certifications & Compliance" section on the public Trust Centre page.
               </Text>
 
               {certifications.length === 0 ? (
@@ -1012,7 +1012,7 @@ export function TrustCenterAdminPage() {
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>
-            Configure Trust Center Settings
+            Configure Trust Centre Settings
             {editingDocument && (
               <Text fontSize="sm" fontWeight="normal" color="gray.500" mt={1}>
                 {editingDocument.document.title}
@@ -1092,7 +1092,7 @@ export function TrustCenterAdminPage() {
                   rows={3}
                 />
                 <Text fontSize="xs" color="gray.500" mt={1}>
-                  This description will be visible to external users in the Trust Center
+                  This description will be visible to external users in the Trust Centre
                 </Text>
               </FormControl>
 

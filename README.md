@@ -9,7 +9,7 @@ A comprehensive Information Security Management System (ISMS) platform that cent
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: 
   - Internal users: Entra ID / Microsoft Identity Platform (MSAL)
-  - External users (Trust Center): JWT-based email/password authentication
+  - External users (Trust Centre): JWT-based email/password authentication
 - **AI/LLM Integration**: Ollama for semantic embeddings and similarity analysis
 - **External Integrations**: 
   - Microsoft SharePoint (document storage and retrieval)
@@ -67,8 +67,8 @@ A web application that provides a "single pane of glass" over an organisation's 
    - `LLM_EMBEDDING_MODEL`: Embedding model name (default: `nomic-embed-text`)
    - `LLM_CHAT_MODEL`: Chat model name (default: `llama2`)
    - `LLM_SIMILARITY_THRESHOLD`: Similarity threshold for AI suggestions (default: `70`)
-   - `TRUST_CENTER_JWT_SECRET`: JWT secret for Trust Center authentication (generate with `openssl rand -base64 32`)
-   - `CORS_TRUST_CENTER_ORIGINS`: Comma-separated list of allowed Trust Center origins (supports wildcards)
+  - `TRUST_CENTER_JWT_SECRET`: JWT secret for Trust Centre authentication (generate with `openssl rand -base64 32`)
+  - `CORS_TRUST_CENTER_ORIGINS`: Comma-separated list of allowed Trust Centre origins (supports wildcards)
    - `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USER`, `EMAIL_SMTP_PASS`, `EMAIL_FROM`: Email service configuration
    
    Example for local development:
@@ -505,10 +505,10 @@ Before deploying to production:
 - Check backend logs for embedding generation errors
 - Run embedding backfill scripts if embeddings are missing
 
-**Trust Center authentication errors**:
+**Trust Centre authentication errors**:
 - Verify `TRUST_CENTER_JWT_SECRET` is set and at least 32 characters
 - Check JWT token expiry configuration
-- Verify CORS origins include Trust Center domain
+- Verify CORS origins include Trust Centre domain
 - Check external user approval status in admin panel
 
 ### Rollback Procedure
@@ -758,9 +758,9 @@ The application uses Ollama for semantic embeddings and similarity analysis. Thi
 
 **Note**: AI features are optional. The application will work without Ollama, but control/risk suggestions will be disabled.
 
-### 5. Trust Center Setup
+### 5. Trust Centre Setup
 
-The Trust Center module allows external users to access selected documents. It uses separate authentication from the main application.
+The Trust Centre module allows external users to access selected documents. It uses separate authentication from the main application.
 
 1. **Generate JWT Secret**:
    ```bash
@@ -776,13 +776,13 @@ The Trust Center module allows external users to access selected documents. It u
    ```
 
 3. **Configure document visibility**:
-   - Use the Trust Center Admin page to configure which documents are public/private
+   - Use the Trust Centre Admin page to configure which documents are public/private
    - Set document categories (certification, policy, report)
    - Configure NDA requirements per document
 
 4. **User approval workflow**:
-   - External users register via the Trust Center
-   - Admins approve/deny users via the Trust Center Admin page
+   - External users register via the Trust Centre
+   - Admins approve/deny users via the Trust Centre Admin page
    - Approved users can access private documents after accepting terms
 
 ## Development Phases
@@ -801,7 +801,7 @@ This project is being built in phases:
 - **Phase 10**: Testing, Documentation & Polish ✅
 - **Phase 11**: Additional Entities (Assets, Asset Categories, Interested Parties, Legislation, Suppliers) ✅
 - **Phase 12**: AI-Powered Features (Semantic Search, Control/Risk Suggestions) ✅
-- **Phase 13**: Trust Center Module (Public Document Access) ✅
+- **Phase 13**: Trust Centre Module (Public Document Access) ✅
 - **Phase 14**: Mass Import Functionality ✅
 
 ## Key Features
@@ -839,7 +839,7 @@ This project is being built in phases:
 - Uses Ollama for local LLM inference (embeddings and similarity analysis)
 - Pre-computed embeddings for controls and risks for fast similarity queries
 
-### Trust Center (Public-Facing Module)
+### Trust Centre (Public-Facing Module)
 - Public document portal for external users
 - Email/password authentication (separate from internal Entra ID auth)
 - Document visibility controls (public/private)
@@ -994,7 +994,7 @@ This project is being built in phases:
 - `GET /api/confluence/pages/:pageId` - Get Confluence page metadata
 - `GET /api/confluence/url` - Generate Confluence URL
 
-### Trust Center (Public API)
+### Trust Centre (Public API)
 - `POST /api/trust/auth/register` - Register external user
 - `POST /api/trust/auth/login` - Login external user
 - `POST /api/trust/auth/logout` - Logout external user
@@ -1006,7 +1006,7 @@ This project is being built in phases:
 - `POST /api/trust/documents/:id/accept-terms` - Accept NDA/terms for document
 - `GET /api/trust/suppliers` - Get public supplier information
 
-### Trust Center Admin (Internal API)
+### Trust Centre Admin (Internal API)
 - `GET /api/trust/admin/users` - List external users (Admin only)
 - `PUT /api/trust/admin/users/:id/approve` - Approve external user (Admin only)
 - `PUT /api/trust/admin/users/:id/deny` - Deny external user (Admin only)

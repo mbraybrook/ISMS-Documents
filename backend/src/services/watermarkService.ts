@@ -10,7 +10,7 @@ export interface ValidationResult {
 }
 
 /**
- * Get watermark prefix from Trust Center settings
+ * Get watermark prefix from Trust Centre settings
  * Returns default 'Paythru Confidential' if not configured
  */
 async function getWatermarkPrefix(): Promise<string> {
