@@ -1,0 +1,749 @@
+---
+alwaysApply: true
+---
+
+# ISMS Documentation - Testing Rules
+
+## Core Requirements
+
+### Mandatory Testing
+- **Write tests for every new function or functionality** - No exceptions
+- **Test coverage must be 80%+** across the project (enforced by coverage thresholds)
+- **ALL tests must pass before commits** - Enforced by pre-commit hook
+- **Test quality matters** - High coverage with poor tests is not acceptable
+
+### Coverage Targets
+- **Backend**: 80%+ coverage on all metrics (lines, functions, branches, statements)
+- **Frontend**: 80%+ coverage on all metrics (lines, functions, branches, statements)
+- **E2E**: All critical user flows must be covered
+
+## Test Structure
+
+### Backend Tests
+- **Framework**: Jest
+- **Location**: `backend/src/**/__tests__/` directories
+- **Naming**: `*.test.ts`
+- **Example**: `backend/src/routes/__tests__/documents.test.ts`
+
+### Frontend Tests
+- **Framework**: Vitest with React Testing Library
+- **Location**: `frontend/src/**/__tests__/` directories
+- **Naming**: `*.test.tsx` for components, `*.test.ts` for utilities/services
+- **Example**: `frontend/src/components/__tests__/ProtectedRoute.test.tsx`
+
+### E2E Tests
+- **Framework**: Playwright
+- **Location**: `e2e/` directory
+- **Naming**: `*.spec.ts`
+- **Example**: `e2e/auth.spec.ts`
+
+## What to Test
+
+### Critical Paths (Priority 1)
+- **Authentication & Authorization**: Token validation, role-based access, department filtering
+- **Data Operations**: CRUD operations, data validation, error handling
+- **Business Logic**: Risk calculations, document workflows, acknowledgment flows
+- **API Endpoints**: Request/response handling, validation, error cases
+
+### Edge Cases (Priority 2)
+- **Error Handling**: Invalid inputs, network failures, database errors
+- **Boundary Conditions**: Empty arrays, null values, maximum values
+- **State Transitions**: Status changes, workflow progressions
+- **Permission Checks**: Unauthorized access attempts, role restrictions
+
+### Integration Points (Priority 3)
+- **Service Interactions**: How services work together
+- **External APIs**: SharePoint, Confluence, MSAL (mocked in tests)
+- **Database Operations**: Prisma queries, transactions
+
+## What NOT to Test (Coverage Exclusions)
+
+These are automatically excluded from coverage:
+- Type definitions and interfaces (`*.d.ts` files)
+- Configuration files (`*.config.*` files)
+- Test utilities and helpers (`test-helpers.ts`, `test-db.ts`, `test/` directories)
+- Generated code (Prisma client, build outputs)
+- Entry points (`index.ts` files)
+- Mock data files (`mockData.ts`)
+
+## Test Quality Standards
+
+### AAA Pattern (Arrange-Act-Assert)
+Every test should follow this structure:
+```typescript
+it('should [expected behavior] when [condition]', () => {
+  // Arrange: Set up test data and mocks
+  const mockUser = createMockUser({ role: 'ADMIN' });
+  
+  // Act: Execute the code being tested
+  const result = myFunction(mockUser);
+  
+  // Assert: Verify the expected outcome
+  expect(result).toBe(expectedValue);
+});
+```
+
+### Test Isolation
+- Tests must be **independent** - no test should depend on another
+- Tests must be **runnable in any order**
+- Use `beforeEach`/`afterEach` to set up and clean up test state
+- Never share mutable state between tests
+
+### Clear Test Names
+- Use descriptive names that explain what is being tested
+- Format: `should [expected behavior] when [condition]`
+- Examples:
+  - ✅ `should return 403 when user lacks required role`
+  - ✅ `should calculate risk score correctly when all factors are provided`
+  - ❌ `test1` or `works correctly`
+
+### Meaningful Assertions
+- Test **behavior**, not implementation details
+- Use specific matchers: `toBe`, `toEqual`, `toContain`, `toThrow`
+- Verify side effects: database changes, API calls, state updates
+- Don't just test that code runs - test that it produces correct results
+
+### Mocking Strategy
+- **Mock external services**: SharePoint, Confluence, MSAL, external APIs
+- **Mock database**: Use Prisma mocks for database operations
+- **Don't over-mock**: Prefer integration tests when appropriate
+- **Reset mocks**: Clear mocks in `beforeEach` to avoid test pollution
+- **Mock before rendering**: Set up all API mocks before calling `render()` to avoid race conditions
+- **Preserve provider exports**: When mocking context providers (like `AuthContext`), use `importOriginal` to preserve component exports
+- **Use global mocks when available**: Check `test/setup.ts` and `test/mocks/` for existing global mocks before creating test-specific ones
+- **Avoid mock conflicts**: Don't create duplicate mocks when global mocks already exist - use `vi.mocked()` to override behavior instead
+
+**✅ Correct Context Mocking:**
+```typescript
+vi.mock('../../contexts/AuthContext', async () => {
+  const actual = await vi.importActual('../../contexts/AuthContext');
+  return {
+    ...actual, // Preserves AuthProvider export
+    useAuth: vi.fn(),
+  };
+});
+```
+
+**✅ Correct Service Mocking:**
+```typescript
+vi.mock('../../services/authService', () => ({
+  authService: {
+    getGraphAccessToken: vi.fn().mockResolvedValue('token'),
+    initialize: vi.fn().mockResolvedValue(undefined), // Include all methods
+  },
+}));
+```
+
+## Best Practices
+
+### Use Test Helpers
+- Leverage existing test utilities: `createMockUser()`, `createMockRequest()`, etc.
+- Create reusable test factories for common data structures
+- Use test helpers from:
+  - Backend: `backend/src/lib/test-helpers.ts`
+  - Frontend: `frontend/src/test/utils.tsx`
+  - E2E: `e2e/helpers/`
+
+### React Testing Library Best Practices
+- **Always import `render` from `test/utils`** instead of `@testing-library/react` - the custom render includes all necessary providers (ChakraProvider, BrowserRouter, AuthProvider) and handles `act()` wrapping
+- **Always use `userEvent`** for user interactions (never `fireEvent` for clicks/typing)
+- **Always use `waitFor`** when asserting on content that appears after async operations
+- **Wait for components to render** before interacting with them (especially modals)
+- **Make tests async** when components have `useEffect` hooks or async operations
+- **Mock all API calls before rendering** components to avoid race conditions
+- Import `userEvent` from `@testing-library/user-event` in all frontend tests
+
+**✅ Correct Import Pattern:**
+```typescript
+import { render, screen, waitFor } from '../../test/utils';
+import userEvent from '@testing-library/user-event';
+```
+
+**❌ Incorrect:**
+```typescript
+import { render, screen, waitFor } from '@testing-library/react'; // Missing providers
+```
+
+### Test Behavior, Not Implementation
+- Focus on **what** the code does, not **how** it does it
+- Test public APIs and user-facing behavior
+- Avoid testing internal implementation details that may change
+
+### Keep Tests Fast
+- Unit tests should complete in < 5 seconds
+- Use mocks to avoid slow operations (network, database)
+- Run tests in parallel when possible
+- Use `test.only` or `describe.only` sparingly during development
+
+### Prefer Integration Over Excessive Mocking
+- When testing complex workflows, prefer integration tests
+- Mock only external dependencies (APIs, services)
+- Use real database connections in integration tests (with test database)
+
+### Error Testing
+- Test both success and failure paths
+- Test error messages and error handling
+- Test edge cases: null, undefined, empty strings, invalid types
+
+### Avoiding React act() Warnings
+
+React Testing Library may show warnings about state updates not being wrapped in `act(...)`. Follow these practices to avoid them:
+
+#### Use `userEvent` Instead of `fireEvent`
+- **Always use `userEvent`** for user interactions (clicks, typing, selecting)
+- `userEvent` is async and properly handles React state updates
+- `fireEvent` should only be used for non-user events (like keyboard events that don't trigger state)
+
+**✅ Correct:**
+```typescript
+const user = userEvent.setup();
+await user.click(button);
+await user.type(input, 'text');
+await user.selectOptions(select, 'value');
+```
+
+**❌ Incorrect:**
+```typescript
+fireEvent.click(button); // Can cause act() warnings
+fireEvent.change(input, { target: { value: 'text' } }); // Can cause act() warnings
+```
+
+#### Wait for Async State Updates
+- Components with `useEffect` hooks that fetch data need time to update state
+- Always use `waitFor` when asserting on content that appears after async operations
+- Wait for components to fully render before interacting with them
+
+**✅ Correct:**
+```typescript
+it('should render data after fetch', async () => {
+  render(<MyComponent />);
+  
+  // Wait for async state updates
+  await waitFor(() => {
+    expect(screen.getByText('Loaded Data')).toBeInTheDocument();
+  });
+});
+```
+
+**❌ Incorrect:**
+```typescript
+it('should render data after fetch', () => {
+  render(<MyComponent />);
+  // This will fail or cause act() warnings - data hasn't loaded yet
+  expect(screen.getByText('Loaded Data')).toBeInTheDocument();
+});
+```
+
+#### Wait for Modals and Dynamic Content
+- Modals and dynamically rendered content need time to mount
+- Always wait for elements to appear before interacting with them
+
+**✅ Correct:**
+```typescript
+const user = userEvent.setup();
+await user.click(openButton);
+
+await waitFor(() => {
+  expect(screen.getByTestId('modal')).toBeInTheDocument();
+});
+
+// Now interact with modal
+await user.click(screen.getByRole('button', { name: /close/i }));
+```
+
+**❌ Incorrect:**
+```typescript
+const user = userEvent.setup();
+await user.click(openButton);
+// Modal might not be fully rendered yet
+await user.click(screen.getByRole('button', { name: /close/i })); // Can cause act() warnings
+```
+
+#### Setup userEvent Once Per Test
+- Create `userEvent.setup()` once at the start of each test
+- Reuse the same instance for all interactions in that test
+
+**✅ Correct:**
+```typescript
+it('should handle multiple interactions', async () => {
+  const user = userEvent.setup();
+  render(<MyComponent />);
+  
+  await user.type(input, 'text');
+  await user.click(button);
+  await user.selectOptions(select, 'value');
+});
+```
+
+**❌ Incorrect:**
+```typescript
+it('should handle multiple interactions', async () => {
+  render(<MyComponent />);
+  
+  const user1 = userEvent.setup();
+  await user1.type(input, 'text');
+  
+  const user2 = userEvent.setup(); // Unnecessary - reuse user1
+  await user2.click(button);
+});
+```
+
+#### Handling Complex Components with Cascading useEffect Hooks
+Some components have multiple `useEffect` hooks that trigger cascading state updates. These can sometimes produce `act()` warnings even when using best practices. To minimize these:
+
+1. **Always wait for initial data fetching to complete** before making assertions
+2. **Wait for API calls** to complete before interacting with components
+3. **Use `waitFor`** to wait for content that appears after async operations
+4. **Use the custom `render` from `test/utils`** which automatically handles `act()` wrapping
+5. **Mock all API calls before rendering** to ensure predictable test behavior
+
+**✅ Correct Pattern for Components with Multiple useEffect Hooks:**
+```typescript
+import { render, screen, waitFor } from '../../test/utils';
+import userEvent from '@testing-library/user-event';
+
+it('should render component with cascading async operations', async () => {
+  // Arrange - Mock ALL API calls that will be triggered
+  vi.mocked(api.get)
+    .mockResolvedValueOnce({ data: { data: [] } }) // First API call
+    .mockResolvedValueOnce({ data: { notes: '' } }); // Second API call
+
+  // Act
+  render(<ComplexComponent />);
+  
+  // Assert - Wait for component to render and initial API calls
+  await waitFor(() => {
+    expect(screen.getByText('Component Title')).toBeInTheDocument();
+  });
+  
+  // Wait for cascading state updates
+  await waitFor(() => {
+    expect(screen.getByText('Loaded Data')).toBeInTheDocument();
+  });
+});
+```
+
+**✅ Correct Pattern for Debounced Operations:**
+```typescript
+it('should handle debounced search', async () => {
+  const user = userEvent.setup();
+  vi.mocked(api.get).mockResolvedValueOnce({ data: { data: [] } });
+  
+  render(<SearchComponent />);
+  
+  // Wait for component to render
+  await waitFor(() => {
+    expect(screen.getByLabelText('Search')).toBeInTheDocument();
+  });
+  
+  // Act - Type in search field (triggers debounced API call)
+  const searchInput = screen.getByLabelText('Search');
+  await user.type(searchInput, 'search term');
+  
+  // Assert - Wait for debounce (500ms) + API call with longer timeout
+  await waitFor(
+    () => {
+      expect(api.get).toHaveBeenCalledWith('/api/search', expect.objectContaining({
+        params: expect.objectContaining({ q: 'search term' })
+      }));
+    },
+    { timeout: 2000 } // Allow time for debounce + API call
+  );
+});
+```
+
+**Important:** Always import `render` from `test/utils` instead of directly from `@testing-library/react`. The custom render function:
+- Automatically wraps renders in `act()` to handle state updates
+- Includes all necessary providers (ChakraProvider, BrowserRouter, AuthProvider)
+- Flushes pending updates to minimize `act()` warnings
+
+**Note:** Some `act()` warnings may still appear with very complex components that have cascading `useEffect` hooks. These warnings are typically harmless if:
+- All tests pass
+- Tests wait for async operations using `waitFor`
+- User interactions use `userEvent` instead of `fireEvent`
+- Tests use the custom `render` from `test/utils`
+
+If warnings persist, they usually indicate that the component has many interdependent state updates that happen in quick succession. This is often acceptable in test environments.
+
+## Running Tests
+
+### Development Workflow
+```bash
+# Run tests in watch mode (recommended during development)
+npm run test:watch
+
+# Run specific test file
+cd backend && npm test -- documents.test.ts
+cd frontend && npm test -- ProtectedRoute.test.tsx
+```
+
+### Pre-commit (Automatic)
+- Tests run automatically before every commit via pre-commit hook
+- **All tests must pass** - commits are blocked if tests fail
+- Runs full test suite for both backend and frontend
+- To bypass (emergency only): `git commit --no-verify` (not recommended)
+
+### CI/CD
+```bash
+# Run tests in CI mode (non-watch, fail-fast)
+npm run test:ci
+
+# Run with coverage reporting
+npm run test:coverage
+```
+
+### Coverage Reports
+```bash
+# Generate coverage reports
+npm run test:coverage
+
+# View HTML coverage reports
+# Backend: backend/coverage/index.html
+# Frontend: frontend/coverage/index.html
+```
+
+## Coverage Selection Strategy
+
+### Step 1: Start with Critical Paths
+Focus on high-impact areas first:
+- Authentication and authorization
+- Core business logic (risk calculations, document workflows)
+- Data operations (CRUD, validation)
+
+### Step 2: Add Edge Cases
+Once critical paths are covered, add tests for:
+- Error handling
+- Boundary conditions
+- Invalid inputs
+
+### Step 3: Fill Coverage Gaps
+Use coverage reports to identify untested code:
+```bash
+npm run test:coverage
+# Review coverage/index.html to see untested lines
+```
+
+### Step 4: Maintain Quality
+- Don't sacrifice test quality for coverage numbers
+- 80% coverage with good tests > 90% coverage with poor tests
+- Focus on meaningful assertions, not just hitting lines
+
+## Writing Tests
+
+### Backend Test Example
+```typescript
+import { createMockUser, createMockAuthRequest } from '../../lib/test-helpers';
+import { prisma } from '../../lib/prisma';
+
+// Mock Prisma
+jest.mock('../../lib/prisma', () => ({
+  prisma: {
+    user: {
+      findUnique: jest.fn(),
+    },
+  },
+}));
+
+describe('MyRoute', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return user data when authenticated', async () => {
+    // Arrange
+    const mockUser = createMockUser({ role: 'ADMIN' });
+    prisma.user.findUnique.mockResolvedValue(mockUser);
+    const req = createMockAuthRequest({ user: mockUser });
+    const res = createMockResponse();
+
+    // Act
+    await myRouteHandler(req, res);
+
+    // Assert
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      id: mockUser.id,
+      role: 'ADMIN',
+    }));
+  });
+});
+```
+
+### Frontend Test Example
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '../../test/utils'; // Import from test/utils
+import userEvent from '@testing-library/user-event';
+import { MyComponent } from '../MyComponent';
+import api from '../../services/api';
+
+// Mock dependencies
+vi.mock('../../services/api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+  },
+}));
+
+describe('MyComponent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should render user name when user is logged in', async () => {
+    // Arrange - Mock API calls before rendering
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { name: 'John Doe' } });
+
+    // Act
+    render(<MyComponent />);
+
+    // Assert - Wait for async state updates from useEffect hooks
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+  });
+
+  it('should show error message when API call fails', async () => {
+    // Arrange - Mock API failure
+    vi.mocked(api.get).mockRejectedValueOnce({
+      response: { data: { error: 'Server error' } },
+    });
+
+    // Act
+    render(<MyComponent />);
+
+    // Assert - Wait for error to appear
+    await waitFor(() => {
+      expect(screen.getByText('Server error')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle user interactions correctly', async () => {
+    // Arrange
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { data: [] } });
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { id: '1' } });
+    
+    render(<MyComponent />);
+
+    // Wait for component to render before interacting
+    await waitFor(() => {
+      expect(screen.getByText('My Component')).toBeInTheDocument();
+    });
+
+    // Act - Use userEvent for all user interactions (clicks, typing, etc.)
+    const input = screen.getByLabelText(/search/i);
+    await user.type(input, 'test query');
+    await user.click(screen.getByRole('button', { name: /search/i }));
+
+    // Assert - Wait for async operations to complete
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalled();
+      expect(screen.getByText('test query')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+### E2E Test Example
+```typescript
+import { test, expect } from '@playwright/test';
+import { loginAs } from './helpers/auth';
+
+test.describe('Document Management', () => {
+  test('should create document when user has EDITOR role', async ({ page }) => {
+    // Arrange
+    await loginAs(page, 'EDITOR');
+    await page.goto('/documents');
+
+    // Act
+    await page.click('text=Create Document');
+    await page.fill('[name="title"]', 'Test Document');
+    await page.click('button[type="submit"]');
+
+    // Assert
+    await expect(page.locator('text=Test Document')).toBeVisible();
+  });
+});
+```
+
+## Pre-commit Hook
+
+### How It Works
+1. When you run `git commit`, the pre-commit hook automatically triggers
+2. Runs full test suite for both backend and frontend
+3. Blocks commit if any tests fail
+4. Provides clear error messages showing which tests failed
+
+### Bypassing (Emergency Only)
+```bash
+git commit --no-verify  # Not recommended - use sparingly!
+```
+
+### Troubleshooting
+- If tests are slow, consider optimizing test setup or using test database
+- If tests fail unexpectedly, check for:
+  - Uncommitted changes that affect tests
+  - Environment variables not set correctly
+  - Database state issues
+
+## Test Maintenance
+
+### When to Update Tests
+- When fixing bugs: Add tests that reproduce the bug first
+- When adding features: Write tests alongside new code
+- When refactoring: Update tests to match new behavior
+- When tests become flaky: Investigate and fix root cause
+- When fixing `act()` warnings: Apply proper async patterns and `waitFor` usage
+
+### Test Debt
+- Don't accumulate test debt - fix failing tests immediately
+- Remove obsolete tests when functionality is removed
+- Update tests when requirements change
+- Refactor tests when they become hard to maintain
+- Fix `act()` warnings systematically by applying best practices
+
+### Common Test Issues and Solutions
+
+#### Issue: `act()` Warnings
+**Symptoms:** Warnings about state updates not wrapped in `act(...)`
+**Solutions:**
+1. Import `render` from `test/utils` instead of `@testing-library/react`
+2. Make all tests that render components `async`
+3. Use `waitFor` for all async operations
+4. Use `userEvent` instead of `fireEvent` for user interactions
+5. Mock all API calls before rendering components
+
+#### Issue: Tests Failing Due to Missing Mocks
+**Symptoms:** Tests fail with "Cannot read property of undefined" or similar
+**Solutions:**
+1. Mock all external dependencies before rendering
+2. Use `importOriginal` when mocking context providers to preserve component exports
+3. Include all methods in service mocks (not just the ones you think you need)
+4. Reset mocks in `beforeEach` to avoid test pollution
+
+#### Issue: "AuthProvider export not found" Error
+**Symptoms:** Error message: `[vitest] No "AuthProvider" export is defined on the "../../contexts/AuthContext" mock`
+**Root Cause:** Mocking AuthContext without preserving the AuthProvider export that `test/utils.tsx` needs
+**Solutions:**
+1. Always use `importOriginal` when mocking context providers:
+```typescript
+vi.mock('../../contexts/AuthContext', async () => {
+  const actual = await vi.importActual('../../contexts/AuthContext');
+  return {
+    ...actual, // Preserves AuthProvider export
+    useAuth: vi.fn(),
+  };
+});
+```
+2. Never mock AuthContext without preserving exports:
+```typescript
+// ❌ Incorrect - breaks test/utils.tsx
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: vi.fn(),
+}));
+
+// ✅ Correct - preserves AuthProvider
+vi.mock('../../contexts/AuthContext', async () => {
+  const actual = await vi.importActual('../../contexts/AuthContext');
+  return {
+    ...actual,
+    useAuth: vi.fn(),
+  };
+});
+```
+
+#### Issue: Mock Conflicts Between Global and Test-Specific Mocks
+**Symptoms:** Tests fail with unexpected mock behavior, or mocks don't work as expected
+**Root Cause:** Creating duplicate mocks when global mocks already exist (e.g., MSAL, authService)
+**Solutions:**
+1. Check `test/setup.ts` and `test/mocks/` for existing global mocks
+2. Use global mocks when possible - they're already set up correctly
+3. Only override global mocks when necessary using `vi.mocked()`:
+```typescript
+// ❌ Incorrect - creates duplicate mock
+vi.mock('@azure/msal-browser', () => ({ /* ... */ }));
+
+// ✅ Correct - use global mock and override if needed
+import { msalInstance } from '../authService';
+vi.mocked(msalInstance.loginPopup).mockResolvedValue(mockResponse);
+```
+4. When you must create a test-specific mock, ensure it doesn't conflict with global setup
+
+#### Issue: Flaky Tests (Sometimes Pass, Sometimes Fail)
+**Symptoms:** Tests pass intermittently, especially in CI
+**Solutions:**
+1. Add proper `waitFor` patterns for all async operations
+2. Use appropriate timeouts for debounced operations (typically 2000ms+)
+3. Wait for components to render before interacting with them
+4. Ensure all API mocks are set up before rendering
+5. Avoid relying on timing - use `waitFor` to wait for actual state changes
+
+#### Issue: Console Log Noise in Test Output
+**Symptoms:** Hundreds of console.log/warn/error messages making test output hard to read
+**Root Cause:** Components and services logging to console during tests
+**Solutions:**
+1. Console logs are automatically suppressed in test environment (see `test/setup.ts`)
+2. If you need to see logs for debugging, temporarily comment out console suppression
+3. Use `console.error` sparingly - it's filtered but some errors may still appear
+4. For test-specific logging, use `vi.fn()` to capture logs without outputting them
+
+## Console Log Suppression
+
+### Why Suppress Console Logs?
+Console logs create noise in test output, making it difficult to:
+- Identify actual test failures
+- Read test results quickly
+- Debug issues effectively
+
+### How It Works
+Console logs are automatically suppressed in the test environment via `test/setup.ts`:
+- `console.log` and `console.warn` are completely suppressed
+- `console.error` is filtered to show only actual test failures (not expected errors from components)
+- Suppression is scoped to test environment only - production code is unaffected
+
+### When Console Logs Are Acceptable
+- **Test failures**: Actual errors that indicate test problems should be visible
+- **Debugging**: Temporarily enable logs when debugging specific test issues
+- **Test utilities**: Helper functions that need to output information for test debugging
+
+### Disabling Suppression (Temporary)
+If you need to see console logs for debugging:
+1. Comment out the console suppression code in `test/setup.ts`
+2. Run your tests
+3. **Remember to uncomment** before committing
+
+## Test Output Quality
+
+### Importance of Clean Test Output
+Clean test output is essential for:
+- **Quick failure identification**: Easily spot which tests failed
+- **CI/CD efficiency**: Faster debugging in automated environments
+- **Developer productivity**: Less time spent parsing noisy output
+- **Maintainability**: Easier to onboard new developers
+
+### Identifying Noisy Tests
+Signs that a test is producing too much output:
+- Test output is longer than the test code itself
+- Multiple console.log/warn/error messages per test
+- Repeated error messages that don't indicate failures
+- Warnings about React state updates (act() warnings)
+
+### Fixing Noisy Tests
+1. **Use proper mocking**: Mock external services to prevent them from logging
+2. **Suppress expected errors**: Use `vi.fn()` to mock console methods in specific tests
+3. **Wait for async operations**: Use `waitFor` to avoid race condition warnings
+4. **Use standardized render**: Always use `render` from `test/utils` which handles providers correctly
+
+### Best Practices
+- **Mock before render**: Set up all mocks before calling `render()` to avoid initialization logs
+- **Use waitFor**: Wait for async operations to complete before making assertions
+- **Clean up**: Reset mocks in `beforeEach` to prevent test pollution
+- **Test behavior**: Focus on what the component does, not implementation details that might log
+
+## Additional Resources
+
+- **Testing Guide**: See `docs/testing.md` for detailed examples and troubleshooting
+- **Jest Documentation**: https://jestjs.io/
+- **Vitest Documentation**: https://vitest.dev/
+- **React Testing Library**: https://testing-library.com/react
+- **Playwright Documentation**: https://playwright.dev/

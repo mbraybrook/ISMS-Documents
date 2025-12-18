@@ -1,0 +1,1 @@
+Fix the following linting errors/warnings. Focus only on the affected files. Setting ignores is fine if it can be reasonably deemed appropriate (e.g. if the solution is quite complex and the impact of the lint notice is low). Verify that the file passes lint checks with no errors or warnings. 
