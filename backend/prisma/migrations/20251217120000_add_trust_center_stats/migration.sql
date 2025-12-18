@@ -1,4 +1,4 @@
 -- AlterTable
-ALTER TABLE "TrustCenterSettings" ADD COLUMN "uptimeSLA" TEXT,
-ADD COLUMN "activeCertifications" INTEGER;
+ALTER TABLE "TrustCenterSettings" ADD COLUMN IF NOT EXISTS "uptimeSLA" TEXT,
+ADD COLUMN IF NOT EXISTS "activeCertifications" INTEGER;
 

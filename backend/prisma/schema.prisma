@@ -452,7 +452,6 @@ model TrustCenterSettings {
   id                    String   @id @default(uuid())
   key                   String   @unique
   watermarkPrefix       String   @default("Paythru Confidential")
-  uptimeSLA             String?  @default("99.9%")
   activeCertifications  Int?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt

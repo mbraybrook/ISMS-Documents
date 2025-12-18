@@ -133,48 +133,48 @@ router.get('/documents', conditionalTrustAuth, async (req: Request, res: Respons
       ],
     });
 
-    // Get private documents if authenticated
-    let privateDocs: any[] = [];
-    if (isAuthenticated) {
-      const privateDocsQuery = await prisma.trustDocSetting.findMany({
-        where: {
-          visibilityLevel: 'private',
-        },
-        include: {
-          Document: {
-            select: {
-              id: true,
-              title: true,
-              type: true,
-              version: true,
-              status: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-          },
-          certificate: {
-            select: {
-              id: true,
-              name: true,
-              type: true,
-            },
+    // Get private documents (always fetch, but filter NDA-required if not authenticated or terms not accepted)
+    const privateDocsQuery = await prisma.trustDocSetting.findMany({
+      where: {
+        visibilityLevel: 'private',
+      },
+      include: {
+        Document: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            version: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
           },
         },
-        orderBy: [
-          { category: 'asc' },
-          { displayOrder: 'asc' },
-          { createdAt: 'desc' },
-        ],
-      });
+        certificate: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
+      } as any,
+      orderBy: [
+        { category: 'asc' },
+        { displayOrder: 'asc' },
+        { createdAt: 'desc' },
+      ],
+    });
 
-      // Filter documents that require NDA if user hasn't accepted terms
-      privateDocs = privateDocsQuery.filter((item: any) => {
-        if (item.requiresNda && !externalUser.termsAcceptedAt) {
-          return false; // Hide documents requiring NDA if terms not accepted
+    // Filter documents that require NDA if user hasn't accepted terms
+    const privateDocs = privateDocsQuery.filter((item: any) => {
+      if (item.requiresNda) {
+        // Only show NDA-required documents if user is authenticated and has accepted terms
+        if (!isAuthenticated || !externalUser?.termsAcceptedAt) {
+          return false; // Hide documents requiring NDA if not authenticated or terms not accepted
         }
-        return true;
-      });
-    }
+      }
+      return true;
+    });
 
     // Combine and group by category
     const allDocuments = [
@@ -256,7 +256,7 @@ router.get('/documents/private', authenticateTrustToken, async (req: TrustAuthRe
             type: true,
           },
         },
-      },
+      } as any,
       orderBy: [
         { category: 'asc' },
         { displayOrder: 'asc' },
@@ -1149,7 +1149,7 @@ router.get(
                   type: true,
                 },
               },
-            },
+            } as any,
           },
         },
         orderBy: {
@@ -1175,9 +1175,9 @@ router.get(
             category: doc.TrustDocSetting.category,
             certificateId: doc.TrustDocSetting.certificateId,
             certificate: doc.TrustDocSetting.certificate ? {
-              id: doc.TrustDocSetting.certificate.id,
-              name: doc.TrustDocSetting.certificate.name,
-              type: doc.TrustDocSetting.certificate.type,
+              id: (doc.TrustDocSetting.certificate as any).id,
+              name: (doc.TrustDocSetting.certificate as any).name,
+              type: (doc.TrustDocSetting.certificate as any).type,
             } : null,
             sharePointUrl: doc.TrustDocSetting.sharePointUrl,
             publicDescription: doc.TrustDocSetting.publicDescription,
@@ -1522,15 +1522,12 @@ router.get(
           data: {
             key: 'global',
             watermarkPrefix: 'Paythru Confidential',
-            uptimeSLA: '99.9%',
           },
         });
       }
 
       res.json({
         watermarkPrefix: settings.watermarkPrefix,
-        uptimeSLA: settings.uptimeSLA || '99.9%',
-        activeCertifications: settings.activeCertifications,
       });
     } catch (error: any) {
       console.error('[TRUST] Error fetching settings:', error);
@@ -1546,13 +1543,11 @@ router.put(
   requireRole('ADMIN', 'EDITOR'),
   [
     body('watermarkPrefix').optional().isString().isLength({ min: 1, max: 100 }),
-    body('uptimeSLA').optional().isString().isLength({ min: 1, max: 50 }),
-    body('activeCertifications').optional().isInt({ min: 0 }),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
-      const { watermarkPrefix, uptimeSLA, activeCertifications } = req.body;
+      const { watermarkPrefix } = req.body;
       // Get internal user from database to get the ID
       const internalUserSettings = req.user?.email ? await prisma.user.findUnique({
         where: { email: req.user.email },
@@ -1566,18 +1561,10 @@ router.put(
 
       const updateData: {
         watermarkPrefix?: string;
-        uptimeSLA?: string | null;
-        activeCertifications?: number | null;
       } = {};
 
       if (watermarkPrefix !== undefined) {
         updateData.watermarkPrefix = watermarkPrefix;
-      }
-      if (uptimeSLA !== undefined) {
-        updateData.uptimeSLA = uptimeSLA || null;
-      }
-      if (activeCertifications !== undefined) {
-        updateData.activeCertifications = activeCertifications !== null && activeCertifications !== undefined ? activeCertifications : null;
       }
 
       if (settings) {
@@ -1592,8 +1579,6 @@ router.put(
           data: {
             key: 'global',
             watermarkPrefix: watermarkPrefix || 'Paythru Confidential',
-            uptimeSLA: uptimeSLA || '99.9%',
-            activeCertifications: activeCertifications !== undefined ? activeCertifications : null,
           },
         });
       }
@@ -1607,16 +1592,12 @@ router.put(
         undefined,
         {
           watermarkPrefix: settings.watermarkPrefix,
-          uptimeSLA: settings.uptimeSLA,
-          activeCertifications: settings.activeCertifications,
         },
         getIpAddress(req)
       );
 
       res.json({
         watermarkPrefix: settings.watermarkPrefix,
-        uptimeSLA: settings.uptimeSLA || '99.9%',
-        activeCertifications: settings.activeCertifications,
       });
     } catch (error: any) {
       console.error('[TRUST] Error updating settings:', error);
@@ -1676,61 +1657,66 @@ router.get(
 // GET /api/trust/stats - Get Trust Center statistics
 router.get('/stats', async (req: Request, res: Response) => {
   try {
-    // Get configurable stats from settings
-    const settings = await prisma.trustCenterSettings.findUnique({
-      where: { key: 'global' },
-    });
-
-    // Use configured activeCertifications if set, otherwise calculate from certificates
-    let activeCertifications: number;
-    if (settings?.activeCertifications !== null && settings?.activeCertifications !== undefined) {
-      activeCertifications = settings.activeCertifications;
-    } else {
-      // Count certificates that have at least one linked document with visibility='public' and status='APPROVED'
-      activeCertifications = await prisma.trustCenterCertification.count({
-        where: {
-          TrustDocSettings: {
-            some: {
-              visibilityLevel: 'public',
-              Document: {
-                status: 'APPROVED',
-              },
-            },
-          },
-        },
-      });
-    }
-
-    // Count policies and procedures (documents with category='policy' and visibility='public')
-    // Only count documents that exist and are APPROVED
-    const policiesAndProcedures = await prisma.trustDocSetting.count({
+    // Always calculate activeCertifications from certificates
+    // Count all certifications that are not expired (validUntil is null or in the future)
+    const activeCertifications = await prisma.trustCenterCertification.count({
       where: {
-        category: 'policy',
-        visibilityLevel: 'public',
-        Document: {
-          status: 'APPROVED',
-        },
+        OR: [
+          { validUntil: null },
+          { validUntil: { gte: new Date() } },
+        ],
       },
     });
 
-    const uptimeSLA = settings?.uptimeSLA || '99.9%';
-    // Security Monitoring is static
-    const securityMonitoring = '24/7';
+    // Count only Policies (not procedures) that are available for download via Trust Center
+    // Count both public and private documents that have SharePoint information
+    const policiesAndProcedures = await prisma.trustDocSetting.count({
+      where: {
+        AND: [
+          {
+            category: 'policy',
+            visibilityLevel: {
+              in: ['public', 'private'],
+            },
+            Document: {
+              status: 'APPROVED',
+              type: 'POLICY', // Only count Policies, not Procedures
+            },
+          },
+          {
+            // Must have SharePoint information to be available for download
+            OR: [
+              // Either have all three SharePoint IDs
+              {
+                sharePointSiteId: { not: null },
+                sharePointDriveId: { not: null },
+                sharePointItemId: { not: null },
+              },
+              // Or have a SharePoint URL that can be parsed
+              {
+                sharePointUrl: { not: null },
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    console.log('[TRUST] Policies count:', policiesAndProcedures);
+
 
     res.json({
       activeCertifications,
       policiesAndProcedures,
-      uptimeSLA,
-      securityMonitoring,
+
     });
   } catch (error: any) {
     console.error('[TRUST] Error fetching stats:', error);
     // Return default values on error
     res.json({
-      activeCertifications: 5,
-      policiesAndProcedures: 24,
-      uptimeSLA: '99.9%',
-      securityMonitoring: '24/7',
+      activeCertifications: 0,
+      policiesAndProcedures: 0,
+
     });
   }
 });

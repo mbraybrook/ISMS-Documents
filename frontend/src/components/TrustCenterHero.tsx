@@ -10,11 +10,6 @@ export function TrustCenterHero() {
     },
     {
       icon: CheckCircleIcon,
-      title: 'SOC 2 Type II',
-      description: 'Certified',
-    },
-    {
-      icon: CheckCircleIcon,
       title: 'GDPR',
       description: 'Compliant',
     },

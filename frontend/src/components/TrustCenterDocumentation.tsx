@@ -7,9 +7,10 @@ import { HStack, Icon } from '@chakra-ui/react';
 interface TrustCenterDocumentationProps {
   documents: TrustCategoryGroup[];
   loading: boolean;
+  isAuthenticated?: boolean;
 }
 
-export function TrustCenterDocumentation({ documents, loading }: TrustCenterDocumentationProps) {
+export function TrustCenterDocumentation({ documents, loading, isAuthenticated = false }: TrustCenterDocumentationProps) {
   // Separate documents into Policies and Certifications & Reports
   const policies = documents.find((g) => g.category === 'policy')?.documents || [];
   const certificationsAndReports = documents
@@ -74,7 +75,7 @@ export function TrustCenterDocumentation({ documents, loading }: TrustCenterDocu
               </HStack>
               <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
                 {policies.map((doc) => (
-                  <TrustDocumentCard key={doc.id} document={doc} />
+                  <TrustDocumentCard key={doc.id} document={doc} isAuthenticated={isAuthenticated} />
                 ))}
               </SimpleGrid>
             </Box>
@@ -91,7 +92,7 @@ export function TrustCenterDocumentation({ documents, loading }: TrustCenterDocu
               </HStack>
               <VStack spacing={8} align="stretch">
                 {Object.values(certificationsByCert).map((group) => (
-                  <Box key={group.certificate.id}>
+                  <Box key={group.certificate.id} id={`cert-${group.certificate.id}`} scrollMarginTop="100px">
                     <HStack spacing={2} mb={4}>
                       <Text fontWeight="semibold" color="gray.700">
                         {group.certificate.name}
@@ -105,7 +106,7 @@ export function TrustCenterDocumentation({ documents, loading }: TrustCenterDocu
                     </HStack>
                     <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
                       {group.documents.map((doc) => (
-                        <TrustDocumentCard key={doc.id} document={doc} />
+                        <TrustDocumentCard key={doc.id} document={doc} isAuthenticated={isAuthenticated} />
                       ))}
                     </SimpleGrid>
                   </Box>
@@ -125,7 +126,7 @@ export function TrustCenterDocumentation({ documents, loading }: TrustCenterDocu
               </HStack>
               <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
                 {reports.map((doc) => (
-                  <TrustDocumentCard key={doc.id} document={doc} />
+                  <TrustDocumentCard key={doc.id} document={doc} isAuthenticated={isAuthenticated} />
                 ))}
               </SimpleGrid>
             </Box>

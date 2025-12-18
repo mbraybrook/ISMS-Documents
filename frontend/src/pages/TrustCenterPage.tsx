@@ -85,7 +85,7 @@ export function TrustCenterPage() {
         <TrustCenterHero />
         <TrustCenterStats />
         <TrustCenterCertifications />
-        <TrustCenterDocumentation documents={documents} loading={loading} />
+        <TrustCenterDocumentation documents={documents} loading={loading} isAuthenticated={isAuthenticated} />
 
         {/* Key Suppliers Section - Moved to bottom, less prominent */}
         {suppliersLoading ? (

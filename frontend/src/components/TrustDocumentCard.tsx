@@ -8,9 +8,10 @@ import type { TrustDocument } from '../types/trust';
 interface TrustDocumentCardProps {
   document: TrustDocument;
   onDownload?: () => void;
+  isAuthenticated?: boolean;
 }
 
-function TrustDocumentCard({ document, onDownload }: TrustDocumentCardProps) {
+function TrustDocumentCard({ document, onDownload, isAuthenticated = false }: TrustDocumentCardProps) {
   const toast = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -79,7 +80,8 @@ function TrustDocumentCard({ document, onDownload }: TrustDocumentCardProps) {
   };
 
   const isPrivate = document.visibilityLevel === 'private';
-  const isRestricted = document.status?.toUpperCase() === 'RESTRICTED' || isPrivate;
+  const isRestricted = document.status?.toUpperCase() === 'RESTRICTED';
+  const canDownload = !isRestricted && (!isPrivate || isAuthenticated);
   
   // Get document type badge text
   const getDocumentTypeBadge = () => {
@@ -169,13 +171,14 @@ function TrustDocumentCard({ document, onDownload }: TrustDocumentCardProps) {
               </Button>
             ) : (
               <Button
-                leftIcon={isDownloading ? <Spinner size="sm" /> : <DownloadIcon />}
-                colorScheme="blue"
+                leftIcon={isDownloading ? <Spinner size="sm" /> : (canDownload ? <DownloadIcon /> : <LockIcon />)}
+                colorScheme={canDownload ? "blue" : "gray"}
                 size="sm"
-                onClick={handleDownload}
+                variant={canDownload ? "solid" : "outline"}
+                onClick={canDownload ? handleDownload : handleRequestAccess}
                 isLoading={isDownloading}
                 loadingText="Preparing..."
-                isDisabled={isDownloading}
+                isDisabled={isDownloading || !canDownload}
               >
                 Download
               </Button>

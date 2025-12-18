@@ -215,6 +215,8 @@ describe('Trust Routes', () => {
           displayOrder: 1,
           publicDescription: 'Test description',
           requiresNda: false,
+          certificateId: null,
+          certificate: null,
           Document: {
             id: 'doc-1',
             title: 'Public Document',
@@ -227,7 +229,10 @@ describe('Trust Routes', () => {
         },
       ];
 
-      (prisma.trustDocSetting.findMany as jest.Mock).mockResolvedValueOnce(mockPublicDocs);
+      // Mock both public and private document queries
+      (prisma.trustDocSetting.findMany as jest.Mock)
+        .mockResolvedValueOnce(mockPublicDocs) // Public docs query
+        .mockResolvedValueOnce([]); // Private docs query (empty for unauthenticated)
 
       // Act
       const response = await request(app)
@@ -252,6 +257,8 @@ describe('Trust Routes', () => {
           displayOrder: 1,
           publicDescription: 'Test description',
           requiresNda: false,
+          certificateId: null,
+          certificate: null,
           Document: {
             id: 'doc-1',
             title: 'Public Document',
@@ -272,6 +279,8 @@ describe('Trust Routes', () => {
           displayOrder: 1,
           publicDescription: 'Private description',
           requiresNda: false,
+          certificateId: null,
+          certificate: null,
           Document: {
             id: 'doc-2',
             title: 'Private Document',
@@ -312,6 +321,8 @@ describe('Trust Routes', () => {
           displayOrder: 1,
           publicDescription: 'Private description',
           requiresNda: true,
+          certificateId: null,
+          certificate: null,
           Document: {
             id: 'doc-1',
             title: 'NDA Required Document',
@@ -361,6 +372,8 @@ describe('Trust Routes', () => {
           displayOrder: 1,
           publicDescription: 'Test description',
           requiresNda: false,
+          certificateId: null,
+          certificate: null,
           Document: {
             id: 'doc-1',
             title: 'Valid Document',
@@ -378,11 +391,16 @@ describe('Trust Routes', () => {
           displayOrder: 2,
           publicDescription: 'Orphaned',
           requiresNda: false,
+          certificateId: null,
+          certificate: null,
           Document: null, // Orphaned setting
         },
       ];
 
-      (prisma.trustDocSetting.findMany as jest.Mock).mockResolvedValueOnce(mockPublicDocs);
+      // Mock both public and private document queries
+      (prisma.trustDocSetting.findMany as jest.Mock)
+        .mockResolvedValueOnce(mockPublicDocs) // Public docs query
+        .mockResolvedValueOnce([]); // Private docs query (empty for unauthenticated)
 
       // Act
       const response = await request(app)

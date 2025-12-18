@@ -336,12 +336,12 @@ export const trustApi = {
     return response.data;
   },
 
-  async getSettings(): Promise<{ watermarkPrefix: string; uptimeSLA?: string; activeCertifications?: number | null }> {
+  async getSettings(): Promise<{ watermarkPrefix: string }> {
     const response = await apiInternal.get('/api/trust/admin/settings');
     return response.data;
   },
 
-  async updateSettings(settings: { watermarkPrefix?: string; uptimeSLA?: string; activeCertifications?: number | null }): Promise<{ watermarkPrefix: string; uptimeSLA?: string; activeCertifications?: number | null }> {
+  async updateSettings(settings: { watermarkPrefix?: string }): Promise<{ watermarkPrefix: string }> {
     const response = await apiInternal.put('/api/trust/admin/settings', settings);
     return response.data;
   },
@@ -362,8 +362,6 @@ export const trustApi = {
   async getStats(): Promise<{
     activeCertifications: number;
     policiesAndProcedures: number;
-    uptimeSLA: string;
-    securityMonitoring: string;
   }> {
     try {
       const response = await axios.get(`${API_URL}/stats`);
@@ -373,8 +371,6 @@ export const trustApi = {
       return {
         activeCertifications: 5,
         policiesAndProcedures: 24,
-        uptimeSLA: '99.9%',
-        securityMonitoring: '24/7',
       };
     }
   },

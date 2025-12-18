@@ -1,6 +1,9 @@
-import { Box, Heading, Text, SimpleGrid, Card, CardBody, VStack, HStack, Badge } from '@chakra-ui/react';
+import { Box, Heading, Text, SimpleGrid, Card, CardBody, VStack, HStack, Badge, Link, Spinner } from '@chakra-ui/react';
+import { DownloadIcon, LockIcon } from '@chakra-ui/icons';
 import { useEffect, useState } from 'react';
 import { trustApi } from '../services/trustApi';
+import { useToast } from '@chakra-ui/react';
+import { useTrustAuth } from '../contexts/TrustAuthContext';
 
 interface Certification {
   id: string;
@@ -23,14 +26,20 @@ interface Certification {
 export function TrustCenterCertifications() {
   const [certifications, setCertifications] = useState<Certification[]>([]);
   const [_loading, setLoading] = useState(true);
+  const [downloadingDocs, setDownloadingDocs] = useState<Set<string>>(new Set());
+  const toast = useToast();
+  const { isAuthenticated } = useTrustAuth();
 
   useEffect(() => {
     const loadCertifications = async () => {
       try {
         setLoading(true);
         const data = await trustApi.getCertifications();
-        // Sort by displayOrder
-        const sorted = [...data].sort((a, b) => a.displayOrder - b.displayOrder);
+        console.log('[TrustCenterCertifications] Loaded certifications:', data);
+        // Filter out SOC 2 Type II and sort by displayOrder
+        const filtered = data.filter(cert => cert.id !== 'soc2' && cert.name !== 'SOC 2 Type II');
+        const sorted = [...filtered].sort((a, b) => a.displayOrder - b.displayOrder);
+        console.log('[TrustCenterCertifications] Filtered and sorted:', sorted);
         setCertifications(sorted);
       } catch (error) {
         console.error('Error loading certifications:', error);
@@ -51,14 +60,8 @@ export function TrustCenterCertifications() {
       description: 'Information Security Management',
       validUntil: '2025-12-31',
       displayOrder: 1,
-    },
-    {
-      id: 'soc2',
-      name: 'SOC 2 Type II',
-      type: 'certified',
-      description: 'Security, Availability & Confidentiality',
-      validUntil: '2025-11-30',
-      displayOrder: 2,
+      documentCount: 0,
+      documents: [],
     },
     {
       id: 'gdpr',
@@ -67,6 +70,8 @@ export function TrustCenterCertifications() {
       description: 'General Data Protection Regulation',
       validUntil: null,
       displayOrder: 3,
+      documentCount: 0,
+      documents: [],
     },
     {
       id: 'hipaa',
@@ -75,6 +80,8 @@ export function TrustCenterCertifications() {
       description: 'Health Information Privacy',
       validUntil: null,
       displayOrder: 4,
+      documentCount: 0,
+      documents: [],
     },
     {
       id: 'pci',
@@ -83,6 +90,8 @@ export function TrustCenterCertifications() {
       description: 'Payment Card Industry Standard',
       validUntil: '2025-03-31',
       displayOrder: 5,
+      documentCount: 0,
+      documents: [],
     },
   ];
 
@@ -97,6 +106,102 @@ export function TrustCenterCertifications() {
       return `Valid until: ${month} ${year}`;
     } catch {
       return 'Ongoing';
+    }
+  };
+
+  const handleDocumentDownload = async (docId: string, docTitle: string, visibilityLevel: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    
+    // Check if document is private and user is not authenticated
+    if (visibilityLevel === 'private' && !isAuthenticated) {
+      toast({
+        title: 'Access Required',
+        description: 'Please login or register to access this document.',
+        status: 'info',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+    
+    if (downloadingDocs.has(docId)) return;
+    
+    setDownloadingDocs(prev => new Set(prev).add(docId));
+    
+    try {
+      const { blob, filename } = await trustApi.downloadDocument(docId);
+      
+      if (!blob || blob.size === 0) {
+        throw new Error('Received empty file');
+      }
+      
+      const url = window.URL.createObjectURL(blob);
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = filename || docTitle;
+      a.style.display = 'none';
+      window.document.body.appendChild(a);
+      a.click();
+      
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        window.document.body.removeChild(a);
+      }, 100);
+
+      toast({
+        title: 'Download started',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error: unknown) {
+      console.error('Download error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to download document';
+      const apiError = error as { response?: { data?: { error?: string } } };
+      
+      // Check if it's an authentication error
+      if (apiError.response?.data?.error?.includes('Authentication required')) {
+        toast({
+          title: 'Access Required',
+          description: 'Please login or register to access this document.',
+          status: 'info',
+          duration: 5000,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: 'Download failed',
+          description: apiError.response?.data?.error || errorMessage,
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } finally {
+      setDownloadingDocs(prev => {
+        const next = new Set(prev);
+        next.delete(docId);
+        return next;
+      });
+    }
+  };
+
+  const handleViewAllDocuments = (cert: Certification, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Update URL hash for bookmarkability
+    window.history.pushState(null, '', `#cert-${cert.id}`);
+    
+    // Scroll to the specific certification's documents section
+    const certElement = document.getElementById(`cert-${cert.id}`);
+    if (certElement) {
+      certElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      // Fallback: scroll to documents section if specific cert not found
+      const documentsSection = document.getElementById('documents');
+      if (documentsSection) {
+        documentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     }
   };
 
@@ -129,12 +234,11 @@ export function TrustCenterCertifications() {
                 _hover={{
                   boxShadow: 'md',
                   borderColor: cert.type === 'certified' ? 'green.300' : 'blue.300',
-                  transform: 'translateY(-2px)',
                 }}
                 transition="all 0.2s"
               >
                 <CardBody>
-                  <VStack align="start" spacing={4}>
+                  <VStack align="stretch" spacing={4}>
                     <HStack justify="space-between" w="100%">
                       <Heading as="h3" size="md" color="gray.900">
                         {cert.name}
@@ -156,23 +260,132 @@ export function TrustCenterCertifications() {
                     <Text color="gray.500" fontSize="xs" fontStyle="italic">
                       {formatValidUntil(cert.validUntil)}
                     </Text>
+                    
+                    {/* Key Certification Documents */}
                     {cert.documentCount > 0 && (
-                      <Box w="100%" pt={2} borderTopWidth="1px" borderColor="gray.200">
-                        <Text fontSize="xs" color="gray.600" fontWeight="semibold" mb={2}>
-                          {cert.documentCount} document{cert.documentCount !== 1 ? 's' : ''} available
+                      <Box w="100%" pt={3} borderTopWidth="1px" borderColor="gray.200">
+                        <Text fontSize="xs" color="gray.600" fontWeight="semibold" mb={3}>
+                          Key Documents
                         </Text>
-                        <VStack align="stretch" spacing={1}>
-                          {cert.documents.slice(0, 3).map((doc) => (
-                            <Text key={doc.id} fontSize="xs" color="gray.500" isTruncated>
-                              • {doc.title}
-                            </Text>
-                          ))}
+                        <VStack align="stretch" spacing={2}>
+                          {cert.documents.slice(0, 3).map((doc) => {
+                            const isPrivate = doc.visibilityLevel === 'private';
+                            const isRestricted = isPrivate && !isAuthenticated;
+                            
+                            return (
+                              <Box
+                                key={doc.id}
+                                as="button"
+                                onClick={(e) => handleDocumentDownload(doc.id, doc.title, doc.visibilityLevel, e)}
+                                disabled={downloadingDocs.has(doc.id) || isRestricted}
+                                p={2}
+                                borderRadius="md"
+                                borderWidth="1px"
+                                borderColor={
+                                  isRestricted
+                                    ? 'gray.300'
+                                    : cert.type === 'certified'
+                                    ? 'green.200'
+                                    : 'blue.200'
+                                }
+                                bg={
+                                  isRestricted
+                                    ? 'gray.50'
+                                    : cert.type === 'certified'
+                                    ? 'green.50'
+                                    : 'blue.50'
+                                }
+                                _hover={
+                                  isRestricted
+                                    ? {}
+                                    : {
+                                        bg: cert.type === 'certified' ? 'green.100' : 'blue.100',
+                                        borderColor: cert.type === 'certified' ? 'green.300' : 'blue.300',
+                                      }
+                                }
+                                _disabled={{
+                                  opacity: 0.6,
+                                  cursor: 'not-allowed',
+                                }}
+                                transition="all 0.2s"
+                                cursor={isRestricted ? 'not-allowed' : 'pointer'}
+                                textAlign="left"
+                              >
+                                <HStack spacing={2} align="start">
+                                  {downloadingDocs.has(doc.id) ? (
+                                    <Spinner size="xs" mt={1} />
+                                  ) : isRestricted ? (
+                                    <LockIcon
+                                      boxSize={3}
+                                      mt={1}
+                                      color="gray.500"
+                                    />
+                                  ) : (
+                                    <DownloadIcon
+                                      boxSize={3}
+                                      mt={1}
+                                      color={cert.type === 'certified' ? 'green.600' : 'blue.600'}
+                                    />
+                                  )}
+                                  <VStack align="start" spacing={0} flex={1}>
+                                    <Text
+                                      fontSize="xs"
+                                      color={isRestricted ? 'gray.500' : 'gray.700'}
+                                      fontWeight="medium"
+                                      noOfLines={2}
+                                    >
+                                      {doc.title}
+                                    </Text>
+                                    {isRestricted && (
+                                      <Text
+                                        fontSize="2xs"
+                                        color="gray.500"
+                                        fontStyle="italic"
+                                        mt={0.5}
+                                      >
+                                        Login or Request Access
+                                      </Text>
+                                    )}
+                                  </VStack>
+                                </HStack>
+                              </Box>
+                            );
+                          })}
                           {cert.documentCount > 3 && (
-                            <Text fontSize="xs" color="gray.400" fontStyle="italic">
-                              +{cert.documentCount - 3} more
-                            </Text>
+                            <Link
+                              href={`#cert-${cert.id}`}
+                              onClick={(e) => handleViewAllDocuments(cert, e)}
+                              fontSize="xs"
+                              color={cert.type === 'certified' ? 'green.600' : 'blue.600'}
+                              fontWeight="semibold"
+                              _hover={{ textDecoration: 'underline' }}
+                              mt={1}
+                            >
+                              View all {cert.documentCount} documents →
+                            </Link>
                           )}
                         </VStack>
+                      </Box>
+                    )}
+                    
+                    {cert.documentCount === 0 && (
+                      <Box w="100%" pt={3} borderTopWidth="1px" borderColor="gray.200">
+                        <Link
+                          href={`#documents`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            const documentsSection = document.getElementById('documents');
+                            if (documentsSection) {
+                              documentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                          }}
+                          fontSize="xs"
+                          color={cert.type === 'certified' ? 'green.600' : 'blue.600'}
+                          fontWeight="semibold"
+                          _hover={{ textDecoration: 'underline' }}
+                        >
+                          View documentation →
+                        </Link>
                       </Box>
                     )}
                   </VStack>

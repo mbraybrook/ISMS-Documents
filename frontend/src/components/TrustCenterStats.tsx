@@ -1,21 +1,17 @@
 import { Box, SimpleGrid, Card, CardBody, VStack, Text, Icon, HStack } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import { trustApi } from '../services/trustApi';
-import { CheckCircleIcon, AttachmentIcon, TimeIcon, ViewIcon } from '@chakra-ui/icons';
+import { CheckCircleIcon, AttachmentIcon } from '@chakra-ui/icons';
 
 interface TrustCenterStats {
   activeCertifications: number;
   policiesAndProcedures: number;
-  uptimeSLA: string;
-  securityMonitoring: string;
 }
 
 export function TrustCenterStats() {
   const [stats, setStats] = useState<TrustCenterStats>({
     activeCertifications: 5,
     policiesAndProcedures: 24,
-    uptimeSLA: '99.9%',
-    securityMonitoring: '24/7',
   });
   const [_loading, setLoading] = useState(true);
 
@@ -47,23 +43,9 @@ export function TrustCenterStats() {
     {
       icon: AttachmentIcon,
       value: stats.policiesAndProcedures.toString(),
-      title: 'Policies & Procedures',
-      description: 'Comprehensive documentation',
+      title: 'Policies',
+      description: 'Available for download via Trust Center',
       color: 'blue',
-    },
-    {
-      icon: TimeIcon,
-      value: stats.uptimeSLA,
-      title: 'Uptime SLA',
-      description: 'Service availability guarantee',
-      color: 'purple',
-    },
-    {
-      icon: ViewIcon,
-      value: stats.securityMonitoring,
-      title: 'Security Monitoring',
-      description: 'Continuous threat detection',
-      color: 'orange',
     },
   ];
 

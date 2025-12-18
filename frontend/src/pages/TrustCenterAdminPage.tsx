@@ -175,10 +175,8 @@ export function TrustCenterAdminPage() {
   const [editingDoc, setEditingDoc] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<TrustDocSetting>>({});
   const [editingDocument, setEditingDocument] = useState<{ document: TrustDocument; trustSetting: TrustDocSetting | null } | null>(null);
-  const [settings, setSettings] = useState<{ watermarkPrefix: string; uptimeSLA?: string; activeCertifications?: number | null }>({ 
+  const [settings, setSettings] = useState<{ watermarkPrefix: string }>({ 
     watermarkPrefix: 'Paythru Confidential',
-    uptimeSLA: '99.9%',
-    activeCertifications: null,
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [tabIndex, setTabIndex] = useState(0); // 0 = Document Management, 1 = Pending Requests, 2 = Settings, 3 = Certifications, 4 = User Management
@@ -470,7 +468,7 @@ export function TrustCenterAdminPage() {
       }
 
       // Only include fields that can be updated (exclude id, documentId, createdAt, updatedAt)
-      const allowedFields = ['visibilityLevel', 'category', 'sharePointUrl', 'publicDescription', 'displayOrder', 'requiresNda', 'maxFileSizeMB'];
+      const allowedFields = ['visibilityLevel', 'category', 'sharePointUrl', 'publicDescription', 'displayOrder', 'requiresNda', 'maxFileSizeMB', 'certificateId'];
       const normalizedData: Partial<TrustDocSetting> = {};
       
       // Only copy allowed fields
@@ -484,6 +482,9 @@ export function TrustCenterAdminPage() {
             // Skip empty sharePointUrl - don't send it
           } else if (field === 'displayOrder' && (value === null || value === '')) {
             // Skip null/empty displayOrder
+          } else if (field === 'certificateId' && (value === null || value === '')) {
+            // Normalize empty certificateId to null
+            normalizedData.certificateId = null;
           } else {
             // Safe cast as we know the field exists on TrustDocSetting
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -748,39 +749,6 @@ export function TrustCenterAdminPage() {
                   />
                   <Text fontSize="xs" color="gray.500" mt={1}>
                     This text will appear in watermarks on private documents. Example: "Paythru Confidential - Prepared for user@example.com"
-                  </Text>
-                </FormControl>
-              </Box>
-
-              <Box>
-                <Heading size="sm" mb={4}>Statistics Display</Heading>
-                <Text fontSize="sm" color="gray.600" mb={4}>
-                  Configure the statistics displayed on the public Trust Center page. Leave Active Certifications empty to automatically calculate from your documents.
-                </Text>
-                
-                <FormControl mb={4}>
-                  <FormLabel>Active Certifications</FormLabel>
-                  <NumberInput
-                    value={settings.activeCertifications ?? ''}
-                    onChange={(_, value) => setSettings({ ...settings, activeCertifications: isNaN(value) ? null : value })}
-                    min={0}
-                  >
-                    <NumberInputField placeholder="Auto-calculate from documents" />
-                  </NumberInput>
-                  <Text fontSize="xs" color="gray.500" mt={1}>
-                    Override the automatic count. Leave empty to use the count from your public certification documents.
-                  </Text>
-                </FormControl>
-
-                <FormControl mb={4}>
-                  <FormLabel>Uptime SLA</FormLabel>
-                  <Input
-                    value={settings.uptimeSLA || '99.9%'}
-                    onChange={(e) => setSettings({ ...settings, uptimeSLA: e.target.value })}
-                    placeholder="99.9%"
-                  />
-                  <Text fontSize="xs" color="gray.500" mt={1}>
-                    Displayed in the stats section (e.g., "99.9%", "99.99%")
                   </Text>
                 </FormControl>
               </Box>
