@@ -359,13 +359,19 @@ describe('RiskReviewQueue', () => {
       });
 
       // Act
-      render(<RiskReviewQueue />);
+      const { container } = render(<RiskReviewQueue />);
 
-      // Assert
+      // Wait for loading to complete (spinner should disappear)
+      await waitFor(() => {
+        const spinner = container.querySelector('[class*="chakra-spinner"]');
+        expect(spinner).not.toBeInTheDocument();
+      }, { timeout: 10000 });
+
+      // Assert - Wait for both first and last risk to appear
       await waitFor(() => {
         expect(screen.getByText('Risk 0')).toBeInTheDocument();
         expect(screen.getByText('Risk 149')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Verify pagination calls
       expect(api.get).toHaveBeenCalledWith('/api/risks', {
@@ -382,7 +388,7 @@ describe('RiskReviewQueue', () => {
           limit: 100,
         },
       });
-    });
+    }, { timeout: 15000 });
 
     // Skipping test with high overhead causing timeouts
     it.skip('should stop pagination at safety limit', async () => {

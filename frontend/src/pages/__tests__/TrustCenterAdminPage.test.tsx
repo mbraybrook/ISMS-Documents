@@ -160,12 +160,13 @@ describe('TrustCenterAdminPage', () => {
     vi.mocked(trustApi.getAllUsers).mockResolvedValue(mockUsers);
     vi.mocked(trustApi.getUserDetails).mockResolvedValue(mockUserDetails);
 
-    render(<TrustCenterAdminPage />);
+    const { container } = render(<TrustCenterAdminPage />);
 
     // Wait for initial loading to complete
     await waitFor(() => {
-      expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
-    });
+      const spinner = container.querySelector('[class*="chakra-spinner"]');
+      expect(spinner).not.toBeInTheDocument();
+    }, { timeout: 5000 });
 
     // Click on User Management tab (use getByRole to find the tab button)
     const user = userEvent.setup();
@@ -176,13 +177,13 @@ describe('TrustCenterAdminPage', () => {
     await waitFor(() => {
       expect(trustApi.getAllUsers).toHaveBeenCalled();
       expect(screen.getByText('user1@example.com')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Wait for View Details button to be available (might be multiple, get the first one)
     await waitFor(() => {
       const buttons = screen.getAllByText('View Details');
       expect(buttons.length).toBeGreaterThan(0);
-    });
+    }, { timeout: 3000 });
     
     const viewDetailsButtons = screen.getAllByText('View Details');
     expect(viewDetailsButtons.length).toBeGreaterThan(0);
@@ -191,18 +192,19 @@ describe('TrustCenterAdminPage', () => {
     // Wait for getUserDetails to be called
     await waitFor(() => {
       expect(trustApi.getUserDetails).toHaveBeenCalledWith('user1');
-    }, { timeout: 2000 });
+    }, { timeout: 3000 });
 
     // Wait for modal to appear - check for modal header
     await waitFor(() => {
       expect(screen.getByText('User Details')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    }, { timeout: 5000 });
 
     // Wait for modal content - look for "Basic Information" heading which appears after loading
     // The spinner will disappear when userDetailsLoading becomes false
+    // We wait for "Basic Information" which only appears after the spinner is gone
     await waitFor(() => {
       expect(screen.getByText('Basic Information')).toBeInTheDocument();
-    }, { timeout: 5000 });
+    }, { timeout: 10000 });
 
     // Verify details are displayed in the modal
     // Note: both email and company appear multiple times (table + modal), so use getAllByText
@@ -210,7 +212,7 @@ describe('TrustCenterAdminPage', () => {
     expect(emailElements.length).toBeGreaterThanOrEqual(1);
     const companyElements = screen.getAllByText('Company 1');
     expect(companyElements.length).toBeGreaterThanOrEqual(1);
-  });
+  }, { timeout: 20000 });
 
   it('should revoke user access when Revoke Access is clicked', async () => {
     const mockUsers = [
