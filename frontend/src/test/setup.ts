@@ -86,9 +86,20 @@ vi.mock('@zag-js/focus-visible', () => {
     cleanup: mockCleanup,
   }));
 
+  // Mock setupGlobalFocusEvents to prevent focus property errors
+  // This function is called internally and tries to set focus properties that don't exist in jsdom
+  const mockSetupGlobalFocusEvents = vi.fn(() => {
+    // Return a no-op cleanup function
+    return mockCleanup;
+  });
+
   return {
     trackFocusVisible: mockTrackFocusVisible,
-    default: mockTrackFocusVisible,
+    setupGlobalFocusEvents: mockSetupGlobalFocusEvents,
+    default: {
+      trackFocusVisible: mockTrackFocusVisible,
+      setupGlobalFocusEvents: mockSetupGlobalFocusEvents,
+    },
   };
 });
 

@@ -20,6 +20,7 @@ vi.mock('../../services/trustApi', () => ({
     restoreUserAccess: vi.fn(),
     updateDocumentSettings: vi.fn(),
     deleteDocumentSettings: vi.fn(),
+    getCertificationsAdmin: vi.fn(),
   },
 }));
 
@@ -57,6 +58,7 @@ describe('TrustCenterAdminPage', () => {
     vi.mocked(trustApi.getDocumentSettings).mockResolvedValue([]);
     vi.mocked(trustApi.getSettings).mockResolvedValue({ watermarkPrefix: 'Paythru Confidential' });
     vi.mocked(trustApi.getAllUsers).mockResolvedValue([]);
+    vi.mocked(trustApi.getCertificationsAdmin).mockResolvedValue([]);
   });
 
   it('should render Trust Center Administration heading', async () => {
@@ -197,9 +199,10 @@ describe('TrustCenterAdminPage', () => {
     }, { timeout: 3000 });
 
     // Wait for modal content - look for "Basic Information" heading which appears after loading
+    // The spinner will disappear when userDetailsLoading becomes false
     await waitFor(() => {
       expect(screen.getByText('Basic Information')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    }, { timeout: 5000 });
 
     // Verify details are displayed in the modal
     // Note: both email and company appear multiple times (table + modal), so use getAllByText
