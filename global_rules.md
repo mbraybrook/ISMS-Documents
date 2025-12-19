@@ -236,11 +236,131 @@ const count = 0;
 - **Auto-fix**: `npm run lint:fix`
 - **Track warning count**: `npm run lint:track`
 
+## CloudFormation Template Rules
+
+### Naming Conventions
+- **Resources**: Use PascalCase (e.g., `BackendService`, `ALBSecurityGroup`)
+- **Parameters**: Use PascalCase (e.g., `Environment`, `DomainName`)
+- **Stack Names**: Use kebab-case with environment prefix (e.g., `isms-staging`, `isms-production`)
+- **Resource Names**: Include environment identifier in resource names (e.g., `isms-${Environment}-backend`)
+
+### Parameters and Mappings
+- **Never hardcode values** - use parameters or mappings instead
+- **Always include descriptions** for all parameters and resources
+- **Use AllowedValues** for parameters with limited options
+- **Use Default values** where appropriate
+- **Validate account IDs** using AllowedPattern: `'^[0-9]{12}$'`
+
+### CloudFormation Functions
+- Use intrinsic functions: `!Ref`, `!GetAtt`, `!Sub`, `!Join`, `!Select`
+- Prefer `!Sub` for string interpolation over `!Join`
+- Use `!GetAtt` for resource attributes
+- Use conditions (`Conditions:`, `!If`, `!Equals`) for environment-specific resources
+
+### Resource Organization
+- **Group related resources** in separate template files
+- **Use nested stacks** or separate stacks with exports/imports for modularity
+- **Document all outputs** and their purposes
+- **Use Export names** for cross-stack references
+
+### Best Practices
+- **Security Groups**: Follow least-privilege principle
+- **IAM Policies**: Use least-privilege, document all permissions
+- **Tags**: Always tag resources with Environment and Name
+- **Deletion Protection**: Enable for production resources (RDS, etc.)
+- **Backup Configuration**: Configure automated backups for databases
+
+### Aurora Serverless v2
+- **Always use Aurora Serverless v2** (not RDS) for auto-scaling
+- **Configure min/max ACU** via parameters
+- **Use Multi-AZ** for high availability
+- **Store credentials** in Secrets Manager (not in template)
+
+### ECS and CodeDeploy
+- **Use CodeDeploy** for Blue/Green deployments (not force-new-deployment)
+- **Configure capacity providers** (FARGATE and FARGATE_SPOT)
+- **Use ARM64 (Graviton2)** for cost savings (20% reduction)
+- **Configure auto-scaling** based on CPU/memory utilization
+- **Set health checks** aligned with ALB health checks
+
+### ECR Lifecycle Policies
+- **Configure lifecycle policies** to manage image retention
+- **Keep last N images** for environment tags (staging/production)
+- **Keep last N images** for commit SHA tags (for rollback)
+- **Expire untagged images** after 7 days
+- **Expire old images** after 30 days (except tagged)
+
+### Template Validation
+- **Validate templates** before committing: `aws cloudformation validate-template`
+- **Test parameter files** with template validation
+- **Check for circular dependencies** in nested stacks
+- **Verify all exports** are imported correctly
+
+### Example Patterns
+
+**✅ Correct Parameter Definition**:
+```yaml
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    AllowedValues:
+      - staging
+      - production
+    Default: staging
+```
+
+**✅ Correct Resource with Tags**:
+```yaml
+Resources:
+  BackendService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub 'isms-${Environment}-backend'
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-backend'
+        - Key: Environment
+          Value: !Ref Environment
+```
+
+**✅ Correct Cross-Stack Reference**:
+```yaml
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID
+
+Outputs:
+  VpcId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: !Sub '${AWS::StackName}-VpcId'
+```
+
+**❌ Avoid Hardcoded Values**:
+```yaml
+# ❌ Bad
+Resources:
+  Service:
+    Properties:
+      ServiceName: 'isms-backend'  # Hardcoded, no environment
+
+# ✅ Good
+Resources:
+  Service:
+    Properties:
+      ServiceName: !Sub 'isms-${Environment}-backend'
+```
+
 ## Additional Resources
 
 - See `LINTING_STANDARDS.md` for detailed examples
 - See `LINTING.md` for linting strategy and tools
 - ESLint configs: `frontend/.eslintrc.cjs`, `backend/.eslintrc.json`
+- CloudFormation templates: `infrastructure/templates/`
+- Infrastructure documentation: `infrastructure/README.md`
 
 
 

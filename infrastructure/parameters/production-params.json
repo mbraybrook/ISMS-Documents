@@ -1,0 +1,59 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "production"
+  },
+  {
+    "ParameterKey": "DomainName",
+    "ParameterValue": "trust.paythru.com"
+  },
+  {
+    "ParameterKey": "AwsAccountId",
+    "ParameterValue": "641918319442"
+  },
+  {
+    "ParameterKey": "BackendImageTag",
+    "ParameterValue": "production"
+  },
+  {
+    "ParameterKey": "FrontendImageTag",
+    "ParameterValue": "production"
+  },
+  {
+    "ParameterKey": "AuroraMinCapacity",
+    "ParameterValue": "2"
+  },
+  {
+    "ParameterKey": "AuroraMaxCapacity",
+    "ParameterValue": "128"
+  },
+  {
+    "ParameterKey": "MinTaskCount",
+    "ParameterValue": "2"
+  },
+  {
+    "ParameterKey": "MaxTaskCount",
+    "ParameterValue": "10"
+  },
+  {
+    "ParameterKey": "UseFargateSpot",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "SpotPercentage",
+    "ParameterValue": "50"
+  },
+  {
+    "ParameterKey": "UseGraviton2",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "DeploymentType",
+    "ParameterValue": "linear"
+  },
+  {
+    "ParameterKey": "TrafficShiftPercentage",
+    "ParameterValue": "25"
+  }
+]
+

@@ -1,0 +1,65 @@
+name: Build and Test
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint backend
+        run: npm run lint --workspace=backend
+
+      - name: Lint frontend
+        run: npm run lint --workspace=frontend
+
+      - name: Test backend
+        run: npm run test --workspace=backend
+
+      - name: Test frontend
+        run: npm run test --workspace=frontend
+
+  build-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend (ARM64)
+        run: |
+          docker buildx build --platform linux/arm64 \
+            -t isms-backend:test \
+            --load \
+            ./backend
+
+      - name: Build frontend (ARM64)
+        env:
+          VITE_API_URL: http://localhost:4000
+          VITE_AUTH_TENANT_ID: test-tenant-id
+          VITE_AUTH_CLIENT_ID: test-client-id
+          VITE_AUTH_REDIRECT_URI: http://localhost:3000
+        run: |
+          docker buildx build --platform linux/arm64 \
+            --build-arg VITE_API_URL=${{ env.VITE_API_URL }} \
+            --build-arg VITE_AUTH_TENANT_ID=${{ env.VITE_AUTH_TENANT_ID }} \
+            --build-arg VITE_AUTH_CLIENT_ID=${{ env.VITE_AUTH_CLIENT_ID }} \
+            --build-arg VITE_AUTH_REDIRECT_URI=${{ env.VITE_AUTH_REDIRECT_URI }} \
+            -t isms-frontend:test \
+            --load \
+            ./frontend
+

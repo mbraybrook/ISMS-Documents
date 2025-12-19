@@ -23,6 +23,8 @@ healthRouter.get('/', async (req, res) => {
       },
     });
   } catch (error: any) {
+    // Return 500 when database connection fails
+    console.error('Health check: Database connection failed:', error.message);
     res.status(500).json({ 
       status: 'error',
       message: 'Database connection failed',

@@ -1,0 +1,16 @@
+version: 0.0
+Resources:
+  - TargetService:
+      Type: AWS::ECS::Service
+      Properties:
+        TaskDefinition: "<TASK_DEFINITION>"
+        LoadBalancerInfo:
+          ContainerName: "frontend"
+          ContainerPort: 80
+Hooks:
+  - BeforeInstall: "arn:aws:lambda:REGION:ACCOUNT_ID:function:CodeDeployHook_BeforeInstall"
+  - AfterInstall: "arn:aws:lambda:REGION:ACCOUNT_ID:function:CodeDeployHook_AfterInstall"
+  - AfterAllowTestTraffic: "arn:aws:lambda:REGION:ACCOUNT_ID:function:CodeDeployHook_AfterAllowTestTraffic"
+  - BeforeAllowTraffic: "arn:aws:lambda:REGION:ACCOUNT_ID:function:CodeDeployHook_BeforeAllowTraffic"
+  - AfterAllowTraffic: "arn:aws:lambda:REGION:ACCOUNT_ID:function:CodeDeployHook_AfterAllowTraffic"
+

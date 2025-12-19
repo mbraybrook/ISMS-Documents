@@ -276,7 +276,7 @@ export function TrustCenterCertifications() {
                               <Box
                                 key={doc.id}
                                 as="button"
-                                onClick={(e) => handleDocumentDownload(doc.id, doc.title, doc.visibilityLevel, e)}
+                                onClick={(e: React.MouseEvent) => handleDocumentDownload(doc.id, doc.title, doc.visibilityLevel, e)}
                                 disabled={downloadingDocs.has(doc.id) || isRestricted}
                                 p={2}
                                 borderRadius="md"

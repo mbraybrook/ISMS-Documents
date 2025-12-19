@@ -1,0 +1,203 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CodeDeploy applications and deployment groups for Blue/Green deployments'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    AllowedValues:
+      - staging
+      - production
+    Default: staging
+
+  ClusterName:
+    Type: String
+    Description: ECS cluster name
+    Default: ''
+
+  BackendServiceName:
+    Type: String
+    Description: Backend ECS service name
+    Default: ''
+
+  FrontendServiceName:
+    Type: String
+    Description: Frontend ECS service name
+    Default: ''
+
+  BackendTargetGroupBlueArn:
+    Type: String
+    Description: Backend Blue Target Group ARN
+    Default: ''
+
+  BackendTargetGroupGreenArn:
+    Type: String
+    Description: Backend Green Target Group ARN
+    Default: ''
+
+  FrontendTargetGroupBlueArn:
+    Type: String
+    Description: Frontend Blue Target Group ARN
+    Default: ''
+
+  FrontendTargetGroupGreenArn:
+    Type: String
+    Description: Frontend Green Target Group ARN
+    Default: ''
+
+  LoadBalancerListenerArn:
+    Type: String
+    Description: ALB HTTPS Listener ARN
+    Default: ''
+
+  CodeDeployRoleArn:
+    Type: String
+    Description: CodeDeploy IAM role ARN
+    Default: ''
+
+  DeploymentType:
+    Type: String
+    Description: Deployment type (canary or linear)
+    AllowedValues:
+      - canary
+      - linear
+    Default: canary
+
+  TrafficShiftPercentage:
+    Type: Number
+    Description: Initial traffic shift percentage
+    Default: 10
+    MinValue: 1
+    MaxValue: 100
+
+Resources:
+  BackendCodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub 'isms-${Environment}-backend-app'
+      ComputePlatform: ECS
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-backend-app'
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Condition: HasBackendService
+    Properties:
+      ApplicationName: !Ref BackendCodeDeployApplication
+      DeploymentGroupName: !Sub 'isms-${Environment}-backend-dg'
+      ServiceRoleArn: !Ref CodeDeployRoleArn
+      DeploymentStyle:
+        DeploymentType: BLUE_GREEN
+        DeploymentOption: WITH_TRAFFIC_CONTROL
+      DeploymentConfigName: !If
+        - IsCanaryDeployment
+        - CodeDeployDefault.ECSAllAtOnce
+        - CodeDeployDefault.ECSLinear10PercentEvery1Minute
+      ECSServices:
+        - ClusterName: !Ref ClusterName
+          ServiceName: !Sub 'isms-${Environment}-backend'
+      LoadBalancerInfo:
+        TargetGroupPairInfoList:
+          - TargetGroups:
+              - Name: !Select [1, !Split ['/', !Ref BackendTargetGroupBlueArn]]
+              - Name: !Select [1, !Split ['/', !Ref BackendTargetGroupGreenArn]]
+            ProdTrafficRoute:
+              ListenerArns:
+                - !Ref LoadBalancerListenerArn
+      BlueGreenDeploymentConfiguration:
+        DeploymentReadyOption:
+          ActionOnTimeout: CONTINUE_DEPLOYMENT
+          WaitTimeInMinutes: 0
+        TerminateBlueInstancesOnDeploymentSuccess:
+          Action: TERMINATE
+          TerminationWaitTimeInMinutes: 5
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-backend-dg'
+        - Key: Environment
+          Value: !Ref Environment
+
+  FrontendCodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub 'isms-${Environment}-frontend-app'
+      ComputePlatform: ECS
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-frontend-app'
+        - Key: Environment
+          Value: !Ref Environment
+
+  FrontendDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Condition: HasFrontendService
+    Properties:
+      ApplicationName: !Ref FrontendCodeDeployApplication
+      DeploymentGroupName: !Sub 'isms-${Environment}-frontend-dg'
+      ServiceRoleArn: !Ref CodeDeployRoleArn
+      DeploymentStyle:
+        DeploymentType: BLUE_GREEN
+        DeploymentOption: WITH_TRAFFIC_CONTROL
+      DeploymentConfigName: !If
+        - IsCanaryDeployment
+        - CodeDeployDefault.ECSAllAtOnce
+        - CodeDeployDefault.ECSLinear10PercentEvery1Minute
+      ECSServices:
+        - ClusterName: !Ref ClusterName
+          ServiceName: !Sub 'isms-${Environment}-frontend'
+      LoadBalancerInfo:
+        TargetGroupPairInfoList:
+          - TargetGroups:
+              - Name: !Select [1, !Split ['/', !Ref FrontendTargetGroupBlueArn]]
+              - Name: !Select [1, !Split ['/', !Ref FrontendTargetGroupGreenArn]]
+            ProdTrafficRoute:
+              ListenerArns:
+                - !Ref LoadBalancerListenerArn
+      BlueGreenDeploymentConfiguration:
+        DeploymentReadyOption:
+          ActionOnTimeout: CONTINUE_DEPLOYMENT
+          WaitTimeInMinutes: 0
+        TerminateBlueInstancesOnDeploymentSuccess:
+          Action: TERMINATE
+          TerminationWaitTimeInMinutes: 5
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-frontend-dg'
+        - Key: Environment
+          Value: !Ref Environment
+
+Conditions:
+  HasBackendService: !Not [!Equals [!Ref BackendServiceName, '']]
+  HasFrontendService: !Not [!Equals [!Ref FrontendServiceName, '']]
+  IsCanaryDeployment: !Equals [!Ref DeploymentType, 'canary']
+
+Outputs:
+  BackendCodeDeployApplicationName:
+    Description: Backend CodeDeploy application name
+    Value: !Ref BackendCodeDeployApplication
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendCodeDeployApplicationName'
+
+  FrontendCodeDeployApplicationName:
+    Description: Frontend CodeDeploy application name
+    Value: !Ref FrontendCodeDeployApplication
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendCodeDeployApplicationName'
+
+  BackendDeploymentGroupName:
+    Description: Backend deployment group name
+    Condition: HasBackendService
+    Value: !Ref BackendDeploymentGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendDeploymentGroupName'
+
+  FrontendDeploymentGroupName:
+    Description: Frontend deployment group name
+    Condition: HasFrontendService
+    Value: !Ref FrontendDeploymentGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendDeploymentGroupName'
+

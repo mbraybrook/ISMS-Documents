@@ -108,11 +108,52 @@ export async function listSharePointItems(
       apiPath = `/sites/${siteId}/drives/${driveId}/items/root/children`;
     }
 
-    const response = await client.api(apiPath).get();
-    return (response.value || []) as SharePointItem[];
-  } catch (error) {
-    console.error('Error listing SharePoint items:', error);
-    return [];
+    // Add query parameters to the API path
+    const queryParams = new URLSearchParams({
+      $select: 'id,name,webUrl,lastModifiedDateTime,createdDateTime,size,folder,file,createdBy,lastModifiedBy',
+      $top: '1000', // Limit to 1000 items
+    });
+    const apiPathWithQuery = `${apiPath}?${queryParams.toString()}`;
+    console.log('[SharePointService] Listing items from API path:', apiPathWithQuery);
+    const response = await client.api(apiPathWithQuery).get();
+    console.log('[SharePointService] Raw API response:', {
+      hasValue: !!response.value,
+      valueType: Array.isArray(response.value) ? 'array' : typeof response.value,
+      valueLength: Array.isArray(response.value) ? response.value.length : 'N/A',
+      responseKeys: Object.keys(response),
+      firstItem: Array.isArray(response.value) && response.value.length > 0 ? {
+        id: response.value[0].id,
+        name: response.value[0].name,
+        type: response.value[0].folder ? 'folder' : response.value[0].file ? 'file' : 'unknown',
+      } : null,
+    });
+    const items = (response.value || []) as SharePointItem[];
+    console.log('[SharePointService] Successfully retrieved items:', {
+      itemCount: items.length,
+      apiPath,
+      siteId,
+      driveId,
+    });
+    return items;
+  } catch (error: any) {
+    console.error('[SharePointService] Error listing SharePoint items:', {
+      error: error.message,
+      code: error.code,
+      statusCode: error.statusCode,
+      status: error.status,
+      body: error.body,
+      apiPath: folderId 
+        ? `/sites/${siteId}/drives/${driveId}/items/${folderId}/children`
+        : folderPath
+        ? `/sites/${siteId}/drives/${driveId}/root:/${folderPath}`
+        : `/sites/${siteId}/drives/${driveId}/items/root/children`,
+      siteId,
+      driveId,
+      folderPath,
+      folderId,
+    });
+    // Re-throw the error so the route handler can handle it properly
+    throw error;
   }
 }
 
@@ -202,14 +243,49 @@ export async function getDefaultDrive(
 ): Promise<any> {
   try {
     const client = createGraphClient(accessToken);
-    const drives = await client.api(`/sites/${siteId}/drives`).get();
-    // Return the first drive (usually the default document library)
-    if (drives.value && drives.value.length > 0) {
-      return drives.value[0];
+    const drivesResponse = await client.api(`/sites/${siteId}/drives`).get();
+    const drives = drivesResponse.value || [];
+    
+    console.log('[SharePointService] Available drives:', {
+      driveCount: drives.length,
+      drives: drives.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        driveType: d.driveType,
+        webUrl: d.webUrl,
+      })),
+    });
+    
+    // Prefer document libraries (driveType: 'documentLibrary') over other types
+    const documentLibrary = drives.find((d: any) => d.driveType === 'documentLibrary');
+    if (documentLibrary) {
+      console.log('[SharePointService] Using document library:', {
+        id: documentLibrary.id,
+        name: documentLibrary.name,
+      });
+      return documentLibrary;
     }
+    
+    // Fall back to first drive if no document library found
+    if (drives.length > 0) {
+      console.log('[SharePointService] No document library found, using first drive:', {
+        id: drives[0].id,
+        name: drives[0].name,
+        driveType: drives[0].driveType,
+      });
+      return drives[0];
+    }
+    
+    console.warn('[SharePointService] No drives found for site');
     return null;
-  } catch (error) {
-    console.error('Error fetching default drive:', error);
+  } catch (error: any) {
+    console.error('[SharePointService] Error fetching default drive:', {
+      error: error.message,
+      code: error.code,
+      statusCode: error.statusCode,
+      body: error.body,
+      siteId,
+    });
     return null;
   }
 }

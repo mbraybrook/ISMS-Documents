@@ -1,0 +1,237 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM roles and policies for ECS, GitHub Actions, and CodeDeploy'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    AllowedValues:
+      - staging
+      - production
+    Default: staging
+
+  GitHubOrg:
+    Type: String
+    Description: GitHub organization name
+    Default: ''
+
+  GitHubRepo:
+    Type: String
+    Description: GitHub repository name
+    Default: 'ISMS-Documentation'
+
+  ECRRegistry:
+    Type: String
+    Description: ECR registry URL
+    Default: ''
+
+Resources:
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'isms-${Environment}-ecs-task-execution-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource:
+                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:isms-${Environment}-*'
+        - PolicyName: ECRPullAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                Resource:
+                  - !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/isms-backend'
+                  - !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/isms-frontend'
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-ecs-task-execution-role'
+        - Key: Environment
+          Value: !Ref Environment
+
+  ECSTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'isms-${Environment}-ecs-task-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudWatchLogsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-ecs-task-role'
+        - Key: Environment
+          Value: !Ref Environment
+
+  GitHubActionsRole:
+    Type: AWS::IAM::Role
+    Condition: HasGitHubOrg
+    Properties:
+      RoleName: !Sub 'isms-${Environment}-github-actions-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                'token.actions.githubusercontent.com:aud': sts.amazonaws.com
+              StringLike:
+                'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubOrg}/${GitHubRepo}:*'
+      Policies:
+        - PolicyName: CloudFormationAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:*
+                  - iam:PassRole
+                Resource: '*'
+        - PolicyName: ECSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:*
+                  - ecr:*
+                  - application-autoscaling:*
+                Resource: '*'
+        - PolicyName: CodeDeployAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codedeploy:*
+                Resource: '*'
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource:
+                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:isms-${Environment}-*'
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-github-actions-role'
+        - Key: Environment
+          Value: !Ref Environment
+
+  CodeDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'isms-${Environment}-codedeploy-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
+      Policies:
+        - PolicyName: ECSCodeDeployAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:CreateTaskSet
+                  - ecs:DeleteTaskSet
+                  - ecs:DescribeServices
+                  - ecs:UpdateServicePrimaryTaskSet
+                  - ecs:DescribeTaskDefinition
+                  - ecs:RegisterTaskDefinition
+                  - elasticloadbalancing:DescribeTargetGroups
+                  - elasticloadbalancing:DescribeListeners
+                  - elasticloadbalancing:ModifyListener
+                  - elasticloadbalancing:DescribeRules
+                  - elasticloadbalancing:ModifyRule
+                Resource: '*'
+        - PolicyName: PassECSRoles
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource:
+                  - !GetAtt ECSTaskExecutionRole.Arn
+                  - !GetAtt ECSTaskRole.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-codedeploy-role'
+        - Key: Environment
+          Value: !Ref Environment
+
+Conditions:
+  HasGitHubOrg: !Not [!Equals [!Ref GitHubOrg, '']]
+
+Outputs:
+  ECSTaskExecutionRoleArn:
+    Description: ECS Task Execution Role ARN
+    Value: !GetAtt ECSTaskExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSTaskExecutionRoleArn'
+
+  ECSTaskRoleArn:
+    Description: ECS Task Role ARN
+    Value: !GetAtt ECSTaskRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSTaskRoleArn'
+
+  GitHubActionsRoleArn:
+    Description: GitHub Actions Role ARN
+    Condition: HasGitHubOrg
+    Value: !GetAtt GitHubActionsRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-GitHubActionsRoleArn'
+
+  CodeDeployRoleArn:
+    Description: CodeDeploy Role ARN
+    Value: !GetAtt CodeDeployRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-CodeDeployRoleArn'
+

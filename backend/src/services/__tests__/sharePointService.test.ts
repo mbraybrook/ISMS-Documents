@@ -121,7 +121,10 @@ describe('sharePointService', () => {
       const result = await sharePointService.listSharePointItems('token', 'site-1', 'drive-1');
 
       // Assert
-      expect(mockGraphClient.api).toHaveBeenCalledWith('/sites/site-1/drives/drive-1/items/root/children');
+      // URLSearchParams encodes $ as %24, so check for URL-encoded query params
+      expect(mockGraphClient.api).toHaveBeenCalledWith(
+        expect.stringMatching(/\/sites\/site-1\/drives\/drive-1\/items\/root\/children\?.*%24select=.*%24top=1000/)
+      );
       expect(result).toEqual(mockItems);
     });
 
@@ -134,7 +137,10 @@ describe('sharePointService', () => {
       const result = await sharePointService.listSharePointItems('token', 'site-1', 'drive-1', undefined, 'folder-1');
 
       // Assert
-      expect(mockGraphClient.api).toHaveBeenCalledWith('/sites/site-1/drives/drive-1/items/folder-1/children');
+      // URLSearchParams encodes $ as %24, so check for URL-encoded query params
+      expect(mockGraphClient.api).toHaveBeenCalledWith(
+        expect.stringMatching(/\/sites\/site-1\/drives\/drive-1\/items\/folder-1\/children\?.*%24select=.*%24top=1000/)
+      );
       expect(result).toEqual(mockItems);
     });
 
@@ -150,21 +156,25 @@ describe('sharePointService', () => {
       const result = await sharePointService.listSharePointItems('token', 'site-1', 'drive-1', 'Documents/Subfolder');
 
       // Assert
+      // First call: get folder by path (no query params)
       expect(mockGraphClient.api).toHaveBeenCalledWith('/sites/site-1/drives/drive-1/root:/Documents/Subfolder');
-      expect(mockGraphClient.api).toHaveBeenCalledWith('/sites/site-1/drives/drive-1/items/folder-123/children');
+      // Second call: list children (with query params - URLSearchParams encodes $ as %24)
+      expect(mockGraphClient.api).toHaveBeenCalledWith(
+        expect.stringMatching(/\/sites\/site-1\/drives\/drive-1\/items\/folder-123\/children\?.*%24select=.*%24top=1000/)
+      );
       expect(result).toEqual(mockItems);
     });
 
-    it('should return empty array on error', async () => {
+    it('should throw error on API error', async () => {
       // Arrange
-      mockApi.get.mockRejectedValue(new Error('Graph API Error'));
+      const error = new Error('Graph API Error');
+      mockApi.get.mockRejectedValue(error);
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      // Act
-      const result = await sharePointService.listSharePointItems('token', 'site-1', 'drive-1');
-
-      // Assert
-      expect(result).toEqual([]);
+      // Act & Assert
+      await expect(
+        sharePointService.listSharePointItems('token', 'site-1', 'drive-1')
+      ).rejects.toThrow('Graph API Error');
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });

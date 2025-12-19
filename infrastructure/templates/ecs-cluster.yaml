@@ -1,0 +1,429 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS Fargate cluster with services, task definitions, and auto-scaling'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    AllowedValues:
+      - staging
+      - production
+    Default: staging
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID
+
+  PrivateSubnet1Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private Subnet 1 ID
+
+  PrivateSubnet2Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private Subnet 2 ID
+
+  ECSSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: ECS Security Group ID
+
+  ECSTaskExecutionRoleArn:
+    Type: String
+    Description: ECS Task Execution Role ARN
+
+  ECSTaskRoleArn:
+    Type: String
+    Description: ECS Task Role ARN
+
+  BackendRepositoryUri:
+    Type: String
+    Description: Backend ECR repository URI
+
+  FrontendRepositoryUri:
+    Type: String
+    Description: Frontend ECR repository URI
+
+  BackendImageTag:
+    Type: String
+    Description: Backend Docker image tag
+    Default: latest
+
+  FrontendImageTag:
+    Type: String
+    Description: Frontend Docker image tag
+    Default: latest
+
+  BackendTargetGroupBlueArn:
+    Type: String
+    Description: Backend Blue Target Group ARN
+
+  FrontendTargetGroupBlueArn:
+    Type: String
+    Description: Frontend Blue Target Group ARN
+
+  DatabaseCredentialsSecretArn:
+    Type: String
+    Description: Database credentials secret ARN
+
+  ApplicationSecretsArn:
+    Type: String
+    Description: Application secrets ARN
+
+  DatabaseUrl:
+    Type: String
+    Description: Database connection URL (without credentials)
+    Default: ''
+
+  MinTaskCount:
+    Type: Number
+    Description: Minimum number of tasks
+    Default: 1
+    MinValue: 1
+
+  MaxTaskCount:
+    Type: Number
+    Description: Maximum number of tasks
+    Default: 4
+    MinValue: 1
+
+  UseFargateSpot:
+    Type: String
+    Description: Use Fargate Spot capacity provider
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'true'
+
+  SpotPercentage:
+    Type: Number
+    Description: Percentage of tasks to run on Spot
+    Default: 70
+    MinValue: 0
+    MaxValue: 100
+
+  OnDemandPercentage:
+    Type: Number
+    Description: Percentage of tasks to run on On-Demand Fargate (should be 100 - SpotPercentage)
+    Default: 30
+    MinValue: 0
+    MaxValue: 100
+
+  UseGraviton2:
+    Type: String
+    Description: Use ARM64 (Graviton2) architecture
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'true'
+
+  CpuUnits:
+    Type: Number
+    Description: CPU units per task (256 = 0.25 vCPU, 512 = 0.5 vCPU, 1024 = 1 vCPU)
+    Default: 512
+    AllowedValues:
+      - 256
+      - 512
+      - 1024
+      - 2048
+      - 4096
+
+  MemoryMB:
+    Type: Number
+    Description: Memory per task in MB
+    Default: 1024
+    AllowedValues:
+      - 512
+      - 1024
+      - 2048
+      - 3072
+      - 4096
+      - 5120
+      - 6144
+      - 7168
+      - 8192
+
+Resources:
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub 'isms-${Environment}'
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}'
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub 'isms-${Environment}-backend'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref CpuUnits
+      Memory: !Ref MemoryMB
+      RuntimePlatform:
+        CpuArchitecture: !If [UseGraviton2, ARM64, X86_64]
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !Ref ECSTaskExecutionRoleArn
+      TaskRoleArn: !Ref ECSTaskRoleArn
+      ContainerDefinitions:
+        - Name: backend
+          Image: !Sub '${BackendRepositoryUri}:${BackendImageTag}'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 4000
+              Protocol: tcp
+          Environment:
+            - Name: NODE_ENV
+              Value: !Ref Environment
+            - Name: PORT
+              Value: '4000'
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Join ['', [!Ref DatabaseCredentialsSecretArn, ':DATABASE_URL::']]
+            - Name: AUTH_TENANT_ID
+              ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':AUTH_TENANT_ID::']]
+            - Name: AUTH_CLIENT_ID
+              ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':AUTH_CLIENT_ID::']]
+            - Name: AUTH_CLIENT_SECRET
+              ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':AUTH_CLIENT_SECRET::']]
+            - Name: AUTH_REDIRECT_URI
+              ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':AUTH_REDIRECT_URI::']]
+            - Name: TRUST_CENTER_JWT_SECRET
+              ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':TRUST_CENTER_JWT_SECRET::']]
+            - Name: CORS_TRUST_CENTER_ORIGINS
+              ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':CORS_TRUST_CENTER_ORIGINS::']]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref BackendLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: backend
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - 'node -e "require(\"http\").get(\"http://localhost:4000/api/health\", (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on(\"error\", () => {process.exit(1)})"'
+            Interval: 30
+            Timeout: 10
+            Retries: 5
+            StartPeriod: 120
+
+  FrontendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub 'isms-${Environment}-frontend'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref CpuUnits
+      Memory: !Ref MemoryMB
+      RuntimePlatform:
+        CpuArchitecture: !If [UseGraviton2, ARM64, X86_64]
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !Ref ECSTaskExecutionRoleArn
+      TaskRoleArn: !Ref ECSTaskRoleArn
+      ContainerDefinitions:
+        - Name: frontend
+          Image: !Sub '${FrontendRepositoryUri}:${FrontendImageTag}'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 80
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref FrontendLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: frontend
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - 'wget --no-verbose --tries=1 --spider http://localhost/health || exit 1'
+            Interval: 30
+            Timeout: 10
+            Retries: 5
+            StartPeriod: 60
+
+  BackendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/isms-${Environment}-backend'
+      RetentionInDays: 7
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-backend-logs'
+        - Key: Environment
+          Value: !Ref Environment
+
+  FrontendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/isms-${Environment}-frontend'
+      RetentionInDays: 7
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-frontend-logs'
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - BackendTaskDefinition
+    Properties:
+      ServiceName: !Sub 'isms-${Environment}-backend'
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref BackendTaskDefinition
+      DesiredCount: !Ref MinTaskCount
+      DeploymentController:
+        Type: CODE_DEPLOY
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnet1Id
+            - !Ref PrivateSubnet2Id
+          SecurityGroups:
+            - !Ref ECSSecurityGroupId
+      LoadBalancers:
+        - ContainerName: backend
+          ContainerPort: 4000
+          TargetGroupArn: !Ref BackendTargetGroupBlueArn
+      HealthCheckGracePeriodSeconds: 120
+      CapacityProviderStrategy: !If
+        - UseFargateSpot
+        - - CapacityProvider: FARGATE_SPOT
+            Weight: !Ref SpotPercentage
+          - CapacityProvider: FARGATE
+            Weight: !Ref OnDemandPercentage
+        - - CapacityProvider: FARGATE
+            Weight: 100
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-backend'
+        - Key: Environment
+          Value: !Ref Environment
+
+  FrontendService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - FrontendTaskDefinition
+    Properties:
+      ServiceName: !Sub 'isms-${Environment}-frontend'
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref FrontendTaskDefinition
+      DesiredCount: !Ref MinTaskCount
+      DeploymentController:
+        Type: CODE_DEPLOY
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnet1Id
+            - !Ref PrivateSubnet2Id
+          SecurityGroups:
+            - !Ref ECSSecurityGroupId
+      LoadBalancers:
+        - ContainerName: frontend
+          ContainerPort: 80
+          TargetGroupArn: !Ref FrontendTargetGroupBlueArn
+      HealthCheckGracePeriodSeconds: 60
+      CapacityProviderStrategy: !If
+        - UseFargateSpot
+        - - CapacityProvider: FARGATE_SPOT
+            Weight: !Ref SpotPercentage
+          - CapacityProvider: FARGATE
+            Weight: !Ref OnDemandPercentage
+        - - CapacityProvider: FARGATE
+            Weight: 100
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-frontend'
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendAutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn:
+      - BackendService
+    Properties:
+      MaxCapacity: !Ref MaxTaskCount
+      MinCapacity: !Ref MinTaskCount
+      ResourceId: !Sub 'service/${ECSCluster}/isms-${Environment}-backend'
+      RoleARN: !Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService'
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+  BackendAutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub 'isms-${Environment}-backend-scaling'
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref BackendAutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+
+  FrontendAutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn:
+      - FrontendService
+    Properties:
+      MaxCapacity: !Ref MaxTaskCount
+      MinCapacity: !Ref MinTaskCount
+      ResourceId: !Sub 'service/${ECSCluster}/isms-${Environment}-frontend'
+      RoleARN: !Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService'
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+  FrontendAutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub 'isms-${Environment}-frontend-scaling'
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref FrontendAutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+
+Conditions:
+  UseGraviton2: !Equals [!Ref UseGraviton2, 'true']
+  UseFargateSpot: !Equals [!Ref UseFargateSpot, 'true']
+
+Outputs:
+  ClusterName:
+    Description: ECS cluster name
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub '${AWS::StackName}-ClusterName'
+
+  BackendServiceName:
+    Description: Backend service name
+    Value: !Ref BackendService
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendServiceName'
+
+  FrontendServiceName:
+    Description: Frontend service name
+    Value: !Ref FrontendService
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendServiceName'
+
+  BackendTaskDefinitionArn:
+    Description: Backend task definition ARN
+    Value: !Ref BackendTaskDefinition
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendTaskDefinitionArn'
+
+  FrontendTaskDefinitionArn:
+    Description: Frontend task definition ARN
+    Value: !Ref FrontendTaskDefinition
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendTaskDefinitionArn'
+

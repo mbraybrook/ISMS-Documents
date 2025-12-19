@@ -1,0 +1,264 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Aurora Serverless v2 PostgreSQL cluster'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    AllowedValues:
+      - staging
+      - production
+    Default: staging
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID
+
+  PrivateSubnet1Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private Subnet 1 ID
+
+  PrivateSubnet2Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private Subnet 2 ID
+
+  AuroraSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Aurora Security Group ID
+
+  AuroraMinCapacity:
+    Type: Number
+    Description: Minimum Aurora Capacity Units (ACU)
+    Default: 0.5
+    MinValue: 0.5
+    MaxValue: 128
+
+  AuroraMaxCapacity:
+    Type: Number
+    Description: Maximum Aurora Capacity Units (ACU)
+    Default: 16
+    MinValue: 0.5
+    MaxValue: 128
+
+  DatabaseName:
+    Type: String
+    Description: Database name
+    Default: isms_db
+
+  MasterUsername:
+    Type: String
+    Description: Master username for database
+    Default: postgres
+    NoEcho: true
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub 'isms-${Environment}-db-subnet-group'
+      DBSubnetGroupDescription: Subnet group for Aurora cluster
+      SubnetIds:
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-db-subnet-group'
+        - Key: Environment
+          Value: !Ref Environment
+
+  DBClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties:
+      DBClusterParameterGroupName: !Sub 'isms-${Environment}-cluster-params'
+      Description: Parameter group for Aurora PostgreSQL 15
+      Family: aurora-postgresql15
+      Parameters:
+        shared_preload_libraries: 'pg_stat_statements'
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-cluster-params'
+        - Key: Environment
+          Value: !Ref Environment
+
+  DBCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DBClusterIdentifier: !Sub 'isms-${Environment}-cluster'
+      Engine: aurora-postgresql
+      EngineVersion: '15.15'
+      EngineMode: provisioned
+      Port: 5432
+      DatabaseName: !Ref DatabaseName
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:isms-${Environment}-db-credentials:SecretString:password}}'
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref AuroraSecurityGroupId
+      DBClusterParameterGroupName: !Ref DBClusterParameterGroup
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: '03:00-04:00'
+      PreferredMaintenanceWindow: 'sun:04:00-sun:05:00'
+      StorageEncrypted: true
+      DeletionProtection: false
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: !Ref AuroraMinCapacity
+        MaxCapacity: !Ref AuroraMaxCapacity
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-cluster'
+        - Key: Environment
+          Value: !Ref Environment
+
+  DBInstance1:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub 'isms-${Environment}-instance-1'
+      DBClusterIdentifier: !Ref DBCluster
+      Engine: aurora-postgresql
+      DBInstanceClass: db.serverless
+      PubliclyAccessible: false
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-instance-1'
+        - Key: Environment
+          Value: !Ref Environment
+
+  DBInstance2:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub 'isms-${Environment}-instance-2'
+      DBClusterIdentifier: !Ref DBCluster
+      Engine: aurora-postgresql
+      DBInstanceClass: db.serverless
+      PubliclyAccessible: false
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-instance-2'
+        - Key: Environment
+          Value: !Ref Environment
+
+  UpdateSecretFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'isms-${Environment}-update-db-secret'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt UpdateSecretRole.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          SECRET_NAME: !Sub 'isms-${Environment}-db-credentials'
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import cfnresponse
+          
+          secretsmanager = boto3.client('secretsmanager')
+          
+          def handler(event, context):
+              try:
+                  if event['RequestType'] == 'Delete':
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      return
+                  
+                  # Get secret name from environment
+                  secret_name = os.environ['SECRET_NAME']
+                  
+                  # Get current secret value
+                  secret_value = secretsmanager.get_secret_value(SecretId=secret_name)
+                  secret_dict = json.loads(secret_value['SecretString'])
+                  
+                  # Get cluster endpoint and port from event properties
+                  cluster_endpoint = event['ResourceProperties']['ClusterEndpoint']
+                  cluster_port = event['ResourceProperties']['ClusterPort']
+                  db_name = event['ResourceProperties']['DatabaseName']
+                  
+                  # Construct DATABASE_URL
+                  # Aurora PostgreSQL uses port 5432, not the cluster port which might be wrong
+                  username = secret_dict['username']
+                  password = secret_dict['password']
+                  # URL encode password to handle special characters
+                  import urllib.parse
+                  encoded_password = urllib.parse.quote(password, safe='')
+                  # Use PostgreSQL default port 5432 instead of cluster_port which might be incorrect
+                  postgres_port = 5432
+                  database_url = f"postgresql://{username}:{encoded_password}@{cluster_endpoint}:{postgres_port}/{db_name}"
+                  
+                  # Update secret with DATABASE_URL
+                  secret_dict['DATABASE_URL'] = database_url
+                  secretsmanager.put_secret_value(
+                      SecretId=secret_name,
+                      SecretString=json.dumps(secret_dict)
+                  )
+                  
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                      'Message': 'Secret updated with DATABASE_URL'
+                  })
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {
+                      'Error': str(e)
+                  })
+
+  UpdateSecretRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: UpdateSecretPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:ListSecrets
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:isms-${Environment}-db-credentials*'
+
+  UpdateSecretCustomResource:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn:
+      - DBInstance1
+      - DBInstance2
+    Properties:
+      ServiceToken: !GetAtt UpdateSecretFunction.Arn
+      ClusterEndpoint: !GetAtt DBCluster.Endpoint.Address
+      ClusterPort: !GetAtt DBCluster.Endpoint.Port
+      DatabaseName: !Ref DatabaseName
+
+Outputs:
+  DBClusterEndpoint:
+    Description: Aurora cluster endpoint
+    Value: !GetAtt DBCluster.Endpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-DBClusterEndpoint'
+
+  DBClusterReadEndpoint:
+    Description: Aurora cluster read endpoint
+    Value: !GetAtt DBCluster.ReadEndpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-DBClusterReadEndpoint'
+
+  DBClusterIdentifier:
+    Description: Aurora cluster identifier
+    Value: !Ref DBCluster
+    Export:
+      Name: !Sub '${AWS::StackName}-DBClusterIdentifier'
+
+  DBClusterPort:
+    Description: Aurora cluster port
+    Value: !GetAtt DBCluster.Endpoint.Port
+    Export:
+      Name: !Sub '${AWS::StackName}-DBClusterPort'
+

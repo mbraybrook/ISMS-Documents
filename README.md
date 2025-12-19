@@ -16,14 +16,6 @@ A comprehensive Information Security Management System (ISMS) platform that cent
   - Confluence (living documentation links)
 - **Document Processing**: PDF generation, watermarking, and conversion (LibreOffice)
 - **Testing**: Jest (backend), Vitest (frontend), Playwright (E2E)
-A web application that provides a "single pane of glass" over an organisation's ISMS documentation stored primarily in Microsoft SharePoint, with links to selected Confluence content.
-
-## Architecture
-
-- **Frontend**: React + TypeScript + Vite + Chakra UI
-- **Backend**: Node.js + Express + TypeScript
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: Entra ID / Microsoft Identity Platform (MSAL)
 
 ## Prerequisites
 
@@ -153,6 +145,30 @@ A web application that provides a "single pane of glass" over an organisation's 
 
 ## Production Deployment
 
+The application can be deployed using two approaches:
+
+1. **AWS ECS (Recommended)**: Fully managed container orchestration with auto-scaling, blue/green deployments, and integrated CI/CD
+2. **Docker Compose**: Self-managed deployment suitable for smaller environments or on-premises
+
+### Option 1: AWS ECS Deployment (Recommended)
+
+The project includes Infrastructure as Code (IaC) for AWS ECS deployment with:
+- **ECS Fargate**: Container orchestration with Spot capacity providers for cost optimization
+- **Aurora Serverless v2**: Auto-scaling PostgreSQL database
+- **Application Load Balancer**: HTTPS termination and routing
+- **CodeDeploy**: Blue/Green deployments for zero-downtime updates
+- **GitHub Actions CI/CD**: Automated builds and deployments
+
+See [`infrastructure/README.md`](infrastructure/README.md) for detailed deployment instructions.
+
+**Quick Start**:
+1. Deploy infrastructure using CloudFormation templates in `infrastructure/`
+2. Configure GitHub Actions secrets (see `infrastructure/DEPLOYMENT.md`)
+3. Push to `main` branch for automatic staging deployment
+4. Use workflow dispatch for production deployments
+
+### Option 2: Docker Compose Deployment
+
 ### Prerequisites
 
 - Node.js 18+ (LTS recommended) for build tools
@@ -221,7 +237,7 @@ A web application that provides a "single pane of glass" over an organisation's 
 
    **Important**: Frontend environment variables are baked into the build at build time. They cannot be changed after the build without rebuilding.
 
-### Step 2: Database Setup
+### Step 2: Database Setup (Docker Compose)
 
 1. **Create Database**:
    ```sql
@@ -246,9 +262,9 @@ A web application that provides a "single pane of glass" over an organisation's 
    - Use `SEED_SCOPE=reference` for first-run production to populate catalog data
    - Use `SEED_SCOPE=none` for subsequent deployments (default in production)
 
-### Step 3: Build Production Images
+### Step 3: Build Production Images (Docker Compose)
 
-#### Option A: Using Docker Compose (Recommended)
+#### Option A: Using Docker Compose
 
 ```bash
 # Build production images
@@ -555,6 +571,12 @@ Before deploying to production:
 │   └── vite.config.ts    # Vite configuration
 ├── docs/                  # Documentation and plans
 ├── e2e/                   # End-to-end tests (Playwright)
+├── infrastructure/        # AWS CloudFormation templates and deployment scripts
+│   ├── templates/         # CloudFormation templates (VPC, ECS, Aurora, etc.)
+│   ├── parameters/        # Environment-specific parameters
+│   ├── appspecs/          # CodeDeploy AppSpec files
+│   └── scripts/           # Deployment helper scripts
+├── .github/workflows/     # GitHub Actions CI/CD workflows
 ├── docker-compose.yml     # Docker Compose for development
 └── docker-compose.prod.yml # Docker Compose for production
 ```
@@ -611,22 +633,58 @@ git commit --no-verify  # Not recommended!
 
 If you're using AI coding assistants (like Cursor/Composer), they will automatically read `.cursorrules` to understand and follow our linting standards. This ensures generated code passes linting checks from the start.
 
-├── backend/          # Express backend
-│   ├── src/
-│   │   ├── config.ts
-│   │   ├── index.ts
-│   │   ├── routes/
-│   │   └── middleware/
-│   └── prisma/       # Prisma schema and migrations
-├── frontend/         # React frontend
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   └── App.tsx
-│   └── vite.config.ts
-├── docs/             # Documentation
-└── docker-compose.yml
-```
+## CI/CD
+
+The project includes GitHub Actions workflows for automated testing and deployment:
+
+### Workflows
+
+- **`build-and-test.yml`**: Runs on pull requests to `main`
+  - Lints backend and frontend code
+  - Runs test suites
+  - Builds Docker images to verify build process
+
+- **`deploy-staging.yml`**: Runs on push to `main` branch
+  - Builds and pushes Docker images to ECR (ARM64)
+  - Deploys to staging ECS environment
+  - Performs health checks after deployment
+
+- **`deploy-production.yml`**: Manual workflow dispatch
+  - Optionally deploys to staging first for validation
+  - Builds and pushes Docker images to ECR (ARM64)
+  - Deploys to production ECS environment using CodeDeploy
+  - Performs health checks after deployment
+
+### GitHub Actions Setup
+
+For AWS ECS deployments, configure the following GitHub secrets:
+
+**Required Secrets**:
+- `AWS_ROLE_ARN`: IAM role ARN for GitHub Actions OIDC
+- `AWS_REGION`: AWS region (e.g., `eu-west-2`)
+- `ECR_REGISTRY`: ECR registry URL
+- `STAGING_BACKEND_SERVICE`: ECS service name for staging backend
+- `STAGING_FRONTEND_SERVICE`: ECS service name for staging frontend
+- `STAGING_BACKEND_CODEDEPLOY_APP`: CodeDeploy application name for staging backend
+- `STAGING_FRONTEND_CODEDEPLOY_APP`: CodeDeploy application name for staging frontend
+- `STAGING_BACKEND_DEPLOYMENT_GROUP`: CodeDeploy deployment group for staging backend
+- `STAGING_FRONTEND_DEPLOYMENT_GROUP`: CodeDeploy deployment group for staging frontend
+- `PRODUCTION_BACKEND_SERVICE`: ECS service name for production backend
+- `PRODUCTION_FRONTEND_SERVICE`: ECS service name for production frontend
+- `PRODUCTION_BACKEND_CODEDEPLOY_APP`: CodeDeploy application name for production backend
+- `PRODUCTION_FRONTEND_CODEDEPLOY_APP`: CodeDeploy application name for production frontend
+- `PRODUCTION_BACKEND_DEPLOYMENT_GROUP`: CodeDeploy deployment group for production backend
+- `PRODUCTION_FRONTEND_DEPLOYMENT_GROUP`: CodeDeploy deployment group for production frontend
+
+**Frontend Build Variables**:
+- `STAGING_VITE_API_URL`: Backend API URL for staging
+- `STAGING_VITE_AUTH_REDIRECT_URI`: Redirect URI for staging
+- `PRODUCTION_VITE_API_URL`: Backend API URL for production
+- `PRODUCTION_VITE_AUTH_REDIRECT_URI`: Redirect URI for production
+- `VITE_AUTH_TENANT_ID`: Azure AD Tenant ID (shared)
+- `VITE_AUTH_CLIENT_ID`: Azure AD Client ID (shared)
+
+See [`infrastructure/DEPLOYMENT.md`](infrastructure/DEPLOYMENT.md) for detailed setup instructions.
 
 ## Available Scripts
 
