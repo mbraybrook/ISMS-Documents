@@ -35,15 +35,26 @@ if ! npx prisma migrate deploy; then
 fi
 echo "[$(date -Iseconds)] Database migrations completed successfully"
 
-# Optionally run seed (only if SEED_SCOPE is set and not 'none')
-# Seed is also idempotent - it uses upsert operations
-if [ -n "$SEED_SCOPE" ] && [ "$SEED_SCOPE" != "none" ]; then
-  echo "[$(date -Iseconds)] Running database seed with scope: $SEED_SCOPE"
+# Always seed system data (Controls, Classifications, etc.) if missing
+# This ensures essential system data is present on first deployment
+# System seed is idempotent - it checks if data exists before seeding
+echo "[$(date -Iseconds)] Ensuring system data is seeded..."
+if ! SEED_SCOPE=system npm run db:seed; then
+  echo "WARNING: System data seed failed, but continuing startup..."
+  # System seed failures are non-fatal - the app can run without seed data
+else
+  echo "[$(date -Iseconds)] System data check completed"
+fi
+
+# Optionally run additional seed (only if SEED_SCOPE is set and not 'none' or 'system')
+# This allows seeding test/demo data via SEED_SCOPE=full or SEED_SCOPE=reference
+if [ -n "$SEED_SCOPE" ] && [ "$SEED_SCOPE" != "none" ] && [ "$SEED_SCOPE" != "system" ]; then
+  echo "[$(date -Iseconds)] Running additional database seed with scope: $SEED_SCOPE"
   if ! npm run db:seed; then
-    echo "WARNING: Database seed failed, but continuing startup..."
+    echo "WARNING: Additional database seed failed, but continuing startup..."
     # Seed failures are non-fatal - the app can run without seed data
   else
-    echo "[$(date -Iseconds)] Database seed completed successfully"
+    echo "[$(date -Iseconds)] Additional database seed completed successfully"
   fi
 fi
 

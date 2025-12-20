@@ -27,3 +27,5 @@ done
 
 echo "All templates are valid!"
 
+
+

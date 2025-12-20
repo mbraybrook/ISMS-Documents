@@ -1,4 +1,5 @@
-import { Box, Container, VStack, HStack, Link, Text, Heading, SimpleGrid } from '@chakra-ui/react';
+import { Box, Container, VStack, HStack, Link, Text, Heading, SimpleGrid, Image } from '@chakra-ui/react';
+import iconImage from '../assets/icon.png';
 
 export function TrustCenterFooter() {
   const handleScrollTo = (id: string) => {
@@ -21,23 +22,7 @@ export function TrustCenterFooter() {
           {/* Branding Section */}
           <VStack align="start" spacing={4}>
             <HStack spacing={3}>
-              <Box
-                w={8}
-                h={8}
-                bg="blue.600"
-                borderRadius="md"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                color="white"
-                fontWeight="bold"
-                fontSize="lg"
-              >
-                TC
-              </Box>
-              <Text fontSize="lg" fontWeight="bold" color="white">
-                Trust Centre
-              </Text>
+            <Image src={iconImage} height={100} alt="Paythru Trust Centre" />
             </HStack>
             <Text fontSize="sm" color="gray.400">
               Demonstrating our commitment to security, privacy, and compliance.
@@ -95,12 +80,12 @@ export function TrustCenterFooter() {
               Contact Security Team
             </Heading>
             <Link
-              href="mailto:security@company.com"
+              href="mailto:dataprotection@paythru.com"
               color="blue.400"
               _hover={{ color: 'blue.300', textDecoration: 'underline' }}
               fontSize="sm"
             >
-              security@company.com
+              dataprotection@paythru.com
             </Link>
           </VStack>
         </SimpleGrid>
@@ -108,7 +93,7 @@ export function TrustCenterFooter() {
         {/* Copyright */}
         <Box borderTopWidth="1px" borderColor="gray.700" mt={8} pt={8}>
           <Text fontSize="sm" color="gray.500" textAlign="center">
-            © {new Date().getFullYear()} Your Company. All rights reserved.
+            © {new Date().getFullYear()} Paythru. All rights reserved.
           </Text>
         </Box>
       </Container>

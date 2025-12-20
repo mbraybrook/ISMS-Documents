@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Client } from '@microsoft/microsoft-graph-client';
 import { ClientSecretCredential } from '@azure/identity';
+import jwt from 'jsonwebtoken';
 import { config } from '../config';
 
 // Token cache for app-only authentication
@@ -115,6 +116,24 @@ export async function listSharePointItems(
     });
     const apiPathWithQuery = `${apiPath}?${queryParams.toString()}`;
     console.log('[SharePointService] Listing items from API path:', apiPathWithQuery);
+    
+    // Decode token to check scopes (for diagnostics)
+    try {
+      const decoded = jwt.decode(accessToken, { complete: true });
+      if (decoded && typeof decoded === 'object' && decoded.payload && typeof decoded.payload === 'object') {
+        const payload = decoded.payload as any;
+        const scopes = payload.scp || payload.roles || 'N/A';
+        console.log('[SharePointService] Token scopes/roles:', {
+          scopes: typeof scopes === 'string' ? scopes.split(' ') : scopes,
+          audience: payload.aud,
+          appId: payload.appid,
+        });
+      }
+    } catch (decodeError) {
+      // Ignore decode errors - token might be opaque or in different format
+      console.log('[SharePointService] Could not decode token for scope check (this is OK)');
+    }
+    
     const response = await client.api(apiPathWithQuery).get();
     console.log('[SharePointService] Raw API response:', {
       hasValue: !!response.value,
@@ -134,9 +153,24 @@ export async function listSharePointItems(
       siteId,
       driveId,
     });
+    
+    // If no items found, log a helpful message
+    if (items.length === 0) {
+      console.warn('[SharePointService] No items found in drive. This could mean:', {
+        possibilities: [
+          'The drive is empty',
+          'User does not have permission to view items in this drive',
+          'Items are in a subfolder (not at root level)',
+        ],
+        suggestion: 'Try listing items from a different drive or check permissions',
+        driveId,
+        siteId,
+      });
+    }
+    
     return items;
   } catch (error: any) {
-    console.error('[SharePointService] Error listing SharePoint items:', {
+    const errorDetails: any = {
       error: error.message,
       code: error.code,
       statusCode: error.statusCode,
@@ -151,7 +185,29 @@ export async function listSharePointItems(
       driveId,
       folderPath,
       folderId,
-    });
+    };
+    
+    // Check for permission-related errors
+    if (error.statusCode === 403 || error.statusCode === 401) {
+      errorDetails.permissionIssue = true;
+      errorDetails.suggestion = 'Check that the token has Sites.Read.All and Files.Read.All scopes, and that admin consent has been granted';
+      
+      // Try to extract error details from response body
+      if (error.body) {
+        try {
+          const errorBody = typeof error.body === 'string' ? JSON.parse(error.body) : error.body;
+          errorDetails.graphError = {
+            code: errorBody.error?.code,
+            message: errorBody.error?.message,
+            innerError: errorBody.error?.innerError,
+          };
+        } catch (parseError) {
+          // Ignore parse errors
+        }
+      }
+    }
+    
+    console.error('[SharePointService] Error listing SharePoint items:', errorDetails);
     // Re-throw the error so the route handler can handle it properly
     throw error;
   }
@@ -256,28 +312,43 @@ export async function getDefaultDrive(
       })),
     });
     
-    // Prefer document libraries (driveType: 'documentLibrary') over other types
-    const documentLibrary = drives.find((d: any) => d.driveType === 'documentLibrary');
-    if (documentLibrary) {
-      console.log('[SharePointService] Using document library:', {
-        id: documentLibrary.id,
-        name: documentLibrary.name,
-      });
-      return documentLibrary;
+    // Filter to document libraries only
+    const documentLibraries = drives.filter((d: any) => d.driveType === 'documentLibrary');
+    
+    if (documentLibraries.length === 0) {
+      console.warn('[SharePointService] No document libraries found');
+      return null;
     }
     
-    // Fall back to first drive if no document library found
-    if (drives.length > 0) {
-      console.log('[SharePointService] No document library found, using first drive:', {
-        id: drives[0].id,
-        name: drives[0].name,
-        driveType: drives[0].driveType,
+    // Prefer "Documents" drive (typical default document library)
+    // Check for common variations: "Documents", "Shared Documents", etc.
+    const documentsDrive = documentLibraries.find((d: any) => {
+      if (!d.name) return false;
+      const nameLower = d.name.toLowerCase().trim();
+      return nameLower === 'documents' || 
+             nameLower === 'shared documents' ||
+             nameLower.startsWith('documents');
+    });
+    
+    if (documentsDrive) {
+      console.log('[SharePointService] Using "Documents" drive:', {
+        id: documentsDrive.id,
+        name: documentsDrive.name,
+        webUrl: documentsDrive.webUrl,
       });
-      return drives[0];
+      return documentsDrive;
     }
     
-    console.warn('[SharePointService] No drives found for site');
-    return null;
+    // Fall back to first document library
+    const firstDocumentLibrary = documentLibraries[0];
+    console.log('[SharePointService] Using first document library (fallback):', {
+      id: firstDocumentLibrary.id,
+      name: firstDocumentLibrary.name,
+      webUrl: firstDocumentLibrary.webUrl,
+      availableDrives: documentLibraries.map((d: any) => d.name),
+      note: 'Consider using "Documents" drive if available',
+    });
+    return firstDocumentLibrary;
   } catch (error: any) {
     console.error('[SharePointService] Error fetching default drive:', {
       error: error.message,

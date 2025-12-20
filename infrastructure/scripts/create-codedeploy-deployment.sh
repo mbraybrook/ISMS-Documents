@@ -66,3 +66,5 @@ DEPLOYMENT_ID=$(aws deploy create-deployment \
 echo "Deployment created: $DEPLOYMENT_ID"
 echo "Monitor deployment: aws deploy get-deployment --deployment-id $DEPLOYMENT_ID --region $REGION"
 
+
+

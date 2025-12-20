@@ -4,7 +4,7 @@ import * as path from 'path';
 
 const prisma = new PrismaClient();
 
-type SeedScope = 'reference' | 'full' | 'none';
+type SeedScope = 'reference' | 'full' | 'none' | 'system';
 
 interface SeedData {
   classifications?: any[];
@@ -630,11 +630,71 @@ async function seedLegislationRisks(data: any[]) {
 }
 
 /**
+ * Seed system data (essential reference data) if it doesn't exist
+ * This ensures Controls, Classifications, etc. are always present
+ * Used for first-time deployments to any environment
+ */
+async function seedSystemDataIfNeeded() {
+  console.log('Checking if system data needs to be seeded...');
+  
+  // Check if Controls exist (use Controls as indicator of system data)
+  const controlCount = await prisma.control.count();
+  
+  if (controlCount > 0) {
+    console.log(`System data already exists (${controlCount} controls found), skipping system seed`);
+    return;
+  }
+  
+  console.log('No system data found, seeding essential reference data...');
+  
+  try {
+    // Load reference data (same as 'reference' scope)
+    const seedData = loadSeedData('reference');
+    
+    // Seed in dependency order
+    if (seedData.classifications) {
+      await seedClassifications(seedData.classifications);
+    }
+    if (seedData.assetCategories) {
+      await seedAssetCategories(seedData.assetCategories);
+    }
+    if (seedData.controls) {
+      await seedControls(seedData.controls);
+    }
+    if (seedData.legislation) {
+      await seedLegislation(seedData.legislation);
+    }
+    if (seedData.interestedParties) {
+      await seedInterestedParties(seedData.interestedParties);
+    }
+    
+    console.log('✓ System data seeded successfully');
+  } catch (error) {
+    console.error('✗ System data seed failed:', error);
+    throw error;
+  }
+}
+
+/**
  * Main seed function
  */
 async function main() {
   const seedScope = (process.env.SEED_SCOPE || 'none') as SeedScope;
   const nodeEnv = process.env.NODE_ENV || 'development';
+
+  // Handle 'system' scope - seed only if data doesn't exist
+  if (seedScope === 'system') {
+    console.log('Running system seed (only if data missing)...');
+    try {
+      await seedSystemDataIfNeeded();
+    } catch (error) {
+      console.error('✗ System seed failed:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+    return;
+  }
 
   // Skip seeding in production unless explicitly enabled
   if (nodeEnv === 'production' && seedScope === 'none') {
@@ -703,6 +763,9 @@ async function main() {
     await prisma.$disconnect();
   }
 }
+
+// Export functions for use in startup script
+export { seedSystemDataIfNeeded };
 
 // Export default main function for Prisma seed
 export default main;

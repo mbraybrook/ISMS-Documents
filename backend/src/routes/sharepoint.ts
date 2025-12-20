@@ -119,13 +119,54 @@ router.get(
 
       // Try to list items - if it fails with invalid drive, try to get available drives
       try {
-        const items = await listSharePointItems(
+        let items = await listSharePointItems(
           accessToken,
           siteId,
           driveId,
           folderPath,
           folderId
         );
+
+        // If no items found and no drive ID was explicitly provided, try other drives
+        if (items.length === 0 && !req.query.driveId) {
+          console.log('[SharePoint] Default drive returned empty, trying other drives...');
+          const availableDrives = await listDrives(accessToken, siteId);
+          const documentLibraries = availableDrives.filter((d: any) => d.driveType === 'documentLibrary');
+          
+          // Try other document libraries (skip the one we already tried)
+          for (const drive of documentLibraries) {
+            if (drive.id === driveId) continue; // Skip the one we already tried
+            
+            console.log(`[SharePoint] Trying drive: ${drive.name} (${drive.id})`);
+            try {
+              const testItems = await listSharePointItems(
+                accessToken,
+                siteId,
+                drive.id,
+                folderPath,
+                folderId
+              );
+              
+              if (testItems.length > 0) {
+                console.log(`[SharePoint] Found ${testItems.length} items in drive: ${drive.name}`);
+                items = testItems;
+                driveId = drive.id; // Update driveId to the one with content
+                break; // Found items, stop searching
+              }
+            } catch (driveError: any) {
+              console.log(`[SharePoint] Drive ${drive.name} failed:`, driveError.message);
+              // Continue to next drive
+            }
+          }
+          
+          if (items.length === 0) {
+            console.warn('[SharePoint] No items found in any drive', {
+              siteId,
+              drivesTried: documentLibraries.length,
+              driveNames: documentLibraries.map((d: any) => d.name),
+            });
+          }
+        }
 
         // Add siteId and driveId to each item so the frontend can save them
         const itemsWithContext = items.map(item => ({
@@ -146,7 +187,27 @@ router.get(
           } : null,
         });
 
-        return res.json({ items: itemsWithContext });
+        // Include available drives in response if no items found (helps frontend show drive selector)
+        const response: any = { items: itemsWithContext };
+        if (itemsWithContext.length === 0 && !req.query.driveId) {
+          try {
+            const availableDrives = await listDrives(accessToken, siteId);
+            response.availableDrives = availableDrives
+              .filter((d: any) => d.driveType === 'documentLibrary')
+              .map((d: any) => ({
+                id: d.id,
+                name: d.name,
+                driveType: d.driveType,
+                webUrl: d.webUrl,
+              }));
+            response.currentDriveId = driveId;
+          } catch (driveListError) {
+            // Ignore errors when fetching drives for info
+            console.log('[SharePoint] Could not fetch available drives for response:', driveListError);
+          }
+        }
+        
+        return res.json(response);
       } catch (error: any) {
         // If drive ID is invalid, fetch available drives to help debug
         if (error.code === 'invalidRequest' && error.message?.includes('drive')) {

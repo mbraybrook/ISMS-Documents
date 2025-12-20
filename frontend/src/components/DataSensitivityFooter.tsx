@@ -1,5 +1,7 @@
 import { Box, Text } from '@chakra-ui/react';
 
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'dev';
+
 export function DataSensitivityFooter() {
   return (
     <Box
@@ -18,7 +20,7 @@ export function DataSensitivityFooter() {
         color="gray.400"
         opacity={0.7}
       >
-        Paythru Confidential
+        Paythru Confidential {APP_VERSION !== 'dev' && `• v${APP_VERSION}`}
       </Text>
     </Box>
   )

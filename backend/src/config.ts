@@ -20,6 +20,7 @@ if (!databaseUrl.match(/^postgres(ql)?:\/\//)) {
 }
 
 // SEED_SCOPE: Controls what data is seeded
+// - "system": seed essential system data (Controls, Classifications, etc.) only if missing (automatic on first deployment)
 // - "reference": seed only canonical/catalogue data (Asset Categories, base Controls, Legislation)
 // - "full": reference data + sample/demo Risks, Documents, links
 // - "none": do nothing (skip seeding)
@@ -27,6 +28,7 @@ if (!databaseUrl.match(/^postgres(ql)?:\/\//)) {
 // - Local dev: "full"
 // - Staging: "reference"
 // - Production: "none"
+// Note: System data is always seeded automatically if missing, regardless of SEED_SCOPE
 const getDefaultSeedScope = (): 'reference' | 'full' | 'none' => {
   const nodeEnv = process.env.NODE_ENV || 'development';
   if (nodeEnv === 'production') {
@@ -38,9 +40,9 @@ const getDefaultSeedScope = (): 'reference' | 'full' | 'none' => {
   }
 };
 
-const seedScope = (process.env.SEED_SCOPE || getDefaultSeedScope()) as 'reference' | 'full' | 'none';
-if (!['reference', 'full', 'none'].includes(seedScope)) {
-  throw new Error(`Invalid SEED_SCOPE: ${seedScope}. Must be one of: "reference", "full", "none"`);
+const seedScope = (process.env.SEED_SCOPE || getDefaultSeedScope()) as 'reference' | 'full' | 'none' | 'system';
+if (!['reference', 'full', 'none', 'system'].includes(seedScope)) {
+  throw new Error(`Invalid SEED_SCOPE: ${seedScope}. Must be one of: "system", "reference", "full", "none"`);
 }
 
 export const config = {

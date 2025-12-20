@@ -22,10 +22,21 @@ This guide provides complete instructions for deploying the ISMS application to 
 Database migrations run **automatically** when backend containers start. The `backend/scripts/start.sh` script:
 1. Validates prerequisites (DATABASE_URL, Prisma CLI)
 2. Runs `npx prisma migrate deploy` (idempotent - only applies pending migrations)
-3. Optionally seeds data if `SEED_SCOPE` is set
-4. Starts the application
+3. **Always seeds system data** (Controls, Classifications, Asset Categories, Legislation, Interested Parties) if missing
+4. Optionally seeds additional data if `SEED_SCOPE` is set (for test/demo data)
+5. Starts the application
 
 Migration failures are fatal - the container will exit and prevent the application from starting with an inconsistent schema.
+
+### System Data Seeding
+
+**System data** (Controls, Classifications, Asset Categories, Legislation, Interested Parties) is **automatically seeded** on first deployment to any environment. The startup script checks if Controls exist, and if not, seeds all essential system data.
+
+- **Automatic**: No configuration needed - system data seeds automatically if missing
+- **Idempotent**: Safe to run multiple times - only seeds if data doesn't exist
+- **Environment-agnostic**: Works for staging, production, and any new environment
+
+This ensures that essential functional data (like ISO 27002 Controls) is always present, even if `SEED_SCOPE` is not set.
 
 ### Frontend API URL Configuration
 
@@ -421,8 +432,28 @@ cd /home/developer/dev/ISMS-Documentation/infrastructure
 - **Check health**: `./scripts/deploy-utils.sh check-health --service frontend`
 - **View logs**: `./scripts/deploy-utils.sh view-logs --service backend`
 - **Monitor deployment**: `./scripts/deploy-utils.sh monitor-deployment --deployment-id <id>`
+- **Seed system data**: `./scripts/seed-system-data.sh` (seeds Controls, Classifications, etc. if missing)
 
 The utility script supports all common options (environment, profile, region, image-tag) and provides helpful output with error handling.
+
+### Seeding System Data to Existing Environments
+
+If you need to seed system data (Controls, Classifications, etc.) to an existing environment that was deployed before this feature:
+
+```bash
+cd /home/developer/dev/ISMS-Documentation/infrastructure
+export AWS_PROFILE=pt-sandbox
+export ENVIRONMENT=staging  # or production
+./scripts/seed-system-data.sh
+```
+
+This script:
+1. Retrieves database credentials from Secrets Manager
+2. Checks if system data exists (by counting Controls)
+3. Seeds system data if missing
+4. Works by either executing in a running ECS task or connecting directly to the database
+
+**Note**: System data seeding is now automatic on all new deployments, so this script is only needed for environments deployed before this feature was added.
 
 ## Updating Deployments
 

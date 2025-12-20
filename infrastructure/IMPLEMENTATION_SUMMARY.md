@@ -93,3 +93,5 @@
 - ARM64 images are required for Graviton2 cost savings
 - Database migrations should be run manually or via ECS Exec before traffic shift
 
+
+

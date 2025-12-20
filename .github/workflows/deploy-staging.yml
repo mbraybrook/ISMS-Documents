@@ -52,24 +52,48 @@ jobs:
             --push \
             ./backend
 
-      - name: Build and push frontend (ARM64)
+      - name: Increment version and build frontend (ARM64)
         env:
           VITE_API_URL: ${{ secrets.STAGING_VITE_API_URL }}
           VITE_AUTH_TENANT_ID: ${{ secrets.VITE_AUTH_TENANT_ID }}
           VITE_AUTH_CLIENT_ID: ${{ secrets.VITE_AUTH_CLIENT_ID }}
           VITE_AUTH_REDIRECT_URI: ${{ secrets.STAGING_VITE_AUTH_REDIRECT_URI }}
         run: |
+          # Read current version
+          CURRENT_VERSION=$(cat frontend/VERSION | tr -d '[:space:]')
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Parse and increment version (semver patch)
+          MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          
+          # Write new version back
+          echo "$NEW_VERSION" > frontend/VERSION
+          echo "New version: $NEW_VERSION"
+          
+          # Build with new version
           docker buildx build --platform linux/arm64 \
             -f ./frontend/Dockerfile.prod \
             --build-arg VITE_API_URL=${{ env.VITE_API_URL }} \
             --build-arg VITE_AUTH_TENANT_ID=${{ env.VITE_AUTH_TENANT_ID }} \
             --build-arg VITE_AUTH_CLIENT_ID=${{ env.VITE_AUTH_CLIENT_ID }} \
             --build-arg VITE_AUTH_REDIRECT_URI=${{ env.VITE_AUTH_REDIRECT_URI }} \
+            --build-arg VITE_APP_VERSION="$NEW_VERSION" \
             -t ${{ secrets.ECR_REGISTRY }}/isms-frontend:${{ steps.set-tag.outputs.tag }} \
             -t ${{ secrets.ECR_REGISTRY }}/isms-frontend:staging \
             -t ${{ secrets.ECR_REGISTRY }}/isms-frontend:latest \
             --push \
             ./frontend
+          
+          # Commit version update back to repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/VERSION
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]" || exit 0
+          git push || echo "Failed to push version update (non-critical)"
 
       - name: Get current backend task definition
         id: backend-task-def
