@@ -190,7 +190,10 @@ export function AcknowledgmentReportingPage() {
               ? aVal.localeCompare(bVal)
               : bVal.localeCompare(aVal);
           }
-          return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+          if (typeof aVal === 'number' && typeof bVal === 'number') {
+            return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+          }
+          return 0;
         })
     : [];
 

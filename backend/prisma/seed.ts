@@ -4,192 +4,21 @@ import * as path from 'path';
 
 const prisma = new PrismaClient();
 
-type SeedScope = 'reference' | 'full' | 'none' | 'system';
-
-interface ClassificationSeed {
-  id: string;
-  name: string;
-  description?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface AssetCategorySeed {
-  id: string;
-  name: string;
-  description?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface AssetSeed {
-  id: string;
-  date: string;
-  assetCategoryId: string;
-  assetSubCategory?: string | null;
-  owner: string;
-  primaryUser?: string | null;
-  location?: string | null;
-  manufacturer?: string | null;
-  model?: string | null;
-  nameSerialNo?: string | null;
-  cdeImpacting?: boolean;
-  classificationId: string;
-  purpose?: string | null;
-  notes?: string | null;
-  cost?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface RiskSeed {
-  id: string;
-  title: string;
-  description?: string | null;
-  dateAdded?: string;
-  riskCategory?: string | null;
-  riskNature?: string | null;
-  ownerUserId?: string | null;
-  department?: string | null;
-  status?: string;
-  wizardData?: unknown;
-  rejectionReason?: string | null;
-  mergedIntoRiskId?: string | null;
-  assetCategory?: string | null;
-  assetId?: string | null;
-  assetCategoryId?: string | null;
-  interestedPartyId?: string | null;
-  threatDescription?: string | null;
-  archived?: boolean;
-  expiryDate?: string | null;
-  lastReviewDate?: string | null;
-  nextReviewDate?: string | null;
-  confidentialityScore?: number;
-  integrityScore?: number;
-  availabilityScore?: number;
-  riskScore?: number | null;
-  likelihood?: number;
-  calculatedScore?: number | null;
-  initialRiskTreatmentCategory?: string | null;
-  mitigatedConfidentialityScore?: number | null;
-  mitigatedIntegrityScore?: number | null;
-  mitigatedAvailabilityScore?: number | null;
-  mitigatedRiskScore?: number | null;
-  mitigatedLikelihood?: number | null;
-  mitigatedScore?: number | null;
-  mitigationImplemented?: boolean;
-  mitigationDescription?: string | null;
-  residualRiskTreatmentCategory?: string | null;
-  annexAControlsRaw?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface ControlSeed {
-  id: string;
-  code: string;
-  title: string;
-  description?: string | null;
-  selectedForRiskAssessment?: boolean;
-  selectedForContractualObligation?: boolean;
-  selectedForLegalRequirement?: boolean;
-  selectedForBusinessRequirement?: boolean;
-  justification?: string | null;
-  controlText?: string | null;
-  purpose?: string | null;
-  guidance?: string | null;
-  otherInformation?: string | null;
-  category?: string | null;
-  isStandardControl?: boolean;
-  implemented?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface DocumentSeed {
-  id: string;
-  title: string;
-  type: string;
-  storageLocation?: string | null;
-  sharePointSiteId?: string | null;
-  sharePointDriveId?: string | null;
-  sharePointItemId?: string | null;
-  confluenceSpaceKey?: string | null;
-  confluencePageId?: string | null;
-  version?: string | null;
-  status?: string | null;
-  ownerUserId?: string | null;
-  lastReviewDate?: string | null;
-  nextReviewDate?: string | null;
-  requiresAcknowledgement?: boolean;
-  lastChangedDate?: string | null;
-  documentUrl?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface InterestedPartySeed {
-  id: string;
-  name: string;
-  group?: string | null;
-  description?: string | null;
-  dateAdded?: string | null;
-  requirements?: string | null;
-  addressedThroughISMS?: string | null;
-  howAddressedThroughISMS?: string | null;
-  sourceLink?: string | null;
-  keyProductsServices?: string | null;
-  ourObligations?: string | null;
-  theirObligations?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface LegislationSeed {
-  id: string;
-  dateAdded?: string | null;
-  interestedParty?: string | null;
-  actRegulationRequirement?: string | null;
-  description?: string | null;
-  riskOfNonCompliance?: string | null;
-  howComplianceAchieved?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface RiskControlSeed {
-  riskId: string;
-  controlId: string;
-}
-
-interface DocumentRiskSeed {
-  documentId: string;
-  riskId: string;
-}
-
-interface DocumentControlSeed {
-  documentId: string;
-  controlId: string;
-}
-
-interface LegislationRiskSeed {
-  legislationId: string;
-  riskId: string;
-}
+type SeedScope = 'reference' | 'full' | 'none';
 
 interface SeedData {
-  classifications?: ClassificationSeed[];
-  assetCategories?: AssetCategorySeed[];
-  assets?: AssetSeed[];
-  risks?: RiskSeed[];
-  controls?: ControlSeed[];
-  documents?: DocumentSeed[];
-  interestedParties?: InterestedPartySeed[];
-  legislation?: LegislationSeed[];
-  riskControls?: RiskControlSeed[];
-  documentRisks?: DocumentRiskSeed[];
-  documentControls?: DocumentControlSeed[];
-  legislationRisks?: LegislationRiskSeed[];
+  classifications?: Record<string, unknown>[];
+  assetCategories?: Record<string, unknown>[];
+  assets?: Record<string, unknown>[];
+  risks?: Record<string, unknown>[];
+  controls?: Record<string, unknown>[];
+  documents?: Record<string, unknown>[];
+  interestedParties?: Record<string, unknown>[];
+  legislation?: Record<string, unknown>[];
+  riskControls?: Record<string, unknown>[];
+  documentRisks?: Record<string, unknown>[];
+  documentControls?: Record<string, unknown>[];
+  legislationRisks?: Record<string, unknown>[];
 }
 
 /**
@@ -219,15 +48,13 @@ function loadSeedData(scope: SeedScope): SeedData {
       const key = file.replace('.json', '').replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
       // Handle camelCase conversion for multi-word keys
       if (key === 'assetCategories') {
-        data.assetCategories = JSON.parse(content) as AssetCategorySeed[];
+        data.assetCategories = JSON.parse(content);
       } else if (key === 'interestedParties') {
-        data.interestedParties = JSON.parse(content) as InterestedPartySeed[];
+        data.interestedParties = JSON.parse(content);
       } else if (key === 'classifications') {
-        data.classifications = JSON.parse(content) as ClassificationSeed[];
-      } else if (key === 'controls') {
-        data.controls = JSON.parse(content) as ControlSeed[];
-      } else if (key === 'legislation') {
-        data.legislation = JSON.parse(content) as LegislationSeed[];
+        data.classifications = JSON.parse(content);
+      } else {
+        data[key as keyof SeedData] = JSON.parse(content);
       }
     }
   }
@@ -251,19 +78,15 @@ function loadSeedData(scope: SeedScope): SeedData {
         const key = file.replace('.json', '').replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
         // Handle camelCase conversion for multi-word keys
         if (key === 'riskControls') {
-          data.riskControls = JSON.parse(content) as RiskControlSeed[];
+          data.riskControls = JSON.parse(content);
         } else if (key === 'documentRisks') {
-          data.documentRisks = JSON.parse(content) as DocumentRiskSeed[];
+          data.documentRisks = JSON.parse(content);
         } else if (key === 'documentControls') {
-          data.documentControls = JSON.parse(content) as DocumentControlSeed[];
+          data.documentControls = JSON.parse(content);
         } else if (key === 'legislationRisks') {
-          data.legislationRisks = JSON.parse(content) as LegislationRiskSeed[];
-        } else if (key === 'assets') {
-          data.assets = JSON.parse(content) as AssetSeed[];
-        } else if (key === 'risks') {
-          data.risks = JSON.parse(content) as RiskSeed[];
-        } else if (key === 'documents') {
-          data.documents = JSON.parse(content) as DocumentSeed[];
+          data.legislationRisks = JSON.parse(content);
+        } else {
+          data[key as keyof SeedData] = JSON.parse(content);
         }
       }
     }
@@ -275,7 +98,7 @@ function loadSeedData(scope: SeedScope): SeedData {
 /**
  * Seed Classifications
  */
-async function seedClassifications(data: ClassificationSeed[]) {
+async function seedClassifications(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} classifications...`);
@@ -302,7 +125,7 @@ async function seedClassifications(data: ClassificationSeed[]) {
 /**
  * Seed Asset Categories
  */
-async function seedAssetCategories(data: AssetCategorySeed[]) {
+async function seedAssetCategories(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} asset categories...`);
@@ -329,7 +152,7 @@ async function seedAssetCategories(data: AssetCategorySeed[]) {
 /**
  * Seed Assets
  */
-async function seedAssets(data: AssetSeed[]) {
+async function seedAssets(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} assets...`);
@@ -380,7 +203,7 @@ async function seedAssets(data: AssetSeed[]) {
 /**
  * Seed Risks
  */
-async function seedRisks(data: RiskSeed[]) {
+async function seedRisks(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} risks...`);
@@ -486,7 +309,7 @@ async function seedRisks(data: RiskSeed[]) {
 /**
  * Seed Controls
  */
-async function seedControls(data: ControlSeed[]) {
+async function seedControls(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} controls...`);
@@ -539,7 +362,7 @@ async function seedControls(data: ControlSeed[]) {
 /**
  * Seed Documents
  */
-async function seedDocuments(data: DocumentSeed[]) {
+async function seedDocuments(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   // Create a default system user if it doesn't exist (Documents require ownerUserId)
@@ -629,7 +452,7 @@ async function seedDocuments(data: DocumentSeed[]) {
 /**
  * Seed Interested Parties
  */
-async function seedInterestedParties(data: InterestedPartySeed[]) {
+async function seedInterestedParties(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} interested parties...`);
@@ -674,7 +497,7 @@ async function seedInterestedParties(data: InterestedPartySeed[]) {
 /**
  * Seed Legislation
  */
-async function seedLegislation(data: LegislationSeed[]) {
+async function seedLegislation(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} legislation records...`);
@@ -709,7 +532,7 @@ async function seedLegislation(data: LegislationSeed[]) {
 /**
  * Seed Risk-Control junction table
  */
-async function seedRiskControls(data: RiskControlSeed[]) {
+async function seedRiskControls(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} risk-control links...`);
@@ -734,7 +557,7 @@ async function seedRiskControls(data: RiskControlSeed[]) {
 /**
  * Seed Document-Risk junction table
  */
-async function seedDocumentRisks(data: DocumentRiskSeed[]) {
+async function seedDocumentRisks(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} document-risk links...`);
@@ -759,7 +582,7 @@ async function seedDocumentRisks(data: DocumentRiskSeed[]) {
 /**
  * Seed Document-Control junction table
  */
-async function seedDocumentControls(data: DocumentControlSeed[]) {
+async function seedDocumentControls(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} document-control links...`);
@@ -784,7 +607,7 @@ async function seedDocumentControls(data: DocumentControlSeed[]) {
 /**
  * Seed Legislation-Risk junction table
  */
-async function seedLegislationRisks(data: LegislationRiskSeed[]) {
+async function seedLegislationRisks(data: Record<string, unknown>[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} legislation-risk links...`);
@@ -807,71 +630,11 @@ async function seedLegislationRisks(data: LegislationRiskSeed[]) {
 }
 
 /**
- * Seed system data (essential reference data) if it doesn't exist
- * This ensures Controls, Classifications, etc. are always present
- * Used for first-time deployments to any environment
- */
-async function seedSystemDataIfNeeded() {
-  console.log('Checking if system data needs to be seeded...');
-  
-  // Check if Controls exist (use Controls as indicator of system data)
-  const controlCount = await prisma.control.count();
-  
-  if (controlCount > 0) {
-    console.log(`System data already exists (${controlCount} controls found), skipping system seed`);
-    return;
-  }
-  
-  console.log('No system data found, seeding essential reference data...');
-  
-  try {
-    // Load reference data (same as 'reference' scope)
-    const seedData = loadSeedData('reference');
-    
-    // Seed in dependency order
-    if (seedData.classifications) {
-      await seedClassifications(seedData.classifications);
-    }
-    if (seedData.assetCategories) {
-      await seedAssetCategories(seedData.assetCategories);
-    }
-    if (seedData.controls) {
-      await seedControls(seedData.controls);
-    }
-    if (seedData.legislation) {
-      await seedLegislation(seedData.legislation);
-    }
-    if (seedData.interestedParties) {
-      await seedInterestedParties(seedData.interestedParties);
-    }
-    
-    console.log('✓ System data seeded successfully');
-  } catch (error) {
-    console.error('✗ System data seed failed:', error);
-    throw error;
-  }
-}
-
-/**
  * Main seed function
  */
 async function main() {
   const seedScope = (process.env.SEED_SCOPE || 'none') as SeedScope;
   const nodeEnv = process.env.NODE_ENV || 'development';
-
-  // Handle 'system' scope - seed only if data doesn't exist
-  if (seedScope === 'system') {
-    console.log('Running system seed (only if data missing)...');
-    try {
-      await seedSystemDataIfNeeded();
-    } catch (error) {
-      console.error('✗ System seed failed:', error);
-      throw error;
-    } finally {
-      await prisma.$disconnect();
-    }
-    return;
-  }
 
   // Skip seeding in production unless explicitly enabled
   if (nodeEnv === 'production' && seedScope === 'none') {
@@ -940,9 +703,6 @@ async function main() {
     await prisma.$disconnect();
   }
 }
-
-// Export functions for use in startup script
-export { seedSystemDataIfNeeded };
 
 // Export default main function for Prisma seed
 export default main;

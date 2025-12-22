@@ -600,22 +600,122 @@ describe('Risks API', () => {
       expect(prisma.risk.findMany).toHaveBeenCalled();
     });
 
-    it('should support sorting', async () => {
-      prisma.risk.findMany.mockResolvedValue([]);
-      prisma.risk.count.mockResolvedValue(0);
-      prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+    describe('Sorting', () => {
+      beforeEach(() => {
+        prisma.risk.findMany.mockResolvedValue([]);
+        prisma.risk.count.mockResolvedValue(0);
+        prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+      });
 
-      await request(app)
-        .get('/api/risks?sortBy=title&sortOrder=asc')
-        .expect(200);
+      it('should support sorting by title ascending', async () => {
+        await request(app)
+          .get('/api/risks?sortBy=title&sortOrder=asc')
+          .expect(200);
 
-      expect(prisma.risk.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          orderBy: {
-            title: 'asc',
-          },
-        })
-      );
+        expect(prisma.risk.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderBy: {
+              title: 'asc',
+            },
+          })
+        );
+      });
+
+      it('should support sorting by title descending', async () => {
+        await request(app)
+          .get('/api/risks?sortBy=title&sortOrder=desc')
+          .expect(200);
+
+        expect(prisma.risk.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderBy: {
+              title: 'desc',
+            },
+          })
+        );
+      });
+
+      it('should support sorting by calculatedScore', async () => {
+        await request(app)
+          .get('/api/risks?sortBy=calculatedScore&sortOrder=desc')
+          .expect(200);
+
+        expect(prisma.risk.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderBy: {
+              calculatedScore: 'desc',
+            },
+          })
+        );
+      });
+
+      it('should support sorting by mitigatedScore', async () => {
+        await request(app)
+          .get('/api/risks?sortBy=mitigatedScore&sortOrder=asc')
+          .expect(200);
+
+        expect(prisma.risk.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderBy: {
+              mitigatedScore: 'asc',
+            },
+          })
+        );
+      });
+
+      it('should support sorting by createdAt', async () => {
+        await request(app)
+          .get('/api/risks?sortBy=createdAt&sortOrder=desc')
+          .expect(200);
+
+        expect(prisma.risk.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderBy: {
+              createdAt: 'desc',
+            },
+          })
+        );
+      });
+
+      it('should support sorting by dateAdded', async () => {
+        await request(app)
+          .get('/api/risks?sortBy=dateAdded&sortOrder=asc')
+          .expect(200);
+
+        expect(prisma.risk.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderBy: {
+              dateAdded: 'asc',
+            },
+          })
+        );
+      });
+
+      it('should reject invalid sortBy value', async () => {
+        await request(app)
+          .get('/api/risks?sortBy=interestedParty&sortOrder=asc')
+          .expect(400);
+      });
+
+      it('should reject invalid sortOrder value', async () => {
+        await request(app)
+          .get('/api/risks?sortBy=title&sortOrder=invalid')
+          .expect(400);
+      });
+
+      it('should use default sortBy and sortOrder when not provided', async () => {
+        await request(app)
+          .get('/api/risks')
+          .expect(200);
+
+        expect(prisma.risk.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderBy: {
+              calculatedScore: 'desc',
+            },
+          })
+        );
+      });
     });
 
     it('should handle testDepartment parameter for ADMIN', async () => {

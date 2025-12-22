@@ -753,6 +753,7 @@ export function RisksPage() {
       cols.push({
         key: 'riskCategory',
         header: 'Risk Category',
+        sortable: false,
         minW: '150px',
         render: (risk) =>
           risk.riskCategory ? (
@@ -767,6 +768,7 @@ export function RisksPage() {
       cols.push({
         key: 'riskNature',
         header: 'Risk Nature',
+        sortable: false,
         minW: '120px',
         render: (risk) =>
           risk.riskNature ? (
@@ -783,6 +785,7 @@ export function RisksPage() {
       cols.push({
         key: 'owner',
         header: 'Owner',
+        sortable: false,
         minW: '150px',
         render: (risk) => <Text>{risk.owner ? risk.owner.displayName : 'N/A'}</Text>,
       });
@@ -792,6 +795,7 @@ export function RisksPage() {
     cols.push({
       key: 'asset',
       header: 'Asset/Category',
+      sortable: false,
       minW: '200px',
       render: (risk) => (
         risk.asset ? (
@@ -812,6 +816,7 @@ export function RisksPage() {
     cols.push({
       key: 'interestedParty',
       header: 'Interested Party',
+      sortable: false,
       minW: '200px',
       render: (risk) => (
         risk.interestedParty ? (
@@ -830,21 +835,25 @@ export function RisksPage() {
         {
           key: 'confidentialityScore',
           header: 'C',
+          sortable: false,
           render: (risk) => risk.confidentialityScore,
         },
         {
           key: 'integrityScore',
           header: 'I',
+          sortable: false,
           render: (risk) => risk.integrityScore,
         },
         {
           key: 'availabilityScore',
           header: 'A',
+          sortable: false,
           render: (risk) => risk.availabilityScore,
         },
         {
           key: 'likelihood',
           header: 'L',
+          sortable: false,
           render: (risk) => risk.likelihood,
         }
       );
@@ -887,6 +896,7 @@ export function RisksPage() {
       cols.push({
         key: 'initialRiskTreatmentCategory',
         header: 'Treatment',
+        sortable: false,
         minW: '120px',
         render: (risk) => {
           const hasMitigatedScores = 
@@ -938,6 +948,7 @@ export function RisksPage() {
         {
           key: 'mitigatedConfidentialityScore',
           header: 'MC',
+          sortable: false,
           render: (risk) =>
             risk.mitigatedConfidentialityScore !== null ? (
               risk.mitigatedConfidentialityScore
@@ -948,6 +959,7 @@ export function RisksPage() {
         {
           key: 'mitigatedIntegrityScore',
           header: 'MI',
+          sortable: false,
           render: (risk) =>
             risk.mitigatedIntegrityScore !== null ? (
               risk.mitigatedIntegrityScore
@@ -958,6 +970,7 @@ export function RisksPage() {
         {
           key: 'mitigatedAvailabilityScore',
           header: 'MA',
+          sortable: false,
           render: (risk) =>
             risk.mitigatedAvailabilityScore !== null ? (
               risk.mitigatedAvailabilityScore
@@ -968,6 +981,7 @@ export function RisksPage() {
         {
           key: 'mitigatedLikelihood',
           header: 'ML',
+          sortable: false,
           render: (risk) =>
             risk.mitigatedLikelihood !== null ? (
               risk.mitigatedLikelihood
@@ -1005,6 +1019,7 @@ export function RisksPage() {
       cols.push({
         key: 'residualRiskTreatmentCategory',
         header: 'Residual Treatment',
+        sortable: false,
         render: (risk) =>
           risk.residualRiskTreatmentCategory ? (
             <Badge colorScheme="green">{risk.residualRiskTreatmentCategory}</Badge>
@@ -1018,6 +1033,7 @@ export function RisksPage() {
       cols.push({
         key: 'controls',
         header: 'Controls',
+        sortable: false,
         minW: '200px',
         render: (risk) =>
           risk.riskControls.length > 0 ? (
