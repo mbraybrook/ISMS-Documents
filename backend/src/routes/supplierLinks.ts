@@ -39,7 +39,7 @@ router.get(
         },
       });
 
-      res.json(links.map((link) => link.risk));
+      res.json(links.map((link: { risk: unknown }) => link.risk));
     } catch (error) {
       console.error('Error fetching supplier risks:', error);
       res.status(500).json({ error: 'Failed to fetch supplier risks' });
@@ -182,7 +182,7 @@ router.get(
         },
       });
 
-      res.json(links.map((link) => link.control));
+      res.json(links.map((link: { control: unknown }) => link.control));
     } catch (error) {
       console.error('Error fetching supplier controls:', error);
       res.status(500).json({ error: 'Failed to fetch supplier controls' });

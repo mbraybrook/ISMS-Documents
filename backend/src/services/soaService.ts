@@ -48,10 +48,21 @@ export async function generateSoAData(): Promise<SoARow[]> {
   });
 
   // Build SoA rows
-  const soaRows: SoARow[] = controls.map((control) => {
-    const riskIds = control.riskControls.map((rc) => rc.risk.id);
+  const soaRows: SoARow[] = controls.map((control: {
+    id: string;
+    code: string;
+    title: string;
+    riskControls: Array<{ risk: { id: string } }>;
+    documentControls: Array<{ document: { title: string; version: string } }>;
+    selectedForRiskAssessment: boolean;
+    selectedForContractualObligation: boolean;
+    selectedForLegalRequirement: boolean;
+    selectedForBusinessRequirement: boolean;
+    justification: string | null;
+  }) => {
+    const riskIds = control.riskControls.map((rc: { risk: { id: string } }) => rc.risk.id);
     const documentTitles = control.documentControls.map(
-      (dc) => `${dc.document.title} (v${dc.document.version})`
+      (dc: { document: { title: string; version: string } }) => `${dc.document.title} (v${dc.document.version})`
     );
 
     // Determine if control is applicable (any selection reason is true)

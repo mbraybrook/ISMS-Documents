@@ -118,7 +118,7 @@ export async function findSimilarRisksForRisk(riskId: string, limit: number = 10
     const riskText = normalizeRiskText(risk.title, risk.threatDescription, risk.description);
     
     // Prepare risks with embeddings for findSimilarRisks
-    const risksWithEmbeddings = allRisks.map((r) => ({
+    const risksWithEmbeddings = allRisks.map((r: { id: string; title: string; threatDescription: string | null; description: string | null; embedding: unknown }) => ({
       id: r.id,
       title: r.title,
       threatDescription: r.threatDescription,
@@ -131,7 +131,7 @@ export async function findSimilarRisksForRisk(riskId: string, limit: number = 10
     // Map results to include full risk data
     const results: SimilarRiskResult[] = similarityResults
       .map((result) => {
-        const fullRisk = allRisks.find((r) => r.id === result.riskId);
+        const fullRisk = allRisks.find((r: { id: string }) => r.id === result.riskId);
         if (!fullRisk) return null;
 
         // Transform AssetCategory to category for frontend compatibility
@@ -246,7 +246,7 @@ export async function checkSimilarityForNewRisk(
     );
 
     if (exactMatches.length > 0) {
-      return exactMatches.slice(0, limit).map((r) => {
+      return exactMatches.slice(0, limit).map((r: { id: string; title: string; asset: { AssetCategory: unknown } | null }) => {
         // Transform AssetCategory to category for frontend compatibility
         const transformedRisk = {
           ...r,
@@ -272,7 +272,7 @@ export async function checkSimilarityForNewRisk(
     const riskText = normalizeRiskText(riskData.title, riskData.threatDescription, riskData.description);
     
     // Prepare risks with embeddings for findSimilarRisks
-    const risksWithEmbeddings = allRisks.map((r) => ({
+    const risksWithEmbeddings = allRisks.map((r: { id: string; title: string; threatDescription: string | null; description: string | null; embedding: unknown }) => ({
       id: r.id,
       title: r.title,
       threatDescription: r.threatDescription,
@@ -285,7 +285,7 @@ export async function checkSimilarityForNewRisk(
     // Map results to include full risk data
     let results: SimilarRiskResult[] = similarityResults
       .map((result) => {
-        const fullRisk = allRisks.find((r) => r.id === result.riskId);
+        const fullRisk = allRisks.find((r: { id: string }) => r.id === result.riskId);
         if (!fullRisk) return null;
 
         // Transform AssetCategory to category for frontend compatibility

@@ -144,7 +144,7 @@ export async function importAssetsFromCSV(csvFilePathOrContent: string | Buffer)
     // First, ensure all classifications exist
     const classificationMap = new Map<string, string>();
     const classifications = await prisma.classification.findMany();
-    classifications.forEach(c => {
+    classifications.forEach((c: { name: string; id: string }) => {
       classificationMap.set(c.name, c.id);
     });
     
@@ -173,7 +173,7 @@ export async function importAssetsFromCSV(csvFilePathOrContent: string | Buffer)
     // Ensure all asset categories exist
     const categoryMap = new Map<string, string>();
     const categories = await prisma.assetCategory.findMany();
-    categories.forEach(c => {
+    categories.forEach((c: { name: string; id: string }) => {
       categoryMap.set(c.name, c.id);
     });
     

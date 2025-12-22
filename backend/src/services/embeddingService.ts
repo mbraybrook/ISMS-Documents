@@ -96,7 +96,7 @@ export async function backfillRiskEmbeddings(
 
     // Process batch with concurrency limit
     await Promise.all(
-      risks.map((risk) =>
+      risks.map((risk: { id: string; title: string; threatDescription: string | null; description: string | null }) =>
         limiter.execute(async () => {
           try {
             if (!dryRun) {

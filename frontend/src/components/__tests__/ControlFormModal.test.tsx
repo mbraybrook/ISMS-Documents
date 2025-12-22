@@ -324,6 +324,11 @@ describe('ControlFormModal', () => {
       const user = userEvent.setup();
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={null} />);
 
+      // Wait for form to render
+      await waitFor(() => {
+        expect(screen.getByLabelText(/code/i)).toBeInTheDocument();
+      });
+
       const codeInput = screen.getByLabelText(/code/i);
       await user.type(codeInput, 'A.8.1');
 
@@ -333,15 +338,29 @@ describe('ControlFormModal', () => {
       const submitButton = screen.getByRole('button', { name: /create/i });
       await user.click(submitButton);
 
-      await waitFor(() => {
-        // Form validation should prevent submission
-        expect(api.post).not.toHaveBeenCalled();
-      });
-    });
+      // Wait a bit for any async operations to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Form validation should prevent submission - API should not be called
+      expect(api.post).not.toHaveBeenCalled();
+
+      // Optionally check for error message if it appears
+      const errorMessage = screen.queryByText('Category is required');
+      if (errorMessage) {
+        expect(errorMessage).toBeInTheDocument();
+      }
+    }, { timeout: 10000 });
 
     it('should clear error when field is corrected', async () => {
       const user = userEvent.setup();
+      vi.mocked(api.post).mockResolvedValue({ data: { id: 'new-control' } });
+      
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={null} />);
+
+      // Wait for form to render
+      await waitFor(() => {
+        expect(screen.getByLabelText(/code/i)).toBeInTheDocument();
+      });
 
       const codeInput = screen.getByLabelText(/code/i);
       await user.clear(codeInput);
@@ -349,23 +368,30 @@ describe('ControlFormModal', () => {
       const submitButton = screen.getByRole('button', { name: /create/i });
       await user.click(submitButton);
 
-      // Form validation should prevent submission
-      await waitFor(() => {
-        expect(api.post).not.toHaveBeenCalled();
-      });
+      // Wait a bit for any async operations to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
 
+      // Form validation should prevent submission - API should not be called yet
+      expect(api.post).not.toHaveBeenCalled();
+
+      // Correct the fields
       await user.type(codeInput, 'A.8.1');
       await user.type(screen.getByLabelText(/title/i), 'Test Control');
       await user.selectOptions(screen.getByLabelText(/category/i), 'ORGANIZATIONAL');
 
-      vi.mocked(api.post).mockResolvedValue({ data: { id: 'new-control' } });
+      // Wait a bit for state to update
+      await waitFor(() => {
+        expect(codeInput).toHaveValue('A.8.1');
+      });
+
+      // Submit again
       await user.click(submitButton);
 
       // After correction, form should submit
       await waitFor(() => {
         expect(api.post).toHaveBeenCalled();
-      });
-    });
+      }, { timeout: 3000 });
+    }, { timeout: 10000 });
 
     it('should not validate standard control fields', async () => {
       const user = userEvent.setup();

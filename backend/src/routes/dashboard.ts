@@ -214,7 +214,15 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       initialRiskTreatmentCategory: string | null;
     }> = [];
 
-    allRisks.forEach((risk) => {
+    allRisks.forEach((risk: {
+      id: string;
+      title: string;
+      calculatedScore: number;
+      mitigatedScore: number | null;
+      mitigationImplemented: boolean;
+      residualRiskTreatmentCategory: string | null;
+      initialRiskTreatmentCategory: string | null;
+    }) => {
       // Total risk score
       totalRiskScore += risk.calculatedScore;
 
@@ -248,7 +256,16 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       risksByTreatmentCategory[treatmentCategory] = (risksByTreatmentCategory[treatmentCategory] || 0) + 1;
 
       // Policy non-conformance
-      if (hasPolicyNonConformance(risk)) {
+      if (hasPolicyNonConformance(risk as unknown as {
+        initialRiskTreatmentCategory: string | null;
+        calculatedScore: number;
+        mitigatedConfidentialityScore: number | null;
+        mitigatedIntegrityScore: number | null;
+        mitigatedAvailabilityScore: number | null;
+        mitigatedLikelihood: number | null;
+        mitigatedScore: number | null;
+        mitigationDescription: string | null;
+      })) {
         policyNonConformanceCount++;
         risksWithPolicyNonConformance.push({
           id: risk.id,
@@ -292,7 +309,16 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       title: string;
     }> = [];
 
-    allControls.forEach((control) => {
+    allControls.forEach((control: {
+      id: string;
+      code: string;
+      title: string;
+      selectedForRiskAssessment: boolean;
+      selectedForContractualObligation: boolean;
+      selectedForLegalRequirement: boolean;
+      selectedForBusinessRequirement: boolean;
+      implemented: boolean;
+    }) => {
       const isSelected =
         control.selectedForRiskAssessment ||
         control.selectedForContractualObligation ||
@@ -416,7 +442,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
 
       // Create a map of documentId -> latest acknowledgment version
       const acknowledgmentMap = new Map<string, string>();
-      userAcknowledgments.forEach((ack) => {
+      userAcknowledgments.forEach((ack: { documentId: string; documentVersion: string }) => {
         const existing = acknowledgmentMap.get(ack.documentId);
         if (!existing || ack.documentVersion > existing) {
           acknowledgmentMap.set(ack.documentId, ack.documentVersion);
@@ -425,7 +451,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
 
       // Filter documents that need acknowledgment
       pendingAcknowledgments = approvedDocuments
-        .filter((doc) => {
+        .filter((doc: { id: string; version: string }) => {
           const lastAcknowledgedVersion = acknowledgmentMap.get(doc.id);
           return !lastAcknowledgedVersion || doc.version !== lastAcknowledgedVersion;
         })
@@ -438,7 +464,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         },
       });
 
-      const acknowledgmentCompletionPromises = approvedDocuments.map(async (doc) => {
+      const acknowledgmentCompletionPromises = approvedDocuments.map(async (doc: { id: string; version: string; title: string }) => {
         const acknowledgments = await prisma.acknowledgment.count({
           where: {
             documentId: doc.id,
@@ -473,7 +499,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         missingReviewDate: documentsMissingReviewDate,
         overdueReviewTasks,
         upcomingReviewTasks,
-        byStatus: documentsByStatus.reduce((acc, item) => {
+        byStatus: documentsByStatus.reduce((acc: Record<string, number>, item: { status: string; _count: number }) => {
           acc[item.status] = item._count;
           return acc;
         }, {} as Record<string, number>),
@@ -557,7 +583,7 @@ router.get('/staff', authenticateToken, async (req: AuthRequest, res: Response) 
 
     // Create a map of documentId -> latest acknowledgment version
     const acknowledgmentMap = new Map<string, string>();
-    userAcknowledgments.forEach((ack) => {
+    userAcknowledgments.forEach((ack: { documentId: string; documentVersion: string }) => {
       const existing = acknowledgmentMap.get(ack.documentId);
       if (!existing || ack.documentVersion > existing) {
         acknowledgmentMap.set(ack.documentId, ack.documentVersion);
@@ -565,7 +591,7 @@ router.get('/staff', authenticateToken, async (req: AuthRequest, res: Response) 
     });
 
     // Filter documents that need acknowledgment
-    const pendingDocuments = approvedDocuments.filter((doc) => {
+    const pendingDocuments = approvedDocuments.filter((doc: { id: string; version: string }) => {
       const lastAcknowledgedVersion = acknowledgmentMap.get(doc.id);
       return !lastAcknowledgedVersion || doc.version !== lastAcknowledgedVersion;
     });
@@ -596,7 +622,17 @@ router.get('/staff', authenticateToken, async (req: AuthRequest, res: Response) 
     });
 
     // Check which documents the user has acknowledged
-    const recentlyUpdatedWithAckStatus = recentlyUpdatedDocuments.map((doc) => {
+    const recentlyUpdatedWithAckStatus = recentlyUpdatedDocuments.map((doc: {
+      id: string;
+      version: string;
+      title: string;
+      type: string;
+      owner: { id: string; displayName: string; email: string } | null;
+      storageLocation: string;
+      documentUrl: string | null;
+      requiresAcknowledgement: boolean;
+      lastChangedDate: Date | null;
+    }) => {
       const lastAcknowledgedVersion = acknowledgmentMap.get(doc.id);
       const isAcknowledged = lastAcknowledgedVersion === doc.version;
       

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Router, Response } from 'express';
 import { randomUUID } from 'crypto';
+import { User } from '@prisma/client';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { retryDbOperation } from '../lib/dbRetry';
@@ -48,7 +49,7 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
 
     // Find user by email or by Entra ID (for cases where email might have changed)
     // Use retry logic for database operations to handle transient connection errors
-    let user = await retryDbOperation(() =>
+    let user: User | null = await retryDbOperation(() =>
       prisma.user.findUnique({
         where: { email: email },
       })
@@ -103,7 +104,15 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
       );
     } else {
       // Update user info if changed, including email if it was missing before
-      const updateData: any = {
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      const updateData: {
+        displayName: string;
+        entraObjectId: string;
+        email?: string;
+      } = {
         displayName: name || user.displayName,
         entraObjectId: oid || req.user?.sub || 'unknown',
       };
@@ -115,10 +124,14 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
       }
       
       // Use retry logic for the update operation that was timing out
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      const userId = user.id;
       user = await retryDbOperation(
         () =>
           prisma.user.update({
-            where: { id: user?.id || '' },
+            where: { id: userId },
             data: updateData,
           }),
         {
@@ -127,6 +140,10 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
           maxDelayMs: 3000, // Allow up to 3 seconds between retries
         }
       );
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
     res.json({

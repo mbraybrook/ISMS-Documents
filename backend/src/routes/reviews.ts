@@ -116,7 +116,14 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
     });
 
     // Create unified overdue items list from overdue documents
-    const overdueItems = overdueDocuments.map((doc) => ({
+    const overdueItems = overdueDocuments.map((doc: {
+      id: string;
+      title: string;
+      version: string;
+      type: string;
+      nextReviewDate: Date | null;
+      owner: { id: string; displayName: string; email: string };
+    }) => ({
       type: 'DOCUMENT' as const,
       id: doc.id,
       documentId: doc.id,
@@ -133,14 +140,14 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res: Respon
       reviewer: null,
       status: null,
       hasAssignedTask: false,
-      daysOverdue: doc.nextReviewDate ? Math.ceil((now.getTime() - new Date(doc.nextReviewDate).getTime()) / (1000 * 60 * 60 * 24)) : 0,
-    })).sort((a, b) => {
+      daysOverdue: doc.nextReviewDate ? Math.ceil((now.getTime() - doc.nextReviewDate.getTime()) / (1000 * 60 * 60 * 24)) : 0,
+    })).sort((a: { daysOverdue: number; reviewDate: Date | null }, b: { daysOverdue: number; reviewDate: Date | null }) => {
       // Sort by days overdue (most overdue first), then by review date
       if (a.daysOverdue !== b.daysOverdue) {
         return b.daysOverdue - a.daysOverdue;
       }
-      const aDate = a.reviewDate ? new Date(a.reviewDate).getTime() : 0;
-      const bDate = b.reviewDate ? new Date(b.reviewDate).getTime() : 0;
+      const aDate = a.reviewDate ? a.reviewDate.getTime() : 0;
+      const bDate = b.reviewDate ? b.reviewDate.getTime() : 0;
       return aDate - bDate;
     });
 

@@ -173,7 +173,7 @@ export async function importLegislationFromCSV(csvFilePathOrContent: string | Bu
     
     // Get existing legislation by act/regulation/requirement name
     const existingLegislation = await prisma.legislation.findMany();
-    const existingNames = new Set(existingLegislation.map(l => l.actRegulationRequirement));
+    const existingNames = new Set(existingLegislation.map((l: { actRegulationRequirement: string }) => l.actRegulationRequirement));
     
     // Create new legislation records
     for (let i = 0; i < rows.length; i++) {

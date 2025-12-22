@@ -64,7 +64,7 @@ router.post(
             exportFormat: 'EXCEL',
             filePath: null, // File is returned directly, not stored
           },
-        }).catch((err) => {
+        }).catch((err: unknown) => {
           console.error('[SOA] Error creating export record:', err);
         });
 

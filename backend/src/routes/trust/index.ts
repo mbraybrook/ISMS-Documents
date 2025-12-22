@@ -626,7 +626,7 @@ router.get(
           downloadToken: downloadToken || null,
           termsAccepted: trustSetting.requiresNda ? !!externalUser?.termsAcceptedAt : false,
         },
-      }).catch((err) => {
+      }).catch((err: unknown) => {
         console.error('[TRUST] Error recording download:', err);
       });
 
@@ -1650,11 +1650,17 @@ router.get(
 
       // Filter out any suppliers without required display fields
       const validSuppliers = suppliers.filter(
-        (s) => s.trustCenterDisplayName && s.trustCenterDescription
+        (s: { trustCenterDisplayName: string | null; trustCenterDescription: string | null }) => s.trustCenterDisplayName && s.trustCenterDescription
       );
 
       res.json({
-        suppliers: validSuppliers.map((s) => ({
+        suppliers: validSuppliers.map((s: {
+          id: string;
+          trustCenterDisplayName: string | null;
+          trustCenterDescription: string | null;
+          trustCenterCategory: string | null;
+          trustCenterComplianceSummary: string | null;
+        }) => ({
           id: s.id,
           displayName: s.trustCenterDisplayName,
           description: s.trustCenterDescription,
@@ -1764,7 +1770,7 @@ router.get('/certifications', async (req: Request, res: Response) => {
     });
     
     // Transform to include document count and basic document info
-    const result = certifications.map((cert) => ({
+    const result = certifications.map((cert: { id: string; name: string; type: string; description: string | null; validUntil: Date | null; displayOrder: number; createdAt: Date; updatedAt: Date; TrustDocSettings: Array<{ Document: { id: string; title: string; type: string; version: string; status: string }; visibilityLevel: string }> }) => ({
       id: cert.id,
       name: cert.name,
       type: cert.type,
@@ -1774,7 +1780,7 @@ router.get('/certifications', async (req: Request, res: Response) => {
       createdAt: cert.createdAt,
       updatedAt: cert.updatedAt,
       documentCount: cert.TrustDocSettings.length,
-      documents: cert.TrustDocSettings.map((setting) => ({
+      documents: cert.TrustDocSettings.map((setting: { Document: { id: string; title: string; type: string; version: string; status: string }; visibilityLevel: string }) => ({
         id: setting.Document.id,
         title: setting.Document.title,
         type: setting.Document.type,
@@ -1818,7 +1824,7 @@ router.get(
       });
       
       // Transform to include document info
-      const result = certifications.map((cert) => ({
+      const result = certifications.map((cert: { id: string; name: string; type: string; description: string | null; validUntil: Date | null; displayOrder: number; createdAt: Date; updatedAt: Date; TrustDocSettings: Array<{ Document: { id: string; title: string; type: string; version: string; status: string }; visibilityLevel: string; category: string | null }> }) => ({
         id: cert.id,
         name: cert.name,
         type: cert.type,
@@ -1828,7 +1834,7 @@ router.get(
         createdAt: cert.createdAt,
         updatedAt: cert.updatedAt,
         documentCount: cert.TrustDocSettings.length,
-        documents: cert.TrustDocSettings.map((setting) => ({
+        documents: cert.TrustDocSettings.map((setting: { Document: { id: string; title: string; type: string; version: string; status: string }; visibilityLevel: string; category: string | null }) => ({
           id: setting.Document.id,
           title: setting.Document.title,
           type: setting.Document.type,

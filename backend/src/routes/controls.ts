@@ -283,8 +283,8 @@ router.get(
       }
 
       res.json({
-        risks: control.riskControls.map((rc) => rc.risk),
-        documents: control.documentControls.map((dc) => dc.document),
+        risks: control.riskControls.map((rc: { risk: unknown }) => rc.risk),
+        documents: control.documentControls.map((dc: { document: unknown }) => dc.document),
       });
     } catch (error) {
       console.error('Error fetching control links:', error);
@@ -595,7 +595,7 @@ router.get(
         },
       });
 
-      res.json(links.map((link) => link.supplier));
+      res.json(links.map((link: { supplier: unknown }) => link.supplier));
     } catch (error) {
       console.error('Error fetching control suppliers:', error);
       res.status(500).json({ error: 'Failed to fetch control suppliers' });
@@ -714,7 +714,7 @@ router.get(
         },
       });
 
-      res.json(documentControls.map((dc) => dc.document));
+      res.json(documentControls.map((dc: { document: unknown }) => dc.document));
     } catch (error) {
       console.error('Error fetching control documents:', error);
       res.status(500).json({ error: 'Failed to fetch control documents' });

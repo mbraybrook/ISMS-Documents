@@ -325,7 +325,7 @@ router.post(
 
         // Check for keyword matches in title
         if (risk.title) {
-          const titleWords = risk.title.toLowerCase().split(/\s+/).filter((word) => word.length > 4);
+          const titleWords = risk.title.toLowerCase().split(/\s+/).filter((word: string) => word.length > 4);
           for (const word of titleWords) {
             if (combinedText.includes(word)) {
               score += 2;

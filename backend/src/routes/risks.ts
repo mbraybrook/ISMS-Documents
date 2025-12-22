@@ -239,8 +239,8 @@ router.get(
           select: { id: true, calculatedScore: true },
         });
         const filteredIds = risksForLevel
-          .filter((r) => getRiskLevel(r.calculatedScore) === riskLevel)
-          .map((r) => r.id);
+          .filter((r: { calculatedScore: number }) => getRiskLevel(r.calculatedScore) === riskLevel)
+          .map((r: { id: string }) => r.id);
         where.id = { in: filteredIds };
         countWhere.id = { in: filteredIds };
       }
@@ -262,11 +262,21 @@ router.get(
           },
         });
         const filteredIds = allRisksForNonConformance
-          .filter((r) => {
+          .filter((r: {
+            id: string;
+            initialRiskTreatmentCategory: string | null;
+            calculatedScore: number;
+            mitigatedConfidentialityScore: number | null;
+            mitigatedIntegrityScore: number | null;
+            mitigatedAvailabilityScore: number | null;
+            mitigatedLikelihood: number | null;
+            mitigatedScore: number | null;
+            mitigationDescription: string | null;
+          }) => {
             const hasNonConformance = hasPolicyNonConformance(r);
             return policyNonConformance === 'true' ? hasNonConformance : !hasNonConformance;
           })
-          .map((r) => r.id);
+          .map((r: { id: string }) => r.id);
         where.id = { in: filteredIds };
         countWhere.id = { in: filteredIds };
       }
@@ -285,11 +295,11 @@ router.get(
           },
         });
         const filteredIds = allRisksForControls
-          .filter((r) => {
+          .filter((r: { id: string; riskControls: unknown[] }) => {
             const hasControls = r.riskControls.length > 0;
             return controlsApplied === 'true' ? hasControls : !hasControls;
           })
-          .map((r) => r.id);
+          .map((r: { id: string }) => r.id);
         where.id = { in: filteredIds };
         countWhere.id = { in: filteredIds };
       }
@@ -334,7 +344,7 @@ router.get(
       ]);
 
       // Add risk level to each risk
-      const risksWithLevel = risks.map((risk) => ({
+      const risksWithLevel = risks.map((risk: { calculatedScore: number; mitigatedScore: number | null }) => ({
         ...risk,
         riskLevel: getRiskLevel(risk.calculatedScore),
         mitigatedRiskLevel: risk.mitigatedScore ? getRiskLevel(risk.mitigatedScore) : null,
@@ -1228,7 +1238,7 @@ router.delete(
       }
 
       // Manually delete related records in a transaction to avoid timeout
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: Omit<typeof prisma, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
         // Delete related records first (cascade deletes can timeout with many records)
         await tx.documentRisk.deleteMany({
           where: { riskId: id },
@@ -1318,7 +1328,7 @@ router.post(
           select: { id: true },
         });
 
-        const existingControlIds = new Set(existingControls.map(c => c.id));
+        const existingControlIds = new Set(existingControls.map((c: { id: string }) => c.id));
         const missingControlIds = uniqueControlIds.filter((id: string) => !existingControlIds.has(id));
 
         if (missingControlIds.length > 0) {
@@ -1465,7 +1475,7 @@ router.post(
       const allControls = await prisma.control.findMany({
         where: {
           isStandardControl: true, // Focus on ISO 27002 controls
-          embedding: { not: Prisma.DbNull }, // Only include controls with pre-computed embeddings
+          embedding: { not: Prisma.JsonNull }, // Only include controls with pre-computed embeddings
         },
         select: {
           id: true,
@@ -1477,8 +1487,8 @@ router.post(
 
       // Use AI service for bulk similarity search
       const candidateEmbeddings = allControls
-        .filter(control => control.embedding && Array.isArray(control.embedding))
-        .map(control => ({
+        .filter((control: { embedding: unknown }) => control.embedding && Array.isArray(control.embedding))
+        .map((control: { id: string; embedding: unknown }) => ({
           id: control.id,
           embedding: control.embedding as number[],
         }));
@@ -1726,7 +1736,7 @@ router.get(
         },
       });
 
-      res.json(links.map((link) => link.supplier));
+      res.json(links.map((link: { supplier: unknown }) => link.supplier));
     } catch (error) {
       console.error('Error fetching risk suppliers:', error);
       res.status(500).json({ error: 'Failed to fetch risk suppliers' });

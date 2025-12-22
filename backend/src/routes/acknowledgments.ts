@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { randomUUID } from 'crypto';
+import { Acknowledgment, Document, User, EntraIdUserCache } from '@prisma/client';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -64,7 +65,7 @@ router.get('/pending', authenticateToken, async (req: AuthRequest, res: Response
 
     // Create a map of documentId -> latest acknowledgment version
     const acknowledgmentMap = new Map<string, string>();
-    userAcknowledgments.forEach((ack) => {
+    userAcknowledgments.forEach((ack: Acknowledgment) => {
       const existing = acknowledgmentMap.get(ack.documentId);
       if (!existing || ack.documentVersion > existing) {
         acknowledgmentMap.set(ack.documentId, ack.documentVersion);
@@ -72,7 +73,7 @@ router.get('/pending', authenticateToken, async (req: AuthRequest, res: Response
     });
 
     // Filter documents that need acknowledgment
-    const pendingDocuments = approvedDocuments.filter((doc) => {
+    const pendingDocuments = approvedDocuments.filter((doc: Document & { owner?: { id: string; displayName: string; email: string } }) => {
       const lastAcknowledgedVersion = acknowledgmentMap.get(doc.id);
       // Need acknowledgment if never acknowledged or version changed
       return !lastAcknowledgedVersion || doc.version !== lastAcknowledgedVersion;
@@ -127,14 +128,14 @@ router.post(
         });
 
         const acknowledgmentMap = new Map<string, string>();
-        userAcknowledgments.forEach((ack) => {
+        userAcknowledgments.forEach((ack: Acknowledgment) => {
           const existing = acknowledgmentMap.get(ack.documentId);
           if (!existing || ack.documentVersion > existing) {
             acknowledgmentMap.set(ack.documentId, ack.documentVersion);
           }
         });
 
-        documentsToAcknowledge = approvedDocuments.filter((doc) => {
+        documentsToAcknowledge = approvedDocuments.filter((doc: Document) => {
           const lastAcknowledgedVersion = acknowledgmentMap.get(doc.id);
           return !lastAcknowledgedVersion || doc.version !== lastAcknowledgedVersion;
         });
@@ -150,7 +151,7 @@ router.post(
 
       // Create acknowledgments
       const acknowledgments = await Promise.all(
-        documentsToAcknowledge.map(async (doc) => {
+        documentsToAcknowledge.map(async (doc: Document) => {
           // Check if already acknowledged for this version
           const existing = await prisma.acknowledgment.findUnique({
             where: {
@@ -281,10 +282,10 @@ router.get(
 
       // Create map of entraObjectId -> cached user for quick lookup
       const staffMapByEntraId = new Map(
-        allStaffUsers.map((u) => [u.entraObjectId, u])
+        allStaffUsers.map((u: EntraIdUserCache) => [u.entraObjectId, u])
       );
       const staffMapByEmail = new Map(
-        allStaffUsers.map((u) => [u.email.toLowerCase(), u])
+        allStaffUsers.map((u: EntraIdUserCache) => [u.email.toLowerCase(), u])
       );
 
       // Get all local users (for matching acknowledgments)
@@ -296,10 +297,10 @@ router.get(
 
       // Create map of entraObjectId -> local user
       const localUserMapByEntraId = new Map(
-        localUsers.map((u) => [u.entraObjectId, u])
+        localUsers.map((u: User) => [u.entraObjectId, u])
       );
       const localUserMapByEmail = new Map(
-        localUsers.map((u) => [u.email.toLowerCase(), u])
+        localUsers.map((u: User) => [u.email.toLowerCase(), u])
       );
 
       // Get documents (filter by documentId if provided)
@@ -333,10 +334,10 @@ router.get(
 
       // Build stats per document
       const now = new Date();
-      const documents = approvedDocuments.map((doc) => {
+      const documents = approvedDocuments.map((doc: Document) => {
         // Get acknowledgments for current document version
         const docAcks = allAcknowledgments.filter(
-          (ack) => ack.documentId === doc.id && ack.documentVersion === doc.version
+          (ack: Acknowledgment & { User: { id: string; displayName: string; email: string; entraObjectId: string | null } }) => ack.documentId === doc.id && ack.documentVersion === doc.version
         );
 
         // Calculate required date (when acknowledgment was required)
@@ -430,7 +431,7 @@ router.get(
       const totalDocuments = documents.length;
       const averageAcknowledgmentRate =
         documents.length > 0
-          ? documents.reduce((sum, doc) => sum + doc.percentage, 0) / documents.length
+          ? documents.reduce((sum: number, doc: { percentage: number }) => sum + doc.percentage, 0) / documents.length
           : 0;
 
       res.json({
@@ -482,18 +483,18 @@ router.get(
 
       // Create maps for lookup
       const staffMapByEntraId = new Map(
-        allStaffUsers.map((u) => [u.entraObjectId, u])
+        allStaffUsers.map((u: EntraIdUserCache) => [u.entraObjectId, u])
       );
       const staffMapByEmail = new Map(
-        allStaffUsers.map((u) => [u.email.toLowerCase(), u])
+        allStaffUsers.map((u: EntraIdUserCache) => [u.email.toLowerCase(), u])
       );
 
       const localUsers = await prisma.user.findMany();
       const localUserMapByEntraId = new Map(
-        localUsers.map((u) => [u.entraObjectId, u])
+        localUsers.map((u: User) => [u.entraObjectId, u])
       );
       const localUserMapByEmail = new Map(
-        localUsers.map((u) => [u.email.toLowerCase(), u])
+        localUsers.map((u: User) => [u.email.toLowerCase(), u])
       );
 
       // Get acknowledgments for this document version

@@ -212,14 +212,14 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
     // Get or create interested parties
     const interestedPartyMap = new Map<string, string>();
     const existingParties = await prisma.interestedParty.findMany();
-    existingParties.forEach(party => {
+    existingParties.forEach((party: { name: string; id: string }) => {
       interestedPartyMap.set(party.name.toLowerCase(), party.id);
     });
     
     // Get users for owners
     const userMap = new Map<string, string>();
     const users = await prisma.user.findMany();
-    users.forEach(user => {
+    users.forEach((user: { displayName: string; email: string; id: string }) => {
       // Map by display name or email
       userMap.set(user.displayName.toUpperCase(), user.id);
       userMap.set(user.email.toUpperCase(), user.id);
@@ -228,7 +228,7 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
     // Get or create asset categories
     const assetCategoryMap = new Map<string, string>();
     const existingCategories = await prisma.assetCategory.findMany();
-    existingCategories.forEach(cat => {
+    existingCategories.forEach((cat: { name: string; id: string }) => {
       assetCategoryMap.set(cat.name.toLowerCase(), cat.id);
     });
     
@@ -289,7 +289,7 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
             categoryId = newCategory.id;
             assetCategoryMap.set(assetCategoryName.toLowerCase(), categoryId);
           }
-          assetCategoryId = categoryId;
+          assetCategoryId = categoryId || null;
         }
         
         // Parse risk scores

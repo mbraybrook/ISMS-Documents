@@ -59,7 +59,11 @@ export async function getRiskDashboardSummary(): Promise<RiskDashboardSummary> {
     risk_score_delta: 0,
   };
 
-  risks.forEach((risk) => {
+  risks.forEach((risk: {
+    calculatedScore: number;
+    mitigatedScore: number | null;
+    mitigationImplemented: boolean;
+  }) => {
     currentSnapshot.total_risk_score += risk.calculatedScore;
 
     if (risk.mitigatedScore !== null) {
@@ -86,7 +90,13 @@ export async function getRiskDashboardSummary(): Promise<RiskDashboardSummary> {
     }>;
   }>();
 
-  risks.forEach((risk) => {
+  risks.forEach((risk: {
+    dateAdded: Date | null;
+    createdAt: Date;
+    calculatedScore: number;
+    mitigatedScore: number | null;
+    mitigationImplemented: boolean;
+  }) => {
     // Handle missing dateAdded by using createdAt or current date
     let dateToUse: Date;
     if (risk.dateAdded) {

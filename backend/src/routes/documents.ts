@@ -118,7 +118,7 @@ router.get(
         console.log(`[DOCUMENTS] Generating URLs for ${documentsNeedingUrls.length} documents missing documentUrl`);
 
         // Generate URLs and update documents array and database
-        const urlPromises = documentsNeedingUrls.map(async (doc) => {
+        const urlPromises = documentsNeedingUrls.map(async (doc: { id: string; storageLocation: string; sharePointSiteId: string | null; sharePointDriveId: string | null; sharePointItemId: string | null; confluenceSpaceKey: string | null; confluencePageId: string | null; documentUrl: string | null }) => {
           try {
             let url: string | null = null;
 
@@ -164,7 +164,13 @@ router.get(
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(now.getDate() + 30);
 
-      const documentsWithComputedFields = documents.map((doc) => {
+      const documentsWithComputedFields = documents.map((doc: {
+        requiresAcknowledgement: boolean;
+        lastChangedDate: Date | null;
+        lastReviewDate: Date | null;
+        nextReviewDate: Date | null;
+        status: string;
+      }) => {
         const docData: any = {
           ...doc,
           requiresAcknowledgement: doc.requiresAcknowledgement,
@@ -188,7 +194,7 @@ router.get(
 
 
       // Log for debugging
-      const sharePointDocs = documents.filter(d => d.storageLocation === 'SHAREPOINT');
+      const sharePointDocs = documents.filter((d: { storageLocation: string }) => d.storageLocation === 'SHAREPOINT');
       const _sampleSharePointDoc = sharePointDocs[0];
       
 
@@ -1176,7 +1182,7 @@ router.delete(
       if (hardDelete) {
         // For hard delete, manually delete related records first to avoid timeout
         // This is more efficient than relying on cascade deletes
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Omit<typeof prisma, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
           // Delete related records in order
           await tx.reviewTask.deleteMany({
             where: { documentId: id },
@@ -1260,7 +1266,7 @@ router.get(
         },
       });
 
-      res.json(documentControls.map((dc) => dc.control));
+      res.json(documentControls.map((dc: { control: unknown }) => dc.control));
     } catch (error) {
       console.error('Error fetching document controls:', error);
       res.status(500).json({ error: 'Failed to fetch document controls' });
@@ -1416,7 +1422,7 @@ router.post(
       const allControls = await prisma.control.findMany({
         where: {
           isStandardControl: true,
-          embedding: { not: Prisma.DbNull },
+          embedding: { not: Prisma.JsonNull },
         },
         select: {
           id: true,
@@ -1428,8 +1434,8 @@ router.post(
 
       // Use AI service for bulk similarity search
       const candidateEmbeddings = allControls
-        .filter(control => control.embedding && Array.isArray(control.embedding))
-        .map(control => ({
+        .filter((control: { embedding: unknown }) => control.embedding && Array.isArray(control.embedding))
+        .map((control: { id: string; embedding: unknown }) => ({
           id: control.id,
           embedding: control.embedding as number[],
         }));

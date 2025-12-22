@@ -655,12 +655,21 @@ describe('RiskReviewQueue', () => {
       const rejectButton = screen.getByRole('button', { name: /reject/i });
       await user.click(rejectButton);
 
+      // Wait for modal to be fully rendered
       await waitFor(() => {
         expect(screen.getByText('Reject Risk')).toBeInTheDocument();
       });
 
+      // Wait for cancel button to be available
+      await waitFor(() => {
+        const modal = screen.getByText('Reject Risk').closest('[role="dialog"]') || document.body;
+        const cancelButton = within(modal as HTMLElement).getByRole('button', { name: /cancel/i });
+        expect(cancelButton).toBeInTheDocument();
+      });
+
       // Act
-      const cancelButton = screen.getByRole('button', { name: /cancel/i });
+      const modal = screen.getByText('Reject Risk').closest('[role="dialog"]') || document.body;
+      const cancelButton = within(modal as HTMLElement).getByRole('button', { name: /cancel/i });
       await user.click(cancelButton);
 
       // Assert
@@ -895,18 +904,27 @@ describe('RiskReviewQueue', () => {
       const mergeButton = screen.getByRole('button', { name: /merge/i });
       await user.click(mergeButton);
 
+      // Wait for modal to fully render
       await waitFor(() => {
         expect(screen.getByText('Merge Risk')).toBeInTheDocument();
       });
 
-      // Act
-      const cancelButton = screen.getByRole('button', { name: /cancel/i });
+      // Wait for cancel button to be available in the modal
+      await waitFor(() => {
+        const modal = screen.getByText('Merge Risk').closest('[role="dialog"]') || document.body;
+        const cancelButton = within(modal as HTMLElement).getByRole('button', { name: /cancel/i });
+        expect(cancelButton).toBeInTheDocument();
+      });
+
+      // Act - Find cancel button within the modal
+      const modal = screen.getByText('Merge Risk').closest('[role="dialog"]') || document.body;
+      const cancelButton = within(modal as HTMLElement).getByRole('button', { name: /cancel/i });
       await user.click(cancelButton);
 
-      // Assert
+      // Assert - Wait for modal to close
       await waitFor(() => {
         expect(screen.queryByText('Merge Risk')).not.toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
     });
 
     it('should display target risks in select dropdown', async () => {

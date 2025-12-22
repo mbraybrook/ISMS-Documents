@@ -214,7 +214,7 @@ export async function importInterestedPartiesFromCSV(csvFilePathOrContent: strin
     
     // Get existing interested parties
     const existingParties = await prisma.interestedParty.findMany();
-    const existingNames = new Set(existingParties.map(p => p.name));
+    const existingNames = new Set(existingParties.map((p: { name: string }) => p.name));
     
     // Create new interested parties
     for (const [name, data] of uniqueParties.entries()) {

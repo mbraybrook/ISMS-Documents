@@ -90,6 +90,14 @@ router.post(
           replacementServiceAnalysis: Prisma.JsonNull,
           contractClosure: Prisma.JsonNull,
           lessonsLearned: Prisma.JsonNull,
+        } as {
+          id: string;
+          supplierId: string;
+          impactAssessment: typeof Prisma.JsonNull;
+          dataAndIpr: typeof Prisma.JsonNull;
+          replacementServiceAnalysis: typeof Prisma.JsonNull;
+          contractClosure: typeof Prisma.JsonNull;
+          lessonsLearned: typeof Prisma.JsonNull;
         },
       });
 

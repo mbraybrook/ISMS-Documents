@@ -145,7 +145,7 @@ export async function findRelevantRisksForSupplier(
     // Use findSimilarRisks to get similarity scores
     const similarityResults = await findSimilarRisks(
       supplierText,
-      candidateRisks.map((risk) => ({
+      candidateRisks.map((risk: { id: string; title: string; threatDescription: string | null; description: string | null; embedding: unknown }) => ({
         id: risk.id,
         title: risk.title,
         threatDescription: risk.threatDescription,
@@ -155,12 +155,12 @@ export async function findRelevantRisksForSupplier(
     );
 
     // Filter by minimum similarity threshold (50)
-    const filteredResults = similarityResults.filter((result) => result.score >= 50);
+    const filteredResults = similarityResults.filter((result: { score: number }) => result.score >= 50);
 
     // Get full risk data for results
     const results: SupplierRiskSuggestion[] = [];
     for (const result of filteredResults.slice(0, limit)) {
-      const risk = candidateRisks.find((r) => r.id === result.riskId);
+      const risk = candidateRisks.find((r: { id: string }) => r.id === result.riskId);
       if (risk) {
         results.push({
           risk: {
