@@ -1181,7 +1181,15 @@ describe('ControlFormModal', () => {
         expect(api.get).toHaveBeenCalledWith('/api/controls/control-1/suppliers');
       });
 
-      const linkButton = screen.getByRole('button', { name: /link supplier/i });
+      // Wait for the Linked Suppliers section to appear
+      await waitFor(() => {
+        expect(screen.getByText(/linked suppliers/i)).toBeInTheDocument();
+      });
+
+      // Get all Link Supplier buttons and use the first one (should be the main one in Linked Suppliers section)
+      const linkButtons = screen.getAllByRole('button', { name: /link supplier/i });
+      expect(linkButtons.length).toBeGreaterThan(0);
+      const linkButton = linkButtons[0];
       await user.click(linkButton);
 
       // Wait for supplier modal to open
@@ -1206,8 +1214,13 @@ describe('ControlFormModal', () => {
         expect(screen.getByText('Another Supplier')).toBeInTheDocument();
       }, { timeout: 3000 });
 
-      // Verify that "Test Supplier" is NOT in the search results (it's already linked)
-      expect(screen.queryByText('Test Supplier')).not.toBeInTheDocument();
+      // Verify that "Test Supplier" is NOT in the search results table (it's already linked)
+      // Note: "Test Supplier" may still appear in the "Linked Suppliers" section above,
+      // but it should NOT appear in the search results table
+      const supplierTable = screen.getByRole('table');
+      expect(supplierTable).toBeInTheDocument();
+      expect(supplierTable.textContent).toContain('Another Supplier');
+      expect(supplierTable.textContent).not.toContain('Test Supplier');
     });
 
     it('should filter out already linked documents from search results', async () => {
