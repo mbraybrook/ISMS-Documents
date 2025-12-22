@@ -109,7 +109,7 @@ router.get(
       // This ensures URLs are stored and returned in the response
       const accessToken = req.headers['x-graph-token'] as string;
       const documentsNeedingUrls = documents.filter(
-        doc => !doc.documentUrl &&
+        (doc: typeof documents[0]) => !doc.documentUrl &&
           ((doc.storageLocation === 'SHAREPOINT' && doc.sharePointSiteId && doc.sharePointDriveId && doc.sharePointItemId) ||
             (doc.storageLocation === 'CONFLUENCE' && doc.confluenceSpaceKey && doc.confluencePageId))
       );

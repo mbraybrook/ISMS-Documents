@@ -252,7 +252,7 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
           interestedPartyName = 'Unspecified';
         }
         
-        let interestedPartyId = interestedPartyMap.get(interestedPartyName.toLowerCase());
+        let interestedPartyId: string | undefined = interestedPartyMap.get(interestedPartyName.toLowerCase());
         if (!interestedPartyId) {
           const newParty = await prisma.interestedParty.create({
             data: {
@@ -264,6 +264,12 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
           interestedPartyId = newParty.id;
           interestedPartyMap.set(interestedPartyName.toLowerCase(), interestedPartyId);
         }
+        // Ensure interestedPartyId is defined (should always be after the if block)
+        if (!interestedPartyId) {
+          throw new Error(`Failed to get or create interested party: ${interestedPartyName}`);
+        }
+        // TypeScript type narrowing: after the check, interestedPartyId is definitely a string
+        const finalInterestedPartyId: string = interestedPartyId;
         
         // Get owner user ID (optional)
         let ownerUserId: string | null = null;
@@ -289,7 +295,7 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
             categoryId = newCategory.id;
             assetCategoryMap.set(assetCategoryName.toLowerCase(), categoryId);
           }
-          assetCategoryId = categoryId || null;
+          assetCategoryId = categoryId ?? null;
         }
         
         // Parse risk scores
@@ -340,7 +346,7 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
             assetCategory: assetCategoryName || null,
             assetCategoryId,
             assetId: null,
-            interestedPartyId,
+            interestedPartyId: finalInterestedPartyId,
             threatDescription: (row['Threat Description'] || '').trim() || null,
             archived: false,
             expiryDate: null,

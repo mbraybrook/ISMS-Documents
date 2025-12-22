@@ -242,7 +242,7 @@ export async function checkSimilarityForNewRisk(
     // Cheap exact title prefilter before LLM calls
     const normalizedTitle = riskData.title.trim().toLowerCase();
     const exactMatches = allRisks.filter(
-      (r) => r.title.trim().toLowerCase() === normalizedTitle,
+      (r: typeof allRisks[0]) => r.title.trim().toLowerCase() === normalizedTitle,
     );
 
     if (exactMatches.length > 0) {

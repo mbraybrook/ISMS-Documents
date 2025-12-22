@@ -133,10 +133,10 @@ export async function findRelevantRisksForSupplier(
       where: { supplierId },
       select: { riskId: true },
     });
-    const linkedRiskIds = new Set(linkedRisks.map((link) => link.riskId));
+    const linkedRiskIds = new Set(linkedRisks.map((link: { riskId: string }) => link.riskId));
 
     // Filter out already-linked risks
-    const candidateRisks = allRisks.filter((risk) => !linkedRiskIds.has(risk.id));
+    const candidateRisks = allRisks.filter((risk: typeof allRisks[0]) => !linkedRiskIds.has(risk.id));
 
     if (candidateRisks.length === 0) {
       return [];

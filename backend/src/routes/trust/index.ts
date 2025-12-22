@@ -1172,7 +1172,7 @@ router.get(
         },
       });
 
-      const result = documents.map((doc) => ({
+      const result = documents.map((doc: typeof documents[0]) => ({
         document: {
           id: doc.id,
           title: doc.title,

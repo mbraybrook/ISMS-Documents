@@ -395,7 +395,7 @@ router.get(
                 localUserMapByEmail.get(staffUser.email.toLowerCase());
 
               notAcknowledgedUsers.push({
-                userId: localUser?.id || null,
+                userId: (localUser?.id) ?? null,
                 entraObjectId: staffUser.entraObjectId,
                 email: staffUser.email,
                 displayName: staffUser.displayName,
@@ -567,7 +567,7 @@ router.get(
             localUserMapByEmail.get(staffUser.email.toLowerCase());
 
           notAcknowledgedUsers.push({
-            userId: localUser?.id || null,
+            userId: (localUser?.id) ?? null,
             entraObjectId: staffUser.entraObjectId,
             email: staffUser.email,
             displayName: staffUser.displayName,

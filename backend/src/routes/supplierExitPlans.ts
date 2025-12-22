@@ -2,7 +2,6 @@
 import { Router, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
 import { randomUUID } from 'crypto';
-import { Prisma } from '@prisma/client';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
@@ -81,23 +80,12 @@ router.post(
       }
 
       // Create exit plan
+      // For optional JSON fields, we omit them (they'll be null in the database)
       const exitPlan = await prisma.supplierExitPlan.create({
         data: {
           id: randomUUID(),
           supplierId: req.params.id,
-          impactAssessment: Prisma.JsonNull,
-          dataAndIpr: Prisma.JsonNull,
-          replacementServiceAnalysis: Prisma.JsonNull,
-          contractClosure: Prisma.JsonNull,
-          lessonsLearned: Prisma.JsonNull,
-        } as {
-          id: string;
-          supplierId: string;
-          impactAssessment: typeof Prisma.JsonNull;
-          dataAndIpr: typeof Prisma.JsonNull;
-          replacementServiceAnalysis: typeof Prisma.JsonNull;
-          contractClosure: typeof Prisma.JsonNull;
-          lessonsLearned: typeof Prisma.JsonNull;
+          // Optional JSON fields are omitted - they'll be null by default
         },
       });
 
