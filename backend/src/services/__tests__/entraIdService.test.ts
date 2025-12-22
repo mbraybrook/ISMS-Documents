@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, jest, afterEach } from '@jest/globals';
 import { Client } from '@microsoft/microsoft-graph-client';
-import { randomUUID } from 'crypto';
 import * as entraIdService from '../entraIdService';
 import * as sharePointService from '../sharePointService';
 
@@ -456,7 +455,7 @@ describe('entraIdService', () => {
       mockApi.select.mockReturnValue(mockApi);
       // Track retry attempts to ensure we exceed maxRetries (5)
       let attemptCount = 0;
-      const maxRetries = 5;
+      const _maxRetries = 5;
       mockApi.get.mockImplementation(() => {
         attemptCount++;
         // Always reject with throttling - after maxRetries attempts, should throw
