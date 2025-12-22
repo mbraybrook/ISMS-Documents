@@ -176,7 +176,7 @@ describe('Config', () => {
       // Act & Assert
       await expect(async () => {
         await import('../config');
-      }).rejects.toThrow('Invalid SEED_SCOPE: invalid. Must be one of: "reference", "full", "none"');
+      }).rejects.toThrow('Invalid SEED_SCOPE: invalid. Must be one of: "system", "reference", "full", "none"');
     });
 
     it('should accept "reference" as valid SEED_SCOPE', async () => {

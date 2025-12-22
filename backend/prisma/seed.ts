@@ -6,19 +6,190 @@ const prisma = new PrismaClient();
 
 type SeedScope = 'reference' | 'full' | 'none' | 'system';
 
+interface ClassificationSeed {
+  id: string;
+  name: string;
+  description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface AssetCategorySeed {
+  id: string;
+  name: string;
+  description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface AssetSeed {
+  id: string;
+  date: string;
+  assetCategoryId: string;
+  assetSubCategory?: string | null;
+  owner: string;
+  primaryUser?: string | null;
+  location?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  nameSerialNo?: string | null;
+  cdeImpacting?: boolean;
+  classificationId: string;
+  purpose?: string | null;
+  notes?: string | null;
+  cost?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface RiskSeed {
+  id: string;
+  title: string;
+  description?: string | null;
+  dateAdded?: string;
+  riskCategory?: string | null;
+  riskNature?: string | null;
+  ownerUserId?: string | null;
+  department?: string | null;
+  status?: string;
+  wizardData?: unknown;
+  rejectionReason?: string | null;
+  mergedIntoRiskId?: string | null;
+  assetCategory?: string | null;
+  assetId?: string | null;
+  assetCategoryId?: string | null;
+  interestedPartyId?: string | null;
+  threatDescription?: string | null;
+  archived?: boolean;
+  expiryDate?: string | null;
+  lastReviewDate?: string | null;
+  nextReviewDate?: string | null;
+  confidentialityScore?: number;
+  integrityScore?: number;
+  availabilityScore?: number;
+  riskScore?: number | null;
+  likelihood?: number;
+  calculatedScore?: number | null;
+  initialRiskTreatmentCategory?: string | null;
+  mitigatedConfidentialityScore?: number | null;
+  mitigatedIntegrityScore?: number | null;
+  mitigatedAvailabilityScore?: number | null;
+  mitigatedRiskScore?: number | null;
+  mitigatedLikelihood?: number | null;
+  mitigatedScore?: number | null;
+  mitigationImplemented?: boolean;
+  mitigationDescription?: string | null;
+  residualRiskTreatmentCategory?: string | null;
+  annexAControlsRaw?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface ControlSeed {
+  id: string;
+  code: string;
+  title: string;
+  description?: string | null;
+  selectedForRiskAssessment?: boolean;
+  selectedForContractualObligation?: boolean;
+  selectedForLegalRequirement?: boolean;
+  selectedForBusinessRequirement?: boolean;
+  justification?: string | null;
+  controlText?: string | null;
+  purpose?: string | null;
+  guidance?: string | null;
+  otherInformation?: string | null;
+  category?: string | null;
+  isStandardControl?: boolean;
+  implemented?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface DocumentSeed {
+  id: string;
+  title: string;
+  type: string;
+  storageLocation?: string | null;
+  sharePointSiteId?: string | null;
+  sharePointDriveId?: string | null;
+  sharePointItemId?: string | null;
+  confluenceSpaceKey?: string | null;
+  confluencePageId?: string | null;
+  version?: string | null;
+  status?: string | null;
+  ownerUserId?: string | null;
+  lastReviewDate?: string | null;
+  nextReviewDate?: string | null;
+  requiresAcknowledgement?: boolean;
+  lastChangedDate?: string | null;
+  documentUrl?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface InterestedPartySeed {
+  id: string;
+  name: string;
+  group?: string | null;
+  description?: string | null;
+  dateAdded?: string | null;
+  requirements?: string | null;
+  addressedThroughISMS?: string | null;
+  howAddressedThroughISMS?: string | null;
+  sourceLink?: string | null;
+  keyProductsServices?: string | null;
+  ourObligations?: string | null;
+  theirObligations?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface LegislationSeed {
+  id: string;
+  dateAdded?: string | null;
+  interestedParty?: string | null;
+  actRegulationRequirement?: string | null;
+  description?: string | null;
+  riskOfNonCompliance?: string | null;
+  howComplianceAchieved?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface RiskControlSeed {
+  riskId: string;
+  controlId: string;
+}
+
+interface DocumentRiskSeed {
+  documentId: string;
+  riskId: string;
+}
+
+interface DocumentControlSeed {
+  documentId: string;
+  controlId: string;
+}
+
+interface LegislationRiskSeed {
+  legislationId: string;
+  riskId: string;
+}
+
 interface SeedData {
-  classifications?: any[];
-  assetCategories?: any[];
-  assets?: any[];
-  risks?: any[];
-  controls?: any[];
-  documents?: any[];
-  interestedParties?: any[];
-  legislation?: any[];
-  riskControls?: any[];
-  documentRisks?: any[];
-  documentControls?: any[];
-  legislationRisks?: any[];
+  classifications?: ClassificationSeed[];
+  assetCategories?: AssetCategorySeed[];
+  assets?: AssetSeed[];
+  risks?: RiskSeed[];
+  controls?: ControlSeed[];
+  documents?: DocumentSeed[];
+  interestedParties?: InterestedPartySeed[];
+  legislation?: LegislationSeed[];
+  riskControls?: RiskControlSeed[];
+  documentRisks?: DocumentRiskSeed[];
+  documentControls?: DocumentControlSeed[];
+  legislationRisks?: LegislationRiskSeed[];
 }
 
 /**
@@ -48,13 +219,15 @@ function loadSeedData(scope: SeedScope): SeedData {
       const key = file.replace('.json', '').replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
       // Handle camelCase conversion for multi-word keys
       if (key === 'assetCategories') {
-        data.assetCategories = JSON.parse(content);
+        data.assetCategories = JSON.parse(content) as AssetCategorySeed[];
       } else if (key === 'interestedParties') {
-        data.interestedParties = JSON.parse(content);
+        data.interestedParties = JSON.parse(content) as InterestedPartySeed[];
       } else if (key === 'classifications') {
-        data.classifications = JSON.parse(content);
-      } else {
-        data[key as keyof SeedData] = JSON.parse(content);
+        data.classifications = JSON.parse(content) as ClassificationSeed[];
+      } else if (key === 'controls') {
+        data.controls = JSON.parse(content) as ControlSeed[];
+      } else if (key === 'legislation') {
+        data.legislation = JSON.parse(content) as LegislationSeed[];
       }
     }
   }
@@ -78,15 +251,19 @@ function loadSeedData(scope: SeedScope): SeedData {
         const key = file.replace('.json', '').replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
         // Handle camelCase conversion for multi-word keys
         if (key === 'riskControls') {
-          data.riskControls = JSON.parse(content);
+          data.riskControls = JSON.parse(content) as RiskControlSeed[];
         } else if (key === 'documentRisks') {
-          data.documentRisks = JSON.parse(content);
+          data.documentRisks = JSON.parse(content) as DocumentRiskSeed[];
         } else if (key === 'documentControls') {
-          data.documentControls = JSON.parse(content);
+          data.documentControls = JSON.parse(content) as DocumentControlSeed[];
         } else if (key === 'legislationRisks') {
-          data.legislationRisks = JSON.parse(content);
-        } else {
-          data[key as keyof SeedData] = JSON.parse(content);
+          data.legislationRisks = JSON.parse(content) as LegislationRiskSeed[];
+        } else if (key === 'assets') {
+          data.assets = JSON.parse(content) as AssetSeed[];
+        } else if (key === 'risks') {
+          data.risks = JSON.parse(content) as RiskSeed[];
+        } else if (key === 'documents') {
+          data.documents = JSON.parse(content) as DocumentSeed[];
         }
       }
     }
@@ -98,7 +275,7 @@ function loadSeedData(scope: SeedScope): SeedData {
 /**
  * Seed Classifications
  */
-async function seedClassifications(data: any[]) {
+async function seedClassifications(data: ClassificationSeed[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} classifications...`);
@@ -125,7 +302,7 @@ async function seedClassifications(data: any[]) {
 /**
  * Seed Asset Categories
  */
-async function seedAssetCategories(data: any[]) {
+async function seedAssetCategories(data: AssetCategorySeed[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} asset categories...`);
@@ -152,7 +329,7 @@ async function seedAssetCategories(data: any[]) {
 /**
  * Seed Assets
  */
-async function seedAssets(data: any[]) {
+async function seedAssets(data: AssetSeed[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} assets...`);
@@ -203,7 +380,7 @@ async function seedAssets(data: any[]) {
 /**
  * Seed Risks
  */
-async function seedRisks(data: any[]) {
+async function seedRisks(data: RiskSeed[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} risks...`);
@@ -309,7 +486,7 @@ async function seedRisks(data: any[]) {
 /**
  * Seed Controls
  */
-async function seedControls(data: any[]) {
+async function seedControls(data: ControlSeed[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} controls...`);
@@ -362,7 +539,7 @@ async function seedControls(data: any[]) {
 /**
  * Seed Documents
  */
-async function seedDocuments(data: any[]) {
+async function seedDocuments(data: DocumentSeed[]) {
   if (!data || data.length === 0) return;
 
   // Create a default system user if it doesn't exist (Documents require ownerUserId)
@@ -452,7 +629,7 @@ async function seedDocuments(data: any[]) {
 /**
  * Seed Interested Parties
  */
-async function seedInterestedParties(data: any[]) {
+async function seedInterestedParties(data: InterestedPartySeed[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} interested parties...`);
@@ -497,7 +674,7 @@ async function seedInterestedParties(data: any[]) {
 /**
  * Seed Legislation
  */
-async function seedLegislation(data: any[]) {
+async function seedLegislation(data: LegislationSeed[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} legislation records...`);
@@ -532,7 +709,7 @@ async function seedLegislation(data: any[]) {
 /**
  * Seed Risk-Control junction table
  */
-async function seedRiskControls(data: any[]) {
+async function seedRiskControls(data: RiskControlSeed[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} risk-control links...`);
@@ -557,7 +734,7 @@ async function seedRiskControls(data: any[]) {
 /**
  * Seed Document-Risk junction table
  */
-async function seedDocumentRisks(data: any[]) {
+async function seedDocumentRisks(data: DocumentRiskSeed[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} document-risk links...`);
@@ -582,7 +759,7 @@ async function seedDocumentRisks(data: any[]) {
 /**
  * Seed Document-Control junction table
  */
-async function seedDocumentControls(data: any[]) {
+async function seedDocumentControls(data: DocumentControlSeed[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} document-control links...`);
@@ -607,7 +784,7 @@ async function seedDocumentControls(data: any[]) {
 /**
  * Seed Legislation-Risk junction table
  */
-async function seedLegislationRisks(data: any[]) {
+async function seedLegislationRisks(data: LegislationRiskSeed[]) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} legislation-risk links...`);

@@ -305,8 +305,8 @@ describe('sharePointService', () => {
       // Arrange
       const mockDrives = {
         value: [
-          { id: 'drive-1', name: 'Documents' },
-          { id: 'drive-2', name: 'Shared Documents' },
+          { id: 'drive-1', name: 'Documents', driveType: 'documentLibrary' },
+          { id: 'drive-2', name: 'Shared Documents', driveType: 'documentLibrary' },
         ],
       };
       mockApi.get.mockResolvedValue(mockDrives);

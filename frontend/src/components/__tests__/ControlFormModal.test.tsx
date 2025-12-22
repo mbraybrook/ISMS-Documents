@@ -1168,13 +1168,26 @@ describe('ControlFormModal', () => {
         if (url.includes('/suppliers')) {
           return Promise.resolve({ data: [mockSupplier] });
         }
+        if (url.includes('/documents')) {
+          return Promise.resolve({ data: [] });
+        }
         return Promise.resolve({ data: [] });
       });
 
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={mockControl} />);
 
+      // Wait for component to load and fetch linked suppliers
+      await waitFor(() => {
+        expect(api.get).toHaveBeenCalledWith('/api/controls/control-1/suppliers');
+      });
+
       const linkButton = screen.getByRole('button', { name: /link supplier/i });
       await user.click(linkButton);
+
+      // Wait for supplier modal to open
+      await waitFor(() => {
+        expect(screen.getByText('Link Supplier to Control')).toBeInTheDocument();
+      });
 
       const searchInput = screen.getByPlaceholderText(/search suppliers by name/i);
       await user.type(searchInput, 'Test');
@@ -1182,15 +1195,19 @@ describe('ControlFormModal', () => {
       const searchButton = screen.getByRole('button', { name: /search/i });
       await user.click(searchButton);
 
+      // Wait for API call to complete
       await waitFor(() => {
-        expect(supplierApi.getSuppliers).toHaveBeenCalled();
-      });
+        expect(supplierApi.getSuppliers).toHaveBeenCalledWith({ search: 'Test' });
+      }, { timeout: 3000 });
 
-      // Wait for search results to appear
+      // Wait for search results to appear - should only show "Another Supplier"
+      // "Test Supplier" should be filtered out as it's already linked
       await waitFor(() => {
-        const supplierTable = screen.getByRole('table');
-        expect(supplierTable).toBeInTheDocument();
-      });
+        expect(screen.getByText('Another Supplier')).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      // Verify that "Test Supplier" is NOT in the search results (it's already linked)
+      expect(screen.queryByText('Test Supplier')).not.toBeInTheDocument();
     });
 
     it('should filter out already linked documents from search results', async () => {
