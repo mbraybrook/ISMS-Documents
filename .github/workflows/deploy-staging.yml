@@ -98,10 +98,19 @@ jobs:
       - name: Get current backend task definition
         id: backend-task-def
         run: |
+          # Get task definition from service
+          TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster ${{ secrets.STAGING_CLUSTER_NAME }} \
+            --services ${{ secrets.STAGING_BACKEND_SERVICE }} \
+            --query 'services[0].taskDefinition' \
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
+          # Get full task definition JSON
           TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition ${{ secrets.STAGING_BACKEND_SERVICE }} \
+            --task-definition $TASK_DEF_ARN \
             --query 'taskDefinition' \
-            --output json)
+            --output json \
+            --region ${{ secrets.AWS_REGION }})
           echo "task_def<<EOF" >> $GITHUB_OUTPUT
           echo "$TASK_DEF" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -115,16 +124,26 @@ jobs:
           NEW_TASK_DEF=$(aws ecs register-task-definition \
             --cli-input-json "$TASK_DEF" \
             --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
           echo "task_def_arn=$NEW_TASK_DEF" >> $GITHUB_OUTPUT
 
       - name: Get current frontend task definition
         id: frontend-task-def
         run: |
+          # Get task definition from service
+          TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster ${{ secrets.STAGING_CLUSTER_NAME }} \
+            --services ${{ secrets.STAGING_FRONTEND_SERVICE }} \
+            --query 'services[0].taskDefinition' \
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
+          # Get full task definition JSON
           TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition ${{ secrets.STAGING_FRONTEND_SERVICE }} \
+            --task-definition $TASK_DEF_ARN \
             --query 'taskDefinition' \
-            --output json)
+            --output json \
+            --region ${{ secrets.AWS_REGION }})
           echo "task_def<<EOF" >> $GITHUB_OUTPUT
           echo "$TASK_DEF" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -138,7 +157,8 @@ jobs:
           NEW_TASK_DEF=$(aws ecs register-task-definition \
             --cli-input-json "$TASK_DEF" \
             --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
           echo "task_def_arn=$NEW_TASK_DEF" >> $GITHUB_OUTPUT
 
       - name: Create backend CodeDeploy deployment
@@ -167,7 +187,8 @@ jobs:
             --deployment-group-name ${{ secrets.STAGING_BACKEND_DEPLOYMENT_GROUP }} \
             --revision "revisionType=AppSpecContent,appSpecContent='${APPSPEC}'" \
             --query 'deploymentId' \
-            --output text)
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
           echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
 
       - name: Create frontend CodeDeploy deployment
@@ -196,25 +217,29 @@ jobs:
             --deployment-group-name ${{ secrets.STAGING_FRONTEND_DEPLOYMENT_GROUP }} \
             --revision "revisionType=AppSpecContent,appSpecContent='${APPSPEC}'" \
             --query 'deploymentId' \
-            --output text)
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
           echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
 
       - name: Wait for backend deployment
         run: |
           aws deploy wait deployment-successful \
-            --deployment-id ${{ steps.backend-deploy.outputs.deployment_id }}
+            --deployment-id ${{ steps.backend-deploy.outputs.deployment_id }} \
+            --region ${{ secrets.AWS_REGION }}
 
       - name: Wait for frontend deployment
         run: |
           aws deploy wait deployment-successful \
-            --deployment-id ${{ steps.frontend-deploy.outputs.deployment_id }}
+            --deployment-id ${{ steps.frontend-deploy.outputs.deployment_id }} \
+            --region ${{ secrets.AWS_REGION }}
 
       - name: Health check
         run: |
           ALB_DNS=$(aws cloudformation describe-stacks \
-            --stack-name isms-staging \
+            --stack-name isms-staging-alb \
             --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNSName`].OutputValue' \
-            --output text)
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
           echo "Checking health at https://$ALB_DNS/api/health"
           curl -f https://$ALB_DNS/api/health || exit 1
 
