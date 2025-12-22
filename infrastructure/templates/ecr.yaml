@@ -178,5 +178,108 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-FrontendRepositoryArn'
 
+  DocumentServiceRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: isms-document-service
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: !Sub |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images tagged with staging or production",
+                "selection": {
+                  "tagStatus": "tagged",
+                  "tagPrefixList": ["staging", "production"],
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": {
+                  "type": "expire"
+                }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Expire untagged images after 7 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 7
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+      Tags:
+        - Key: Name
+          Value: isms-document-service
+        - Key: Environment
+          Value: !Ref Environment
+
+  AIServiceRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: isms-ai-service
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: !Sub |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images tagged with staging or production",
+                "selection": {
+                  "tagStatus": "tagged",
+                  "tagPrefixList": ["staging", "production"],
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": {
+                  "type": "expire"
+                }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Expire untagged images after 7 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 7
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+      Tags:
+        - Key: Name
+          Value: isms-ai-service
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  DocumentServiceRepositoryUri:
+    Description: Document Service ECR repository URI
+    Value: !GetAtt DocumentServiceRepository.RepositoryUri
+    Export:
+      Name: !Sub '${AWS::StackName}-DocumentServiceRepositoryUri'
+
+  AIServiceRepositoryUri:
+    Description: AI Service ECR repository URI
+    Value: !GetAtt AIServiceRepository.RepositoryUri
+    Export:
+      Name: !Sub '${AWS::StackName}-AIServiceRepositoryUri'
+
 
 

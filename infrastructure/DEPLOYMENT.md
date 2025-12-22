@@ -364,10 +364,66 @@ aws secretsmanager put-secret-value \
     "AUTH_CLIENT_ID": "your-client-id",
     "AUTH_CLIENT_SECRET": "your-client-secret",
     "AUTH_REDIRECT_URI": "https://trust.demo.paythru.com",
-    "TRUST_CENTER_JWT_SECRET": "your-jwt-secret"
+    "TRUST_CENTER_JWT_SECRET": "your-jwt-secret",
+    "INTERNAL_SERVICE_TOKEN": "your-secure-token-here"
   }' \
   --region eu-west-2 \
   --profile pt-sandbox
+```
+
+**Important Notes:**
+- `INTERNAL_SERVICE_TOKEN` is used for authentication between microservices (backend, document-service, ai-service)
+- Generate a secure random token (e.g., using `openssl rand -hex 32`)
+- If updating an existing secret, you must include ALL existing fields - `put-secret-value` replaces the entire secret
+- To add/update a single field without replacing the entire secret, see the "Updating Individual Secrets" section below
+
+#### Updating Individual Secrets
+
+If you need to add or update a single secret value (like `INTERNAL_SERVICE_TOKEN`) without replacing all existing secrets:
+
+```bash
+# 1. Get current secret value
+CURRENT_SECRET=$(aws secretsmanager get-secret-value \
+  --secret-id isms-staging-app-secrets \
+  --query 'SecretString' \
+  --output text \
+  --region eu-west-2 \
+  --profile pt-sandbox)
+
+# 2. Generate a secure token (optional - only if adding INTERNAL_SERVICE_TOKEN)
+NEW_TOKEN=$(openssl rand -hex 32)
+echo "Generated token: $NEW_TOKEN"
+
+# 3. Update secret with new value (merges with existing values)
+aws secretsmanager put-secret-value \
+  --secret-id isms-staging-app-secrets \
+  --secret-string "$(echo "$CURRENT_SECRET" | jq --arg token "$NEW_TOKEN" '.INTERNAL_SERVICE_TOKEN = $token')" \
+  --region eu-west-2 \
+  --profile pt-sandbox
+```
+
+**To add `INTERNAL_SERVICE_TOKEN` to an existing secret:**
+```bash
+# Get current secret
+CURRENT_SECRET=$(aws secretsmanager get-secret-value \
+  --secret-id isms-staging-app-secrets \
+  --query 'SecretString' \
+  --output text \
+  --region eu-west-2 \
+  --profile pt-sandbox)
+
+# Generate secure token
+NEW_TOKEN=$(openssl rand -hex 32)
+
+# Add INTERNAL_SERVICE_TOKEN to existing secret
+aws secretsmanager put-secret-value \
+  --secret-id isms-staging-app-secrets \
+  --secret-string "$(echo "$CURRENT_SECRET" | jq --arg token "$NEW_TOKEN" '. + {INTERNAL_SERVICE_TOKEN: $token}')" \
+  --region eu-west-2 \
+  --profile pt-sandbox
+
+echo "✅ Added INTERNAL_SERVICE_TOKEN to secret"
+echo "Token: $NEW_TOKEN"
 ```
 
 ### Step 3: Configure DNS

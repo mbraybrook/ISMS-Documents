@@ -117,7 +117,33 @@ A comprehensive Information Security Management System (ISMS) platform that cent
 
 ### Docker Development
 
-1. **Build and start services:**
+The docker-compose setup mirrors the ECS production deployment architecture, allowing you to test the full microservices architecture locally before deploying.
+
+**Architecture:**
+- **Backend**: Main API service (port 4000)
+- **Frontend**: React app served via nginx (port 3000, mapped from container port 80)
+- **Document Service**: Microservice for PDF conversion and watermarking (port 4001)
+- **AI Service**: Microservice for embeddings and similarity calculations (port 4002)
+- **PostgreSQL**: Database (port 5432)
+- **Ollama**: LLM service for AI operations (port 11434)
+
+**Service Discovery:**
+- Services use the same DNS names as ECS: `document-service.local` and `ai-service.local`
+- Backend connects to microservices using the same URLs as production
+- All services communicate via internal service authentication token
+
+1. **Set up environment variables:**
+   
+   Create a `.env` file in the root directory:
+   ```bash
+   INTERNAL_SERVICE_TOKEN=dev-token-change-me-in-production
+   VITE_API_URL=http://localhost:4000
+   VITE_AUTH_TENANT_ID=your-tenant-id
+   VITE_AUTH_CLIENT_ID=your-client-id
+   VITE_AUTH_REDIRECT_URI=http://localhost:3000
+   ```
+
+2. **Build and start services:**
    ```bash
    docker compose up
    ```
@@ -127,18 +153,47 @@ A comprehensive Information Security Management System (ISMS) platform that cent
    docker compose up -d
    ```
 
-2. **Stop services:**
+   **Note**: First build may take several minutes as it builds production Docker images matching the ECS deployment.
+
+3. **Stop services:**
    ```bash
    docker compose down
    ```
 
-3. **View logs:**
+4. **View logs:**
    ```bash
+   # All services
    docker compose logs -f
+   
+   # Specific service
+   docker compose logs -f backend
+   docker compose logs -f document-service
+   docker compose logs -f ai-service
    ```
 
-4. **Access the application:**
+5. **Access the application:**
    - Frontend: http://localhost:3000
+   - Backend API: http://localhost:4000
+   - Document Service: http://localhost:4001/health
+   - AI Service: http://localhost:4002/health
+
+6. **Health Checks:**
+   All services include health checks matching the ECS configuration:
+   - Backend: `GET /api/health`
+   - Frontend: `GET /health`
+   - Document Service: `GET /health`
+   - AI Service: `GET /health`
+
+7. **Rebuild services after code changes:**
+   ```bash
+   # Rebuild specific service
+   docker compose build backend
+   docker compose up -d backend
+   
+   # Rebuild all services
+   docker compose build
+   docker compose up -d
+   ```
    - Backend API: http://localhost:4000
 
 **Note**: Use `docker compose` (without hyphen) for Docker Compose V2. For older installations, you may need `docker-compose` (with hyphen).

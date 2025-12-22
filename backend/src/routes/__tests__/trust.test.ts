@@ -132,10 +132,12 @@ jest.mock('../../services/documentConversionService', () => ({
   }),
 }));
 
-// Mock PDF cache service
-jest.mock('../../services/pdfCacheService', () => ({
-  getCachedPdf: jest.fn(),
-  setCachedPdf: jest.fn(),
+// Mock document service client
+jest.mock('../../clients/documentServiceClient', () => ({
+  getCachedPdfRemote: jest.fn().mockResolvedValue(null),
+  setCachedPdfRemote: jest.fn().mockResolvedValue({ success: true }),
+  convertToPdfRemote: jest.fn(),
+  watermarkPdfRemote: jest.fn(),
 }));
 
 // Mock trust audit service
@@ -148,6 +150,11 @@ jest.mock('../../config', () => ({
   config: {
     trustCenter: {
       maxFileSizeMB: 50,
+    },
+    documentService: {
+      baseUrl: 'http://document-service:4001',
+      internalToken: 'test-token',
+      timeout: 30000,
     },
   },
 }));
@@ -162,9 +169,9 @@ import {
   FileTooLargeError,
   PermissionDeniedError,
 } from '../../services/sharePointService';
-import { addWatermarkToPdf, validatePdfForWatermarking } from '../../services/watermarkService';
-import { convertToPdf, canConvertToPdf, getPdfFilename } from '../../services/documentConversionService';
-import { getCachedPdf, setCachedPdf } from '../../services/pdfCacheService';
+import { addWatermarkToPdf as _addWatermarkToPdf, validatePdfForWatermarking } from '../../services/watermarkService';
+import { convertToPdf as _convertToPdf, canConvertToPdf, getPdfFilename } from '../../services/documentConversionService';
+import { getCachedPdfRemote, setCachedPdfRemote, convertToPdfRemote, watermarkPdfRemote } from '../../clients/documentServiceClient';
 import { logTrustAction } from '../../services/trustAuditService';
 
 describe('Trust Routes', () => {
@@ -190,6 +197,19 @@ describe('Trust Routes', () => {
         termsAcceptedAt: new Date(),
       };
       next();
+    });
+    
+    // Reset document service client mocks
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const documentServiceClient = require('../../clients/documentServiceClient');
+    documentServiceClient.getCachedPdfRemote.mockResolvedValue(null);
+    documentServiceClient.setCachedPdfRemote.mockResolvedValue({ success: true });
+    documentServiceClient.convertToPdfRemote.mockResolvedValue({
+      pdfBufferBase64: Buffer.from('mock-pdf').toString('base64'),
+      filename: 'test.pdf',
+    });
+    documentServiceClient.watermarkPdfRemote.mockResolvedValue({
+      pdfBufferBase64: Buffer.from('watermarked-pdf').toString('base64'),
     });
     
     // Suppress console methods during tests
@@ -558,7 +578,7 @@ describe('Trust Routes', () => {
     beforeEach(() => {
       (prisma.document.findUnique as jest.Mock).mockResolvedValue(mockDocument);
       (getAppOnlyAccessToken as jest.Mock).mockResolvedValue('mock-token');
-      (getCachedPdf as jest.Mock).mockResolvedValue(null);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValue(null);
     });
 
     it('should return 404 when document not found', async () => {
@@ -663,11 +683,11 @@ describe('Trust Routes', () => {
       // Arrange
       const mockPdfBuffer = Buffer.from('mock-pdf-content');
       const cachedPdf = {
-        buffer: mockPdfBuffer,
+        buffer: mockPdfBuffer.toString('base64'),
         originalFilename: 'test.pdf',
       };
       (prisma.document.findUnique as jest.Mock).mockResolvedValueOnce(mockDocument);
-      (getCachedPdf as jest.Mock).mockResolvedValueOnce(cachedPdf);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValueOnce(cachedPdf);
       (getPdfFilename as jest.Mock).mockReturnValue('test.pdf');
       (prisma.trustDownload.create as jest.Mock).mockResolvedValueOnce({});
 
@@ -679,7 +699,7 @@ describe('Trust Routes', () => {
       // Assert
       expect(response.headers['content-type']).toBe('application/pdf');
       expect(response.headers['content-disposition']).toContain('test.pdf');
-      expect(getCachedPdf).toHaveBeenCalled();
+      expect(getCachedPdfRemote).toHaveBeenCalled();
       expect(downloadSharePointFile).not.toHaveBeenCalled();
     });
 
@@ -693,10 +713,10 @@ describe('Trust Routes', () => {
         size: mockPdfBuffer.length,
       };
       (prisma.document.findUnique as jest.Mock).mockResolvedValueOnce(mockDocument);
-      (getCachedPdf as jest.Mock).mockResolvedValueOnce(null);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValueOnce(null);
       (downloadSharePointFile as jest.Mock).mockResolvedValueOnce(mockFileData);
       (getPdfFilename as jest.Mock).mockReturnValue('test.pdf');
-      (setCachedPdf as jest.Mock).mockResolvedValueOnce(undefined);
+      (setCachedPdfRemote as jest.Mock).mockResolvedValueOnce(undefined);
       (prisma.trustDownload.create as jest.Mock).mockResolvedValueOnce({});
 
       // Act
@@ -706,7 +726,7 @@ describe('Trust Routes', () => {
 
       // Assert
       expect(downloadSharePointFile).toHaveBeenCalled();
-      expect(setCachedPdf).toHaveBeenCalled();
+      expect(setCachedPdfRemote).toHaveBeenCalled();
       expect(response.headers['content-type']).toBe('application/pdf');
     });
 
@@ -721,12 +741,15 @@ describe('Trust Routes', () => {
         size: mockWordBuffer.length,
       };
       (prisma.document.findUnique as jest.Mock).mockResolvedValueOnce(mockDocument);
-      (getCachedPdf as jest.Mock).mockResolvedValueOnce(null);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValueOnce(null);
       (downloadSharePointFile as jest.Mock).mockResolvedValueOnce(mockFileData);
       (canConvertToPdf as jest.Mock).mockReturnValueOnce(true);
-      (convertToPdf as jest.Mock).mockResolvedValueOnce(mockPdfBuffer);
+      (convertToPdfRemote as jest.Mock).mockResolvedValueOnce({
+        pdfBufferBase64: mockPdfBuffer.toString('base64'),
+        filename: 'test.pdf',
+      });
       (getPdfFilename as jest.Mock).mockReturnValue('test.pdf');
-      (setCachedPdf as jest.Mock).mockResolvedValueOnce(undefined);
+      (setCachedPdfRemote as jest.Mock).mockResolvedValueOnce(undefined);
       (prisma.trustDownload.create as jest.Mock).mockResolvedValueOnce({});
 
       // Act
@@ -735,7 +758,7 @@ describe('Trust Routes', () => {
         .expect(200);
 
       // Assert
-      expect(convertToPdf).toHaveBeenCalled();
+      expect(convertToPdfRemote).toHaveBeenCalled();
       expect(response.headers['content-type']).toBe('application/pdf');
       expect(response.headers['content-disposition']).toContain('test.pdf');
     });
@@ -748,7 +771,7 @@ describe('Trust Routes', () => {
         name: 'test.bin',
         size: 100,
       };
-      (getCachedPdf as jest.Mock).mockResolvedValueOnce(null);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValueOnce(null);
       (downloadSharePointFile as jest.Mock).mockResolvedValueOnce(mockFileData);
       (canConvertToPdf as jest.Mock).mockReturnValueOnce(false);
 
@@ -774,14 +797,16 @@ describe('Trust Routes', () => {
         },
       };
       const cachedPdf = {
-        buffer: mockPdfBuffer,
+        buffer: mockPdfBuffer.toString('base64'),
         originalFilename: 'test.pdf',
       };
       (prisma.document.findUnique as jest.Mock).mockResolvedValueOnce(privateDocument);
-      (getCachedPdf as jest.Mock).mockResolvedValueOnce(cachedPdf);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValueOnce(cachedPdf);
       (getPdfFilename as jest.Mock).mockReturnValue('test.pdf');
       (validatePdfForWatermarking as jest.Mock).mockReturnValueOnce({ valid: true });
-      (addWatermarkToPdf as jest.Mock).mockResolvedValueOnce(watermarkedBuffer);
+      (watermarkPdfRemote as jest.Mock).mockResolvedValueOnce({
+        pdfBufferBase64: watermarkedBuffer.toString('base64'),
+      });
       (prisma.trustDownload.create as jest.Mock).mockResolvedValueOnce({});
 
       // Act
@@ -791,13 +816,13 @@ describe('Trust Routes', () => {
         .expect(200);
 
       // Assert
-      expect(addWatermarkToPdf).toHaveBeenCalled();
+      expect(watermarkPdfRemote).toHaveBeenCalled();
       expect(response.headers['content-type']).toBe('application/pdf');
     });
 
     it('should handle SharePoint file not found error', async () => {
       // Arrange
-      (getCachedPdf as jest.Mock).mockResolvedValueOnce(null);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValueOnce(null);
       (downloadSharePointFile as jest.Mock).mockRejectedValueOnce(
         new FileNotFoundError('File not found')
       );
@@ -813,7 +838,7 @@ describe('Trust Routes', () => {
 
     it('should handle file too large error', async () => {
       // Arrange
-      (getCachedPdf as jest.Mock).mockResolvedValueOnce(null);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValueOnce(null);
       (downloadSharePointFile as jest.Mock).mockRejectedValueOnce(
         new FileTooLargeError('File too large')
       );
@@ -829,7 +854,7 @@ describe('Trust Routes', () => {
 
     it('should handle permission denied error', async () => {
       // Arrange
-      (getCachedPdf as jest.Mock).mockResolvedValueOnce(null);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValueOnce(null);
       (downloadSharePointFile as jest.Mock).mockRejectedValueOnce(
         new PermissionDeniedError('Permission denied')
       );
@@ -877,10 +902,10 @@ describe('Trust Routes', () => {
         ...documentWithoutIds.TrustDocSetting,
         ...parsedIds,
       });
-      (getCachedPdf as jest.Mock).mockResolvedValueOnce(null);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValueOnce(null);
       (downloadSharePointFile as jest.Mock).mockResolvedValueOnce(mockFileData);
       (getPdfFilename as jest.Mock).mockReturnValue('test.pdf');
-      (setCachedPdf as jest.Mock).mockResolvedValueOnce(undefined);
+      (setCachedPdfRemote as jest.Mock).mockResolvedValueOnce(undefined);
       (prisma.trustDownload.create as jest.Mock).mockResolvedValueOnce({});
 
       // Act
@@ -1836,10 +1861,10 @@ describe('Trust Routes', () => {
         size: 100,
       };
       (prisma.document.findUnique as jest.Mock).mockResolvedValueOnce(mockDocument);
-      (getCachedPdf as jest.Mock).mockResolvedValueOnce(null);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValueOnce(null);
       (downloadSharePointFile as jest.Mock).mockResolvedValueOnce(mockFileData);
       (canConvertToPdf as jest.Mock).mockReturnValueOnce(true);
-      (convertToPdf as jest.Mock).mockRejectedValueOnce(new Error('Conversion failed'));
+      (convertToPdfRemote as jest.Mock).mockRejectedValueOnce(new Error('Conversion failed'));
 
       // Act
       const response = await request(app)
@@ -1873,14 +1898,14 @@ describe('Trust Routes', () => {
         },
       };
       const cachedPdf = {
-        buffer: mockPdfBuffer,
+        buffer: mockPdfBuffer.toString('base64'),
         originalFilename: 'test.pdf',
       };
       (prisma.document.findUnique as jest.Mock).mockResolvedValueOnce(privateDocument);
-      (getCachedPdf as jest.Mock).mockResolvedValueOnce(cachedPdf);
+      (getCachedPdfRemote as jest.Mock).mockResolvedValueOnce(cachedPdf);
       (getPdfFilename as jest.Mock).mockReturnValue('test.pdf');
       (validatePdfForWatermarking as jest.Mock).mockReturnValueOnce({ valid: true });
-      (addWatermarkToPdf as jest.Mock).mockRejectedValueOnce(new Error('Watermarking failed'));
+      (watermarkPdfRemote as jest.Mock).mockRejectedValueOnce(new Error('Watermarking failed'));
       // Mock trustDownload.create to avoid errors
       (prisma.trustDownload.create as jest.Mock).mockResolvedValueOnce({});
 

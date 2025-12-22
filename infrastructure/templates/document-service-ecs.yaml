@@ -1,0 +1,272 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS service for document processing (PDF conversion, watermarking, caching)'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    AllowedValues:
+      - staging
+      - production
+    Default: staging
+
+  ClusterName:
+    Type: String
+    Description: ECS cluster name
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID
+
+  PrivateSubnet1Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private Subnet 1 ID
+
+  PrivateSubnet2Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private Subnet 2 ID
+
+  ECSSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: ECS Security Group ID
+
+  ECSTaskExecutionRoleArn:
+    Type: String
+    Description: ECS Task Execution Role ARN
+
+  ECSTaskRoleArn:
+    Type: String
+    Description: ECS Task Role ARN
+
+  DocumentServiceRepositoryUri:
+    Type: String
+    Description: Document Service ECR repository URI
+
+  DocumentServiceImageTag:
+    Type: String
+    Description: Document Service Docker image tag
+    Default: latest
+
+  ApplicationSecretsArn:
+    Type: String
+    Description: Application secrets ARN
+
+  EfsFileSystemId:
+    Type: String
+    Description: EFS file system ID for cache storage
+    Default: ''
+
+  MinTaskCount:
+    Type: Number
+    Description: Minimum number of tasks
+    Default: 1
+    MinValue: 1
+
+  MaxTaskCount:
+    Type: Number
+    Description: Maximum number of tasks
+    Default: 2
+    MinValue: 1
+
+  CpuUnits:
+    Type: Number
+    Description: CPU units per task (1024 = 1 vCPU)
+    Default: 1024
+    AllowedValues:
+      - 512
+      - 1024
+      - 2048
+      - 4096
+
+  MemoryMB:
+    Type: Number
+    Description: Memory per task in MB
+    Default: 2048
+    AllowedValues:
+      - 1024
+      - 2048
+      - 3072
+      - 4096
+
+Resources:
+  # Service Discovery Namespace (if not exists)
+  ServiceDiscoveryNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: document-service.local
+      Vpc: !Ref VpcId
+      Description: Service discovery namespace for document-service
+
+  # EFS Access Point for cache (if EFS is provided)
+  CacheAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Condition: HasEfsFileSystem
+    Properties:
+      FileSystemId: !Ref EfsFileSystemId
+      PosixUser:
+        Uid: 1001
+        Gid: 1001
+      RootDirectory:
+        Path: /cache
+        CreationInfo:
+          OwnerUid: 1001
+          OwnerGid: 1001
+          Permissions: '755'
+
+  DocumentServiceTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub 'isms-${Environment}-document-service'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref CpuUnits
+      Memory: !Ref MemoryMB
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !Ref ECSTaskExecutionRoleArn
+      TaskRoleArn: !Ref ECSTaskRoleArn
+      ContainerDefinitions:
+        - Name: document-service
+          Image: !Sub '${DocumentServiceRepositoryUri}:${DocumentServiceImageTag}'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 4001
+              Protocol: tcp
+          Environment:
+            - Name: NODE_ENV
+              Value: !Ref Environment
+            - Name: PORT
+              Value: '4001'
+            - Name: CACHE_DIR
+              Value: '/cache'
+          Secrets:
+            - Name: INTERNAL_SERVICE_TOKEN
+              ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':INTERNAL_SERVICE_TOKEN::']]
+          Volumes:
+            - !If
+              - HasEfsFileSystem
+              - - Name: cache
+                  EfsVolumeConfiguration:
+                    FileSystemId: !Ref EfsFileSystemId
+                    AuthorizationConfig:
+                      AccessPointId: !Ref CacheAccessPoint
+                    TransitEncryption: ENABLED
+              - []
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref DocumentServiceLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: document-service
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - 'curl -f http://localhost:4001/health || exit 1'
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+
+  DocumentServiceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/isms-${Environment}-document-service'
+      RetentionInDays: 7
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-document-service-logs'
+        - Key: Environment
+          Value: !Ref Environment
+
+  DocumentServiceService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - DocumentServiceTaskDefinition
+      - ServiceDiscoveryService
+    Properties:
+      ServiceName: !Sub 'isms-${Environment}-document-service'
+      Cluster: !Ref ClusterName
+      TaskDefinition: !Ref DocumentServiceTaskDefinition
+      DesiredCount: !Ref MinTaskCount
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnet1Id
+            - !Ref PrivateSubnet2Id
+          SecurityGroups:
+            - !Ref ECSSecurityGroupId
+      ServiceRegistries:
+        - RegistryArn: !GetAtt ServiceDiscoveryService.Arn
+      HealthCheckGracePeriodSeconds: 60
+      CapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 100
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-document-service'
+        - Key: Environment
+          Value: !Ref Environment
+
+  ServiceDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: document-service
+      NamespaceId: !GetAtt ServiceDiscoveryNamespace.Id
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 60
+        NamespaceId: !GetAtt ServiceDiscoveryNamespace.Id
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+
+  DocumentServiceAutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn:
+      - DocumentServiceService
+    Properties:
+      MaxCapacity: !Ref MaxTaskCount
+      MinCapacity: !Ref MinTaskCount
+      ResourceId: !Sub 'service/${ClusterName}/isms-${Environment}-document-service'
+      RoleARN: !Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService'
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+  DocumentServiceAutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub 'isms-${Environment}-document-service-scaling'
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref DocumentServiceAutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+
+Conditions:
+  HasEfsFileSystem: !Not [!Equals [!Ref EfsFileSystemId, '']]
+
+Outputs:
+  DocumentServiceName:
+    Description: Document service name
+    Value: !Ref DocumentServiceService
+    Export:
+      Name: !Sub '${AWS::StackName}-DocumentServiceName'
+
+  DocumentServiceUrl:
+    Description: Document service URL (for service discovery)
+    Value: 'http://document-service.local:4001'
+    Export:
+      Name: !Sub '${AWS::StackName}-DocumentServiceUrl'
+
+  DocumentServiceTaskDefinitionArn:
+    Description: Document service task definition ARN
+    Value: !Ref DocumentServiceTaskDefinition
+    Export:
+      Name: !Sub '${AWS::StackName}-DocumentServiceTaskDefinitionArn'
+

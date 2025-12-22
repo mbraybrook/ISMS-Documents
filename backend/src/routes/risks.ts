@@ -21,7 +21,7 @@ import {
 import { importRisksFromCSV } from '../services/riskImportService';
 import { findSimilarRisksForRisk, checkSimilarityForNewRisk } from '../services/similarityService';
 import { computeAndStoreEmbedding } from '../services/embeddingService';
-import { generateEmbedding, normalizeRiskText, cosineSimilarity, mapToScore } from '../services/llmService';
+import { generateEmbeddingRemote, similaritySearchRemote } from '../clients/aiServiceClient';
 
 const router = Router();
 
@@ -1440,18 +1440,21 @@ router.post(
       const { title, description, threatDescription } = req.body;
 
       // Combine all text fields for analysis
-      const riskText = normalizeRiskText(
+      const parts = [
         title || '',
-        threatDescription || null,
-        description || null
-      );
+        threatDescription || '',
+        description || '',
+      ]
+        .map((t) => t.trim().toLowerCase())
+        .filter((t) => t.length > 0);
+      const riskText = parts.join('\n\n');
 
       if (!riskText || riskText.trim().length === 0) {
         return res.status(400).json({ error: 'No text provided for analysis' });
       }
 
       // Generate embedding for the risk text
-      const riskEmbedding = await generateEmbedding(riskText);
+      const riskEmbedding = await generateEmbeddingRemote(riskText);
       if (!riskEmbedding) {
         // Fallback to keyword-based matching if embeddings fail
         console.warn('[Control Suggestions] Embedding generation failed, falling back to keyword matching');
@@ -1471,6 +1474,26 @@ router.post(
           embedding: true,
         },
       });
+
+      // Use AI service for bulk similarity search
+      const candidateEmbeddings = allControls
+        .filter(control => control.embedding && Array.isArray(control.embedding))
+        .map(control => ({
+          id: control.id,
+          embedding: control.embedding as number[],
+        }));
+
+      const similarityResults = await similaritySearchRemote({
+        queryEmbedding: riskEmbedding,
+        candidateEmbeddings,
+        limit: 100, // Get more results for keyword boosting
+      });
+
+      // Create a map of control ID to similarity score
+      const similarityMap = new Map<string, number>();
+      for (const result of similarityResults.results) {
+        similarityMap.set(result.id, result.score);
+      }
 
       // Extract keywords from risk text for boosting
       const riskTextLower = riskText.toLowerCase();
@@ -1504,10 +1527,8 @@ router.post(
           continue;
         }
 
-        // Calculate cosine similarity using stored embedding
-        const controlEmbedding = control.embedding as number[];
-        const cosineSim = cosineSimilarity(riskEmbedding, controlEmbedding);
-        let similarityScore = mapToScore(cosineSim);
+        // Get similarity score from AI service results
+        let similarityScore = similarityMap.get(control.id) || 0;
 
         // Keyword boosting: Check for exact term matches in control title/code
         const controlTextLower = `${control.code} ${control.title || ''}`.toLowerCase();

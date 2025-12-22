@@ -7,6 +7,8 @@
 # Commands:
 #   build-frontend          Build and push frontend image
 #   build-backend           Build and push backend image
+#   build-document-service  Build and push document-service image
+#   build-ai-service        Build and push ai-service image
 #   rebuild-frontend        Rebuild frontend with secrets from Secrets Manager
 #   deploy-frontend          Deploy frontend using CodeDeploy
 #   deploy-backend           Deploy backend using CodeDeploy
@@ -172,6 +174,8 @@ show_help() {
         "${BOLD}Commands:${NC}" \
         "    ${GREEN}build-frontend${NC}          Build and push frontend Docker image" \
         "    ${GREEN}build-backend${NC}           Build and push backend Docker image" \
+        "    ${GREEN}build-document-service${NC}  Build and push document-service Docker image" \
+        "    ${GREEN}build-ai-service${NC}        Build and push ai-service Docker image" \
         "    ${GREEN}rebuild-frontend${NC}         Rebuild frontend with secrets from Secrets Manager" \
         "    ${GREEN}deploy-frontend${NC}          Deploy frontend using CodeDeploy (blue/green)" \
         "    ${GREEN}deploy-backend${NC}           Deploy backend using CodeDeploy (blue/green)" \
@@ -202,6 +206,10 @@ show_help() {
         "" \
         "    ${CYAN}# Build backend with specific tag${NC}" \
         "    ./deploy-utils.sh build-backend --image-tag v1.2.3" \
+        "" \
+        "    ${CYAN}# Build microservices${NC}" \
+        "    ./deploy-utils.sh build-document-service --image-tag staging" \
+        "    ./deploy-utils.sh build-ai-service --image-tag staging" \
         "" \
         "    ${CYAN}# Monitor a specific CodeDeploy deployment${NC}" \
         "    ./deploy-utils.sh monitor-deployment --deployment-id d-1234567890" \
@@ -1052,6 +1060,16 @@ main() {
             # Clear SERVICE_TYPE for build commands (not needed)
             unset SERVICE_TYPE
             build_backend
+            exit $?
+            ;;
+        build-document-service)
+            unset SERVICE_TYPE
+            build_document_service
+            exit $?
+            ;;
+        build-ai-service)
+            unset SERVICE_TYPE
+            build_ai_service
             exit $?
             ;;
         rebuild-frontend)

@@ -90,6 +90,12 @@ jest.mock('../../services/llmService', () => ({
   mapToScore: jest.fn(),
 }));
 
+// Mock AI service client
+jest.mock('../../clients/aiServiceClient', () => ({
+  generateEmbeddingRemote: jest.fn(),
+  similaritySearchRemote: jest.fn(),
+}));
+
 jest.mock('../../config', () => ({
   config: {
     sharePoint: {
@@ -98,6 +104,16 @@ jest.mock('../../config', () => ({
     },
     confluence: {
       baseUrl: 'https://test.atlassian.net',
+    },
+    documentService: {
+      baseUrl: 'http://document-service:4001',
+      internalToken: 'test-token',
+      timeout: 30000,
+    },
+    aiService: {
+      baseUrl: 'http://ai-service:4002',
+      internalToken: 'test-token',
+      timeout: 10000,
     },
   },
 }));
@@ -108,9 +124,11 @@ describe('Documents API', () => {
   let generateSharePointUrl: jest.Mock;
   let generateConfluenceUrl: jest.Mock;
   let getSharePointItem: jest.Mock;
-  let generateEmbedding: jest.Mock;
-  let cosineSimilarity: jest.Mock;
-  let mapToScore: jest.Mock;
+  let _generateEmbedding: jest.Mock;
+  let _cosineSimilarity: jest.Mock;
+  let _mapToScore: jest.Mock;
+  let generateEmbeddingRemote: jest.Mock;
+  let similaritySearchRemote: jest.Mock;
   let consoleErrorSpy: jest.SpyInstance;
   let consoleLogSpy: jest.SpyInstance;
   let consoleWarnSpy: jest.SpyInstance;
@@ -127,13 +145,21 @@ describe('Documents API', () => {
     const confluenceService = require('../../services/confluenceService');
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const llmService = require('../../services/llmService');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const aiServiceClient = require('../../clients/aiServiceClient');
     
     generateSharePointUrl = sharePointService.generateSharePointUrl;
     generateConfluenceUrl = confluenceService.generateConfluenceUrl;
     getSharePointItem = sharePointService.getSharePointItem;
-    generateEmbedding = llmService.generateEmbedding;
-    cosineSimilarity = llmService.cosineSimilarity;
-    mapToScore = llmService.mapToScore;
+    _generateEmbedding = llmService.generateEmbedding;
+    _cosineSimilarity = llmService.cosineSimilarity;
+    _mapToScore = llmService.mapToScore;
+    generateEmbeddingRemote = aiServiceClient.generateEmbeddingRemote;
+    similaritySearchRemote = aiServiceClient.similaritySearchRemote;
+    
+    // Reset mocks to default values
+    generateEmbeddingRemote.mockResolvedValue([0.1, 0.2, 0.3]);
+    similaritySearchRemote.mockResolvedValue({ results: [] });
     
     jest.clearAllMocks();
     
@@ -2496,13 +2522,13 @@ describe('Documents API', () => {
         },
       ];
 
-      generateEmbedding.mockResolvedValue(documentEmbedding);
-      cosineSimilarity
-        .mockReturnValueOnce(0.95) // High similarity
-        .mockReturnValueOnce(0.3); // Low similarity
-      mapToScore
-        .mockReturnValueOnce(85) // Above threshold
-        .mockReturnValueOnce(40); // Below threshold
+      generateEmbeddingRemote.mockResolvedValue(documentEmbedding);
+      similaritySearchRemote.mockResolvedValue({
+        results: [
+          { id: 'control-1', score: 95, matchedFields: [] },
+          { id: 'control-2', score: 30, matchedFields: [] },
+        ],
+      });
       prisma.control.findMany.mockResolvedValue(allControls);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 
@@ -2532,7 +2558,7 @@ describe('Documents API', () => {
         },
       ];
 
-      generateEmbedding.mockResolvedValue(null);
+      generateEmbeddingRemote.mockResolvedValue(null);
       prisma.control.findMany.mockResolvedValue(allControls);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 
@@ -2578,9 +2604,12 @@ describe('Documents API', () => {
         },
       ];
 
-      generateEmbedding.mockResolvedValue(documentEmbedding);
-      cosineSimilarity.mockReturnValue(0.5); // Medium similarity
-      mapToScore.mockReturnValue(50); // Below threshold initially
+      generateEmbeddingRemote.mockResolvedValue(documentEmbedding);
+      similaritySearchRemote.mockResolvedValue({
+        results: [
+          { id: 'control-1', score: 50, matchedFields: [] },
+        ],
+      });
       prisma.control.findMany.mockResolvedValue(allControls);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 
@@ -2613,9 +2642,12 @@ describe('Documents API', () => {
         },
       ];
 
-      generateEmbedding.mockResolvedValue(documentEmbedding);
-      cosineSimilarity.mockReturnValue(0.95);
-      mapToScore.mockReturnValue(85);
+      generateEmbeddingRemote.mockResolvedValue(documentEmbedding);
+      similaritySearchRemote.mockResolvedValue({
+        results: [
+          { id: 'control-1', score: 95, matchedFields: [] },
+        ],
+      });
       prisma.control.findMany.mockResolvedValue(allControls);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 
@@ -2638,7 +2670,7 @@ describe('Documents API', () => {
     });
 
     it('should handle errors when suggesting controls', async () => {
-      generateEmbedding.mockRejectedValue(new Error('LLM service error'));
+      generateEmbeddingRemote.mockRejectedValue(new Error('LLM service error'));
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 
       await request(app)

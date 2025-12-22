@@ -17,10 +17,14 @@ import {
   FileTooLargeError,
   PermissionDeniedError,
 } from '../../services/sharePointService';
-import { addWatermarkToPdf, validatePdfForWatermarking } from '../../services/watermarkService';
 import { logTrustAction } from '../../services/trustAuditService';
-import { convertToPdf, canConvertToPdf, getPdfFilename } from '../../services/documentConversionService';
-import { getCachedPdf, setCachedPdf } from '../../services/pdfCacheService';
+import { canConvertToPdf, getPdfFilename } from '../../services/documentConversionService';
+import {
+  convertToPdfRemote,
+  watermarkPdfRemote,
+  getCachedPdfRemote,
+  setCachedPdfRemote,
+} from '../../clients/documentServiceClient';
 import crypto from 'crypto';
 
 const router = Router();
@@ -397,15 +401,13 @@ router.get(
       const isPdf = false; // We'll determine this after cache check or download
       const needsWatermark = isPrivate && externalUser;
 
+      // Compute cache key (same SHA256 hash as pdfCacheService)
+      const cacheKeyData = `${document.id}-${document.version}-${document.updatedAt.toISOString()}-false-`;
+      const cacheKey = crypto.createHash('sha256').update(cacheKeyData).digest('hex');
+
       // Check cache FIRST (before downloading from SharePoint)
       // Always check for unwatermarked PDF - we'll apply watermark after retrieval if needed
-      const cachedResult = await getCachedPdf(
-        document.id,
-        document.version,
-        document.updatedAt,
-        false, // Always cache without watermark
-        undefined // No user email in cache key
-      );
+      const cachedResult = await getCachedPdfRemote(cacheKey);
 
       let finalBuffer: Buffer;
       let finalFilename: string;
@@ -414,7 +416,7 @@ router.get(
 
       if (cachedResult) {
         // Cache HIT - use cached unwatermarked PDF
-        finalBuffer = cachedResult.buffer;
+        finalBuffer = Buffer.from(cachedResult.buffer, 'base64');
         originalFilename = cachedResult.originalFilename;
         finalFilename = getPdfFilename(originalFilename);
         finalMimeType = 'application/pdf';
@@ -467,8 +469,13 @@ router.get(
               originalType: fileData.mimeType,
               originalName: fileData.name,
             });
-            finalBuffer = await convertToPdf(fileData.buffer, fileData.mimeType, fileData.name);
-            finalFilename = getPdfFilename(originalFilename);
+            const convertResult = await convertToPdfRemote({
+              bufferBase64: fileData.buffer.toString('base64'),
+              mimeType: fileData.mimeType,
+              filename: fileData.name,
+            });
+            finalBuffer = Buffer.from(convertResult.pdfBufferBase64, 'base64');
+            finalFilename = convertResult.filename;
             finalMimeType = 'application/pdf';
             console.log('[TRUST] Conversion successful:', {
               pdfFilename: finalFilename,
@@ -497,16 +504,21 @@ router.get(
 
         // Cache the unwatermarked PDF for future requests
         // Always cache without watermark - we'll apply watermark on-the-fly when serving
-        await setCachedPdf(
-          document.id,
-          document.version,
-          document.updatedAt,
-          finalBuffer, // Unwatermarked PDF
-          fileData.mimeType,
-          originalFilename,
-          false, // Always cache as unwatermarked
-          undefined // No user email in cache
-        );
+        await setCachedPdfRemote({
+          cacheKey,
+          pdfBufferBase64: finalBuffer.toString('base64'),
+          metadata: {
+            documentId: document.id,
+            version: document.version,
+            updatedAt: document.updatedAt.toISOString(),
+            originalMimeType: fileData.mimeType,
+            originalFilename,
+            isWatermarked: false,
+            watermarkUserEmail: undefined,
+          },
+        }).catch((err) => {
+          console.warn('[TRUST] Cache write failed (non-critical):', err);
+        });
       }
 
       // Apply watermark AFTER cache retrieval (if needed for private documents)
@@ -523,37 +535,40 @@ router.get(
             originalBufferHash,
           });
           
-          const validation = validatePdfForWatermarking(finalBuffer);
-          if (validation.valid) {
-            const watermarkedBuffer = await addWatermarkToPdf(
-              finalBuffer,
-              externalUser.email,
-              new Date(), // Download date
-              trustSetting.maxFileSizeMB || config.trustCenter.maxFileSizeMB,
-              document.createdAt // Document issue/creation date
-            );
-            
-            const watermarkedBufferHash = crypto.createHash('sha256').update(watermarkedBuffer).digest('hex').substring(0, 16);
-            const buffersAreEqual = originalBufferHash === watermarkedBufferHash;
-            
-            console.log('[TRUST] Watermark process completed:', {
-              originalSize,
-              watermarkedSize: watermarkedBuffer.length,
-              sizeIncrease: watermarkedBuffer.length - originalSize,
-              originalBufferHash,
-              watermarkedBufferHash,
-              buffersAreEqual: buffersAreEqual ? 'WARNING: Buffers are identical!' : 'OK: Buffers differ',
-            });
-            
-            // Only update finalBuffer if it actually changed
-            if (!buffersAreEqual) {
-              finalBuffer = watermarkedBuffer;
-              console.log('[TRUST] Watermark applied successfully - using watermarked buffer');
-            } else {
-              console.warn('[TRUST] WARNING: Watermark function returned identical buffer - watermark may not have been applied!');
-            }
+          // Get watermark prefix from Trust Center settings
+          const trustCenterSettings = await prisma.trustCenterSettings.findUnique({
+            where: { key: 'global' },
+          });
+          const watermarkPrefix = trustCenterSettings?.watermarkPrefix || 'Paythru Confidential';
+          
+          const watermarkResult = await watermarkPdfRemote({
+            pdfBufferBase64: finalBuffer.toString('base64'),
+            watermarkPrefix,
+            userEmail: externalUser.email,
+            date: new Date().toISOString(),
+            maxSizeMB: trustSetting.maxFileSizeMB || config.trustCenter.maxFileSizeMB,
+            issuedDate: document.createdAt.toISOString(),
+          });
+          
+          const watermarkedBuffer = Buffer.from(watermarkResult.pdfBufferBase64, 'base64');
+          const watermarkedBufferHash = crypto.createHash('sha256').update(watermarkedBuffer).digest('hex').substring(0, 16);
+          const buffersAreEqual = originalBufferHash === watermarkedBufferHash;
+          
+          console.log('[TRUST] Watermark process completed:', {
+            originalSize,
+            watermarkedSize: watermarkedBuffer.length,
+            sizeIncrease: watermarkedBuffer.length - originalSize,
+            originalBufferHash,
+            watermarkedBufferHash,
+            buffersAreEqual: buffersAreEqual ? 'WARNING: Buffers are identical!' : 'OK: Buffers differ',
+          });
+          
+          // Only update finalBuffer if it actually changed
+          if (!buffersAreEqual) {
+            finalBuffer = watermarkedBuffer;
+            console.log('[TRUST] Watermark applied successfully - using watermarked buffer');
           } else {
-            console.warn('[TRUST] PDF validation failed, cannot apply watermark:', validation.reason);
+            console.warn('[TRUST] WARNING: Watermark function returned identical buffer - watermark may not have been applied!');
           }
         } catch (error: any) {
           console.error('[TRUST] Watermarking failed:', {

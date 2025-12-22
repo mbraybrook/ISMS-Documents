@@ -1,8 +1,32 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from '../lib/prisma';
-import { generateEmbedding, normalizeRiskText } from './llmService';
+import { generateEmbeddingRemote } from '../clients/aiServiceClient';
 import { ConcurrencyLimiter } from '../utils/concurrencyLimiter';
 import { config } from '../config';
+
+/**
+ * Normalize and combine risk text for embedding generation
+ */
+function normalizeRiskText(
+  title: string,
+  threatDescription?: string | null,
+  description?: string | null,
+): string {
+  const parts = [
+    title || '',
+    threatDescription || '',
+    description || '',
+  ]
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => t.length > 0);
+
+  let combined = parts.join('\n\n');
+  const maxLen = config.llm.maxEmbeddingTextLength;
+  if (combined.length > maxLen) {
+    combined = combined.slice(0, maxLen);
+  }
+  return combined;
+}
 
 /**
  * Compute and store embedding for a risk
@@ -16,7 +40,7 @@ export async function computeAndStoreEmbedding(
 ): Promise<number[] | null> {
   try {
     const text = normalizeRiskText(title, threatDescription, description);
-    const embedding = await generateEmbedding(text);
+    const embedding = await generateEmbeddingRemote(text);
     
     if (embedding) {
       await prisma.risk.update({
@@ -155,7 +179,7 @@ export async function computeAndStoreControlEmbedding(
 ): Promise<number[] | null> {
   try {
     const text = normalizeControlText(code, title, description, purpose, guidance);
-    const embedding = await generateEmbedding(text);
+    const embedding = await generateEmbeddingRemote(text);
     
     if (embedding) {
       await prisma.control.update({

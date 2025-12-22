@@ -8,17 +8,19 @@ COPY package*.json ./
 COPY tsconfig.json ./
 
 # Install dependencies (including dev dependencies for build)
+# Use BuildKit cache mount for npm dependencies
 # Note: Using npm install instead of npm ci since package-lock.json may not exist
-# The Docker image itself provides reproducibility by using exact package.json versions
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
 
 # Copy source code
 COPY src ./src
 COPY prisma ./prisma
 COPY scripts ./scripts
 
-# Generate Prisma Client
-RUN npm run db:generate
+# Generate Prisma Client with BuildKit cache mount
+RUN --mount=type=cache,target=/app/node_modules/.prisma \
+    npm run db:generate
 
 # Build TypeScript
 RUN npm run build
@@ -27,22 +29,9 @@ RUN npm run build
 FROM node:18-alpine
 
 # Install OpenSSL for Prisma (required for database connections)
-# Install LibreOffice for document conversion with comprehensive fonts
-# Xvfb is needed for headless LibreOffice operation
+# Note: LibreOffice has been moved to document-service microservice
 RUN apk add --no-cache openssl \
-    openssl-dev \
-    libreoffice \
-    xvfb \
-    ttf-dejavu \
-    ttf-liberation \
-    font-noto \
-    font-noto-extra \
-    ttf-opensans \
-    && fc-cache -f -v \
-    && mkdir -p /usr/share/fonts/truetype
-
-# Create LibreOffice user config directory for root user
-RUN mkdir -p /root/.config/libreoffice/4/user
+    openssl-dev
 
 WORKDIR /app
 
@@ -50,8 +39,11 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install production dependencies + Prisma CLI (needed for migrations)
+# Use BuildKit cache mount for npm dependencies
 # Prisma CLI is in devDependencies, so we install it separately
-RUN npm install --only=production && \
+# Note: Using npm install instead of npm ci since package-lock.json may not exist
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --only=production && \
     npm install prisma@^5.7.1 --no-save
 
 # Copy built files from builder
@@ -66,34 +58,21 @@ RUN mkdir -p prisma/migrations && \
 # Copy scripts needed at runtime
 COPY scripts ./scripts
 
-# Copy LibreOffice font configuration
-COPY libreoffice-font-config/registrymodifications.xcu /root/.config/libreoffice/4/user/registrymodifications.xcu
-
 # Copy and make startup scripts executable
-COPY scripts/start-xvfb.sh /usr/local/bin/start-xvfb.sh
 COPY scripts/start.sh /usr/local/bin/start.sh
-RUN chmod +x /usr/local/bin/start-xvfb.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Change ownership (including LibreOffice config and scripts)
-RUN chown -R nodejs:nodejs /app && \
-    mkdir -p /home/nodejs/.config/libreoffice/4/user && \
-    cp /root/.config/libreoffice/4/user/registrymodifications.xcu /home/nodejs/.config/libreoffice/4/user/ && \
-    chown -R nodejs:nodejs /home/nodejs/.config && \
-    chmod +x /usr/local/bin/start-xvfb.sh
+# Change ownership
+RUN chown -R nodejs:nodejs /app
 
 USER nodejs
 
-# Set LibreOffice environment variables for headless operation
-ENV SAL_USE_VCLPLUGIN=gen \
-    OOO_FORCE_DESKTOP=gnome \
-    HOME=/home/nodejs \
-    DISPLAY=:99 \
-    JAVA_HOME="" \
-    SAL_DISABLE_OPENCL=1
+# Set HOME for nodejs user
+ENV HOME=/home/nodejs
 
 EXPOSE 4000
 

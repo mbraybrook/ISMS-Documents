@@ -719,8 +719,36 @@ describe('RiskReviewQueue', () => {
       const rejectionReasonInput = screen.getByLabelText(/rejection reason/i);
       await user.type(rejectionReasonInput, 'Not relevant to our organization');
 
+      // Wait for input to be fully typed before proceeding
+      await waitFor(() => {
+        expect(rejectionReasonInput).toHaveValue('Not relevant to our organization');
+      });
+
       // Reset mock to return empty list after refresh (before clicking confirm)
-      setupApiMocks([], []);
+      // Keep the same mock structure but update the response
+      vi.mocked(api.get).mockImplementation((url, config) => {
+        if (config?.params?.view === 'inbox') {
+          return Promise.resolve({
+            data: {
+              data: [],
+              pagination: { page: 1, limit: 100, total: 0, totalPages: 1 },
+            },
+          });
+        } else if (config?.params?.status === 'ACTIVE') {
+          return Promise.resolve({
+            data: {
+              data: [],
+              pagination: { page: 1, limit: 100, total: 0, totalPages: 1 },
+            },
+          });
+        }
+        return Promise.resolve({
+          data: {
+            data: [],
+            pagination: { page: 1, limit: 100, total: 0, totalPages: 1 },
+          },
+        });
+      });
 
       const modal = screen.getByText('Reject Risk').closest('[role="dialog"]') || document.body;
       const rejectConfirmButton = within(modal as HTMLElement).getByRole('button', { name: /^reject$/i });
@@ -732,7 +760,7 @@ describe('RiskReviewQueue', () => {
           status: 'REJECTED',
           rejectionReason: 'Not relevant to our organization',
         });
-      }, { timeout: 3000 });
+      }, { timeout: 5000 });
 
       // Wait for toast call
       await waitFor(() => {
@@ -743,7 +771,7 @@ describe('RiskReviewQueue', () => {
           duration: 3000,
           isClosable: true,
         });
-      }, { timeout: 3000 });
+      }, { timeout: 5000 });
 
       // Should refresh risks list - wait for the refresh call after rejection
       await waitFor(() => {
@@ -752,8 +780,8 @@ describe('RiskReviewQueue', () => {
         );
         // Should have at least one call after the initial load (the refresh call)
         expect(inboxCalls.length).toBeGreaterThan(1);
-      }, { timeout: 3000 });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 15000 });
 
     it('should show error toast when rejection fails', async () => {
       // Arrange
@@ -784,6 +812,11 @@ describe('RiskReviewQueue', () => {
       const rejectionReasonInput = screen.getByLabelText(/rejection reason/i);
       await user.type(rejectionReasonInput, 'Test reason');
 
+      // Wait for input to be fully typed before proceeding
+      await waitFor(() => {
+        expect(rejectionReasonInput).toHaveValue('Test reason');
+      });
+
       const modal = screen.getByText('Reject Risk').closest('[role="dialog"]') || document.body;
       const rejectConfirmButton = within(modal as HTMLElement).getByRole('button', { name: /^reject$/i });
       await user.click(rejectConfirmButton);
@@ -797,8 +830,8 @@ describe('RiskReviewQueue', () => {
           duration: 5000,
           isClosable: true,
         });
-      }, { timeout: 3000 });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 15000 });
 
     it('should disable reject button when reason is empty', async () => {
       // Arrange

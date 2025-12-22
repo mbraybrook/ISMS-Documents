@@ -8,9 +8,9 @@ import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
 import { getSharePointItem, generateSharePointUrl } from '../services/sharePointService';
 import { generateConfluenceUrl } from '../services/confluenceService';
-import { invalidateCache } from '../services/pdfCacheService';
+import { invalidateCacheRemote } from '../clients/documentServiceClient';
 import { config } from '../config';
-import { generateEmbedding, cosineSimilarity, mapToScore } from '../services/llmService';
+import { generateEmbeddingRemote, similaritySearchRemote } from '../clients/aiServiceClient';
 
 const router = Router();
 
@@ -748,7 +748,7 @@ router.put(
       });
 
       // Invalidate PDF cache when document is updated (version or content may have changed)
-      invalidateCache(id).catch((err) => {
+      invalidateCacheRemote(id).catch((err) => {
         console.error('[Document Update] Error invalidating PDF cache:', err);
       });
 
@@ -917,7 +917,7 @@ router.post(
       });
 
       // Invalidate PDF cache when version changes
-      invalidateCache(id).catch((err) => {
+      invalidateCacheRemote(id).catch((err) => {
         console.error('[Version Update] Error invalidating PDF cache:', err);
       });
 
@@ -1083,7 +1083,7 @@ router.post(
             });
 
             // Invalidate PDF cache when document is updated
-            invalidateCache(existing.id).catch((err) => {
+            invalidateCacheRemote(existing.id).catch((err) => {
               console.error('[Bulk Import] Error invalidating PDF cache:', err);
             });
 
@@ -1369,7 +1369,7 @@ router.post(
       const documentText = `${title} ${type || ''}`.trim().toLowerCase();
 
       // Generate embedding for the document text
-      const documentEmbedding = await generateEmbedding(documentText);
+      const documentEmbedding = await generateEmbeddingRemote(documentText);
       if (!documentEmbedding) {
         console.warn('[Document Control Suggestions] Embedding generation failed, falling back to keyword matching');
         // Fallback to keyword-based matching
@@ -1426,6 +1426,26 @@ router.post(
         },
       });
 
+      // Use AI service for bulk similarity search
+      const candidateEmbeddings = allControls
+        .filter(control => control.embedding && Array.isArray(control.embedding))
+        .map(control => ({
+          id: control.id,
+          embedding: control.embedding as number[],
+        }));
+
+      const similarityResults = await similaritySearchRemote({
+        queryEmbedding: documentEmbedding,
+        candidateEmbeddings,
+        limit: 100, // Get more results for keyword boosting
+      });
+
+      // Create a map of control ID to similarity score
+      const similarityMap = new Map<string, number>();
+      for (const result of similarityResults.results) {
+        similarityMap.set(result.id, result.score);
+      }
+
       // Extract keywords from document text for boosting
       const documentTextLower = documentText.toLowerCase();
       const documentWords = documentTextLower
@@ -1440,10 +1460,8 @@ router.post(
           continue;
         }
 
-        // Calculate cosine similarity using stored embedding
-        const controlEmbedding = control.embedding as number[];
-        const cosineSim = cosineSimilarity(documentEmbedding, controlEmbedding);
-        let similarityScore = mapToScore(cosineSim);
+        // Get similarity score from AI service results
+        let similarityScore = similarityMap.get(control.id) || 0;
 
         // Keyword boosting: Check for word matches in control title/code
         const controlTextLower = `${control.code} ${control.title || ''}`.toLowerCase();

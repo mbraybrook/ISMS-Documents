@@ -1,0 +1,250 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS service for AI/LLM operations (embeddings, similarity calculations)'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    AllowedValues:
+      - staging
+      - production
+    Default: staging
+
+  ClusterName:
+    Type: String
+    Description: ECS cluster name
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID
+
+  PrivateSubnet1Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private Subnet 1 ID
+
+  PrivateSubnet2Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private Subnet 2 ID
+
+  ECSSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: ECS Security Group ID
+
+  ECSTaskExecutionRoleArn:
+    Type: String
+    Description: ECS Task Execution Role ARN
+
+  ECSTaskRoleArn:
+    Type: String
+    Description: ECS Task Role ARN
+
+  AIServiceRepositoryUri:
+    Type: String
+    Description: AI Service ECR repository URI
+
+  AIServiceImageTag:
+    Type: String
+    Description: AI Service Docker image tag
+    Default: latest
+
+  ApplicationSecretsArn:
+    Type: String
+    Description: Application secrets ARN
+
+  OllamaEndpoint:
+    Type: String
+    Description: Ollama endpoint URL
+    Default: 'http://ollama:11434'
+
+  OllamaModel:
+    Type: String
+    Description: Ollama embedding model name
+    Default: 'nomic-embed-text'
+
+  MinTaskCount:
+    Type: Number
+    Description: Minimum number of tasks
+    Default: 1
+    MinValue: 1
+
+  MaxTaskCount:
+    Type: Number
+    Description: Maximum number of tasks
+    Default: 2
+    MinValue: 1
+
+  CpuUnits:
+    Type: Number
+    Description: CPU units per task (512 = 0.5 vCPU)
+    Default: 512
+    AllowedValues:
+      - 256
+      - 512
+      - 1024
+
+  MemoryMB:
+    Type: Number
+    Description: Memory per task in MB
+    Default: 1024
+    AllowedValues:
+      - 512
+      - 1024
+      - 2048
+
+Resources:
+  # Service Discovery Namespace (if not exists)
+  ServiceDiscoveryNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: ai-service.local
+      Vpc: !Ref VpcId
+      Description: Service discovery namespace for ai-service
+
+  AIServiceTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub 'isms-${Environment}-ai-service'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref CpuUnits
+      Memory: !Ref MemoryMB
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !Ref ECSTaskExecutionRoleArn
+      TaskRoleArn: !Ref ECSTaskRoleArn
+      ContainerDefinitions:
+        - Name: ai-service
+          Image: !Sub '${AIServiceRepositoryUri}:${AIServiceImageTag}'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 4002
+              Protocol: tcp
+          Environment:
+            - Name: NODE_ENV
+              Value: !Ref Environment
+            - Name: PORT
+              Value: '4002'
+            - Name: OLLAMA_ENDPOINT
+              Value: !Ref OllamaEndpoint
+            - Name: OLLAMA_MODEL
+              Value: !Ref OllamaModel
+            - Name: OLLAMA_EMBEDDING_MODEL
+              Value: !Ref OllamaModel
+          Secrets:
+            - Name: INTERNAL_SERVICE_TOKEN
+              ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':INTERNAL_SERVICE_TOKEN::']]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AIServiceLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ai-service
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - 'curl -f http://localhost:4002/health || exit 1'
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+
+  AIServiceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/isms-${Environment}-ai-service'
+      RetentionInDays: 7
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-ai-service-logs'
+        - Key: Environment
+          Value: !Ref Environment
+
+  AIServiceService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - AIServiceTaskDefinition
+      - ServiceDiscoveryService
+    Properties:
+      ServiceName: !Sub 'isms-${Environment}-ai-service'
+      Cluster: !Ref ClusterName
+      TaskDefinition: !Ref AIServiceTaskDefinition
+      DesiredCount: !Ref MinTaskCount
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnet1Id
+            - !Ref PrivateSubnet2Id
+          SecurityGroups:
+            - !Ref ECSSecurityGroupId
+      ServiceRegistries:
+        - RegistryArn: !GetAtt ServiceDiscoveryService.Arn
+      HealthCheckGracePeriodSeconds: 60
+      CapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 100
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-ai-service'
+        - Key: Environment
+          Value: !Ref Environment
+
+  ServiceDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: ai-service
+      NamespaceId: !GetAtt ServiceDiscoveryNamespace.Id
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 60
+        NamespaceId: !GetAtt ServiceDiscoveryNamespace.Id
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+
+  AIServiceAutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn:
+      - AIServiceService
+    Properties:
+      MaxCapacity: !Ref MaxTaskCount
+      MinCapacity: !Ref MinTaskCount
+      ResourceId: !Sub 'service/${ClusterName}/isms-${Environment}-ai-service'
+      RoleARN: !Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService'
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+  AIServiceAutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub 'isms-${Environment}-ai-service-scaling'
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AIServiceAutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+
+Outputs:
+  AIServiceName:
+    Description: AI service name
+    Value: !Ref AIServiceService
+    Export:
+      Name: !Sub '${AWS::StackName}-AIServiceName'
+
+  AIServiceUrl:
+    Description: AI service URL (for service discovery)
+    Value: 'http://ai-service.local:4002'
+    Export:
+      Name: !Sub '${AWS::StackName}-AIServiceUrl'
+
+  AIServiceTaskDefinitionArn:
+    Description: AI service task definition ARN
+    Value: !Ref AIServiceTaskDefinition
+    Export:
+      Name: !Sub '${AWS::StackName}-AIServiceTaskDefinitionArn'
+

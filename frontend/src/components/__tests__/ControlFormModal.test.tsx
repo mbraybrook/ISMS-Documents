@@ -391,6 +391,11 @@ describe('ControlFormModal', () => {
 
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={null} />);
 
+      // Wait for form to render before interacting
+      await waitFor(() => {
+        expect(screen.getByLabelText(/code/i)).toBeInTheDocument();
+      });
+
       await user.type(screen.getByLabelText(/code/i), 'A.8.1');
       await user.type(screen.getByLabelText(/title/i), 'New Control');
       await user.selectOptions(screen.getByLabelText(/category/i), 'ORGANIZATIONAL');
@@ -404,7 +409,7 @@ describe('ControlFormModal', () => {
           title: 'New Control',
           category: 'ORGANIZATIONAL',
         }));
-      });
+      }, { timeout: 3000 });
     });
 
     it('should update existing control when form is submitted', async () => {

@@ -106,6 +106,18 @@ export const config = {
     smtpPass: process.env.EMAIL_SMTP_PASS || '',
     from: process.env.EMAIL_FROM || '',
   },
+  // Document service configuration
+  documentService: {
+    baseUrl: process.env.DOCUMENT_SERVICE_URL || 'http://document-service:4001',
+    internalToken: process.env.INTERNAL_SERVICE_TOKEN || '',
+    timeout: parseInt(process.env.DOCUMENT_SERVICE_TIMEOUT || '30000', 10),
+  },
+  // AI service configuration
+  aiService: {
+    baseUrl: process.env.AI_SERVICE_URL || 'http://ai-service:4002',
+    internalToken: process.env.INTERNAL_SERVICE_TOKEN || '',
+    timeout: parseInt(process.env.AI_SERVICE_TIMEOUT || '10000', 10),
+  },
 };
 
 // Log config on startup to verify env vars are loaded (in development only)

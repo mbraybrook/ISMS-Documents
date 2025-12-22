@@ -21,9 +21,64 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    # Optional: Pull the embedding model on startup
-    # This can take a while, so you might want to do it manually
-    # command: sh -c "ollama serve & sleep 5 && ollama pull nomic-embed-text && wait"
+    healthcheck:
+      # Use ollama CLI to check if service is running and responding
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  document-service:
+    build:
+      context: ./services/document-service
+      dockerfile: Dockerfile
+    ports:
+      - "4001:4001"
+    environment:
+      - NODE_ENV=development
+      - PORT=4001
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:-dev-token-change-me}
+      - CACHE_DIR=/cache
+    volumes:
+      - document_cache:/cache
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4001/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      default:
+        aliases:
+          - document-service.local
+
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    ports:
+      - "4002:4002"
+    environment:
+      - NODE_ENV=development
+      - PORT=4002
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:-dev-token-change-me}
+      - OLLAMA_ENDPOINT=http://ollama:11434
+      - OLLAMA_MODEL=nomic-embed-text
+      - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4002/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      default:
+        aliases:
+          - ai-service.local
 
   backend:
     build:
@@ -31,44 +86,66 @@ services:
       dockerfile: Dockerfile
     ports:
       - "4000:4000"
-      - "5555:5555"  # Add Prisma Studio port
     env_file:
-      - .env  # Load root .env file (contains AUTH_* variables)
-      - ./backend/.env  # Load backend/.env file (contains DATABASE_URL for local dev)
+      - .env
+      - ./backend/.env
     environment:
       - NODE_ENV=development
       - PORT=4000
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/isms_db?schema=public
       - SEED_SCOPE=full
-      - LLM_BASE_URL=http://ollama:11434  # Use service name instead of localhost
+      - DOCUMENT_SERVICE_URL=http://document-service.local:4001
+      - AI_SERVICE_URL=http://ai-service.local:4002
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:-dev-token-change-me}
+      - DOCUMENT_SERVICE_TIMEOUT=30000
+      - AI_SERVICE_TIMEOUT=10000
+      # Legacy LLM config (for backward compatibility, but backend should use AI service)
+      - LLM_BASE_URL=http://ollama:11434
       - LLM_EMBEDDING_MODEL=nomic-embed-text
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - ./docs:/docs
-    command: sh -c "start-xvfb.sh && npm run db:generate && npm run db:migrate:deploy && npm run dev"
-    working_dir: /app
     depends_on:
       postgres:
         condition: service_healthy
-      ollama:
-        condition: service_started
+      document-service:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => {process.exit(1)})\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+        VITE_AUTH_TENANT_ID: ${VITE_AUTH_TENANT_ID:-your-tenant-id}
+        VITE_AUTH_CLIENT_ID: ${VITE_AUTH_CLIENT_ID:-your-client-id}
+        VITE_AUTH_REDIRECT_URI: ${VITE_AUTH_REDIRECT_URI:-http://localhost:3000}
+        VITE_APP_VERSION: ${VITE_APP_VERSION:-dev}
     ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev
-    working_dir: /app
+      - "3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
 volumes:
   postgres_data:
   ollama_data:
+  document_cache:
 
+networks:
+  default:
+    name: isms-documentation_default

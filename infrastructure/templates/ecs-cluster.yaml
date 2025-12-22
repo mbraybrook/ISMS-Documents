@@ -178,6 +178,14 @@ Resources:
               Value: !Ref Environment
             - Name: PORT
               Value: '4000'
+            - Name: DOCUMENT_SERVICE_URL
+              Value: 'http://document-service.local:4001'
+            - Name: AI_SERVICE_URL
+              Value: 'http://ai-service.local:4002'
+            - Name: DOCUMENT_SERVICE_TIMEOUT
+              Value: '30000'
+            - Name: AI_SERVICE_TIMEOUT
+              Value: '10000'
           Secrets:
             - Name: DATABASE_URL
               ValueFrom: !Join ['', [!Ref DatabaseCredentialsSecretArn, ':DATABASE_URL::']]
@@ -193,6 +201,8 @@ Resources:
               ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':TRUST_CENTER_JWT_SECRET::']]
             - Name: CORS_TRUST_CENTER_ORIGINS
               ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':CORS_TRUST_CENTER_ORIGINS::']]
+            - Name: INTERNAL_SERVICE_TOKEN
+              ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':INTERNAL_SERVICE_TOKEN::']]
           LogConfiguration:
             LogDriver: awslogs
             Options:

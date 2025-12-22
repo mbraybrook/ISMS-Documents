@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import { backfillControlEmbeddings } from '../src/services/embeddingService';
 
 const prisma = new PrismaClient();
 
@@ -662,6 +663,24 @@ async function main() {
     }
     if (seedData.controls) {
       await seedControls(seedData.controls);
+      
+      // Compute embeddings for controls after seeding
+      // This is idempotent - only processes controls with NULL embeddings
+      // Safe to re-run on existing infrastructure to populate missing embeddings
+      console.log('Computing embeddings for controls...');
+      try {
+        const embeddingStats = await backfillControlEmbeddings(20, 2, false);
+        console.log(
+          `✓ Control embeddings computed: ${embeddingStats.succeeded} succeeded, ${embeddingStats.failed} failed (${embeddingStats.processed} total)`,
+        );
+      } catch (error) {
+        // Embedding computation is best-effort - don't fail the seed if it errors
+        console.warn(
+          '⚠ Control embedding computation failed (non-fatal):',
+          error instanceof Error ? error.message : String(error),
+        );
+        console.warn('⚠ You can manually run: npm run backfill-control-embeddings');
+      }
     }
     if (seedData.legislation) {
       await seedLegislation(seedData.legislation);

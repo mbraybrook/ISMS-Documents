@@ -1,0 +1,23 @@
+{
+  "name": "@app/document-service",
+  "version": "1.0.0",
+  "description": "Document processing service for ISMS - handles PDF conversion, watermarking, and caching",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pdf-lib": "^1.17.1",
+    "libreoffice-convert": "^1.7.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.5",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
+  }
+}
+

@@ -19,10 +19,9 @@ jest.mock('../../lib/prisma', () => ({
   },
 }));
 
-// Mock llmService
-jest.mock('../llmService', () => ({
-  generateEmbedding: jest.fn(),
-  normalizeRiskText: jest.fn(),
+// Mock aiServiceClient
+jest.mock('../../clients/aiServiceClient', () => ({
+  generateEmbeddingRemote: jest.fn(),
 }));
 
 // Mock ConcurrencyLimiter
@@ -36,17 +35,21 @@ jest.mock('../../config', () => ({
     llm: {
       maxEmbeddingTextLength: 1024,
     },
+    aiService: {
+      baseUrl: 'http://ai-service:4002',
+      internalToken: 'test-token',
+      timeout: 10000,
+    },
   },
 }));
 
 // Import mocked modules
 import { prisma } from '../../lib/prisma';
-import { generateEmbedding, normalizeRiskText } from '../llmService';
+import { generateEmbeddingRemote } from '../../clients/aiServiceClient';
 import { ConcurrencyLimiter } from '../../utils/concurrencyLimiter';
 
 const mockPrisma = prisma as any;
-const mockGenerateEmbedding = generateEmbedding as jest.MockedFunction<typeof generateEmbedding>;
-const mockNormalizeRiskText = normalizeRiskText as jest.MockedFunction<typeof normalizeRiskText>;
+const mockGenerateEmbeddingRemote = generateEmbeddingRemote as jest.MockedFunction<typeof generateEmbeddingRemote>;
 const MockConcurrencyLimiter = ConcurrencyLimiter as jest.MockedClass<typeof ConcurrencyLimiter>;
 
 describe('embeddingService', () => {
@@ -72,20 +75,17 @@ describe('embeddingService', () => {
     const threatDescription = 'Test threat';
     const description = 'Test description';
     const mockEmbedding = [0.1, 0.2, 0.3, 0.4, 0.5];
-    const normalizedText = 'normalized text';
 
     it('should compute and store embedding successfully when embedding is generated', async () => {
       // Arrange
-      mockNormalizeRiskText.mockReturnValue(normalizedText);
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.risk.update.mockResolvedValue({ id: riskId, embedding: mockEmbedding });
 
       // Act
       const result = await computeAndStoreEmbedding(riskId, title, threatDescription, description);
 
       // Assert
-      expect(mockNormalizeRiskText).toHaveBeenCalledWith(title, threatDescription, description);
-      expect(mockGenerateEmbedding).toHaveBeenCalledWith(normalizedText);
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalled();
       expect(mockPrisma.risk.update).toHaveBeenCalledWith({
         where: { id: riskId },
         data: { embedding: mockEmbedding },
@@ -95,14 +95,13 @@ describe('embeddingService', () => {
 
     it('should return null when embedding generation fails', async () => {
       // Arrange
-      mockNormalizeRiskText.mockReturnValue(normalizedText);
-      mockGenerateEmbedding.mockResolvedValue(null);
+      mockGenerateEmbeddingRemote.mockResolvedValue(null);
 
       // Act
       const result = await computeAndStoreEmbedding(riskId, title, threatDescription, description);
 
       // Assert
-      expect(mockGenerateEmbedding).toHaveBeenCalledWith(normalizedText);
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalled();
       expect(mockPrisma.risk.update).not.toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(`Failed to generate embedding for risk ${riskId}`),
@@ -112,30 +111,28 @@ describe('embeddingService', () => {
 
     it('should handle null threatDescription and description', async () => {
       // Arrange
-      mockNormalizeRiskText.mockReturnValue(normalizedText);
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.risk.update.mockResolvedValue({ id: riskId, embedding: mockEmbedding });
 
       // Act
       const result = await computeAndStoreEmbedding(riskId, title, null, null);
 
       // Assert
-      expect(mockNormalizeRiskText).toHaveBeenCalledWith(title, null, null);
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalled();
       expect(result).toEqual(mockEmbedding);
     });
 
     it('should return null and log error when database update fails', async () => {
       // Arrange
       const dbError = new Error('Database error');
-      mockNormalizeRiskText.mockReturnValue(normalizedText);
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.risk.update.mockRejectedValue(dbError);
 
       // Act
       const result = await computeAndStoreEmbedding(riskId, title, threatDescription, description);
 
       // Assert
-      expect(mockGenerateEmbedding).toHaveBeenCalledWith(normalizedText);
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalled();
       expect(mockPrisma.risk.update).toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(`Error computing/storing embedding for risk ${riskId}`),
@@ -147,14 +144,13 @@ describe('embeddingService', () => {
     it('should return null and log error when embedding generation throws', async () => {
       // Arrange
       const embeddingError = new Error('Embedding generation failed');
-      mockNormalizeRiskText.mockReturnValue(normalizedText);
-      mockGenerateEmbedding.mockRejectedValue(embeddingError);
+      mockGenerateEmbeddingRemote.mockRejectedValue(embeddingError);
 
       // Act
       const result = await computeAndStoreEmbedding(riskId, title, threatDescription, description);
 
       // Assert
-      expect(mockGenerateEmbedding).toHaveBeenCalledWith(normalizedText);
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalled();
       expect(mockPrisma.risk.update).not.toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(`Error computing/storing embedding for risk ${riskId}`),
@@ -189,8 +185,7 @@ describe('embeddingService', () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce(risks)
         .mockResolvedValueOnce([]);
-      mockNormalizeRiskText.mockReturnValue('normalized');
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.risk.update.mockResolvedValue({});
 
       // Act
@@ -200,7 +195,7 @@ describe('embeddingService', () => {
       expect(result).toEqual({ processed: 2, succeeded: 2, failed: 0 });
       expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
       expect(mockLimiter.execute).toHaveBeenCalledTimes(2);
-      expect(mockGenerateEmbedding).toHaveBeenCalledTimes(2);
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalledTimes(2);
     });
 
     it('should handle dry run mode without storing embeddings', async () => {
@@ -218,7 +213,7 @@ describe('embeddingService', () => {
 
       // Assert
       expect(result).toEqual({ processed: 1, succeeded: 1, failed: 0 });
-      expect(mockGenerateEmbedding).not.toHaveBeenCalled();
+      expect(mockGenerateEmbeddingRemote).not.toHaveBeenCalled();
       expect(mockPrisma.risk.update).not.toHaveBeenCalled();
     });
 
@@ -249,8 +244,7 @@ describe('embeddingService', () => {
         .mockResolvedValueOnce(batch1)
         .mockResolvedValueOnce(batch2)
         .mockResolvedValueOnce([]);
-      mockNormalizeRiskText.mockReturnValue('normalized');
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.risk.update.mockResolvedValue({});
 
       // Act
@@ -272,8 +266,7 @@ describe('embeddingService', () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce(risks)
         .mockResolvedValueOnce([]);
-      mockNormalizeRiskText.mockReturnValue('normalized');
-      mockGenerateEmbedding
+      mockGenerateEmbeddingRemote
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce([0.1, 0.2, 0.3]);
       mockPrisma.risk.update.mockResolvedValue({});
@@ -296,8 +289,7 @@ describe('embeddingService', () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce(risks)
         .mockResolvedValueOnce([]);
-      mockNormalizeRiskText.mockReturnValue('normalized');
-      mockGenerateEmbedding
+      mockGenerateEmbeddingRemote
         .mockRejectedValueOnce(processingError)
         .mockResolvedValueOnce([0.1, 0.2, 0.3]);
       mockPrisma.risk.update.mockResolvedValue({});
@@ -320,8 +312,7 @@ describe('embeddingService', () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce(risks)
         .mockResolvedValueOnce([]);
-      mockNormalizeRiskText.mockReturnValue('normalized');
-      mockGenerateEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
+      mockGenerateEmbeddingRemote.mockResolvedValue([0.1, 0.2, 0.3]);
       mockPrisma.risk.update.mockResolvedValue({});
 
       // Act
@@ -345,8 +336,7 @@ describe('embeddingService', () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce(risks)
         .mockResolvedValueOnce([]);
-      mockNormalizeRiskText.mockReturnValue('normalized');
-      mockGenerateEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
+      mockGenerateEmbeddingRemote.mockResolvedValue([0.1, 0.2, 0.3]);
       mockPrisma.risk.update.mockResolvedValue({});
 
       // Act
@@ -369,7 +359,7 @@ describe('embeddingService', () => {
 
     it('should compute and store embedding successfully when embedding is generated', async () => {
       // Arrange
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.control.update.mockResolvedValue({ id: controlId, embedding: mockEmbedding });
 
       // Act
@@ -383,7 +373,7 @@ describe('embeddingService', () => {
       );
 
       // Assert
-      expect(mockGenerateEmbedding).toHaveBeenCalled();
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalled();
       expect(mockPrisma.control.update).toHaveBeenCalledWith({
         where: { id: controlId },
         data: { embedding: mockEmbedding },
@@ -393,7 +383,7 @@ describe('embeddingService', () => {
 
     it('should return null when embedding generation fails', async () => {
       // Arrange
-      mockGenerateEmbedding.mockResolvedValue(null);
+      mockGenerateEmbeddingRemote.mockResolvedValue(null);
 
       // Act
       const result = await computeAndStoreControlEmbedding(
@@ -406,7 +396,7 @@ describe('embeddingService', () => {
       );
 
       // Assert
-      expect(mockGenerateEmbedding).toHaveBeenCalled();
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalled();
       expect(mockPrisma.control.update).not.toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(`Failed to generate embedding for control ${controlId}`),
@@ -416,7 +406,7 @@ describe('embeddingService', () => {
 
     it('should handle null optional fields', async () => {
       // Arrange
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.control.update.mockResolvedValue({ id: controlId, embedding: mockEmbedding });
 
       // Act
@@ -430,14 +420,14 @@ describe('embeddingService', () => {
       );
 
       // Assert
-      expect(mockGenerateEmbedding).toHaveBeenCalled();
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalled();
       expect(result).toEqual(mockEmbedding);
     });
 
     it('should return null and log error when database update fails', async () => {
       // Arrange
       const dbError = new Error('Database error');
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.control.update.mockRejectedValue(dbError);
 
       // Act
@@ -451,7 +441,7 @@ describe('embeddingService', () => {
       );
 
       // Assert
-      expect(mockGenerateEmbedding).toHaveBeenCalled();
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalled();
       expect(mockPrisma.control.update).toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(`Error computing/storing embedding for control ${controlId}`),
@@ -463,7 +453,7 @@ describe('embeddingService', () => {
     it('should return null and log error when embedding generation throws', async () => {
       // Arrange
       const embeddingError = new Error('Embedding generation failed');
-      mockGenerateEmbedding.mockRejectedValue(embeddingError);
+      mockGenerateEmbeddingRemote.mockRejectedValue(embeddingError);
 
       // Act
       const result = await computeAndStoreControlEmbedding(
@@ -476,7 +466,7 @@ describe('embeddingService', () => {
       );
 
       // Assert
-      expect(mockGenerateEmbedding).toHaveBeenCalled();
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalled();
       expect(mockPrisma.control.update).not.toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(`Error computing/storing embedding for control ${controlId}`),
@@ -525,7 +515,7 @@ describe('embeddingService', () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce(controls)
         .mockResolvedValueOnce([]);
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.control.update.mockResolvedValue({});
 
       // Act
@@ -535,7 +525,7 @@ describe('embeddingService', () => {
       expect(result).toEqual({ processed: 2, succeeded: 2, failed: 0 });
       expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
       expect(mockLimiter.execute).toHaveBeenCalledTimes(2);
-      expect(mockGenerateEmbedding).toHaveBeenCalledTimes(2);
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalledTimes(2);
     });
 
     it('should use cursor-based pagination with lastId', async () => {
@@ -566,7 +556,7 @@ describe('embeddingService', () => {
         .mockResolvedValueOnce(batch1)
         .mockResolvedValueOnce(batch2)
         .mockResolvedValueOnce([]);
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.control.update.mockResolvedValue({});
 
       // Act
@@ -607,7 +597,7 @@ describe('embeddingService', () => {
 
       // Assert
       expect(result).toEqual({ processed: 1, succeeded: 1, failed: 0 });
-      expect(mockGenerateEmbedding).not.toHaveBeenCalled();
+      expect(mockGenerateEmbeddingRemote).not.toHaveBeenCalled();
       expect(mockPrisma.control.update).not.toHaveBeenCalled();
     });
 
@@ -659,7 +649,7 @@ describe('embeddingService', () => {
         .mockResolvedValueOnce(batch1)
         .mockResolvedValueOnce(batch2)
         .mockResolvedValueOnce([]);
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.control.update.mockResolvedValue({});
 
       // Act
@@ -695,7 +685,7 @@ describe('embeddingService', () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce(controls)
         .mockResolvedValueOnce([]);
-      mockGenerateEmbedding
+      mockGenerateEmbeddingRemote
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce([0.1, 0.2, 0.3]);
       mockPrisma.control.update.mockResolvedValue({});
@@ -732,7 +722,7 @@ describe('embeddingService', () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce(controls)
         .mockResolvedValueOnce([]);
-      mockGenerateEmbedding
+      mockGenerateEmbeddingRemote
         .mockRejectedValueOnce(processingError)
         .mockResolvedValueOnce([0.1, 0.2, 0.3]);
       mockPrisma.control.update.mockResolvedValue({});
@@ -772,7 +762,7 @@ describe('embeddingService', () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce(controls)
         .mockResolvedValueOnce([]);
-      mockGenerateEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
+      mockGenerateEmbeddingRemote.mockResolvedValue([0.1, 0.2, 0.3]);
       mockPrisma.control.update.mockResolvedValue({});
 
       // Act
@@ -798,7 +788,7 @@ describe('embeddingService', () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce(controls)
         .mockResolvedValueOnce([]);
-      mockGenerateEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
+      mockGenerateEmbeddingRemote.mockResolvedValue([0.1, 0.2, 0.3]);
       mockPrisma.control.update.mockResolvedValue({});
 
       // Act
@@ -821,7 +811,7 @@ describe('embeddingService', () => {
       const longText = 'x'.repeat(2000);
       const mockEmbedding = [0.1, 0.2, 0.3];
 
-      mockGenerateEmbedding.mockResolvedValue(mockEmbedding);
+      mockGenerateEmbeddingRemote.mockResolvedValue(mockEmbedding);
       mockPrisma.control.update.mockResolvedValue({ id: controlId, embedding: mockEmbedding });
 
       // Act
@@ -835,9 +825,9 @@ describe('embeddingService', () => {
       );
 
       // Assert
-      expect(mockGenerateEmbedding).toHaveBeenCalled();
+      expect(mockGenerateEmbeddingRemote).toHaveBeenCalled();
       // The text should be truncated to maxEmbeddingTextLength (1024)
-      const callArg = mockGenerateEmbedding.mock.calls[0][0];
+      const callArg = mockGenerateEmbeddingRemote.mock.calls[0][0];
       expect(callArg.length).toBeLessThanOrEqual(1024);
       expect(result).toEqual(mockEmbedding);
     });

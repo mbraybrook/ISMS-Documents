@@ -140,6 +140,12 @@ jest.mock('../../services/llmService', () => ({
   mapToScore: jest.fn((sim) => Math.round(sim * 100)),
 }));
 
+// Mock AI service client
+jest.mock('../../clients/aiServiceClient', () => ({
+  generateEmbeddingRemote: jest.fn().mockResolvedValue([0.1, 0.2, 0.3]),
+  similaritySearchRemote: jest.fn().mockResolvedValue({ results: [] }),
+}));
+
 // Mock multer config
 jest.mock('../../lib/multerConfig', () => ({
   csvUpload: {
@@ -169,6 +175,11 @@ describe('Risks API', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     prisma = require('../../lib/prisma').prisma;
     jest.clearAllMocks();
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const aiServiceClient = require('../../clients/aiServiceClient');
+    // Reset aiServiceClient mocks to default after clearing
+    aiServiceClient.generateEmbeddingRemote.mockResolvedValue([0.1, 0.2, 0.3]);
+    aiServiceClient.similaritySearchRemote.mockResolvedValue({ results: [] });
     // Reset all Prisma mocks to their default state
     prisma.risk.findUnique.mockReset();
     prisma.risk.findMany.mockReset();
@@ -2127,8 +2138,8 @@ describe('Risks API', () => {
 
     it('should return 500 when embedding generation fails', async () => {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { generateEmbedding } = require('../../services/llmService');
-      generateEmbedding.mockResolvedValueOnce(null);
+      const { generateEmbeddingRemote } = require('../../clients/aiServiceClient');
+      generateEmbeddingRemote.mockResolvedValueOnce(null);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 
       await request(app)

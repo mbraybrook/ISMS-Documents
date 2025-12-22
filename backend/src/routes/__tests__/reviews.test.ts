@@ -40,9 +40,9 @@ jest.mock('../../lib/prisma', () => ({
   },
 }));
 
-// Mock pdfCacheService
-jest.mock('../../services/pdfCacheService', () => ({
-  invalidateCache: jest.fn().mockResolvedValue(undefined),
+// Mock documentServiceClient
+jest.mock('../../clients/documentServiceClient', () => ({
+  invalidateCacheRemote: jest.fn().mockResolvedValue({ invalidated: 1 }),
 }));
 
 // Mock express-validator - validators are middleware functions
@@ -82,7 +82,7 @@ jest.mock('express-validator', () => {
 describe('Reviews API', () => {
   let app: express.Application;
   let prisma: any;
-  let invalidateCache: jest.Mock;
+  let invalidateCacheRemote: jest.Mock;
   let consoleErrorSpy: jest.SpyInstance;
   let consoleLogSpy: jest.SpyInstance;
   let consoleWarnSpy: jest.SpyInstance;
@@ -101,8 +101,8 @@ describe('Reviews API', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     prisma = require('../../lib/prisma').prisma;
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pdfCacheService = require('../../services/pdfCacheService');
-    invalidateCache = pdfCacheService.invalidateCache;
+    const documentServiceClient = require('../../clients/documentServiceClient');
+    invalidateCacheRemote = documentServiceClient.invalidateCacheRemote;
 
     // Reset validation result mock
     mockValidationResult = {
@@ -896,7 +896,7 @@ describe('Reviews API', () => {
       // Assert
       // Wait a bit for async cache invalidation
       await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(invalidateCache).toHaveBeenCalledWith(validDocumentId);
+      expect(invalidateCacheRemote).toHaveBeenCalledWith(validDocumentId);
     });
 
     it('should handle cache invalidation errors gracefully', async () => {
@@ -938,7 +938,7 @@ describe('Reviews API', () => {
         },
       };
 
-      invalidateCache.mockRejectedValue(new Error('Cache error'));
+      invalidateCacheRemote.mockRejectedValue(new Error('Cache error'));
 
       prisma.reviewTask.findUnique.mockResolvedValue(mockReviewTask);
       prisma.reviewTask.update.mockResolvedValue(updatedReviewTask);
@@ -1096,7 +1096,7 @@ describe('Reviews API', () => {
 
       // Assert
       expect(prisma.document.update).not.toHaveBeenCalled();
-      expect(invalidateCache).not.toHaveBeenCalled();
+      expect(invalidateCacheRemote).not.toHaveBeenCalled();
     });
   });
 

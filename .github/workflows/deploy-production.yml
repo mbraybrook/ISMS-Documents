@@ -293,12 +293,25 @@ jobs:
 
       - name: Health check
         run: |
+          # Get ALB DNS name
           ALB_DNS=$(aws cloudformation describe-stacks \
             --stack-name isms-production \
             --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNSName`].OutputValue' \
-            --output text)
-          echo "Checking health at https://$ALB_DNS/api/health"
-          curl -f https://$ALB_DNS/api/health || exit 1
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
+          
+          # Check if custom domain is configured (from PRODUCTION_VITE_API_URL)
+          # If available, use it with HTTPS; otherwise use HTTP with ALB DNS
+          if [ -n "${{ secrets.PRODUCTION_VITE_API_URL }}" ]; then
+            # Extract domain from URL (remove https:// and trailing /)
+            HEALTH_URL="${{ secrets.PRODUCTION_VITE_API_URL }}/api/health"
+            echo "Checking health at $HEALTH_URL"
+            curl -f "$HEALTH_URL" || exit 1
+          else
+            # Use HTTP with ALB DNS (certificate is for custom domain, not ALB DNS)
+            echo "Checking health at http://$ALB_DNS/api/health"
+            curl -f "http://$ALB_DNS/api/health" || exit 1
+          fi
 
 
 
