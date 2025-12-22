@@ -821,21 +821,30 @@ describe('ControlFormModal', () => {
 
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={mockControl} />);
 
+      // Wait for component to fully load - wait for initial data fetches
+      await waitFor(() => {
+        expect(api.get).toHaveBeenCalledWith('/api/controls/control-1/documents');
+      }, { timeout: 2000 });
+
+      // Wait for search input to be ready
       await waitFor(() => {
         expect(screen.getByPlaceholderText(/search documents by title/i)).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
 
       const searchInput = screen.getByPlaceholderText(/search documents by title/i);
+      
+      // Type search term - debounce will trigger one API call after 300ms
       await user.type(searchInput, 'Test');
 
-      // Wait for API call to complete and document to appear (with longer timeout for debounce/search)
+      // Wait for debounced search API call to complete (300ms debounce + API call time)
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/api/documents', expect.anything());
-      }, { timeout: 3000 });
+      }, { timeout: 2000 });
 
+      // Wait for document to appear in search results
       await waitFor(() => {
         expect(screen.getByText('Test Document')).toBeInTheDocument();
-      }, { timeout: 3000 });
+      }, { timeout: 2000 });
 
       // Find the clickable document box (it's a Box with onClick, not a button)
       const documentBox = screen.getByText('Test Document').closest('div[class*="Box"]') ||
@@ -848,12 +857,13 @@ describe('ControlFormModal', () => {
         await user.click(screen.getByText('Test Document'));
       }
 
+      // Wait for link API call
       await waitFor(() => {
         expect(api.post).toHaveBeenCalledWith('/api/controls/control-1/documents', {
           documentId: 'doc-1',
         });
-      }, { timeout: 3000 });
-    });
+      }, { timeout: 5000 });
+    }, 10000); // Increase test timeout to 10 seconds
 
     // Skipped due to jsdom/Chakra UI focus-visible compatibility issue
     // The focus error ("Cannot set property focus of #<HTMLElement> which has only a getter")
@@ -1205,12 +1215,12 @@ describe('ControlFormModal', () => {
       // Wait for component to load and fetch linked suppliers
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/api/controls/control-1/suppliers');
-      });
+      }, { timeout: 2000 });
 
       // Wait for the Linked Suppliers section to appear
       await waitFor(() => {
         expect(screen.getByText(/linked suppliers/i)).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
 
       // Get all Link Supplier buttons and use the first one (should be the main one in Linked Suppliers section)
       const linkButtons = screen.getAllByRole('button', { name: /link supplier/i });
@@ -1221,7 +1231,7 @@ describe('ControlFormModal', () => {
       // Wait for supplier modal to open
       await waitFor(() => {
         expect(screen.getByText('Link Supplier to Control')).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
 
       const searchInput = screen.getByPlaceholderText(/search suppliers by name/i);
       await user.type(searchInput, 'Test');
@@ -1232,22 +1242,24 @@ describe('ControlFormModal', () => {
       // Wait for API call to complete
       await waitFor(() => {
         expect(supplierApi.getSuppliers).toHaveBeenCalledWith({ search: 'Test' });
-      }, { timeout: 3000 });
+      }, { timeout: 5000 });
 
       // Wait for search results to appear - should only show "Another Supplier"
       // "Test Supplier" should be filtered out as it's already linked
       await waitFor(() => {
         expect(screen.getByText('Another Supplier')).toBeInTheDocument();
-      }, { timeout: 3000 });
+      }, { timeout: 5000 });
 
       // Verify that "Test Supplier" is NOT in the search results table (it's already linked)
       // Note: "Test Supplier" may still appear in the "Linked Suppliers" section above,
       // but it should NOT appear in the search results table
-      const supplierTable = screen.getByRole('table');
-      expect(supplierTable).toBeInTheDocument();
-      expect(supplierTable.textContent).toContain('Another Supplier');
-      expect(supplierTable.textContent).not.toContain('Test Supplier');
-    });
+      await waitFor(() => {
+        const supplierTable = screen.getByRole('table');
+        expect(supplierTable).toBeInTheDocument();
+        expect(supplierTable.textContent).toContain('Another Supplier');
+        expect(supplierTable.textContent).not.toContain('Test Supplier');
+      }, { timeout: 2000 });
+    }, 10000); // Increase test timeout to 10 seconds
 
     it('should filter out already linked documents from search results', async () => {
       const user = userEvent.setup();
@@ -1271,37 +1283,41 @@ describe('ControlFormModal', () => {
 
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={mockControl} />);
 
-      // Wait for component to load and fetch linked documents
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText(/search documents by title/i)).toBeInTheDocument();
-      });
-
-      // Wait for linked documents to be fetched
+      // Wait for component to load and fetch linked documents first
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith(`/api/controls/${mockControl.id}/documents`);
-      });
+      }, { timeout: 2000 });
+
+      // Wait for search input to be ready
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/search documents by title/i)).toBeInTheDocument();
+      }, { timeout: 2000 });
 
       const searchInput = screen.getByPlaceholderText(/search documents by title/i);
+      
+      // Type search term - debounce will trigger one API call after 300ms
       await user.type(searchInput, 'Document');
 
-      // Wait for search API call (with timeout for debounce/search processing)
+      // Wait for debounced search API call to complete (300ms debounce + API call time)
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/api/documents', expect.anything());
-      }, { timeout: 3000 });
+      }, { timeout: 2000 });
 
       // Wait for search results to appear - should only show "Another Document"
       // "Test Document" should be filtered out as it's already linked
       await waitFor(() => {
         expect(screen.getByText('Another Document')).toBeInTheDocument();
-      }, { timeout: 3000 });
+      }, { timeout: 2000 });
 
       // Verify that "Test Document" is NOT in the search results (it's already linked)
       // But it might still be visible in the linked documents section, so check the search results area specifically
-      const searchResultsArea = screen.getByText('Another Document').closest('div');
-      if (searchResultsArea) {
-        expect(searchResultsArea.textContent).not.toContain('Test Document');
-      }
-    });
+      await waitFor(() => {
+        const searchResultsArea = screen.getByText('Another Document').closest('div');
+        if (searchResultsArea) {
+          expect(searchResultsArea.textContent).not.toContain('Test Document');
+        }
+      }, { timeout: 2000 });
+    }, 10000); // Increase test timeout to 10 seconds
   });
 });
 

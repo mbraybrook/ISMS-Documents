@@ -59,6 +59,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
   const { isOpen: isSupplierModalOpen, onOpen: onSupplierModalOpen, onClose: onSupplierModalClose } = useDisclosure();
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const documentSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [linkedSuppliers, setLinkedSuppliers] = useState<Supplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
@@ -125,6 +126,42 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
     }
   }, [control?.id, toast]);
 
+  // Define searchDocuments before the useEffect that uses it
+  const searchDocuments = useCallback(async () => {
+    if (!documentSearchTerm.trim()) {
+      setAvailableDocuments([]);
+      return;
+    }
+
+    try {
+      setSearchingDocuments(true);
+      const response = await api.get('/api/documents', {
+        params: {
+          limit: 20,
+        },
+      });
+      // Filter out documents already linked and filter by search term
+      const linkedDocumentIds = new Set(linkedDocuments.map((d) => d.id));
+      const searchLower = documentSearchTerm.toLowerCase();
+      setAvailableDocuments(
+        response.data.data.filter(
+          (d: any) =>
+            !linkedDocumentIds.has(d.id) &&
+            d.title.toLowerCase().includes(searchLower)
+        )
+      );
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to search documents',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setSearchingDocuments(false);
+    }
+  }, [documentSearchTerm, linkedDocuments, toast]);
+
   useEffect(() => {
     if (control) {
       setFormData({
@@ -159,6 +196,27 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
     }
     setErrors({});
   }, [control, fetchLinkedDocuments, fetchLinkedSuppliers]);
+
+  // Debounced document search
+  useEffect(() => {
+    if (documentSearchTimeoutRef.current) {
+      clearTimeout(documentSearchTimeoutRef.current);
+    }
+
+    if (documentSearchTerm.length >= 2) {
+      documentSearchTimeoutRef.current = setTimeout(() => {
+        searchDocuments();
+      }, 300); // 300ms debounce
+    } else if (documentSearchTerm.length === 0) {
+      setAvailableDocuments([]);
+    }
+
+    return () => {
+      if (documentSearchTimeoutRef.current) {
+        clearTimeout(documentSearchTimeoutRef.current);
+      }
+    };
+  }, [documentSearchTerm, searchDocuments]);
 
   const searchSuppliers = async () => {
     if (!supplierSearchTerm.trim()) {
@@ -229,41 +287,6 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
         status: 'error',
         duration: 3000,
       });
-    }
-  };
-
-  const searchDocuments = async () => {
-    if (!documentSearchTerm.trim()) {
-      setAvailableDocuments([]);
-      return;
-    }
-
-    try {
-      setSearchingDocuments(true);
-      const response = await api.get('/api/documents', {
-        params: {
-          limit: 20,
-        },
-      });
-      // Filter out documents already linked and filter by search term
-      const linkedDocumentIds = new Set(linkedDocuments.map((d) => d.id));
-      const searchLower = documentSearchTerm.toLowerCase();
-      setAvailableDocuments(
-        response.data.data.filter(
-          (d: any) =>
-            !linkedDocumentIds.has(d.id) &&
-            d.title.toLowerCase().includes(searchLower)
-        )
-      );
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: 'Failed to search documents',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setSearchingDocuments(false);
     }
   };
 
@@ -895,15 +918,14 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                               value={documentSearchTerm}
                               onChange={(e) => {
                                 setDocumentSearchTerm(e.target.value);
-                                if (e.target.value.trim()) {
-                                  searchDocuments();
-                                } else {
-                                  setAvailableDocuments([]);
-                                }
                               }}
                               onKeyPress={(e) => {
                                 if (e.key === 'Enter' && documentSearchTerm.trim()) {
                                   e.preventDefault();
+                                  // Clear any pending debounced search and trigger immediate search
+                                  if (documentSearchTimeoutRef.current) {
+                                    clearTimeout(documentSearchTimeoutRef.current);
+                                  }
                                   searchDocuments();
                                 }
                               }}
