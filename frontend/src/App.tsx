@@ -8,6 +8,8 @@ import { LoginPage } from './pages/LoginPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { DocumentsPage } from './pages/DocumentsPage'
 import { AcknowledgmentPage } from './pages/AcknowledgmentPage'
+import { AcknowledgmentReportingPage } from './pages/AcknowledgmentReportingPage'
+import { AllStaffGroupConfig } from './components/AllStaffGroupConfig'
 import { ReviewsPage } from './pages/ReviewsPage'
 import { RisksPage } from './pages/RisksPage'
 import { DepartmentRiskTable } from './components/DepartmentRiskTable'
@@ -94,6 +96,26 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <AcknowledgmentPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/documents/acknowledgments/reporting"
+            element={
+              <ProtectedRoute requiredRole="EDITOR">
+                <Layout>
+                  <AcknowledgmentReportingPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/documents/acknowledgments/config"
+            element={
+              <ProtectedRoute requiredRole="ADMIN">
+                <Layout>
+                  <AllStaffGroupConfig />
                 </Layout>
               </ProtectedRoute>
             }

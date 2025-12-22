@@ -104,6 +104,16 @@ export function Layout({ children }: LayoutProps) {
                           <MenuItem as={RouterLink} to="/admin/documents/acknowledgments">
                             Acknowledgments
                           </MenuItem>
+                          {(effectiveRole === 'EDITOR' || effectiveRole === 'ADMIN') && (
+                            <MenuItem as={RouterLink} to="/admin/documents/acknowledgments/reporting">
+                              Acknowledgment Reporting
+                            </MenuItem>
+                          )}
+                          {effectiveRole === 'ADMIN' && (
+                            <MenuItem as={RouterLink} to="/admin/documents/acknowledgments/config">
+                              Acknowledgment Config
+                            </MenuItem>
+                          )}
                           <MenuItem as={RouterLink} to="/admin/documents/reviews">
                             Reviews
                           </MenuItem>

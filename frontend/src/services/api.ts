@@ -191,5 +191,159 @@ export const riskDashboardApi = {
   },
 };
 
+// Acknowledgment API functions
+export interface AcknowledgmentStats {
+  dataAsOf: string | null;
+  documents: Array<{
+    documentId: string;
+    documentTitle: string;
+    documentVersion: string;
+    requiresAcknowledgement: boolean;
+    lastChangedDate: string | null;
+    totalUsers: number;
+    acknowledgedCount: number;
+    notAcknowledgedCount: number;
+    percentage: number;
+    acknowledgedUsers: Array<{
+      userId?: string | null;
+      entraObjectId: string;
+      email: string;
+      displayName: string;
+      acknowledgedAt: string;
+      daysSinceRequired: number;
+    }>;
+    notAcknowledgedUsers: Array<{
+      userId?: string | null;
+      entraObjectId: string;
+      email: string;
+      displayName: string;
+      daysSinceRequired: number;
+    }>;
+  }>;
+  summary: {
+    totalDocuments: number;
+    totalUsers: number;
+    averageAcknowledgmentRate: number;
+  };
+}
+
+export interface DocumentAcknowledgmentDetails {
+  dataAsOf: string | null;
+  document: {
+    documentId: string;
+    documentTitle: string;
+    documentVersion: string;
+    requiresAcknowledgement: boolean;
+    lastChangedDate: string | null;
+    totalUsers: number;
+    acknowledgedCount: number;
+    notAcknowledgedCount: number;
+    percentage: number;
+  };
+  acknowledgedUsers: Array<{
+    userId?: string | null;
+    entraObjectId: string;
+    email: string;
+    displayName: string;
+    acknowledgedAt: string;
+    daysSinceRequired: number;
+  }>;
+  notAcknowledgedUsers: Array<{
+    userId?: string | null;
+    entraObjectId: string;
+    email: string;
+    displayName: string;
+    daysSinceRequired: number;
+  }>;
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+  };
+}
+
+export interface EntraIdConfig {
+  groupId: string | null;
+  groupName: string | null;
+  lastSyncedAt: string | null;
+}
+
+export const acknowledgmentApi = {
+  /**
+   * Get acknowledgment statistics for all documents or a specific document
+   */
+  getAcknowledgmentStats: async (
+    documentId?: string,
+    includeUsers: boolean = true
+  ): Promise<AcknowledgmentStats> => {
+    const params: { documentId?: string; includeUsers?: string } = {};
+    if (documentId) {
+      params.documentId = documentId;
+    }
+    if (!includeUsers) {
+      params.includeUsers = 'false';
+    }
+    const response = await api.get('/api/acknowledgments/stats', { params });
+    return response.data;
+  },
+
+  /**
+   * Get detailed acknowledgment status for a specific document with pagination
+   */
+  getDocumentAcknowledgmentDetails: async (
+    documentId: string,
+    page: number = 1,
+    pageSize: number = 50
+  ): Promise<DocumentAcknowledgmentDetails> => {
+    const response = await api.get(`/api/acknowledgments/document/${documentId}`, {
+      params: { page, pageSize },
+    });
+    return response.data;
+  },
+
+  /**
+   * Get configured all-staff Entra ID group
+   */
+  getEntraIdConfig: async (): Promise<EntraIdConfig> => {
+    const response = await api.get('/api/acknowledgments/entra-config');
+    return response.data;
+  },
+
+  /**
+   * Set all-staff Entra ID group (requires Graph token)
+   */
+  setEntraIdConfig: async (groupId: string): Promise<EntraIdConfig> => {
+    const graphToken = await authService.getGraphAccessToken([
+      'GroupMember.Read.All',
+      'Group.Read.All',
+    ]);
+    if (!graphToken) {
+      throw new Error('Unable to get Graph access token');
+    }
+    const response = await api.post(
+      '/api/acknowledgments/entra-config',
+      { groupId },
+      {
+        headers: {
+          'x-graph-token': graphToken,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Sync Entra ID users to cache
+   * Uses app-only token (application permissions) - no user consent required
+   * Backend automatically uses app-only token from Azure app credentials
+   */
+  syncEntraIdUsers: async (): Promise<{ synced: number; lastSyncedAt: string | null }> => {
+    // No token needed - backend uses app-only token automatically
+    // This avoids requiring user consent for delegated permissions
+    const response = await api.post('/api/acknowledgments/entra-sync');
+    return response.data;
+  },
+};
+
 export default api;
 

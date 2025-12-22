@@ -367,6 +367,27 @@ model User {
   @@index([department])
 }
 
+model EntraIdConfig {
+  id          String    @id @default(uuid())
+  groupId     String    @unique  // Entra ID group object ID
+  groupName   String    // Display name (cached from Graph API)
+  lastSyncedAt DateTime? // When members were last synced (nullable initially)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model EntraIdUserCache {
+  id              String   @id @default(uuid())
+  entraObjectId   String   @unique  // Entra ID object ID
+  email           String
+  displayName     String
+  lastSyncedAt    DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([email])
+}
+
 model ExternalUser {
   id                   String          @id @default(uuid())
   email                String          @unique
