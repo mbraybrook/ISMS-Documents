@@ -22,6 +22,12 @@ GitHub Actions will:
 
 The OIDC provider allows GitHub Actions to assume an IAM role without storing AWS credentials. It only needs to be created once per AWS account.
 
+**Important**: The OIDC provider URL differs between GitHub.com and GitHub Enterprise:
+- **GitHub.com**: `https://token.actions.githubusercontent.com`
+- **GitHub Enterprise**: `https://token.actions.YOUR-ENTERPRISE-DOMAIN` (e.g., `https://token.actions.paythru.ghe.com`)
+
+The setup script will automatically detect which type you're using based on your git remote URL.
+
 ### Option A: Automatic (Recommended)
 
 The setup script (`scripts/setup-github-actions.sh`) will detect if the OIDC provider exists and offer to create it if it doesn't. The OIDC provider is an account-level resource that only needs to be created once per AWS account.
@@ -73,6 +79,17 @@ GITHUB_REPO_NAME=$(echo "$GITHUB_REPO" | cut -d'/' -f2 | sed 's/\.git$//')
 echo "GitHub Org: $GITHUB_ORG"
 echo "GitHub Repo: $GITHUB_REPO_NAME"
 
+# Detect GitHub Enterprise vs GitHub.com (for OIDC domain)
+GITHUB_REMOTE_URL=$(git -C .. remote get-url pt-origin 2>/dev/null || git -C .. remote get-url origin)
+if echo "$GITHUB_REMOTE_URL" | grep -q "\.ghe\.com"; then
+    GITHUB_ENTERPRISE_DOMAIN=$(echo "$GITHUB_REMOTE_URL" | sed -E 's|.*@([^:]+):.*|\1|' | sed 's|\.ghe\.com||')
+    GITHUB_OIDC_DOMAIN="token.actions.${GITHUB_ENTERPRISE_DOMAIN}.ghe.com"
+    echo "Detected GitHub Enterprise: $GITHUB_OIDC_DOMAIN"
+else
+    GITHUB_OIDC_DOMAIN="token.actions.githubusercontent.com"
+    echo "Detected GitHub.com: $GITHUB_OIDC_DOMAIN"
+fi
+
 # Deploy IAM roles stack
 aws cloudformation deploy \
   --template-file templates/iam-roles.yaml \
@@ -81,6 +98,7 @@ aws cloudformation deploy \
     Environment=staging \
     GitHubOrg=$GITHUB_ORG \
     GitHubRepo=$GITHUB_REPO_NAME \
+    GitHubOIDCDomain=$GITHUB_OIDC_DOMAIN \
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
   --region eu-west-2 \
   --profile pt-sandbox
@@ -221,9 +239,14 @@ aws deploy list-deployments \
 
 **Solution**: Add `AWS_REGION` secret with value `eu-west-2`.
 
-### Error: "Role cannot be assumed"
+### Error: "Role cannot be assumed" or Repeated "Assuming role with OIDC" Messages
 
-**Cause**: OIDC provider not set up or IAM role trust policy incorrect.
+**Cause**: OIDC provider not set up, IAM role trust policy incorrect, or repository name mismatch.
+
+**Symptoms**:
+- Repeated "Assuming role with OIDC" messages in workflow logs
+- Action retries multiple times before failing
+- Error: "Error: Could not assume role with OIDC"
 
 **Solution**:
 1. Verify OIDC provider exists:
@@ -234,7 +257,21 @@ aws deploy list-deployments \
    ```bash
    aws iam get-role --role-name isms-staging-github-actions-role --profile pt-sandbox --query 'Role.AssumeRolePolicyDocument'
    ```
-3. Ensure GitHub org/repo match exactly (case-sensitive)
+3. Ensure GitHub org/repo match exactly (case-sensitive). For GitHub Enterprise, the format should be `repo:OrgName/RepoName:*`
+4. Check CloudTrail logs for detailed error messages:
+   ```bash
+   aws cloudtrail lookup-events \
+     --lookup-attributes AttributeKey=EventName,AttributeValue=AssumeRoleWithWebIdentity \
+     --max-results 10 \
+     --profile pt-sandbox \
+     --region eu-west-2
+   ```
+5. Verify the OIDC provider thumbprint is current (it may change):
+   ```bash
+   THUMBPRINT=$(echo | openssl s_client -servername token.actions.githubusercontent.com -showcerts -connect token.actions.githubusercontent.com:443 2>/dev/null | openssl x509 -fingerprint -noout | sed 's/SHA256 Fingerprint=//' | tr -d ':')
+   echo "Current thumbprint: $THUMBPRINT"
+   ```
+6. For GitHub Enterprise, ensure the repository name in the trust policy matches exactly what GitHub sends in the OIDC token (check workflow logs for the actual repository context)
 
 ### Error: "ECR repository not found"
 

@@ -20,6 +20,11 @@ Parameters:
     Description: GitHub repository name
     Default: 'ISMS-Documentation'
 
+  GitHubOIDCDomain:
+    Type: String
+    Description: GitHub OIDC domain (token.actions.githubusercontent.com for GitHub.com, or token.actions.YOUR-ENTERPRISE-DOMAIN for GitHub Enterprise)
+    Default: 'token.actions.githubusercontent.com'
+
   ECRRegistry:
     Type: String
     Description: ECR registry URL
@@ -103,17 +108,31 @@ Resources:
     Properties:
       RoleName: !Sub 'isms-${Environment}-github-actions-role'
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
-            Action: sts:AssumeRoleWithWebIdentity
-            Condition:
-              StringEquals:
-                'token.actions.githubusercontent.com:aud': sts.amazonaws.com
-              StringLike:
-                'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubOrg}/${GitHubRepo}:*'
+        Fn::Sub:
+          - |
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Federated": "arn:aws:iam::${AWS::AccountId}:oidc-provider/${OIDCDomain}"
+                  },
+                  "Action": "sts:AssumeRoleWithWebIdentity",
+                  "Condition": {
+                    "StringEquals": {
+                      "${OIDCDomain}:aud": "sts.amazonaws.com"
+                    },
+                    "StringLike": {
+                      "${OIDCDomain}:sub": "repo:${GitHubOrg}/${GitHubRepo}:*"
+                    }
+                  }
+                }
+              ]
+            }
+          - OIDCDomain: !Ref GitHubOIDCDomain
+            GitHubOrg: !Ref GitHubOrg
+            GitHubRepo: !Ref GitHubRepo
       Policies:
         - PolicyName: CloudFormationAccess
           PolicyDocument:

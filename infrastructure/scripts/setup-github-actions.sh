@@ -63,9 +63,30 @@ GITHUB_REPO_NAME=$(echo "$GITHUB_REPO" | cut -d'/' -f2 | sed 's/\.git$//')
 print_info "GitHub Org: $GITHUB_ORG"
 print_info "GitHub Repo: $GITHUB_REPO_NAME"
 
+# Detect GitHub Enterprise vs GitHub.com
+GITHUB_REMOTE_URL=$(git remote get-url pt-origin 2>/dev/null || git remote get-url origin 2>/dev/null || echo "")
+if echo "$GITHUB_REMOTE_URL" | grep -q "\.ghe\.com\|github\.com"; then
+    if echo "$GITHUB_REMOTE_URL" | grep -q "\.ghe\.com"; then
+        # GitHub Enterprise - extract domain
+        GITHUB_ENTERPRISE_DOMAIN=$(echo "$GITHUB_REMOTE_URL" | sed -E 's|.*@([^:]+):.*|\1|' | sed 's|\.ghe\.com||')
+        GITHUB_OIDC_DOMAIN="token.actions.${GITHUB_ENTERPRISE_DOMAIN}.ghe.com"
+        print_info "Detected GitHub Enterprise: $GITHUB_ENTERPRISE_DOMAIN"
+    else
+        # GitHub.com
+        GITHUB_OIDC_DOMAIN="token.actions.githubusercontent.com"
+        print_info "Detected GitHub.com"
+    fi
+else
+    # Default to GitHub.com if we can't detect
+    GITHUB_OIDC_DOMAIN="token.actions.githubusercontent.com"
+    print_warning "Could not detect GitHub type, defaulting to GitHub.com"
+fi
+
+print_info "OIDC Domain: $GITHUB_OIDC_DOMAIN"
+
 # Check if OIDC provider exists
 print_header "Checking OIDC Provider"
-OIDC_PROVIDER_ARN="arn:aws:iam::${ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
+OIDC_PROVIDER_ARN="arn:aws:iam::${ACCOUNT_ID}:oidc-provider/${GITHUB_OIDC_DOMAIN}"
 OIDC_EXISTS=$(aws iam list-open-id-connect-providers \
     --profile "$AWS_PROFILE" \
     --query "OpenIDConnectProviderList[?Arn=='${OIDC_PROVIDER_ARN}'].Arn" \
@@ -78,16 +99,16 @@ if [ -z "$OIDC_EXISTS" ]; then
     echo "The OIDC provider must be created manually (it's an account-level resource)."
     echo "Create it with:"
     echo "  aws iam create-open-id-connect-provider \\"
-    echo "    --url https://token.actions.githubusercontent.com \\"
+    echo "    --url https://${GITHUB_OIDC_DOMAIN} \\"
     echo "    --client-id-list sts.amazonaws.com \\"
     echo "    --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 \\"
     echo "    --profile $AWS_PROFILE"
     echo ""
     read -p "Would you like to create it now? (y/n): " CREATE_OIDC
     if [ "$CREATE_OIDC" = "y" ] || [ "$CREATE_OIDC" = "Y" ]; then
-        print_info "Creating OIDC provider..."
+        print_info "Creating OIDC provider for ${GITHUB_OIDC_DOMAIN}..."
         aws iam create-open-id-connect-provider \
-            --url https://token.actions.githubusercontent.com \
+            --url "https://${GITHUB_OIDC_DOMAIN}" \
             --client-id-list sts.amazonaws.com \
             --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 \
             --profile "$AWS_PROFILE" 2>/dev/null && print_info "OIDC provider created successfully!" || print_error "Failed to create OIDC provider (it may already exist)."
@@ -331,16 +352,17 @@ echo -e "${BLUE}Next Steps:${NC}"
 echo ""
 echo "1. Ensure OIDC provider is set up (will be created automatically when deploying IAM roles)"
 echo "2. Deploy/update IAM roles stack with GitHub org/repo:"
-echo "   aws cloudformation deploy \\"
-echo "     --template-file infrastructure/templates/iam-roles.yaml \\"
-echo "     --stack-name $IAM_STACK_NAME \\"
-echo "     --parameter-overrides \\"
-echo "       Environment=$ENVIRONMENT \\"
-echo "       GitHubOrg=$GITHUB_ORG \\"
-echo "       GitHubRepo=$GITHUB_REPO_NAME \\"
-echo "     --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \\"
-echo "     --region $AWS_REGION \\"
-echo "     --profile $AWS_PROFILE"
+    echo "   aws cloudformation deploy \\"
+    echo "     --template-file infrastructure/templates/iam-roles.yaml \\"
+    echo "     --stack-name $IAM_STACK_NAME \\"
+    echo "     --parameter-overrides \\"
+    echo "       Environment=$ENVIRONMENT \\"
+    echo "       GitHubOrg=$GITHUB_ORG \\"
+    echo "       GitHubRepo=$GITHUB_REPO_NAME \\"
+    echo "       GitHubOIDCDomain=$GITHUB_OIDC_DOMAIN \\"
+    echo "     --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \\"
+    echo "     --region $AWS_REGION \\"
+    echo "     --profile $AWS_PROFILE"
 echo ""
 echo "3. Add the secrets above to GitHub (Settings > Secrets and variables > Actions)"
 echo "4. Test the workflow by pushing to main branch or using workflow_dispatch"

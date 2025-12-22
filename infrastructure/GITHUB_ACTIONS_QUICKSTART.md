@@ -26,6 +26,15 @@ GITHUB_REPO=$(git -C .. remote get-url pt-origin 2>/dev/null | sed -E 's|.*[:/](
 GITHUB_ORG=$(echo "$GITHUB_REPO" | cut -d'/' -f1)
 GITHUB_REPO_NAME=$(echo "$GITHUB_REPO" | cut -d'/' -f2 | sed 's/\.git$//')
 
+# Detect GitHub Enterprise vs GitHub.com (for OIDC domain)
+GITHUB_REMOTE_URL=$(git -C .. remote get-url pt-origin 2>/dev/null || git -C .. remote get-url origin)
+if echo "$GITHUB_REMOTE_URL" | grep -q "\.ghe\.com"; then
+    GITHUB_ENTERPRISE_DOMAIN=$(echo "$GITHUB_REMOTE_URL" | sed -E 's|.*@([^:]+):.*|\1|' | sed 's|\.ghe\.com||')
+    GITHUB_OIDC_DOMAIN="token.actions.${GITHUB_ENTERPRISE_DOMAIN}.ghe.com"
+else
+    GITHUB_OIDC_DOMAIN="token.actions.githubusercontent.com"
+fi
+
 # Deploy IAM roles with GitHub config
 aws cloudformation deploy \
   --template-file templates/iam-roles.yaml \
@@ -34,6 +43,7 @@ aws cloudformation deploy \
     Environment=staging \
     GitHubOrg=$GITHUB_ORG \
     GitHubRepo=$GITHUB_REPO_NAME \
+    GitHubOIDCDomain=$GITHUB_OIDC_DOMAIN \
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
   --region eu-west-2 \
   --profile pt-sandbox
