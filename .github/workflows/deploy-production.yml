@@ -180,59 +180,105 @@ jobs:
       - name: Create backend CodeDeploy deployment
         id: backend-deploy
         run: |
-          APPSPEC=$(cat <<EOF
-          {
-            "version": 0.0,
-            "Resources": [{
-              "TargetService": {
-                "Type": "AWS::ECS::Service",
-                "Properties": {
-                  "TaskDefinition": "${{ steps.register-backend.outputs.task_def_arn }}",
-                  "LoadBalancerInfo": {
-                    "ContainerName": "backend",
-                    "ContainerPort": 4000
+          # Create AppSpec JSON file
+          APPSPEC_FILE=$(mktemp)
+          jq -n \
+            --arg task_def "${{ steps.register-backend.outputs.task_def_arn }}" \
+            '{
+              "version": 0.0,
+              "Resources": [{
+                "TargetService": {
+                  "Type": "AWS::ECS::Service",
+                  "Properties": {
+                    "TaskDefinition": $task_def,
+                    "LoadBalancerInfo": {
+                      "ContainerName": "backend",
+                      "ContainerPort": 4000
+                    }
                   }
                 }
+              }]
+            }' > $APPSPEC_FILE
+          
+          # Create deployment input JSON with AppSpec content as a JSON string
+          # The content field needs the AppSpec JSON as a string (not an object)
+          DEPLOYMENT_INPUT_FILE=$(mktemp)
+          APPSPEC_COMPACT=$(jq -c '.' $APPSPEC_FILE)
+          jq -n \
+            --arg appName "${{ secrets.PRODUCTION_BACKEND_CODEDEPLOY_APP }}" \
+            --arg dgName "${{ secrets.PRODUCTION_BACKEND_DEPLOYMENT_GROUP }}" \
+            --arg appSpecContent "$APPSPEC_COMPACT" \
+            '{
+              "applicationName": $appName,
+              "deploymentGroupName": $dgName,
+              "revision": {
+                "revisionType": "AppSpecContent",
+                "appSpecContent": {
+                  "content": $appSpecContent
+                }
               }
-            }]
-          }
-          EOF
-          )
+            }' > $DEPLOYMENT_INPUT_FILE
+          
+          rm $APPSPEC_FILE
+          
           DEPLOYMENT_ID=$(aws deploy create-deployment \
-            --application-name ${{ secrets.PRODUCTION_BACKEND_CODEDEPLOY_APP }} \
-            --deployment-group-name ${{ secrets.PRODUCTION_BACKEND_DEPLOYMENT_GROUP }} \
-            --revision "revisionType=AppSpecContent,appSpecContent='${APPSPEC}'" \
+            --cli-input-json file://$DEPLOYMENT_INPUT_FILE \
             --query 'deploymentId' \
             --output text)
+          
+          rm $DEPLOYMENT_INPUT_FILE
           echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
 
       - name: Create frontend CodeDeploy deployment
         id: frontend-deploy
         run: |
-          APPSPEC=$(cat <<EOF
-          {
-            "version": 0.0,
-            "Resources": [{
-              "TargetService": {
-                "Type": "AWS::ECS::Service",
-                "Properties": {
-                  "TaskDefinition": "${{ steps.register-frontend.outputs.task_def_arn }}",
-                  "LoadBalancerInfo": {
-                    "ContainerName": "frontend",
-                    "ContainerPort": 80
+          # Create AppSpec JSON file
+          APPSPEC_FILE=$(mktemp)
+          jq -n \
+            --arg task_def "${{ steps.register-frontend.outputs.task_def_arn }}" \
+            '{
+              "version": 0.0,
+              "Resources": [{
+                "TargetService": {
+                  "Type": "AWS::ECS::Service",
+                  "Properties": {
+                    "TaskDefinition": $task_def,
+                    "LoadBalancerInfo": {
+                      "ContainerName": "frontend",
+                      "ContainerPort": 80
+                    }
                   }
                 }
+              }]
+            }' > $APPSPEC_FILE
+          
+          # Create deployment input JSON with AppSpec content as a JSON string
+          # The content field needs the AppSpec JSON as a string (not an object)
+          DEPLOYMENT_INPUT_FILE=$(mktemp)
+          APPSPEC_COMPACT=$(jq -c '.' $APPSPEC_FILE)
+          jq -n \
+            --arg appName "${{ secrets.PRODUCTION_FRONTEND_CODEDEPLOY_APP }}" \
+            --arg dgName "${{ secrets.PRODUCTION_FRONTEND_DEPLOYMENT_GROUP }}" \
+            --arg appSpecContent "$APPSPEC_COMPACT" \
+            '{
+              "applicationName": $appName,
+              "deploymentGroupName": $dgName,
+              "revision": {
+                "revisionType": "AppSpecContent",
+                "appSpecContent": {
+                  "content": $appSpecContent
+                }
               }
-            }]
-          }
-          EOF
-          )
+            }' > $DEPLOYMENT_INPUT_FILE
+          
+          rm $APPSPEC_FILE
+          
           DEPLOYMENT_ID=$(aws deploy create-deployment \
-            --application-name ${{ secrets.PRODUCTION_FRONTEND_CODEDEPLOY_APP }} \
-            --deployment-group-name ${{ secrets.PRODUCTION_FRONTEND_DEPLOYMENT_GROUP }} \
-            --revision "revisionType=AppSpecContent,appSpecContent='${APPSPEC}'" \
+            --cli-input-json file://$DEPLOYMENT_INPUT_FILE \
             --query 'deploymentId' \
             --output text)
+          
+          rm $DEPLOYMENT_INPUT_FILE
           echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
 
       - name: Wait for backend deployment

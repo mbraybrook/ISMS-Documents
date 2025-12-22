@@ -77,21 +77,61 @@ global.ResizeObserver = class ResizeObserver {
   unobserve() { }
 } as unknown as typeof ResizeObserver;
 
+// Fix jsdom HTMLElement.focus property to be writable (must be synchronous, not in beforeAll)
+// This prevents "Cannot set property focus" errors from @zag-js/focus-visible
+// jsdom defines focus as read-only, but @zag-js/focus-visible needs to set it
+// We need to do this synchronously during setup, not in beforeAll, because the error
+// happens during module initialization before beforeAll runs
+try {
+  Object.defineProperty(HTMLElement.prototype, 'focus', {
+    writable: true,
+    configurable: true,
+    value: function() {
+      // Provide a no-op implementation
+      return;
+    },
+  });
+} catch (error) {
+  // If it fails, try to delete and redefine
+  try {
+    delete (HTMLElement.prototype as any).focus;
+    Object.defineProperty(HTMLElement.prototype, 'focus', {
+      writable: true,
+      configurable: true,
+      value: function() {
+        return;
+      },
+    });
+  } catch {
+    // If it still fails, ignore - the mock should handle it
+  }
+}
+
 // Mock @zag-js/focus-visible to prevent jsdom compatibility errors
 // This is a known compatibility issue between jsdom and Chakra UI's focus-visible library
 // The mock must be hoisted (Vitest does this automatically) to work before module imports
 vi.mock('@zag-js/focus-visible', () => {
   const mockCleanup = vi.fn();
-  const mockTrackFocusVisible = vi.fn(() => ({
-    cleanup: mockCleanup,
-  }));
-
+  
   // Mock setupGlobalFocusEvents to prevent focus property errors
   // This function is called internally and tries to set focus properties that don't exist in jsdom
   const mockSetupGlobalFocusEvents = vi.fn(() => {
     // Return a no-op cleanup function
     return mockCleanup;
   });
+
+  // Mock trackFocusVisible to return an object that doesn't trigger the real implementation
+  // The real trackFocusVisible calls setupGlobalFocusEvents internally, so we need to prevent that
+  const mockTrackFocusVisible = vi.fn(() => {
+    // Return an object with cleanup, but don't call setupGlobalFocusEvents
+    return {
+      cleanup: mockCleanup,
+    };
+  });
+
+  // Ensure setupGlobalFocusEvents is available as a standalone function too
+  // Some code might import it directly
+  mockTrackFocusVisible.setupGlobalFocusEvents = mockSetupGlobalFocusEvents;
 
   return {
     trackFocusVisible: mockTrackFocusVisible,

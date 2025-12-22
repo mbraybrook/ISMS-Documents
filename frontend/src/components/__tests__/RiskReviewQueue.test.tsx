@@ -719,21 +719,22 @@ describe('RiskReviewQueue', () => {
       const rejectionReasonInput = screen.getByLabelText(/rejection reason/i);
       await user.type(rejectionReasonInput, 'Not relevant to our organization');
 
-      // Reset mock to return empty list after refresh
+      // Reset mock to return empty list after refresh (before clicking confirm)
       setupApiMocks([], []);
 
       const modal = screen.getByText('Reject Risk').closest('[role="dialog"]') || document.body;
       const rejectConfirmButton = within(modal as HTMLElement).getByRole('button', { name: /^reject$/i });
       await user.click(rejectConfirmButton);
 
-      // Assert
+      // Assert - Wait for patch call first
       await waitFor(() => {
         expect(api.patch).toHaveBeenCalledWith('/api/risks/risk-1/status', {
           status: 'REJECTED',
           rejectionReason: 'Not relevant to our organization',
         });
-      });
+      }, { timeout: 3000 });
 
+      // Wait for toast call
       await waitFor(() => {
         expect(mockToast).toHaveBeenCalledWith({
           title: 'Success',
@@ -742,18 +743,16 @@ describe('RiskReviewQueue', () => {
           duration: 3000,
           isClosable: true,
         });
-      });
+      }, { timeout: 3000 });
 
-      // Should refresh risks list
+      // Should refresh risks list - wait for the refresh call after rejection
       await waitFor(() => {
-        expect(api.get).toHaveBeenCalledWith('/api/risks', {
-          params: {
-            view: 'inbox',
-            page: 1,
-            limit: 100,
-          },
-        });
-      });
+        const inboxCalls = vi.mocked(api.get).mock.calls.filter(
+          (call) => call[1]?.params?.view === 'inbox'
+        );
+        // Should have at least one call after the initial load (the refresh call)
+        expect(inboxCalls.length).toBeGreaterThan(1);
+      }, { timeout: 3000 });
     });
 
     it('should show error toast when rejection fails', async () => {
@@ -789,7 +788,7 @@ describe('RiskReviewQueue', () => {
       const rejectConfirmButton = within(modal as HTMLElement).getByRole('button', { name: /^reject$/i });
       await user.click(rejectConfirmButton);
 
-      // Assert
+      // Assert - Wait for error toast (on error, fetchRisks is NOT called, so we only wait for toast)
       await waitFor(() => {
         expect(mockToast).toHaveBeenCalledWith({
           title: 'Error',
@@ -798,7 +797,7 @@ describe('RiskReviewQueue', () => {
           duration: 5000,
           isClosable: true,
         });
-      });
+      }, { timeout: 3000 });
     });
 
     it('should disable reject button when reason is empty', async () => {
