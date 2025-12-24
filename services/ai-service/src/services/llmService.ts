@@ -44,6 +44,10 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
 
   try {
     // Ollama embeddings API format
+    // Add timeout to prevent hanging if Ollama is unreachable
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout (backend has 10s)
+    
     const response = await fetch(`${OLLAMA_ENDPOINT}/api/embeddings`, {
       method: 'POST',
       headers: {
@@ -53,7 +57,10 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
         model: OLLAMA_EMBEDDING_MODEL,
         prompt: normalized, // Ollama uses 'prompt' not 'input'
       }),
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -78,8 +85,14 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
     
     return embedding;
   } catch (error: any) {
-    console.error('[Embedding Error] Failed to generate embedding:', error.message);
-    console.error(`[Embedding Error] Make sure Ollama is running and model '${OLLAMA_EMBEDDING_MODEL}' supports embeddings`);
+    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+      console.error('[Embedding Error] Request timed out connecting to Ollama');
+      console.error(`[Embedding Error] OLLAMA_ENDPOINT: ${OLLAMA_ENDPOINT}`);
+      console.error(`[Embedding Error] Check if Ollama is reachable and service discovery is working`);
+    } else {
+      console.error('[Embedding Error] Failed to generate embedding:', error.message);
+      console.error(`[Embedding Error] Make sure Ollama is running and model '${OLLAMA_EMBEDDING_MODEL}' supports embeddings`);
+    }
     return null;
   }
 }
@@ -281,6 +294,10 @@ Respond with ONLY a JSON object:
 }`;
 
   try {
+    // Add timeout to prevent hanging if Ollama is unreachable
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for chat
+    
     const response = await fetch(`${OLLAMA_ENDPOINT}/api/chat`, {
       method: 'POST',
       headers: {
@@ -296,7 +313,10 @@ Respond with ONLY a JSON object:
         ],
         stream: false,
       }),
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`Ollama API error: ${response.status}`);
@@ -346,7 +366,12 @@ Respond with ONLY a JSON object:
       matchedFields: [],
     };
   } catch (error: any) {
-    console.error('Chat-based similarity calculation failed:', error);
+    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+      console.error('[Similarity Chat] Request timed out connecting to Ollama');
+      console.error(`[Similarity Chat] OLLAMA_ENDPOINT: ${OLLAMA_ENDPOINT}`);
+    } else {
+      console.error('Chat-based similarity calculation failed:', error);
+    }
     // Return a default low score if all methods fail
     return {
       score: 0,

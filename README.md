@@ -5,16 +5,19 @@ A comprehensive Information Security Management System (ISMS) platform that cent
 ## Architecture
 
 - **Frontend**: React + TypeScript + Vite + Chakra UI + React Router
-- **Backend**: Node.js + Express + TypeScript
+- **Backend**: Node.js + Express + TypeScript (Main API service)
+- **Microservices**:
+  - **Document Service**: Microservice for PDF conversion, watermarking, and document processing (port 4001)
+  - **AI Service**: Microservice for embeddings generation and similarity calculations (port 4002)
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: 
   - Internal users: Entra ID / Microsoft Identity Platform (MSAL)
   - External users (Trust Centre): JWT-based email/password authentication
-- **AI/LLM Integration**: Ollama for semantic embeddings and similarity analysis
+- **AI/LLM Integration**: Ollama for semantic embeddings and similarity analysis (used by AI Service)
 - **External Integrations**: 
   - Microsoft SharePoint (document storage and retrieval)
   - Confluence (living documentation links)
-- **Document Processing**: PDF generation, watermarking, and conversion (LibreOffice)
+- **Service Communication**: Internal service authentication token for secure microservice-to-microservice communication
 - **Testing**: Jest (backend), Vitest (frontend), Playwright (E2E)
 
 ## Prerequisites
@@ -54,10 +57,15 @@ A comprehensive Information Security Management System (ISMS) platform that cent
    - `CONFLUENCE_BASE_URL`: Confluence base URL (e.g., `https://your-domain.atlassian.net`)
    - `CONFLUENCE_USERNAME`: Confluence API username
    - `CONFLUENCE_API_TOKEN`: Confluence API token
-   - `LLM_PROVIDER`: LLM provider (default: `ollama`)
-   - `LLM_BASE_URL`: Ollama base URL (default: `http://localhost:11434`)
-   - `LLM_EMBEDDING_MODEL`: Embedding model name (default: `nomic-embed-text`)
-   - `LLM_CHAT_MODEL`: Chat model name (default: `llama2`)
+   - `DOCUMENT_SERVICE_URL`: URL for document service (default: `http://document-service.local:4001`)
+   - `AI_SERVICE_URL`: URL for AI service (default: `http://ai-service.local:4002`)
+   - `INTERNAL_SERVICE_TOKEN`: Shared secret for inter-service authentication (required for microservices)
+   - `DOCUMENT_SERVICE_TIMEOUT`: Timeout for document service requests in milliseconds (default: `30000`)
+   - `AI_SERVICE_TIMEOUT`: Timeout for AI service requests in milliseconds (default: `10000`)
+   - `LLM_PROVIDER`: LLM provider (default: `ollama`, legacy - backend should use AI service)
+   - `LLM_BASE_URL`: Ollama base URL (default: `http://localhost:11434`, legacy - AI service uses this)
+   - `LLM_EMBEDDING_MODEL`: Embedding model name (default: `nomic-embed-text`, legacy)
+   - `LLM_CHAT_MODEL`: Chat model name (default: `llama2`, legacy)
    - `LLM_SIMILARITY_THRESHOLD`: Similarity threshold for AI suggestions (default: `70`)
   - `TRUST_CENTER_JWT_SECRET`: JWT secret for Trust Centre authentication (generate with `openssl rand -base64 32`)
   - `CORS_TRUST_CENTER_ORIGINS`: Comma-separated list of allowed Trust Centre origins (supports wildcards)
@@ -130,7 +138,9 @@ The docker-compose setup mirrors the ECS production deployment architecture, all
 **Service Discovery:**
 - Services use the same DNS names as ECS: `document-service.local` and `ai-service.local`
 - Backend connects to microservices using the same URLs as production
-- All services communicate via internal service authentication token
+- All services communicate via internal service authentication token (`INTERNAL_SERVICE_TOKEN`)
+
+For detailed architecture information, see [`DOCKER_COMPOSE_ARCHITECTURE.md`](DOCKER_COMPOSE_ARCHITECTURE.md).
 
 1. **Set up environment variables:**
    
@@ -142,6 +152,8 @@ The docker-compose setup mirrors the ECS production deployment architecture, all
    VITE_AUTH_CLIENT_ID=your-client-id
    VITE_AUTH_REDIRECT_URI=http://localhost:3000
    ```
+   
+   **Note**: The `INTERNAL_SERVICE_TOKEN` is required for microservice communication. All services (backend, document-service, ai-service) must use the same token value.
 
 2. **Build and start services:**
    ```bash
@@ -213,14 +225,25 @@ The project includes Infrastructure as Code (IaC) for AWS ECS deployment with:
 - **Application Load Balancer**: HTTPS termination and routing
 - **CodeDeploy**: Blue/Green deployments for zero-downtime updates
 - **GitHub Actions CI/CD**: Automated builds and deployments
+- **Microservices**: Document Service, AI Service, and Ollama deployed as separate ECS services
+- **Service Discovery**: AWS Cloud Map for microservice-to-microservice communication
 
-See [`infrastructure/README.md`](infrastructure/README.md) for detailed deployment instructions.
+**For complete deployment instructions, see [`infrastructure/DEPLOYMENT.md`](infrastructure/DEPLOYMENT.md)** - this is the primary deployment guide.
+
+See [`infrastructure/README.md`](infrastructure/README.md) for infrastructure overview.
 
 **Quick Start**:
 1. Deploy infrastructure using CloudFormation templates in `infrastructure/`
 2. Configure GitHub Actions secrets (see `infrastructure/DEPLOYMENT.md`)
-3. Push to `main` branch for automatic staging deployment
-4. Use workflow dispatch for production deployments
+3. Deploy microservices (document-service, ai-service, ollama) - see `infrastructure/DEPLOYMENT.md` sections 9.5-9.7
+4. Push to `main` branch for automatic staging deployment
+5. Use workflow dispatch for production deployments
+
+**Deployment Utilities**: Use scripts in `infrastructure/scripts/` for common deployment tasks:
+- `deploy-utils.sh`: Main deployment utility (build images, deploy services, monitor deployments)
+- `backfill-control-embeddings.sh`: Backfill control embeddings after AI service deployment
+- `check-embeddings-simple.sh`: Check embedding status
+- `seed-system-data.sh`: Seed system data to existing environments
 
 ### Option 2: Docker Compose Deployment
 
@@ -270,8 +293,13 @@ See [`infrastructure/README.md`](infrastructure/README.md) for detailed deployme
      - Wildcard support: `https://trust.*.paythru.com` matches all subdomains
    - `TRUST_CENTER_JWT_SECRET`: Strong random secret (minimum 32 characters)
      - Generate: `openssl rand -base64 32`
-   - `LLM_BASE_URL`: Ollama server URL (if using AI features)
-   - `LLM_EMBEDDING_MODEL`: Embedding model name
+   - `DOCUMENT_SERVICE_URL`: URL for document service (e.g., `http://document-service.local:4001`)
+   - `AI_SERVICE_URL`: URL for AI service (e.g., `http://ai-service.local:4002`)
+   - `INTERNAL_SERVICE_TOKEN`: Shared secret for inter-service authentication (required for microservices)
+   - `DOCUMENT_SERVICE_TIMEOUT`: Timeout for document service requests in milliseconds (default: `30000`)
+   - `AI_SERVICE_TIMEOUT`: Timeout for AI service requests in milliseconds (default: `10000`)
+   - `LLM_BASE_URL`: Ollama server URL (if using AI features, legacy - AI service uses this)
+   - `LLM_EMBEDDING_MODEL`: Embedding model name (legacy)
    - `SHAREPOINT_SITE_ID`, `SHAREPOINT_DRIVE_ID`: SharePoint integration (if used)
    - `CONFLUENCE_BASE_URL`, `CONFLUENCE_USERNAME`, `CONFLUENCE_API_TOKEN`: Confluence integration (if used)
 
@@ -370,6 +398,12 @@ docker build -f Dockerfile.prod \
    
    # Frontend health check
    curl http://localhost:3000/health
+   
+   # Document Service health check (if deployed)
+   curl http://localhost:4001/health
+   
+   # AI Service health check (if deployed)
+   curl http://localhost:4002/health
    ```
 
 ### Step 5: Configure Reverse Proxy
@@ -570,11 +604,21 @@ Before deploying to production:
 - Check firewall rules
 
 **AI/Embedding features not working**:
+- Verify AI service is running and accessible (check health endpoint: `curl http://localhost:4002/health`)
 - Verify Ollama is running: `curl http://localhost:11434/api/tags`
-- Check `LLM_BASE_URL` matches your Ollama instance
+- Check `AI_SERVICE_URL` matches your AI service instance
+- Check `INTERNAL_SERVICE_TOKEN` is set correctly in all services
 - Ensure embedding model is pulled: `ollama pull nomic-embed-text`
-- Check backend logs for embedding generation errors
-- Run embedding backfill scripts if embeddings are missing
+- Check backend logs for AI service connection errors
+- Check AI service logs for embedding generation errors
+- Run embedding backfill scripts if embeddings are missing (see `infrastructure/scripts/backfill-control-embeddings.sh`)
+
+**Document processing/watermarking not working**:
+- Verify Document service is running and accessible (check health endpoint: `curl http://localhost:4001/health`)
+- Check `DOCUMENT_SERVICE_URL` matches your Document service instance
+- Check `INTERNAL_SERVICE_TOKEN` is set correctly in all services
+- Check backend logs for Document service connection errors
+- Check Document service logs for processing errors
 
 **Trust Centre authentication errors**:
 - Verify `TRUST_CENTER_JWT_SECRET` is set and at least 32 characters
@@ -603,7 +647,7 @@ Before deploying to production:
 
 ```
 .
-├── backend/              # Express backend
+├── backend/              # Express backend (Main API service)
 │   ├── src/
 │   │   ├── config.ts     # Configuration and environment variables
 │   │   ├── index.ts      # Express app entry point
@@ -624,6 +668,9 @@ Before deploying to production:
 │   │   ├── utils/        # Utility functions
 │   │   └── App.tsx       # Main app component
 │   └── vite.config.ts    # Vite configuration
+├── services/             # Microservices
+│   ├── document-service/ # Document processing microservice (PDF conversion, watermarking)
+│   └── ai-service/       # AI microservice (embeddings, similarity calculations)
 ├── docs/                  # Documentation and plans
 ├── e2e/                   # End-to-end tests (Playwright)
 ├── infrastructure/        # AWS CloudFormation templates and deployment scripts
@@ -631,6 +678,10 @@ Before deploying to production:
 │   ├── parameters/        # Environment-specific parameters
 │   ├── appspecs/          # CodeDeploy AppSpec files
 │   └── scripts/           # Deployment helper scripts
+│       ├── deploy-utils.sh          # Main deployment utility
+│       ├── backfill-control-embeddings.sh  # Backfill control embeddings
+│       ├── check-embeddings-simple.sh      # Check embedding status
+│       └── seed-system-data.sh      # Seed system data
 ├── .github/workflows/     # GitHub Actions CI/CD workflows
 ├── docker-compose.yml     # Docker Compose for development
 └── docker-compose.prod.yml # Docker Compose for production
@@ -700,15 +751,17 @@ The project includes GitHub Actions workflows for automated testing and deployme
   - Builds Docker images to verify build process
 
 - **`deploy-staging.yml`**: Runs on push to `main` branch
-  - Builds and pushes Docker images to ECR (ARM64)
+  - Builds and pushes Docker images to ECR (ARM64) for backend, frontend, document-service, and ai-service
   - Deploys to staging ECS environment
   - Performs health checks after deployment
 
 - **`deploy-production.yml`**: Manual workflow dispatch
   - Optionally deploys to staging first for validation
-  - Builds and pushes Docker images to ECR (ARM64)
+  - Builds and pushes Docker images to ECR (ARM64) for backend, frontend, document-service, and ai-service
   - Deploys to production ECS environment using CodeDeploy
   - Performs health checks after deployment
+
+**Note**: GitHub Actions workflows automatically build and deploy microservices (document-service, ai-service) on each push. These services are updated via ECS service update (not CodeDeploy, since they're not behind an ALB).
 
 ### GitHub Actions Setup
 
@@ -754,7 +807,28 @@ See [`infrastructure/DEPLOYMENT.md`](infrastructure/DEPLOYMENT.md) for detailed 
 - `npm run lint:fix` - Auto-fix linting issues
 - `npm run lint:track` - Record current warning count
 - `npm run lint:report` - Show warning reduction progress
-- `npm run lint` - Lint both backend and frontend
+
+### Infrastructure Deployment Scripts
+
+The `infrastructure/scripts/` directory contains deployment utilities for AWS ECS deployments:
+
+- **`deploy-utils.sh`**: Main deployment utility script
+  - `build-all-images`: Build and push all Docker images (backend, frontend, document-service, ai-service)
+  - `rebuild-frontend`: Rebuild frontend with secrets from Secrets Manager
+  - `deploy-frontend` / `deploy-backend`: Deploy services using CodeDeploy
+  - `view-logs`: Tail CloudWatch logs for services
+  - `monitor-deployment`: Monitor CodeDeploy deployment status
+  - `check-health`: Check target group health
+  - `get-deployment-vars`: Export CloudFormation stack outputs as environment variables
+  - See `infrastructure/scripts/deploy-utils.sh --help` for full usage
+
+- **`backfill-control-embeddings.sh`**: Backfill control embeddings after AI service deployment
+- **`check-embeddings-simple.sh`**: Check embedding status for controls
+- **`seed-system-data.sh`**: Seed system data (Controls, Classifications, etc.) to existing environments
+- **`pull-ollama-model.sh`**: Pull Ollama embedding model in ECS tasks
+- **`validate-templates.sh`**: Validate CloudFormation templates
+
+See [`infrastructure/DEPLOYMENT.md`](infrastructure/DEPLOYMENT.md) for detailed usage instructions.
 
 ### Backend
 - `npm run dev --workspace=backend` - Start backend dev server

@@ -283,7 +283,6 @@ Resources:
     Properties:
       ServiceName: !Sub 'isms-${Environment}-backend'
       Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref BackendTaskDefinition
       DesiredCount: !Ref MinTaskCount
       DeploymentController:
         Type: CODE_DEPLOY
@@ -321,7 +320,6 @@ Resources:
     Properties:
       ServiceName: !Sub 'isms-${Environment}-frontend'
       Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref FrontendTaskDefinition
       DesiredCount: !Ref MinTaskCount
       DeploymentController:
         Type: CODE_DEPLOY

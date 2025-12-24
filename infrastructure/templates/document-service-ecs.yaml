@@ -89,13 +89,14 @@ Parameters:
       - 4096
 
 Resources:
-  # Service Discovery Namespace (if not exists)
+  # Service Discovery Namespace (shared with other microservices)
+  # Uses a shared 'local' namespace so services resolve as service-name.local
   ServiceDiscoveryNamespace:
     Type: AWS::ServiceDiscovery::PrivateDnsNamespace
     Properties:
-      Name: document-service.local
+      Name: local
       Vpc: !Ref VpcId
-      Description: Service discovery namespace for document-service
+      Description: Shared service discovery namespace for microservices
 
   # EFS Access Point for cache (if EFS is provided)
   CacheAccessPoint:
@@ -144,16 +145,6 @@ Resources:
           Secrets:
             - Name: INTERNAL_SERVICE_TOKEN
               ValueFrom: !Join ['', [!Ref ApplicationSecretsArn, ':INTERNAL_SERVICE_TOKEN::']]
-          Volumes:
-            - !If
-              - HasEfsFileSystem
-              - - Name: cache
-                  EfsVolumeConfiguration:
-                    FileSystemId: !Ref EfsFileSystemId
-                    AuthorizationConfig:
-                      AccessPointId: !Ref CacheAccessPoint
-                    TransitEncryption: ENABLED
-              - []
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -219,7 +210,6 @@ Resources:
         DnsRecords:
           - Type: A
             TTL: 60
-        NamespaceId: !GetAtt ServiceDiscoveryNamespace.Id
       HealthCheckCustomConfig:
         FailureThreshold: 1
 

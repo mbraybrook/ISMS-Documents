@@ -69,6 +69,37 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  # Allow ECS tasks to communicate with each other (document-service and ai-service)
+  ECSSelfIngress4001:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ECSSecurityGroup
+      IpProtocol: tcp
+      FromPort: 4001
+      ToPort: 4001
+      SourceSecurityGroupId: !Ref ECSSecurityGroup
+      Description: Allow document-service traffic from other ECS tasks
+
+  ECSSelfIngress4002:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ECSSecurityGroup
+      IpProtocol: tcp
+      FromPort: 4002
+      ToPort: 4002
+      SourceSecurityGroupId: !Ref ECSSecurityGroup
+      Description: Allow ai-service traffic from other ECS tasks
+
+  ECSSelfIngress11434:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ECSSecurityGroup
+      IpProtocol: tcp
+      FromPort: 11434
+      ToPort: 11434
+      SourceSecurityGroupId: !Ref ECSSecurityGroup
+      Description: Allow Ollama traffic from other ECS tasks (AI service needs this to connect to Ollama)
+
   AuroraSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:

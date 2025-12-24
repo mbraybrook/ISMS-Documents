@@ -169,6 +169,8 @@ Resources:
               TargetGroups:
                 - TargetGroupArn: !Ref FrontendTargetGroupBlue
                   Weight: 100
+                - TargetGroupArn: !Ref FrontendTargetGroupGreen
+                  Weight: 0
 
   HTTPBackendListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
@@ -184,8 +186,10 @@ Resources:
         - Type: forward
           ForwardConfig:
             TargetGroups:
-              - TargetGroupArn: !Ref BackendTargetGroupBlue
+              - TargetGroupArn: !Ref BackendTargetGroupGreen
                 Weight: 100
+              - TargetGroupArn: !Ref BackendTargetGroupBlue
+                Weight: 0
 
   HTTPSListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -202,6 +206,8 @@ Resources:
             TargetGroups:
               - TargetGroupArn: !Ref FrontendTargetGroupBlue
                 Weight: 100
+              - TargetGroupArn: !Ref FrontendTargetGroupGreen
+                Weight: 0
 
   BackendListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
@@ -217,8 +223,10 @@ Resources:
         - Type: forward
           ForwardConfig:
             TargetGroups:
-              - TargetGroupArn: !Ref BackendTargetGroupBlue
+              - TargetGroupArn: !Ref BackendTargetGroupGreen
                 Weight: 100
+              - TargetGroupArn: !Ref BackendTargetGroupBlue
+                Weight: 0
 
   FrontendListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
@@ -236,6 +244,8 @@ Resources:
             TargetGroups:
               - TargetGroupArn: !Ref FrontendTargetGroupBlue
                 Weight: 100
+              - TargetGroupArn: !Ref FrontendTargetGroupGreen
+                Weight: 0
 
 Conditions:
   HasCertificate: !Not [!Equals [!Ref CertificateArn, '']]

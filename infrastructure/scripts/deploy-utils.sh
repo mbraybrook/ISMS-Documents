@@ -140,7 +140,12 @@ parse_args() {
                 shift 2
                 ;;
             --service|-s)
-                SERVICE_TYPE="$2"
+                # Support multiple services by appending to array
+                if [ -z "${SERVICE_TYPES:-}" ]; then
+                    SERVICE_TYPES=()
+                fi
+                SERVICE_TYPES+=("$2")
+                SERVICE_TYPE="$2"  # Keep for backward compatibility
                 shift 2
                 ;;
             --follow)
@@ -176,11 +181,18 @@ show_help() {
         "    ${GREEN}build-backend${NC}           Build and push backend Docker image" \
         "    ${GREEN}build-document-service${NC}  Build and push document-service Docker image" \
         "    ${GREEN}build-ai-service${NC}        Build and push ai-service Docker image" \
+        "    ${GREEN}build-all-images${NC}        Build and push all service images (backend, frontend, document-service, ai-service)" \
         "    ${GREEN}rebuild-frontend${NC}         Rebuild frontend with secrets from Secrets Manager" \
         "    ${GREEN}deploy-frontend${NC}          Deploy frontend using CodeDeploy (blue/green)" \
         "    ${GREEN}deploy-backend${NC}           Deploy backend using CodeDeploy (blue/green)" \
+        "    ${GREEN}deploy-document-service${NC}  Deploy document-service (direct ECS update, auto-creates stack if needed)" \
+        "    ${GREEN}deploy-ai-service${NC}       Deploy ai-service (direct ECS update, auto-creates stack if needed)" \
+        "    ${GREEN}deploy-document-service-stack${NC}  Deploy document-service CloudFormation stack (initial setup)" \
+        "    ${GREEN}deploy-ai-service-stack${NC} Deploy ai-service CloudFormation stack (initial setup)" \
         "    ${GREEN}update-service${NC}           Update ECS service directly (fallback, no CodeDeploy)" \
         "    ${GREEN}get-stack-outputs${NC}        Get CloudFormation stack outputs" \
+        "    ${GREEN}get-deployment-vars${NC}      Get all deployment variables as export statements" \
+        "    ${GREEN}verify-ecs-role${NC}         Verify/create ECS service-linked role" \
         "    ${GREEN}monitor-deployment${NC}       Monitor CodeDeploy deployment status" \
         "    ${GREEN}check-health${NC}             Check target group health" \
         "    ${GREEN}view-logs${NC}                Tail CloudWatch logs" \
@@ -194,15 +206,30 @@ show_help() {
         "${BOLD}Note:${NC} Default values are automatically used if environment variables are not set." \
         "You don't need to export AWS_PROFILE or AWS_REGION before running the script." \
         "    ${YELLOW}--deployment-id, -d${NC}      CodeDeploy deployment ID (for monitor-deployment)" \
-        "    ${YELLOW}--service, -s${NC}             Service type: frontend or backend (for check-health, view-logs, monitor-deployment)" \
+        "    ${YELLOW}--service, -s${NC}             Service type (can be used multiple times for view-logs):" \
+        "                          frontend, backend, document-service, ai-service, or all" \
         "    ${YELLOW}--help, -h${NC}               Show this help message" \
         "" \
         "${BOLD}Examples:${NC}" \
         "    ${CYAN}# Rebuild frontend with secrets from Secrets Manager${NC}" \
         "    ./deploy-utils.sh rebuild-frontend" \
         "" \
+        "    ${CYAN}# Build and push all images${NC}" \
+        "    ./deploy-utils.sh build-all-images" \
+        "" \
         "    ${CYAN}# Deploy frontend using CodeDeploy${NC}" \
         "    ./deploy-utils.sh deploy-frontend --environment staging" \
+        "" \
+        "    ${CYAN}# Deploy backend using CodeDeploy${NC}" \
+        "    ./deploy-utils.sh deploy-backend --environment staging" \
+        "" \
+        "    ${CYAN}# Deploy microservices (auto-creates CloudFormation stack if needed)${NC}" \
+        "    ./deploy-utils.sh deploy-document-service --image-tag staging" \
+        "    ./deploy-utils.sh deploy-ai-service --image-tag staging" \
+        "" \
+        "    ${CYAN}# Deploy microservice CloudFormation stacks manually (if needed)${NC}" \
+        "    ./deploy-utils.sh deploy-document-service-stack --image-tag staging" \
+        "    ./deploy-utils.sh deploy-ai-service-stack --image-tag staging" \
         "" \
         "    ${CYAN}# Build backend with specific tag${NC}" \
         "    ./deploy-utils.sh build-backend --image-tag v1.2.3" \
@@ -210,6 +237,12 @@ show_help() {
         "    ${CYAN}# Build microservices${NC}" \
         "    ./deploy-utils.sh build-document-service --image-tag staging" \
         "    ./deploy-utils.sh build-ai-service --image-tag staging" \
+        "" \
+        "    ${CYAN}# Get deployment variables${NC}" \
+        "    eval \$(./deploy-utils.sh get-deployment-vars)" \
+        "" \
+        "    ${CYAN}# Verify ECS service-linked role${NC}" \
+        "    ./deploy-utils.sh verify-ecs-role" \
         "" \
         "    ${CYAN}# Monitor a specific CodeDeploy deployment${NC}" \
         "    ./deploy-utils.sh monitor-deployment --deployment-id d-1234567890" \
@@ -223,8 +256,14 @@ show_help() {
         "    ${CYAN}# Check target group health${NC}" \
         "    ./deploy-utils.sh check-health --service frontend" \
         "" \
-        "    ${CYAN}# View logs${NC}" \
-        "    ./deploy-utils.sh view-logs --service backend --follow"
+        "    ${CYAN}# View logs for a single service${NC}" \
+        "    ./deploy-utils.sh view-logs --service backend --follow" \
+        "" \
+        "    ${CYAN}# View logs for multiple services${NC}" \
+        "    ./deploy-utils.sh view-logs --service backend --service frontend --follow" \
+        "" \
+        "    ${CYAN}# View logs for all services${NC}" \
+        "    ./deploy-utils.sh view-logs --service all --follow"
 }
 
 # Get CloudFormation stack outputs
@@ -248,13 +287,33 @@ get_ecr_repo() {
     get_stack_output "isms-${ENVIRONMENT}-ecr" "$repo_key"
 }
 
+# Extract registry domain from repository URI
+get_registry_domain() {
+    local repo_uri="$1"
+    # Extract registry domain (everything before the first /)
+    echo "$repo_uri" | cut -d'/' -f1
+}
+
 # Login to ECR
 ecr_login() {
     local repo_uri="$1"
-    print_step "Logging in to ECR..."
+    local registry_domain=$(get_registry_domain "$repo_uri")
+    
+    if [ -z "$registry_domain" ]; then
+        print_error "Could not extract registry domain from: $repo_uri"
+        return 1
+    fi
+    
+    print_step "Logging in to ECR registry: $registry_domain..."
     aws ecr get-login-password --region "$AWS_REGION" --profile "$AWS_PROFILE" | \
-        docker login --username AWS --password-stdin "$repo_uri" > /dev/null 2>&1
-    print_success "ECR login successful"
+        docker login --username AWS --password-stdin "$registry_domain" > /dev/null 2>&1
+    
+    if [ $? -eq 0 ]; then
+        print_success "ECR login successful"
+    else
+        print_error "ECR login failed"
+        return 1
+    fi
 }
 
 # Increment version number (semver patch version)
@@ -386,6 +445,88 @@ build_backend() {
         --push
     
     print_success "Backend image built and pushed: ${repo_uri}:${IMAGE_TAG}"
+    return 0
+}
+
+# Build and push document-service image
+build_document_service() {
+    print_header "Building Document Service Image"
+    
+    local repo_uri=$(get_stack_output "isms-${ENVIRONMENT}-ecr" "DocumentServiceRepositoryUri")
+    if [ -z "$repo_uri" ] || [ "$repo_uri" == "None" ]; then
+        print_error "Could not get document-service repository URI"
+        echo ""
+        print_info "Troubleshooting:"
+        echo "  1. Ensure AWS credentials are configured:"
+        echo "     export AWS_PROFILE=pt-sandbox"
+        echo "     export AWS_REGION=eu-west-2"
+        echo ""
+        echo "  2. Verify the ECR CloudFormation stack exists:"
+        echo "     aws cloudformation describe-stacks --stack-name isms-${ENVIRONMENT}-ecr --profile ${AWS_PROFILE} --region ${AWS_REGION}"
+        echo ""
+        echo "  3. If the stack doesn't exist, deploy it first (see DEPLOYMENT.md):"
+        echo "     aws cloudformation deploy --template-file templates/ecr.yaml --stack-name isms-${ENVIRONMENT}-ecr --parameter-overrides Environment=${ENVIRONMENT} --region ${AWS_REGION} --profile ${AWS_PROFILE}"
+        exit 1
+    fi
+    
+    print_info "Repository: $repo_uri"
+    print_info "Tag: $IMAGE_TAG"
+    print_info "Platform: linux/arm64"
+    echo ""
+    
+    ecr_login "$repo_uri"
+    
+    print_step "Building document-service image..."
+    cd "$PROJECT_ROOT"
+    
+    docker buildx build --platform linux/arm64 \
+        -f ./services/document-service/Dockerfile \
+        -t "${repo_uri}:${IMAGE_TAG}" \
+        ./services/document-service \
+        --push
+    
+    print_success "Document service image built and pushed: ${repo_uri}:${IMAGE_TAG}"
+    return 0
+}
+
+# Build and push ai-service image
+build_ai_service() {
+    print_header "Building AI Service Image"
+    
+    local repo_uri=$(get_stack_output "isms-${ENVIRONMENT}-ecr" "AIServiceRepositoryUri")
+    if [ -z "$repo_uri" ] || [ "$repo_uri" == "None" ]; then
+        print_error "Could not get ai-service repository URI"
+        echo ""
+        print_info "Troubleshooting:"
+        echo "  1. Ensure AWS credentials are configured:"
+        echo "     export AWS_PROFILE=pt-sandbox"
+        echo "     export AWS_REGION=eu-west-2"
+        echo ""
+        echo "  2. Verify the ECR CloudFormation stack exists:"
+        echo "     aws cloudformation describe-stacks --stack-name isms-${ENVIRONMENT}-ecr --profile ${AWS_PROFILE} --region ${AWS_REGION}"
+        echo ""
+        echo "  3. If the stack doesn't exist, deploy it first (see DEPLOYMENT.md):"
+        echo "     aws cloudformation deploy --template-file templates/ecr.yaml --stack-name isms-${ENVIRONMENT}-ecr --parameter-overrides Environment=${ENVIRONMENT} --region ${AWS_REGION} --profile ${AWS_PROFILE}"
+        exit 1
+    fi
+    
+    print_info "Repository: $repo_uri"
+    print_info "Tag: $IMAGE_TAG"
+    print_info "Platform: linux/arm64"
+    echo ""
+    
+    ecr_login "$repo_uri"
+    
+    print_step "Building ai-service image..."
+    cd "$PROJECT_ROOT"
+    
+    docker buildx build --platform linux/arm64 \
+        -f ./services/ai-service/Dockerfile \
+        -t "${repo_uri}:${IMAGE_TAG}" \
+        ./services/ai-service \
+        --push
+    
+    print_success "AI service image built and pushed: ${repo_uri}:${IMAGE_TAG}"
     return 0
 }
 
@@ -602,10 +743,37 @@ deploy_service() {
         exit 1
     fi
     
-    # Update task definition with new image
+    # Get ApplicationSecretsArn for INTERNAL_SERVICE_TOKEN secret
+    local app_secret_arn=$(get_stack_output "isms-${ENVIRONMENT}-secrets" "ApplicationSecretsArn")
+    
+    # Update task definition with new image and ensure required environment variables and secrets are set
     local updated_task_def
-    if ! updated_task_def=$(echo "$task_def_json" | jq --arg IMAGE "$new_image" '
+    if ! updated_task_def=$(echo "$task_def_json" | jq --arg IMAGE "$new_image" \
+        --arg DOC_SERVICE_URL "http://document-service.local:4001" \
+        --arg AI_SERVICE_URL "http://ai-service.local:4002" \
+        --arg DOC_TIMEOUT "30000" \
+        --arg AI_TIMEOUT "10000" \
+        --arg SECRET_ARN "${app_secret_arn}:INTERNAL_SERVICE_TOKEN::" '
         .containerDefinitions[0].image = $IMAGE |
+        # Ensure environment variables exist (add if missing, update if present)
+        .containerDefinitions[0].environment = (
+          (.containerDefinitions[0].environment // []) |
+          map(select(.name != "DOCUMENT_SERVICE_URL" and .name != "AI_SERVICE_URL" and .name != "DOCUMENT_SERVICE_TIMEOUT" and .name != "AI_SERVICE_TIMEOUT")) +
+          [
+            {name: "DOCUMENT_SERVICE_URL", value: $DOC_SERVICE_URL},
+            {name: "AI_SERVICE_URL", value: $AI_SERVICE_URL},
+            {name: "DOCUMENT_SERVICE_TIMEOUT", value: $DOC_TIMEOUT},
+            {name: "AI_SERVICE_TIMEOUT", value: $AI_TIMEOUT}
+          ]
+        ) |
+        # Ensure INTERNAL_SERVICE_TOKEN secret exists (add if missing, update if present)
+        .containerDefinitions[0].secrets = (
+          (.containerDefinitions[0].secrets // []) |
+          map(select(.name != "INTERNAL_SERVICE_TOKEN")) +
+          [
+            {name: "INTERNAL_SERVICE_TOKEN", valueFrom: $SECRET_ARN}
+          ]
+        ) |
         del(.taskDefinitionArn) |
         del(.revision) |
         del(.status) |
@@ -818,13 +986,286 @@ update_service() {
         --cluster "$cluster_name" \
         --service "$service_name" \
         --task-definition "$new_task_def_arn" \
-        --deployment-controller type=ECS \
         --force-new-deployment \
         --profile "$AWS_PROFILE" \
         --region "$AWS_REGION" > /dev/null
     
     print_success "Service updated! New deployment started."
     print_info "Monitor: aws ecs describe-services --cluster $cluster_name --services $service_name --profile $AWS_PROFILE --region $AWS_REGION"
+}
+
+# Deploy microservice CloudFormation stack (initial setup)
+deploy_microservice_stack() {
+    local service="$1"  # document-service or ai-service
+    
+    print_header "Deploying ${service^} CloudFormation Stack"
+    
+    # Get required parameters
+    print_step "Gathering required parameters..."
+    
+    local cluster_name=$(get_stack_output "isms-${ENVIRONMENT}-ecs" "ClusterName")
+    local vpc_id=$(get_stack_output "isms-${ENVIRONMENT}-vpc" "VpcId")
+    local priv_subnet_1=$(get_stack_output "isms-${ENVIRONMENT}-vpc" "PrivateSubnet1Id")
+    local priv_subnet_2=$(get_stack_output "isms-${ENVIRONMENT}-vpc" "PrivateSubnet2Id")
+    local ecs_sg_id=$(get_stack_output "isms-${ENVIRONMENT}-sg" "ECSSecurityGroupId")
+    local task_exec_role=$(get_stack_output "isms-${ENVIRONMENT}-iam" "ECSTaskExecutionRoleArn")
+    local task_role=$(get_stack_output "isms-${ENVIRONMENT}-iam" "ECSTaskRoleArn")
+    local app_secret_arn=$(get_stack_output "isms-${ENVIRONMENT}-secrets" "ApplicationSecretsArn")
+    
+    # Get repository URI
+    local repo_key
+    if [ "$service" == "document-service" ]; then
+        repo_key="DocumentServiceRepositoryUri"
+    elif [ "$service" == "ai-service" ]; then
+        repo_key="AIServiceRepositoryUri"
+    else
+        print_error "Unknown service: $service"
+        exit 1
+    fi
+    
+    local repo_uri=$(get_stack_output "isms-${ENVIRONMENT}-ecr" "$repo_key")
+    
+    if [ -z "$cluster_name" ] || [ -z "$vpc_id" ] || [ -z "$repo_uri" ] || [ "$repo_uri" == "None" ]; then
+        print_error "Could not get required parameters"
+        print_info "Ensure all prerequisite stacks are deployed:"
+        echo "  - isms-${ENVIRONMENT}-ecs (cluster)"
+        echo "  - isms-${ENVIRONMENT}-vpc (VPC and subnets)"
+        echo "  - isms-${ENVIRONMENT}-sg (security groups)"
+        echo "  - isms-${ENVIRONMENT}-iam (IAM roles)"
+        echo "  - isms-${ENVIRONMENT}-secrets (secrets)"
+        echo "  - isms-${ENVIRONMENT}-ecr (ECR repositories)"
+        exit 1
+    fi
+    
+    print_info "Cluster: $cluster_name"
+    print_info "Repository: $repo_uri"
+    echo ""
+    
+    print_step "Deploying CloudFormation stack..."
+    cd "$INFRA_DIR"
+    
+    # Build parameter overrides array
+    local param_args=(
+        "Environment=${ENVIRONMENT}"
+        "ClusterName=${cluster_name}"
+        "VpcId=${vpc_id}"
+        "PrivateSubnet1Id=${priv_subnet_1}"
+        "PrivateSubnet2Id=${priv_subnet_2}"
+        "ECSSecurityGroupId=${ecs_sg_id}"
+        "ECSTaskExecutionRoleArn=${task_exec_role}"
+        "ECSTaskRoleArn=${task_role}"
+    )
+    
+    if [ "$service" == "document-service" ]; then
+        param_args+=(
+            "DocumentServiceRepositoryUri=${repo_uri}"
+            "DocumentServiceImageTag=${IMAGE_TAG}"
+            "ApplicationSecretsArn=${app_secret_arn}"
+            "MinTaskCount=1"
+            "MaxTaskCount=2"
+            "CpuUnits=1024"
+            "MemoryMB=2048"
+        )
+    elif [ "$service" == "ai-service" ]; then
+        param_args+=(
+            "AIServiceRepositoryUri=${repo_uri}"
+            "AIServiceImageTag=${IMAGE_TAG}"
+            "ApplicationSecretsArn=${app_secret_arn}"
+            "OllamaEndpoint=http://ollama:11434"
+            "OllamaModel=nomic-embed-text"
+            "MinTaskCount=1"
+            "MaxTaskCount=2"
+            "CpuUnits=512"
+            "MemoryMB=1024"
+        )
+    fi
+    
+    aws cloudformation deploy \
+        --template-file "templates/${service}-ecs.yaml" \
+        --stack-name "isms-${ENVIRONMENT}-${service}" \
+        --parameter-overrides "${param_args[@]}" \
+        --capabilities CAPABILITY_IAM \
+        --region "$AWS_REGION" \
+        --profile "$AWS_PROFILE" 2>&1 | tee /tmp/cf-deploy.log
+    
+    if grep -q "Successfully created/updated stack\|No changes to deploy" /tmp/cf-deploy.log; then
+        print_success "CloudFormation stack deployed successfully"
+        echo ""
+        print_info "Service will start automatically. Monitor with:"
+        echo "  aws ecs describe-services --cluster $cluster_name --services isms-${ENVIRONMENT}-${service} --profile $AWS_PROFILE --region $AWS_REGION"
+    else
+        print_error "CloudFormation deployment failed"
+        print_info "Check the output above for details"
+        exit 1
+    fi
+}
+
+# Deploy microservice (document-service or ai-service) - uses direct ECS update (no CodeDeploy)
+deploy_microservice() {
+    local service="$1"  # document-service or ai-service
+    
+    print_header "Deploying ${service^} Service"
+    
+    print_info "Microservices use direct ECS updates (not CodeDeploy blue/green)"
+    echo ""
+    
+    # Get cluster name
+    local cluster_name=$(get_stack_output "isms-${ENVIRONMENT}-ecs" "ClusterName")
+    local service_name="isms-${ENVIRONMENT}-${service}"
+    
+    if [ -z "$cluster_name" ]; then
+        print_error "Could not get cluster name"
+        exit 1
+    fi
+    
+    print_info "Cluster: $cluster_name"
+    print_info "Service: $service_name"
+    echo ""
+    
+    # Check if service exists, if not, deploy the stack first
+    print_step "Checking if service exists..."
+    local service_exists=$(aws ecs describe-services \
+        --cluster "$cluster_name" \
+        --services "$service_name" \
+        --query 'services[0].status' \
+        --output text \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" 2>/dev/null || echo "MISSING")
+    
+    if [ "$service_exists" == "MISSING" ] || [ "$service_exists" == "None" ] || [ -z "$service_exists" ]; then
+        print_warning "Service does not exist. Deploying CloudFormation stack first..."
+        echo ""
+        deploy_microservice_stack "$service"
+        echo ""
+        print_info "Waiting for service to be created..."
+        sleep 5
+    fi
+    
+    # Get current task definition
+    print_step "Getting current task definition..."
+    local current_task_def=$(aws ecs describe-services \
+        --cluster "$cluster_name" \
+        --services "$service_name" \
+        --query 'services[0].taskDefinition' \
+        --output text \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" 2>&1)
+    
+    if [ $? -ne 0 ] || [ -z "$current_task_def" ] || [ "$current_task_def" == "None" ]; then
+        print_error "Could not get current task definition"
+        print_info "Service may still be initializing. Try again in a few moments."
+        exit 1
+    fi
+    
+    print_info "Current task definition: $current_task_def"
+    echo ""
+    
+    # Get repository URI
+    local repo_key="${service^}RepositoryUri"
+    # Handle camelCase conversion: document-service -> DocumentService, ai-service -> AIService
+    if [ "$service" == "document-service" ]; then
+        repo_key="DocumentServiceRepositoryUri"
+    elif [ "$service" == "ai-service" ]; then
+        repo_key="AIServiceRepositoryUri"
+    fi
+    
+    local repo_uri=$(get_stack_output "isms-${ENVIRONMENT}-ecr" "$repo_key")
+    local new_image="${repo_uri}:${IMAGE_TAG}"
+    
+    if [ -z "$repo_uri" ] || [ "$repo_uri" == "None" ]; then
+        print_error "Could not get ${service} repository URI"
+        exit 1
+    fi
+    
+    print_info "New image: $new_image"
+    echo ""
+    
+    # Create new task definition revision
+    print_step "Creating new task definition revision..."
+    
+    local task_def_json=$(aws ecs describe-task-definition \
+        --task-definition "$current_task_def" \
+        --query 'taskDefinition' \
+        --output json \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" 2>&1)
+    
+    if [ $? -ne 0 ]; then
+        print_error "Failed to get task definition: $task_def_json"
+        exit 1
+    fi
+    
+    # Validate JSON before processing
+    if ! echo "$task_def_json" | jq empty >/dev/null 2>&1; then
+        print_error "Invalid JSON received from AWS CLI"
+        print_info "Response preview: $(echo "$task_def_json" | head -c 200)"
+        exit 1
+    fi
+    
+    # Update task definition with new image
+    local updated_task_def
+    if ! updated_task_def=$(echo "$task_def_json" | jq --arg IMAGE "$new_image" '
+        .containerDefinitions[0].image = $IMAGE |
+        del(.taskDefinitionArn) |
+        del(.revision) |
+        del(.status) |
+        del(.requiresAttributes) |
+        del(.compatibilities) |
+        del(.registeredAt) |
+        del(.registeredBy)
+    '); then
+        print_error "Failed to update task definition JSON with jq"
+        exit 1
+    fi
+    
+    # Register new task definition
+    print_info "Registering new task definition..."
+    
+    local task_def_file=$(mktemp)
+    trap "rm -f '$task_def_file'" EXIT
+    
+    echo "$updated_task_def" > "$task_def_file"
+    
+    local new_task_def_arn=$(aws ecs register-task-definition \
+        --cli-input-json "file://$task_def_file" \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" \
+        --query 'taskDefinition.taskDefinitionArn' \
+        --output text 2>&1)
+    
+    rm -f "$task_def_file"
+    trap - EXIT
+    
+    if [ $? -ne 0 ] || [ -z "$new_task_def_arn" ] || [ "$new_task_def_arn" == "None" ]; then
+        print_error "Failed to register task definition: $new_task_def_arn"
+        exit 1
+    fi
+    
+    print_success "New task definition created: $new_task_def_arn"
+    echo ""
+    
+    # Update service
+    print_step "Updating service..."
+    aws ecs update-service \
+        --cluster "$cluster_name" \
+        --service "$service_name" \
+        --task-definition "$new_task_def_arn" \
+        --force-new-deployment \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" > /dev/null
+    
+    if [ $? -eq 0 ]; then
+        print_success "Service updated! New deployment started."
+        echo ""
+        print_info "Monitor deployment:"
+        echo "  aws ecs describe-services --cluster $cluster_name --services $service_name --profile $AWS_PROFILE --region $AWS_REGION"
+        echo ""
+        print_info "View logs:"
+        echo "  ./deploy-utils.sh view-logs --service ${service}"
+    else
+        print_error "Failed to update service"
+        exit 1
+    fi
 }
 
 # Find active CodeDeploy deployments
@@ -999,31 +1440,173 @@ check_health() {
 
 # View logs
 view_logs() {
-    local service="${SERVICE_TYPE:-}"
     local follow="${FOLLOW_LOGS:-true}"
+    local services=()
     
-    if [ -z "$service" ]; then
-        print_error "Service type required. Use --service frontend or --service backend"
+    # Determine which services to view
+    if [ -n "${SERVICE_TYPES:-}" ] && [ ${#SERVICE_TYPES[@]} -gt 0 ]; then
+        # Multiple services specified via --service flag
+        services=("${SERVICE_TYPES[@]}")
+    elif [ -n "${SERVICE_TYPE:-}" ]; then
+        # Single service specified (backward compatibility)
+        services=("$SERVICE_TYPE")
+    else
+        print_error "Service type required. Use --service frontend, --service backend, --service all, or multiple --service flags"
         exit 1
     fi
     
-    local log_group="/ecs/isms-${ENVIRONMENT}-${service}"
+    # Handle "all" or "all-services" to view all available services
+    if [ ${#services[@]} -eq 1 ] && [[ "${services[0]}" == "all" || "${services[0]}" == "all-services" ]]; then
+        services=("backend" "frontend" "document-service" "ai-service")
+        print_info "Viewing logs for all services: ${services[*]}"
+        echo ""
+    fi
     
-    print_header "Viewing Logs: $log_group"
+    # Remove duplicates
+    local unique_services=()
+    for service in "${services[@]}"; do
+        local is_duplicate=false
+        for existing in "${unique_services[@]}"; do
+            if [ "$service" == "$existing" ]; then
+                is_duplicate=true
+                break
+            fi
+        done
+        if [ "$is_duplicate" == "false" ]; then
+            unique_services+=("$service")
+        fi
+    done
+    services=("${unique_services[@]}")
+    
+    # Build log groups
+    local log_groups=()
+    for service in "${services[@]}"; do
+        log_groups+=("/ecs/isms-${ENVIRONMENT}-${service}")
+    done
+    
+    if [ ${#log_groups[@]} -eq 0 ]; then
+        print_error "No valid services specified"
+        exit 1
+    fi
+    
+    # Single service - use simple tail with formatting
+    if [ ${#log_groups[@]} -eq 1 ]; then
+        print_header "Viewing Logs: ${log_groups[0]}"
+        if [ "$follow" == "true" ]; then
+            print_info "Press Ctrl+C to stop"
+        fi
+        echo ""
+        
+        local service_name="${services[0]}"
+        if [ "$follow" == "true" ]; then
+            aws logs tail "${log_groups[0]}" \
+                --follow \
+                --profile "$AWS_PROFILE" \
+                --region "$AWS_REGION" 2>/dev/null | \
+                while IFS= read -r line; do
+                    echo "$line" | awk -v service="$service_name" '
+                    {
+                        timestamp = $1
+                        gsub(/.*T/, "", timestamp)
+                        gsub(/\..*/, "", timestamp)
+                        message = ""
+                        for (i = 3; i <= NF; i++) {
+                            if (message != "") message = message " "
+                            message = message $i
+                        }
+                        printf "[%s] %s %s\n", service, timestamp, message
+                    }'
+                done
+        else
+            aws logs tail "${log_groups[0]}" \
+                --profile "$AWS_PROFILE" \
+                --region "$AWS_REGION" 2>/dev/null | \
+                while IFS= read -r line; do
+                    echo "$line" | awk -v service="$service_name" '
+                    {
+                        timestamp = $1
+                        gsub(/.*T/, "", timestamp)
+                        gsub(/\..*/, "", timestamp)
+                        message = ""
+                        for (i = 3; i <= NF; i++) {
+                            if (message != "") message = message " "
+                            message = message $i
+                        }
+                        printf "[%s] %s %s\n", service, timestamp, message
+                    }'
+                done
+        fi
+        return 0
+    fi
+    
+    # Multiple services - use parallel tail with service name prefixes
+    print_header "Viewing Logs: ${#log_groups[@]} Services"
+    print_info "Services: ${services[*]}"
     if [ "$follow" == "true" ]; then
         print_info "Press Ctrl+C to stop"
     fi
     echo ""
     
+    # Run tail commands
     if [ "$follow" == "true" ]; then
-        aws logs tail "$log_group" \
-            --follow \
-            --profile "$AWS_PROFILE" \
-            --region "$AWS_REGION"
+        # For follow mode, run all tails in background with prefixes
+        local pids=()
+        for i in "${!log_groups[@]}"; do
+            (
+                local service_name="${services[$i]}"
+                aws logs tail "${log_groups[$i]}" \
+                    --follow \
+                    --profile "$AWS_PROFILE" \
+                    --region "$AWS_REGION" 2>/dev/null | \
+                    while IFS= read -r line; do
+                        echo "$line" | awk -v service="$service_name" '
+                        {
+                            timestamp = $1
+                            gsub(/.*T/, "", timestamp)
+                            gsub(/\..*/, "", timestamp)
+                            message = ""
+                            for (i = 3; i <= NF; i++) {
+                                if (message != "") message = message " "
+                                message = message $i
+                            }
+                            printf "[%s] %s %s\n", service, timestamp, message
+                        }'
+                    done
+            ) &
+            pids+=($!)
+        done
+        
+        # Set up trap to kill background processes on exit
+        trap "kill ${pids[*]} 2>/dev/null; exit" INT TERM
+        
+        # Wait for all background processes
+        wait "${pids[@]}"
+        trap - INT TERM
     else
-        aws logs tail "$log_group" \
-            --profile "$AWS_PROFILE" \
-            --region "$AWS_REGION"
+        # For non-follow mode, run sequentially with prefixes
+        for i in "${!log_groups[@]}"; do
+            print_info "=== ${services[$i]} ==="
+            local service_name="${services[$i]}"
+            # Suppress stderr for cleaner output (log group might not exist)
+            aws logs tail "${log_groups[$i]}" \
+                --profile "$AWS_PROFILE" \
+                --region "$AWS_REGION" 2>/dev/null | \
+                while IFS= read -r line; do
+                    echo "$line" | awk -v service="$service_name" '
+                    {
+                        timestamp = $1
+                        gsub(/.*T/, "", timestamp)
+                        gsub(/\..*/, "", timestamp)
+                        message = ""
+                        for (i = 3; i <= NF; i++) {
+                            if (message != "") message = message " "
+                            message = message $i
+                        }
+                        printf "[%s] %s %s\n", service, timestamp, message
+                    }'
+                done
+            echo ""
+        done
     fi
 }
 
@@ -1039,6 +1622,144 @@ get_stack_outputs() {
         --region "$AWS_REGION" \
         --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' \
         --output table
+}
+
+# Build and push all images (backend, frontend, document-service, ai-service)
+build_all_images() {
+    print_header "Building All Images"
+    
+    print_step "This will build and push all service images to ECR"
+    echo ""
+    
+    # Build backend
+    if ! build_backend; then
+        print_error "Backend build failed"
+        return 1
+    fi
+    echo ""
+    
+    # Build frontend (with secrets)
+    if ! rebuild_frontend; then
+        print_error "Frontend build failed"
+        return 1
+    fi
+    echo ""
+    
+    # Build document-service
+    if ! build_document_service; then
+        print_error "Document service build failed"
+        return 1
+    fi
+    echo ""
+    
+    # Build ai-service
+    if ! build_ai_service; then
+        print_error "AI service build failed"
+        return 1
+    fi
+    echo ""
+    
+    print_success "All images built and pushed successfully!"
+    return 0
+}
+
+# Verify ECS service-linked role exists
+verify_ecs_service_role() {
+    print_header "Verifying ECS Service-Linked Role"
+    
+    if aws iam get-role --role-name AWSServiceRoleForECS --profile "$AWS_PROFILE" &>/dev/null; then
+        print_success "ECS service-linked role exists"
+        return 0
+    else
+        print_warning "ECS service-linked role does not exist"
+        print_step "Creating ECS service-linked role..."
+        
+        if aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com --profile "$AWS_PROFILE" 2>&1; then
+            print_success "ECS service-linked role created"
+            return 0
+        else
+            print_error "Failed to create ECS service-linked role"
+            return 1
+        fi
+    fi
+}
+
+# Get all deployment variables (for use in scripts)
+get_deployment_vars() {
+    print_header "Deployment Variables for ${ENVIRONMENT}"
+    echo ""
+    echo "# Copy and paste these into your shell:"
+    echo ""
+    
+    # VPC outputs
+    local vpc_id=$(get_stack_output "isms-${ENVIRONMENT}-vpc" "VpcId")
+    local pub_subnet_1=$(get_stack_output "isms-${ENVIRONMENT}-vpc" "PublicSubnet1Id")
+    local pub_subnet_2=$(get_stack_output "isms-${ENVIRONMENT}-vpc" "PublicSubnet2Id")
+    local priv_subnet_1=$(get_stack_output "isms-${ENVIRONMENT}-vpc" "PrivateSubnet1Id")
+    local priv_subnet_2=$(get_stack_output "isms-${ENVIRONMENT}-vpc" "PrivateSubnet2Id")
+    
+    # Secrets outputs
+    local db_secret_arn=$(get_stack_output "isms-${ENVIRONMENT}-secrets" "DatabaseCredentialsSecretArn")
+    local app_secret_arn=$(get_stack_output "isms-${ENVIRONMENT}-secrets" "ApplicationSecretsArn")
+    
+    # Security groups
+    local alb_sg_id=$(get_stack_output "isms-${ENVIRONMENT}-sg" "ALBSecurityGroupId")
+    local ecs_sg_id=$(get_stack_output "isms-${ENVIRONMENT}-sg" "ECSSecurityGroupId")
+    local aurora_sg_id=$(get_stack_output "isms-${ENVIRONMENT}-sg" "AuroraSecurityGroupId")
+    
+    # IAM roles
+    local task_exec_role=$(get_stack_output "isms-${ENVIRONMENT}-iam" "ECSTaskExecutionRoleArn")
+    local task_role=$(get_stack_output "isms-${ENVIRONMENT}-iam" "ECSTaskRoleArn")
+    local codedeploy_role=$(get_stack_output "isms-${ENVIRONMENT}-iam" "CodeDeployRoleArn")
+    
+    # ECR repositories
+    local backend_repo=$(get_stack_output "isms-${ENVIRONMENT}-ecr" "BackendRepositoryUri")
+    local frontend_repo=$(get_stack_output "isms-${ENVIRONMENT}-ecr" "FrontendRepositoryUri")
+    local doc_service_repo=$(get_stack_output "isms-${ENVIRONMENT}-ecr" "DocumentServiceRepositoryUri")
+    local ai_service_repo=$(get_stack_output "isms-${ENVIRONMENT}-ecr" "AIServiceRepositoryUri")
+    
+    # ALB outputs
+    local backend_tg_blue=$(get_stack_output "isms-${ENVIRONMENT}-alb" "BackendTargetGroupBlueArn")
+    local backend_tg_green=$(get_stack_output "isms-${ENVIRONMENT}-alb" "BackendTargetGroupGreenArn")
+    local frontend_tg_blue=$(get_stack_output "isms-${ENVIRONMENT}-alb" "FrontendTargetGroupBlueArn")
+    local frontend_tg_green=$(get_stack_output "isms-${ENVIRONMENT}-alb" "FrontendTargetGroupGreenArn")
+    local listener_arn=$(get_stack_output "isms-${ENVIRONMENT}-alb" "LoadBalancerListenerArn")
+    
+    # ECS outputs
+    local cluster_name=$(get_stack_output "isms-${ENVIRONMENT}-ecs" "ClusterName")
+    local backend_service=$(get_stack_output "isms-${ENVIRONMENT}-ecs" "BackendServiceName")
+    local frontend_service=$(get_stack_output "isms-${ENVIRONMENT}-ecs" "FrontendServiceName")
+    
+    # Print export statements
+    [ -n "$vpc_id" ] && echo "export VPC_ID=\"$vpc_id\""
+    [ -n "$pub_subnet_1" ] && echo "export PUB_SUBNET_1=\"$pub_subnet_1\""
+    [ -n "$pub_subnet_2" ] && echo "export PUB_SUBNET_2=\"$pub_subnet_2\""
+    [ -n "$priv_subnet_1" ] && echo "export PRIV_SUBNET_1=\"$priv_subnet_1\""
+    [ -n "$priv_subnet_2" ] && echo "export PRIV_SUBNET_2=\"$priv_subnet_2\""
+    [ -n "$db_secret_arn" ] && echo "export DB_SECRET_ARN=\"$db_secret_arn\""
+    [ -n "$app_secret_arn" ] && echo "export APP_SECRET_ARN=\"$app_secret_arn\""
+    [ -n "$alb_sg_id" ] && echo "export ALB_SG_ID=\"$alb_sg_id\""
+    [ -n "$ecs_sg_id" ] && echo "export ECS_SG_ID=\"$ecs_sg_id\""
+    [ -n "$aurora_sg_id" ] && echo "export AURORA_SG_ID=\"$aurora_sg_id\""
+    [ -n "$task_exec_role" ] && echo "export TASK_EXEC_ROLE=\"$task_exec_role\""
+    [ -n "$task_role" ] && echo "export TASK_ROLE=\"$task_role\""
+    [ -n "$codedeploy_role" ] && echo "export CODEDEPLOY_ROLE=\"$codedeploy_role\""
+    [ -n "$backend_repo" ] && echo "export BACKEND_REPO=\"$backend_repo\""
+    [ -n "$frontend_repo" ] && echo "export FRONTEND_REPO=\"$frontend_repo\""
+    [ -n "$doc_service_repo" ] && echo "export DOCUMENT_SERVICE_REPO=\"$doc_service_repo\""
+    [ -n "$ai_service_repo" ] && echo "export AI_SERVICE_REPO=\"$ai_service_repo\""
+    [ -n "$backend_tg_blue" ] && echo "export BACKEND_TG_BLUE=\"$backend_tg_blue\""
+    [ -n "$backend_tg_green" ] && echo "export BACKEND_TG_GREEN=\"$backend_tg_green\""
+    [ -n "$frontend_tg_blue" ] && echo "export FRONTEND_TG_BLUE=\"$frontend_tg_blue\""
+    [ -n "$frontend_tg_green" ] && echo "export FRONTEND_TG_GREEN=\"$frontend_tg_green\""
+    [ -n "$listener_arn" ] && echo "export LISTENER_ARN=\"$listener_arn\""
+    [ -n "$cluster_name" ] && echo "export CLUSTER_NAME=\"$cluster_name\""
+    [ -n "$backend_service" ] && echo "export BACKEND_SERVICE=\"$backend_service\""
+    [ -n "$frontend_service" ] && echo "export FRONTEND_SERVICE=\"$frontend_service\""
+    
+    echo ""
+    print_info "To use these variables, run:"
+    echo "  eval \$($0 get-deployment-vars)"
 }
 
 # Main
@@ -1072,6 +1793,11 @@ main() {
             build_ai_service
             exit $?
             ;;
+        build-all-images)
+            unset SERVICE_TYPE
+            build_all_images
+            exit $?
+            ;;
         rebuild-frontend)
             # Clear SERVICE_TYPE for build commands (not needed)
             unset SERVICE_TYPE
@@ -1084,6 +1810,22 @@ main() {
             ;;
         deploy-backend)
             deploy_service "backend"
+            exit $?
+            ;;
+        deploy-document-service)
+            deploy_microservice "document-service"
+            exit $?
+            ;;
+        deploy-ai-service)
+            deploy_microservice "ai-service"
+            exit $?
+            ;;
+        deploy-document-service-stack)
+            deploy_microservice_stack "document-service"
+            exit $?
+            ;;
+        deploy-ai-service-stack)
+            deploy_microservice_stack "ai-service"
             exit $?
             ;;
         update-service)
@@ -1108,6 +1850,14 @@ main() {
             ;;
         get-stack-outputs)
             get_stack_outputs
+            exit $?
+            ;;
+        get-deployment-vars)
+            get_deployment_vars
+            exit $?
+            ;;
+        verify-ecs-role)
+            verify_ecs_service_role
             exit $?
             ;;
         *)

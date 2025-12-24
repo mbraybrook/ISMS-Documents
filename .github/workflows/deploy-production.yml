@@ -82,11 +82,32 @@ jobs:
       - name: Build and push backend (ARM64)
         run: |
           docker buildx build --platform linux/arm64 \
+            -f ./backend/Dockerfile.prod \
             -t ${{ secrets.ECR_REGISTRY }}/isms-backend:${{ steps.set-tag.outputs.tag }} \
             -t ${{ secrets.ECR_REGISTRY }}/isms-backend:production \
             -t ${{ secrets.ECR_REGISTRY }}/isms-backend:latest \
             --push \
             ./backend
+
+      - name: Build and push document-service (ARM64)
+        run: |
+          docker buildx build --platform linux/arm64 \
+            -f ./services/document-service/Dockerfile \
+            -t ${{ secrets.ECR_REGISTRY }}/isms-document-service:${{ steps.set-tag.outputs.tag }} \
+            -t ${{ secrets.ECR_REGISTRY }}/isms-document-service:production \
+            -t ${{ secrets.ECR_REGISTRY }}/isms-document-service:latest \
+            --push \
+            ./services/document-service
+
+      - name: Build and push ai-service (ARM64)
+        run: |
+          docker buildx build --platform linux/arm64 \
+            -f ./services/ai-service/Dockerfile \
+            -t ${{ secrets.ECR_REGISTRY }}/isms-ai-service:${{ steps.set-tag.outputs.tag }} \
+            -t ${{ secrets.ECR_REGISTRY }}/isms-ai-service:production \
+            -t ${{ secrets.ECR_REGISTRY }}/isms-ai-service:latest \
+            --push \
+            ./services/ai-service
 
       - name: Increment version and build frontend (ARM64)
         env:
@@ -290,6 +311,94 @@ jobs:
         run: |
           aws deploy wait deployment-successful \
             --deployment-id ${{ steps.frontend-deploy.outputs.deployment_id }}
+
+      - name: Update document-service
+        run: |
+          # Get current task definition for document service
+          SERVICE_NAME="isms-production-document-service"
+          TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster ${{ secrets.PRODUCTION_CLUSTER_NAME }} \
+            --services $SERVICE_NAME \
+            --query 'services[0].taskDefinition' \
+            --output text \
+            --region ${{ secrets.AWS_REGION }} 2>/dev/null || echo "")
+          
+          if [ -z "$TASK_DEF_ARN" ] || [ "$TASK_DEF_ARN" == "None" ]; then
+            echo "Document service not found. Skipping update (deploy via CloudFormation first)."
+            exit 0
+          fi
+          
+          # Get full task definition JSON
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition $TASK_DEF_ARN \
+            --query 'taskDefinition' \
+            --output json \
+            --region ${{ secrets.AWS_REGION }})
+          
+          # Update image and register new revision
+          NEW_TASK_DEF=$(echo "$TASK_DEF" | jq \
+            --arg IMAGE "${{ secrets.ECR_REGISTRY }}/isms-document-service:${{ steps.set-tag.outputs.tag }}" \
+            '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+          
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
+          
+          # Update service with new task definition
+          aws ecs update-service \
+            --cluster ${{ secrets.PRODUCTION_CLUSTER_NAME }} \
+            --service $SERVICE_NAME \
+            --task-definition $NEW_TASK_DEF_ARN \
+            --region ${{ secrets.AWS_REGION }} \
+            --output text
+          
+          echo "Document service updated with new task definition: $NEW_TASK_DEF_ARN"
+
+      - name: Update ai-service
+        run: |
+          # Get current task definition for AI service
+          SERVICE_NAME="isms-production-ai-service"
+          TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster ${{ secrets.PRODUCTION_CLUSTER_NAME }} \
+            --services $SERVICE_NAME \
+            --query 'services[0].taskDefinition' \
+            --output text \
+            --region ${{ secrets.AWS_REGION }} 2>/dev/null || echo "")
+          
+          if [ -z "$TASK_DEF_ARN" ] || [ "$TASK_DEF_ARN" == "None" ]; then
+            echo "AI service not found. Skipping update (deploy via CloudFormation first)."
+            exit 0
+          fi
+          
+          # Get full task definition JSON
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition $TASK_DEF_ARN \
+            --query 'taskDefinition' \
+            --output json \
+            --region ${{ secrets.AWS_REGION }})
+          
+          # Update image and register new revision
+          NEW_TASK_DEF=$(echo "$TASK_DEF" | jq \
+            --arg IMAGE "${{ secrets.ECR_REGISTRY }}/isms-ai-service:${{ steps.set-tag.outputs.tag }}" \
+            '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+          
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
+          
+          # Update service with new task definition
+          aws ecs update-service \
+            --cluster ${{ secrets.PRODUCTION_CLUSTER_NAME }} \
+            --service $SERVICE_NAME \
+            --task-definition $NEW_TASK_DEF_ARN \
+            --region ${{ secrets.AWS_REGION }} \
+            --output text
+          
+          echo "AI service updated with new task definition: $NEW_TASK_DEF_ARN"
 
       - name: Health check
         run: |

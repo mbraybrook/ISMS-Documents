@@ -226,12 +226,26 @@ FRONTEND_TG_GREEN=$(aws cloudformation describe-stacks --stack-name isms-staging
 # - Backend image must include OpenSSL libraries for Prisma to work
 # - Prisma schema must specify correct binary targets (linux-musl-arm64-openssl-3.0.x)
 #
+# RECOMMENDED: Use deploy-utils.sh to build and push all images:
+cd /home/developer/dev/ISMS-Documentation/infrastructure
+export AWS_PROFILE=pt-sandbox
+export ENVIRONMENT=staging
+./scripts/deploy-utils.sh build-all-images
+#
+# This will build and push backend, frontend, document-service, and ai-service images.
+# It handles ECR login correctly and uses secrets from Secrets Manager for frontend.
+#
+# ALTERNATIVE: Manual build and push (if you need more control):
+#
 # Get repository URIs (if not already set)
 BACKEND_REPO=$(aws cloudformation describe-stacks --stack-name isms-staging-ecr --query 'Stacks[0].Outputs[?OutputKey==`BackendRepositoryUri`].OutputValue' --output text --profile pt-sandbox)
 FRONTEND_REPO=$(aws cloudformation describe-stacks --stack-name isms-staging-ecr --query 'Stacks[0].Outputs[?OutputKey==`FrontendRepositoryUri`].OutputValue' --output text --profile pt-sandbox)
+DOCUMENT_SERVICE_REPO=$(aws cloudformation describe-stacks --stack-name isms-staging-ecr --query 'Stacks[0].Outputs[?OutputKey==`DocumentServiceRepositoryUri`].OutputValue' --output text --profile pt-sandbox)
 
-# Login to ECR
-aws ecr get-login-password --region eu-west-2 --profile pt-sandbox | docker login --username AWS --password-stdin $BACKEND_REPO
+# Login to ECR (extract registry domain from repository URI)
+# IMPORTANT: docker login needs just the registry domain, not the full repository URI
+REGISTRY_DOMAIN=$(echo $BACKEND_REPO | cut -d'/' -f1)
+aws ecr get-login-password --region eu-west-2 --profile pt-sandbox | docker login --username AWS --password-stdin $REGISTRY_DOMAIN
 
 # Build and push backend image
 # Uses Dockerfile.prod which includes:
@@ -258,8 +272,32 @@ docker buildx build --platform linux/arm64 \
   ./frontend \
   --push
 
+# Build and push document-service image (REQUIRED for Trust Center document downloads)
+# The document service handles PDF conversion and watermarking
+docker buildx build --platform linux/arm64 \
+  -f ./services/document-service/Dockerfile \
+  -t $DOCUMENT_SERVICE_REPO:staging \
+  ./services/document-service \
+  --push
+
+# Build and push ai-service image (REQUIRED for risk similarity and embeddings)
+# The AI service handles embedding generation and similarity calculations
+AI_SERVICE_REPO=$(aws cloudformation describe-stacks --stack-name isms-staging-ecr --query 'Stacks[0].Outputs[?OutputKey==`AIServiceRepositoryUri`].OutputValue' --output text --profile pt-sandbox)
+
+docker buildx build --platform linux/arm64 \
+  -f ./services/ai-service/Dockerfile \
+  -t $AI_SERVICE_REPO:staging \
+  ./services/ai-service \
+  --push
+
 # 8.6. Verify ECS Service-Linked Role exists
 # Check if the ECS service-linked role exists (required for cluster creation):
+# RECOMMENDED: Use deploy-utils.sh:
+cd /home/developer/dev/ISMS-Documentation/infrastructure
+export AWS_PROFILE=pt-sandbox
+./scripts/deploy-utils.sh verify-ecs-role
+#
+# ALTERNATIVE: Manual check:
 if ! aws iam get-role --role-name AWSServiceRoleForECS --profile pt-sandbox &>/dev/null; then
   echo "Creating ECS service-linked role..."
   aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com --profile pt-sandbox
@@ -301,6 +339,176 @@ aws cloudformation deploy \
 CLUSTER_NAME=$(aws cloudformation describe-stacks --stack-name isms-staging-ecs --query 'Stacks[0].Outputs[?OutputKey==`ClusterName`].OutputValue' --output text --profile pt-sandbox)
 BACKEND_SERVICE=$(aws cloudformation describe-stacks --stack-name isms-staging-ecs --query 'Stacks[0].Outputs[?OutputKey==`BackendServiceName`].OutputValue' --output text --profile pt-sandbox)
 FRONTEND_SERVICE=$(aws cloudformation describe-stacks --stack-name isms-staging-ecs --query 'Stacks[0].Outputs[?OutputKey==`FrontendServiceName`].OutputValue' --output text --profile pt-sandbox)
+
+# 9.5. Deploy Document Service (REQUIRED for Trust Center document downloads)
+# The document service handles PDF conversion, watermarking, and caching
+# It must be deployed before the backend can download documents from the Trust Center
+#
+# NOTE: After initial deployment, GitHub Actions will automatically build and deploy
+#       document service updates on each push to main. However, the initial CloudFormation
+#       stack deployment must be done manually (this step).
+#
+DOCUMENT_SERVICE_REPO=$(aws cloudformation describe-stacks --stack-name isms-staging-ecr --query 'Stacks[0].Outputs[?OutputKey==`DocumentServiceRepositoryUri`].OutputValue' --output text --profile pt-sandbox)
+
+aws cloudformation deploy \
+  --template-file templates/document-service-ecs.yaml \
+  --stack-name isms-staging-document-service \
+  --parameter-overrides \
+    Environment=staging \
+    ClusterName=$CLUSTER_NAME \
+    VpcId=$VPC_ID \
+    PrivateSubnet1Id=$PRIV_SUBNET_1 \
+    PrivateSubnet2Id=$PRIV_SUBNET_2 \
+    ECSSecurityGroupId=$ECS_SG_ID \
+    ECSTaskExecutionRoleArn=$TASK_EXEC_ROLE \
+    ECSTaskRoleArn=$TASK_ROLE \
+    DocumentServiceRepositoryUri=$DOCUMENT_SERVICE_REPO \
+    DocumentServiceImageTag=staging \
+    ApplicationSecretsArn=$APP_SECRET_ARN \
+    MinTaskCount=1 \
+    MaxTaskCount=2 \
+    CpuUnits=1024 \
+    MemoryMB=2048 \
+  --capabilities CAPABILITY_IAM \
+  --region eu-west-2 \
+  --profile pt-sandbox
+
+# Verify document service is running
+aws ecs describe-services \
+  --cluster $CLUSTER_NAME \
+  --services isms-staging-document-service \
+  --profile pt-sandbox \
+  --region eu-west-2 \
+  --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount}' \
+  --output json | jq '.'
+
+# 9.6. Deploy AI Service (REQUIRED for risk similarity and embeddings)
+# The AI service handles embedding generation and similarity calculations
+# It must be deployed before the backend can generate embeddings or calculate risk similarity
+AI_SERVICE_REPO=$(aws cloudformation describe-stacks --stack-name isms-staging-ecr --query 'Stacks[0].Outputs[?OutputKey==`AIServiceRepositoryUri`].OutputValue' --output text --profile pt-sandbox)
+
+aws cloudformation deploy \
+  --template-file templates/ai-service-ecs.yaml \
+  --stack-name isms-staging-ai-service \
+  --parameter-overrides \
+    Environment=staging \
+    ClusterName=$CLUSTER_NAME \
+    VpcId=$VPC_ID \
+    PrivateSubnet1Id=$PRIV_SUBNET_1 \
+    PrivateSubnet2Id=$PRIV_SUBNET_2 \
+    ECSSecurityGroupId=$ECS_SG_ID \
+    ECSTaskExecutionRoleArn=$TASK_EXEC_ROLE \
+    ECSTaskRoleArn=$TASK_ROLE \
+    AIServiceRepositoryUri=$AI_SERVICE_REPO \
+    AIServiceImageTag=staging \
+    ApplicationSecretsArn=$APP_SECRET_ARN \
+    OllamaEndpoint=http://ollama.local:11434 \
+    OllamaModel=nomic-embed-text \
+    MinTaskCount=1 \
+    MaxTaskCount=2 \
+    CpuUnits=512 \
+    MemoryMB=1024 \
+  --capabilities CAPABILITY_IAM \
+  --region eu-west-2 \
+  --profile pt-sandbox
+
+# Verify AI service is running
+aws ecs describe-services \
+  --cluster $CLUSTER_NAME \
+  --services isms-staging-ai-service \
+  --profile pt-sandbox \
+  --region eu-west-2 \
+  --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount}' \
+  --output json | jq '.'
+
+# NOTE: After deploying AI service and Ollama, you may need to backfill control embeddings
+# if controls were seeded before these services were available. See troubleshooting section
+# for instructions on checking and backfilling embeddings.
+
+# 9.7. Deploy Ollama (REQUIRED for AI Service embeddings)
+# Ollama provides the embedding model (nomic-embed-text) that the AI service uses
+# to generate embeddings for risk similarity and control suggestions
+#
+# NOTE: Ollama requires significant resources (4 vCPU, 8GB RAM)
+# After deployment, you must pull the embedding model (see below)
+#
+# Get Service Discovery Namespace ID (created by document-service stack)
+# The namespace is named 'local' and is shared across all microservices
+NAMESPACE_ID=$(aws servicediscovery list-namespaces \
+  --query 'Namespaces[?Name==`local`].Id' \
+  --output text \
+  --profile pt-sandbox \
+  --region eu-west-2)
+
+if [ -z "$NAMESPACE_ID" ] || [ "$NAMESPACE_ID" == "None" ]; then
+  echo "❌ Error: Service Discovery namespace 'local' not found."
+  echo "   Make sure document-service stack (section 9.5) is deployed first."
+  exit 1
+fi
+
+echo "✅ Using Service Discovery namespace: $NAMESPACE_ID"
+
+aws cloudformation deploy \
+  --template-file templates/ollama-ecs.yaml \
+  --stack-name isms-staging-ollama \
+  --parameter-overrides \
+    Environment=staging \
+    ClusterName=$CLUSTER_NAME \
+    VpcId=$VPC_ID \
+    PrivateSubnet1Id=$PRIV_SUBNET_1 \
+    PrivateSubnet2Id=$PRIV_SUBNET_2 \
+    ECSSecurityGroupId=$ECS_SG_ID \
+    ECSTaskExecutionRoleArn=$TASK_EXEC_ROLE \
+    ECSTaskRoleArn=$TASK_ROLE \
+    ServiceDiscoveryNamespaceId=$NAMESPACE_ID \
+    EmbeddingModel=nomic-embed-text \
+    MinTaskCount=1 \
+    MaxTaskCount=1 \
+    CpuUnits=4096 \
+    MemoryMB=8192 \
+  --capabilities CAPABILITY_IAM \
+  --region eu-west-2 \
+  --profile pt-sandbox
+
+# Wait for Ollama service to start
+echo "Waiting for Ollama service to start..."
+sleep 60
+
+# Verify Ollama service is running
+aws ecs describe-services \
+  --cluster $CLUSTER_NAME \
+  --services isms-staging-ollama \
+  --profile pt-sandbox \
+  --region eu-west-2 \
+  --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount}' \
+  --output json | jq '.'
+
+# Pull the embedding model (REQUIRED - Ollama doesn't auto-download models)
+# RECOMMENDED: Use the helper script
+cd /home/developer/dev/ISMS-Documentation/infrastructure
+./scripts/pull-ollama-model.sh staging nomic-embed-text
+
+# ALTERNATIVE: Manual pull using ECS Exec
+# TASK_ARN=$(aws ecs list-tasks --cluster $CLUSTER_NAME --service-name isms-staging-ollama --query 'taskArns[0]' --output text --profile pt-sandbox --region eu-west-2)
+# aws ecs execute-command \
+#   --cluster $CLUSTER_NAME \
+#   --task $TASK_ARN \
+#   --container ollama \
+#   --command "ollama pull nomic-embed-text" \
+#   --interactive \
+#   --profile pt-sandbox \
+#   --region eu-west-2
+
+# Verify model is available
+TASK_ARN=$(aws ecs list-tasks --cluster $CLUSTER_NAME --service-name isms-staging-ollama --query 'taskArns[0]' --output text --profile pt-sandbox --region eu-west-2)
+aws ecs execute-command \
+  --cluster $CLUSTER_NAME \
+  --task $TASK_ARN \
+  --container ollama \
+  --command "ollama list" \
+  --interactive \
+  --profile pt-sandbox \
+  --region eu-west-2
 
 # 10. CodeDeploy
 # Get listener ARN from ALB stack
@@ -482,15 +690,37 @@ cd /home/developer/dev/ISMS-Documentation/infrastructure
 
 **Common Commands:**
 
-- **Rebuild frontend with secrets**: `./scripts/deploy-utils.sh rebuild-frontend`
-- **Build and push images**: `./scripts/deploy-utils.sh build-frontend` or `build-backend`
-- **Deploy services**: `./scripts/deploy-utils.sh deploy-frontend` or `deploy-backend`
+- **Build and push all images**: `./scripts/deploy-utils.sh build-all-images` (builds backend, frontend, document-service, ai-service)
+- **Rebuild frontend with secrets**: `./scripts/deploy-utils.sh rebuild-frontend` (retrieves secrets from Secrets Manager)
+- **Build individual images**: `./scripts/deploy-utils.sh build-frontend`, `build-backend`, `build-document-service`, `build-ai-service`
+- **Deploy services**: `./scripts/deploy-utils.sh deploy-frontend` or `deploy-backend` (uses CodeDeploy for blue/green)
+- **Get deployment variables**: `eval $(./scripts/deploy-utils.sh get-deployment-vars)` (exports all stack outputs as variables)
+- **Verify ECS role**: `./scripts/deploy-utils.sh verify-ecs-role` (creates service-linked role if missing)
 - **Check health**: `./scripts/deploy-utils.sh check-health --service frontend`
 - **View logs**: `./scripts/deploy-utils.sh view-logs --service backend`
-- **Monitor deployment**: `./scripts/deploy-utils.sh monitor-deployment --deployment-id <id>`
+- **Monitor deployment**: `./scripts/deploy-utils.sh monitor-deployment --deployment-id <id>` or `--service backend`
 - **Seed system data**: `./scripts/seed-system-data.sh` (seeds Controls, Classifications, etc. if missing)
 
 The utility script supports all common options (environment, profile, region, image-tag) and provides helpful output with error handling.
+
+### Getting Deployment Variables
+
+If you need to use CloudFormation stack outputs in manual scripts, you can easily export them:
+
+```bash
+cd /home/developer/dev/ISMS-Documentation/infrastructure
+export AWS_PROFILE=pt-sandbox
+export ENVIRONMENT=staging
+
+# Export all deployment variables
+eval $(./scripts/deploy-utils.sh get-deployment-vars)
+
+# Now you can use variables like $VPC_ID, $BACKEND_REPO, $CLUSTER_NAME, etc.
+echo "Backend repo: $BACKEND_REPO"
+echo "Cluster name: $CLUSTER_NAME"
+```
+
+This is especially useful when following the manual deployment steps in Option A (Separate Stack Deployment).
 
 ### Seeding System Data to Existing Environments
 
@@ -523,14 +753,24 @@ CodeDeploy provides blue/green deployments with zero downtime. The easiest way i
 ```bash
 cd /home/developer/dev/ISMS-Documentation/infrastructure
 export AWS_PROFILE=pt-sandbox
-./deploy-frontend.sh
+export ENVIRONMENT=staging
+./scripts/deploy-utils.sh deploy-frontend
 ```
 
 **Deploy Backend:**
 ```bash
 cd /home/developer/dev/ISMS-Documentation/infrastructure
 export AWS_PROFILE=pt-sandbox
-./deploy-backend.sh  # (create this script similarly)
+export ENVIRONMENT=staging
+./scripts/deploy-utils.sh deploy-backend
+```
+
+**Build and Push All Images Before Deployment:**
+```bash
+cd /home/developer/dev/ISMS-Documentation/infrastructure
+export AWS_PROFILE=pt-sandbox
+export ENVIRONMENT=staging
+./scripts/deploy-utils.sh build-all-images
 ```
 
 #### Manual Deployment Steps
@@ -539,12 +779,22 @@ If you prefer to deploy manually, here's the process:
 
 **1. Build and Push New Image**
 
+**RECOMMENDED: Use deploy-utils.sh:**
+```bash
+cd /home/developer/dev/ISMS-Documentation/infrastructure
+export AWS_PROFILE=pt-sandbox
+export ENVIRONMENT=staging
+./scripts/deploy-utils.sh rebuild-frontend  # Uses secrets from Secrets Manager
+```
+
+**ALTERNATIVE: Manual build (if you need more control):**
 ```bash
 # Get repository URI
 FRONTEND_REPO=$(aws cloudformation describe-stacks --stack-name isms-staging-ecr --query 'Stacks[0].Outputs[?OutputKey==`FrontendRepositoryUri`].OutputValue' --output text --profile pt-sandbox)
 
-# Login to ECR
-aws ecr get-login-password --region eu-west-2 --profile pt-sandbox | docker login --username AWS --password-stdin $FRONTEND_REPO
+# Login to ECR (extract registry domain from repository URI)
+REGISTRY_DOMAIN=$(echo $FRONTEND_REPO | cut -d'/' -f1)
+aws ecr get-login-password --region eu-west-2 --profile pt-sandbox | docker login --username AWS --password-stdin $REGISTRY_DOMAIN
 
 # Build and push (with corrected API URL - NO /api)
 docker buildx build --platform linux/arm64 \
@@ -724,78 +974,148 @@ After updating, the ALB will:
 
 ## Troubleshooting
 
-### Migrations Not Running
+### Common Deployment Issues
 
-Check:
-1. Container logs for migration execution messages
-2. That `DATABASE_URL` is set correctly in Secrets Manager
-3. That Prisma CLI is installed in the Docker image
-4. That migration files are included in the Docker image
-5. That OpenSSL libraries are installed (required for Prisma)
+**Migrations Not Running:**
+- Check container logs for migration execution messages
+- Verify `DATABASE_URL` is set correctly in Secrets Manager
+- Ensure Prisma CLI is installed in the Docker image
+- Verify migration files are included in the Docker image
+- Confirm OpenSSL libraries are installed (required for Prisma)
 
-### Migration Failures
+**Health Check Failures:**
+- Verify security groups allow ECS → ALB traffic
+- Check health check paths: Frontend uses `/health`, backend uses `/api/health`
+- Verify ports: Frontend exposes port 80, backend exposes port 4000
+- Check CloudWatch logs for application startup errors
 
-Check:
-1. Database connectivity (security groups, VPC routing)
-2. Database user permissions
-3. Migration file syntax
-4. Aurora cluster is using port 5432 (not 3306)
-5. Prisma binary targets match the runtime platform
+**Database Connection Issues:**
+- Verify Aurora cluster status and endpoint
+- Ensure security groups allow ECS → Aurora traffic on port 5432
+- Verify DATABASE_URL in Secrets Manager uses correct port (5432)
+- Confirm ECS tasks have permission to read Secrets Manager
 
-### Health Check Failures
+**Prisma Binary Target Errors:**
+- Ensure `backend/prisma/schema.prisma` includes: `binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]`
+- Rebuild the Docker image to regenerate Prisma Client
+- Verify OpenSSL 3.0.x is installed in the Alpine image
 
-Check target group health status:
-
-```bash
-TARGET_GROUP_ARN=$(aws cloudformation describe-stacks --stack-name isms-staging-alb --query 'Stacks[0].Outputs[?OutputKey==`BackendTargetGroupBlueArn`].OutputValue' --output text --profile pt-sandbox)
-
-aws elbv2 describe-target-health --target-group-arn $TARGET_GROUP_ARN --profile pt-sandbox --region eu-west-2 | jq '.TargetHealthDescriptions[] | {State: .TargetHealth.State, Reason: .TargetHealth.Reason, Description: .TargetHealth.Description}'
-```
-
-Common issues:
-- **Security groups**: ECS security group must allow inbound traffic from ALB security group
-- **Health check path**: Frontend uses `/health`, backend uses `/api/health`
-- **Port mismatch**: Frontend exposes port 80, backend exposes port 4000
-- **Application errors**: Check CloudWatch logs for application startup errors
-
-### Database Connection Issues
-
-Verify:
-1. Aurora cluster status and endpoint
-2. Security groups allow ECS → Aurora traffic on port 5432
-3. DATABASE_URL in Secrets Manager uses correct port (5432)
-4. ECS tasks have permission to read Secrets Manager
-
-```bash
-# Check Aurora cluster
-aws rds describe-db-clusters \
-  --db-cluster-identifier isms-staging-cluster \
-  --profile pt-sandbox \
-  --region eu-west-2 \
-  --query 'DBClusters[0].{Status:Status,Endpoint:Endpoint,Port:Port}'
-
-# Check DATABASE_URL
-aws secretsmanager get-secret-value \
-  --secret-id isms-staging-db-credentials \
-  --query 'SecretString' \
-  --output text \
-  --profile pt-sandbox \
-  --region eu-west-2 | jq -r '.DATABASE_URL'
-```
-
-### Prisma Binary Target Errors
-
-If you see errors about Prisma binary targets:
-1. Ensure `backend/prisma/schema.prisma` includes: `binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]`
-2. Rebuild the Docker image to regenerate Prisma Client
-3. Verify OpenSSL 3.0.x is installed in the Alpine image
-
-### Frontend API URL Issues
-
-If API calls fail with 404 or double `/api`:
-- Verify `VITE_API_URL` does NOT include `/api`
-- Frontend code adds `/api` prefix automatically
+**Frontend API URL Issues:**
+- Verify `VITE_API_URL` does NOT include `/api` (frontend code adds it automatically)
 - Rebuild frontend image with correct `VITE_API_URL`
+
+### Microservice Issues
+
+**Document Service:**
+If Trust Center document downloads fail, verify:
+- Document service is deployed (see section 9.5)
+- Service is running: `aws ecs describe-services --cluster $CLUSTER_NAME --services isms-staging-document-service`
+- Service discovery is working: `aws servicediscovery list-services`
+- `INTERNAL_SERVICE_TOKEN` is set in Secrets Manager
+- Check CloudWatch logs: `aws logs tail /ecs/isms-staging-document-service --follow`
+
+**AI Service:**
+If risk similarity calculations or embedding generation fail, verify:
+- AI service is deployed (see section 9.6)
+- Service is running: `aws ecs describe-services --cluster $CLUSTER_NAME --services isms-staging-ai-service`
+- Ollama is deployed and running (see section 9.7)
+- Service discovery is working: `aws servicediscovery list-services`
+- `INTERNAL_SERVICE_TOKEN` is set in Secrets Manager
+- Check CloudWatch logs: `aws logs tail /ecs/isms-staging-ai-service --follow`
+
+**Check Backend Logs for AI Service Connection Errors:**
+
+If "Get AI Suggestions" returns 500 errors, check backend logs:
+```bash
+aws logs tail /ecs/isms-staging-backend --follow --profile pt-sandbox --region eu-west-2 | grep -i "ai\|embedding\|ollama"
+```
+
+Common error patterns:
+- `[AIServiceClient] Failed to generate embedding` - AI service not accessible or Ollama not available
+- `ECONNREFUSED` or `ENOTFOUND` - Service discovery not working or AI service not deployed
+- `401 Unauthorized` - INTERNAL_SERVICE_TOKEN mismatch
+
+**Ollama Not Deployed:**
+
+If you see errors about Ollama not being available, ensure Ollama is deployed as part of the main deployment process (see section 9.7). The AI service requires Ollama to generate embeddings for control suggestions and risk similarity calculations.
+
+**Control Embeddings Missing (No AI Suggestions Returned):**
+
+If "Get AI Suggestions" doesn't fail but returns no suggestions, controls likely don't have embeddings stored in the database. The AI suggestion endpoint only includes controls with pre-computed embeddings (`embedding: { not: Prisma.JsonNull }`).
+
+**Symptoms:**
+- API call succeeds (200 OK) but `suggestedControlIds` is empty
+- `totalMatches` is 0
+- No error messages in logs
+
+**Check Embedding Status:**
+
+Use the check script:
+```bash
+cd /home/developer/dev/ISMS-Documentation/infrastructure
+export AWS_PROFILE=pt-sandbox
+export ENVIRONMENT=staging
+./scripts/check-embeddings-simple.sh staging
+```
+
+Alternatively, check via backend logs:
+```bash
+# Check if embedding computation is happening
+aws logs tail /ecs/isms-staging-backend --since 1h --profile pt-sandbox --region eu-west-2 | grep -i "embedding\|backfill"
+```
+
+**Backfill Control Embeddings:**
+
+If controls are missing embeddings, run the backfill script:
+
+```bash
+cd /home/developer/dev/ISMS-Documentation/infrastructure
+export AWS_PROFILE=pt-sandbox
+export ENVIRONMENT=staging
+
+# Check status first
+./scripts/check-embeddings-simple.sh staging
+
+# Backfill embeddings (requires AI service and Ollama to be running)
+./scripts/backfill-control-embeddings.sh staging
+```
+
+**Note:** The backfill script uses ECS Exec to run the embedding computation inside a backend task. This requires:
+- ECS Exec enabled on the backend task definition (`EnableExecuteCommand: true`)
+- AI service running and accessible
+- Ollama service running with the embedding model (`nomic-embed-text`) pulled
+
+**If ECS Exec is not enabled**, use the one-time task script instead:
+```bash
+cd /home/developer/dev/ISMS-Documentation/infrastructure
+export AWS_PROFILE=pt-sandbox
+export ENVIRONMENT=staging
+./scripts/backfill-embeddings-onetime-task.sh staging
+```
+
+This script creates a temporary task definition with the backfill command and runs it as a one-time task (no ECS Exec required).
+
+**Monitor Progress:**
+```bash
+# Watch backend logs for embedding computation progress
+aws logs tail /ecs/isms-staging-backend --follow --profile pt-sandbox --region eu-west-2 | grep -i "backfill\|embedding"
+```
+
+**Expected Output:**
+- `[Backfill] Starting control embedding backfill...`
+- `[Backfill Progress] Processed: X, Succeeded: Y, Failed: Z`
+- `[Backfill] Complete - Processed: X, Succeeded: Y, Failed: Z`
+
+**After Backfill:**
+- Verify embeddings were created: `./scripts/check-embeddings-simple.sh staging`
+- Test AI suggestions again - should now return control suggestions
+- If still no suggestions, check similarity scores in backend logs (threshold is 55%)
+
+**Why Embeddings Might Be Missing:**
+- Controls were seeded before AI service/Ollama was deployed
+- Embedding computation failed during seed (non-fatal, seed continues)
+- AI service was unavailable when controls were created
+- Database was restored from a backup that didn't include embeddings
 
 ## GitHub Actions Setup
 
@@ -803,6 +1123,7 @@ If API calls fail with 404 or double `/api`:
    - `AWS_ROLE_ARN`: ARN of GitHub Actions IAM role
    - `AWS_REGION`: `eu-west-2`
    - `ECR_REGISTRY`: ECR registry URL
+   - `STAGING_CLUSTER_NAME`: ECS cluster name (e.g., `isms-staging`)
    - `STAGING_BACKEND_SERVICE`: ECS service name
    - `STAGING_FRONTEND_SERVICE`: ECS service name
    - `STAGING_BACKEND_CODEDEPLOY_APP`: CodeDeploy application name
@@ -811,7 +1132,11 @@ If API calls fail with 404 or double `/api`:
    - `STAGING_FRONTEND_DEPLOYMENT_GROUP`: CodeDeploy deployment group name
    - Frontend build args (VITE_* variables)
 
-2. Push to `main` branch to trigger staging deployment
+2. **Initial Deployment**: Deploy document service, AI service, and Ollama CloudFormation stacks manually (sections 9.5, 9.6, and 9.7) before first GitHub Actions deployment
 
-3. Use workflow dispatch for production deployments
+3. Push to `main` branch to trigger staging deployment (will automatically build and deploy backend, frontend, document-service, and ai-service)
+
+4. Use workflow dispatch for production deployments
+
+**Note**: GitHub Actions workflows automatically build and deploy the document service and AI service on each push. These services are updated via ECS service update (not CodeDeploy, since they're not behind an ALB).
 

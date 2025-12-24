@@ -53,8 +53,8 @@ Parameters:
 
   OllamaEndpoint:
     Type: String
-    Description: Ollama endpoint URL
-    Default: 'http://ollama:11434'
+    Description: 'Ollama endpoint URL (use service discovery: http://ollama.local:11434)'
+    Default: 'http://ollama.local:11434'
 
   OllamaModel:
     Type: String
@@ -91,14 +91,14 @@ Parameters:
       - 1024
       - 2048
 
+  ServiceDiscoveryNamespaceId:
+    Type: String
+    Description: Service Discovery Namespace ID (get from document-service stack)
+    Default: ''
+
 Resources:
-  # Service Discovery Namespace (if not exists)
-  ServiceDiscoveryNamespace:
-    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
-    Properties:
-      Name: ai-service.local
-      Vpc: !Ref VpcId
-      Description: Service discovery namespace for ai-service
+  # Note: Service Discovery Namespace is created by document-service stack
+  # Pass the namespace ID as a parameter
 
   AIServiceTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -195,12 +195,11 @@ Resources:
     Type: AWS::ServiceDiscovery::Service
     Properties:
       Name: ai-service
-      NamespaceId: !GetAtt ServiceDiscoveryNamespace.Id
+      NamespaceId: !Ref ServiceDiscoveryNamespaceId
       DnsConfig:
         DnsRecords:
           - Type: A
             TTL: 60
-        NamespaceId: !GetAtt ServiceDiscoveryNamespace.Id
       HealthCheckCustomConfig:
         FailureThreshold: 1
 

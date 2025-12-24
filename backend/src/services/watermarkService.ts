@@ -139,10 +139,22 @@ export async function addWatermarkToPdf(
       });
 
       // Add another watermark at bottom
-      page.drawText(bottomWatermarkText, {
+      // Use much smaller font size to prevent text overflow with long email addresses
+      const bottomFontSize = fontSize * 0.2; // Reduced from 0.5 to 0.2 (60% smaller)
+      const bottomTextWidth = bottomWatermarkText.length * bottomFontSize * 0.6; // Approximate text width
+      const maxBottomTextWidth = width - 40; // Leave 20px margin on each side
+      
+      // Truncate text if it's too long to fit on the page
+      let finalBottomText = bottomWatermarkText;
+      if (bottomTextWidth > maxBottomTextWidth) {
+        const maxChars = Math.floor((maxBottomTextWidth / (bottomFontSize * 0.6)) - 3); // -3 for "..."
+        finalBottomText = bottomWatermarkText.substring(0, maxChars) + '...';
+      }
+      
+      page.drawText(finalBottomText, {
         x: 20,
         y: 20,
-        size: fontSize * 0.5,
+        size: bottomFontSize,
         color: rgb(0.5, 0.5, 0.5),
         opacity: 0.5,
       });

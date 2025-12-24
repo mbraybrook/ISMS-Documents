@@ -42,98 +42,42 @@ infrastructure/
 │   ├── backend-appspec.yaml
 │   └── frontend-appspec.yaml
 └── scripts/           # Deployment helper scripts
-    ├── deploy.sh
-    ├── validate-templates.sh
-    └── create-codedeploy-deployment.sh
+    ├── deploy-utils.sh          # Main deployment utility (use this for all deployments)
+    ├── validate-templates.sh   # CloudFormation template validation
+    ├── seed-system-data.sh      # Seed system data to existing environments
+    ├── setup-github-actions.sh  # GitHub Actions setup helper
+    ├── check-embeddings-simple.sh      # Check control embedding status
+    ├── check-control-embeddings.sh     # Check control embeddings
+    ├── backfill-control-embeddings.sh  # Backfill control embeddings
+    ├── backfill-embeddings-onetime-task.sh  # Alternative backfill method
+    └── pull-ollama-model.sh     # Pull Ollama embedding model
 ```
 
 ## Deployment
 
-### Prerequisites
+For complete deployment instructions, see **[DEPLOYMENT.md](./DEPLOYMENT.md)**. This is the primary guide for deploying and managing the ISMS infrastructure.
 
-1. **Upload templates to S3** (required for nested stacks):
-   ```bash
-   # Create S3 bucket for templates (one-time)
-   aws s3 mb s3://isms-cloudformation-templates-$(aws sts get-caller-identity --query Account --output text) --region eu-west-2
-   
-   # Upload templates
-   aws s3 sync infrastructure/templates/ s3://isms-cloudformation-templates-$(aws sts get-caller-identity --query Account --output text)/templates/ --region eu-west-2
-   ```
+### Quick Reference
 
-   **Note**: Update `main.yaml` TemplateURL paths to use your S3 bucket, or deploy stacks separately (see below).
-
-### Initial Setup
-
-1. **Validate templates**:
-   ```bash
-   cd infrastructure
-   ./scripts/validate-templates.sh
-   ```
-
-2. **Create ACM certificate** (if not already created):
-   ```bash
-   aws acm request-certificate \
-     --domain-name trust.demo.paythru.com \
-     --validation-method DNS \
-     --region eu-west-2
-   ```
-   Note the certificate ARN and add it to the parameter file.
-
-3. **Deploy stacks** (choose one approach):
-
-   **Option A: Deploy stacks separately** (recommended for initial setup):
-   ```bash
-   # Deploy in order
-   aws cloudformation deploy --template-file templates/vpc.yaml --stack-name isms-staging-vpc --parameter-overrides file://parameters/staging-params.json --capabilities CAPABILITY_IAM --region eu-west-2
-   aws cloudformation deploy --template-file templates/secrets-manager.yaml --stack-name isms-staging-secrets --parameter-overrides file://parameters/staging-params.json --capabilities CAPABILITY_IAM --region eu-west-2
-   aws cloudformation deploy --template-file templates/security-groups.yaml --stack-name isms-staging-sg --parameter-overrides Environment=staging VpcId=<vpc-id> --capabilities CAPABILITY_IAM --region eu-west-2
-   # ... continue with other stacks, referencing outputs from previous stacks
-   ```
-
-   **Option B: Use main template with S3** (after uploading templates):
-   ```bash
-   ./scripts/deploy.sh staging [aws-profile]
-   ```
-
-4. **Configure Secrets Manager**:
-   After initial deployment, update the application secrets in AWS Secrets Manager:
-   ```bash
-   aws secretsmanager put-secret-value \
-     --secret-id isms-staging-app-secrets \
-     --secret-string '{
-       "AUTH_TENANT_ID": "your-tenant-id",
-       "AUTH_CLIENT_ID": "your-client-id",
-       "AUTH_CLIENT_SECRET": "your-client-secret",
-       "AUTH_REDIRECT_URI": "https://trust.demo.paythru.com",
-       "TRUST_CENTER_JWT_SECRET": "your-jwt-secret"
-     }'
-   ```
-
-5. **Set up DNS**:
-   Point `trust.demo.paythru.com` to the ALB DNS name (from stack outputs).
-
-### Manual Deployment
-
-Deploy using the helper script:
+**Main Deployment Utility:**
 ```bash
-./scripts/deploy.sh <environment> [aws-profile]
+cd infrastructure
+./scripts/deploy-utils.sh --help
 ```
 
-Or use AWS CLI directly:
+**Common Commands:**
+- Build and push images: `./scripts/deploy-utils.sh build-all-images`
+- Deploy services: `./scripts/deploy-utils.sh deploy-frontend` or `deploy-backend`
+- View logs: `./scripts/deploy-utils.sh view-logs --service backend`
+- Monitor deployments: `./scripts/deploy-utils.sh monitor-deployment --service backend`
+
+**Template Validation:**
 ```bash
-aws cloudformation deploy \
-  --template-file infrastructure/templates/main.yaml \
-  --stack-name isms-staging \
-  --parameter-overrides file://infrastructure/parameters/staging-params.json \
-  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-  --region eu-west-2
+./scripts/validate-templates.sh
 ```
 
-### CI/CD Deployment
-
-Deployments are automated via GitHub Actions:
-- **Staging**: Automatically deploys on push to `main` branch
-- **Production**: Manual workflow dispatch (deploys to staging first, then production)
+**GitHub Actions Setup:**
+See [GITHUB_ACTIONS_SETUP.md](./GITHUB_ACTIONS_SETUP.md) for detailed GitHub Actions configuration.
 
 ## Environment Configuration
 
@@ -158,47 +102,15 @@ Deployments are automated via GitHub Actions:
 
 ## Troubleshooting
 
-### Stack deployment fails
-- Check CloudFormation events: `aws cloudformation describe-stack-events --stack-name isms-staging`
-- Validate templates: `./scripts/validate-templates.sh`
-- Check IAM permissions
-
-### ECS tasks not starting
-- Check task logs: `aws logs tail /ecs/isms-staging-backend --follow`
-- Verify Secrets Manager secrets are configured
-- Check security group rules
-
-### CodeDeploy deployment fails
-- Check deployment status: `aws deploy get-deployment --deployment-id <id>`
-- Verify target groups are healthy
-- Check ECS service events
-
-### Database connection issues
-- Verify Aurora security group allows traffic from ECS security group
-- Check database credentials in Secrets Manager
-- Verify DATABASE_URL format in task definition
+For troubleshooting guidance, see the **Troubleshooting** section in [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ## Maintenance
 
-### Update application secrets
-```bash
-aws secretsmanager put-secret-value \
-  --secret-id isms-staging-app-secrets \
-  --secret-string file://secrets.json
-```
-
-### Scale Aurora manually
-Update `AuroraMinCapacity` and `AuroraMaxCapacity` in parameter file and redeploy.
-
-### Rollback deployment
-Use CodeDeploy to rollback:
-```bash
-aws deploy create-deployment \
-  --application-name isms-staging-backend-app \
-  --deployment-group-name isms-staging-backend-dg \
-  --revision revisionType=AppSpecContent,appSpecContent='...' \
-  --deployment-config-name CodeDeployDefault.ECSAllAtOnce
-```
+For maintenance procedures, see [DEPLOYMENT.md](./DEPLOYMENT.md) sections on:
+- Updating deployments
+- Configuring secrets
+- Scaling services
+- Monitoring deployments
 
 ## Security
 

@@ -153,31 +153,6 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-Outputs:
-  BackendRepositoryUri:
-    Description: Backend ECR repository URI
-    Value: !GetAtt BackendRepository.RepositoryUri
-    Export:
-      Name: !Sub '${AWS::StackName}-BackendRepositoryUri'
-
-  FrontendRepositoryUri:
-    Description: Frontend ECR repository URI
-    Value: !GetAtt FrontendRepository.RepositoryUri
-    Export:
-      Name: !Sub '${AWS::StackName}-FrontendRepositoryUri'
-
-  BackendRepositoryArn:
-    Description: Backend ECR repository ARN
-    Value: !GetAtt BackendRepository.Arn
-    Export:
-      Name: !Sub '${AWS::StackName}-BackendRepositoryArn'
-
-  FrontendRepositoryArn:
-    Description: Frontend ECR repository ARN
-    Value: !GetAtt FrontendRepository.Arn
-    Export:
-      Name: !Sub '${AWS::StackName}-FrontendRepositoryArn'
-
   DocumentServiceRepository:
     Type: AWS::ECR::Repository
     Properties:
@@ -269,6 +244,30 @@ Outputs:
           Value: !Ref Environment
 
 Outputs:
+  BackendRepositoryUri:
+    Description: Backend ECR repository URI
+    Value: !GetAtt BackendRepository.RepositoryUri
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendRepositoryUri'
+
+  FrontendRepositoryUri:
+    Description: Frontend ECR repository URI
+    Value: !GetAtt FrontendRepository.RepositoryUri
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendRepositoryUri'
+
+  BackendRepositoryArn:
+    Description: Backend ECR repository ARN
+    Value: !GetAtt BackendRepository.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendRepositoryArn'
+
+  FrontendRepositoryArn:
+    Description: Frontend ECR repository ARN
+    Value: !GetAtt FrontendRepository.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendRepositoryArn'
+
   DocumentServiceRepositoryUri:
     Description: Document Service ECR repository URI
     Value: !GetAtt DocumentServiceRepository.RepositoryUri
@@ -280,6 +279,18 @@ Outputs:
     Value: !GetAtt AIServiceRepository.RepositoryUri
     Export:
       Name: !Sub '${AWS::StackName}-AIServiceRepositoryUri'
+
+  DocumentServiceRepositoryArn:
+    Description: Document Service ECR repository ARN
+    Value: !GetAtt DocumentServiceRepository.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DocumentServiceRepositoryArn'
+
+  AIServiceRepositoryArn:
+    Description: AI Service ECR repository ARN
+    Value: !GetAtt AIServiceRepository.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-AIServiceRepositoryArn'
 
 
 

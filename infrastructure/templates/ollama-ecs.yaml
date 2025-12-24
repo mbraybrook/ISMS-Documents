@@ -1,0 +1,247 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS service for Ollama (required by AI service for embeddings)'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    AllowedValues:
+      - staging
+      - production
+    Default: staging
+
+  ClusterName:
+    Type: String
+    Description: ECS cluster name
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID
+
+  PrivateSubnet1Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private Subnet 1 ID
+
+  PrivateSubnet2Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private Subnet 2 ID
+
+  ECSSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: ECS Security Group ID
+
+  ECSTaskExecutionRoleArn:
+    Type: String
+    Description: ECS Task Execution Role ARN
+
+  ECSTaskRoleArn:
+    Type: String
+    Description: ECS Task Role ARN
+
+  ServiceDiscoveryNamespaceId:
+    Type: String
+    Description: Service Discovery Namespace ID (get from document-service stack)
+
+  MinTaskCount:
+    Type: Number
+    Description: Minimum number of tasks
+    Default: 1
+    MinValue: 1
+
+  MaxTaskCount:
+    Type: Number
+    Description: Maximum number of tasks
+    Default: 1
+    MinValue: 1
+
+  CpuUnits:
+    Type: Number
+    Description: CPU units per task (2048 = 2 vCPU, 4096 = 4 vCPU)
+    Default: 4096
+    AllowedValues:
+      - 2048
+      - 4096
+
+  MemoryMB:
+    Type: Number
+    Description: Memory per task in MB (Ollama needs at least 4GB)
+    Default: 8192
+    AllowedValues:
+      - 4096
+      - 8192
+      - 16384
+
+  EmbeddingModel:
+    Type: String
+    Description: Ollama embedding model to pull on startup
+    Default: 'nomic-embed-text'
+
+Resources:
+  OllamaTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub 'isms-${Environment}-ollama'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref CpuUnits
+      Memory: !Ref MemoryMB
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !Ref ECSTaskExecutionRoleArn
+      TaskRoleArn: !Ref ECSTaskRoleArn
+      ContainerDefinitions:
+        - Name: ollama
+          Image: 'ollama/ollama:latest'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 11434
+              Protocol: tcp
+          Environment:
+            - Name: OLLAMA_HOST
+              Value: '0.0.0.0:11434'
+          # Startup command to pull the embedding model
+          EntryPoint:
+            - /bin/sh
+            - -c
+          Command:
+            - !Sub |
+              set -e
+              echo "Starting Ollama..."
+              # Start Ollama in background
+              ollama serve &
+              OLLAMA_PID=$!
+              
+              # Wait for Ollama to be ready (up to 2 minutes)
+              echo "Waiting for Ollama to be ready..."
+              i=1
+              while [ $i -le 60 ]; do
+                if ollama list >/dev/null 2>&1; then
+                  echo "Ollama is ready!"
+                  break
+                fi
+                if [ $i -eq 60 ]; then
+                  echo "Warning: Ollama did not become ready in time"
+                  break
+                fi
+                sleep 2
+                i=$((i+1))
+              done
+              
+              # Pull the embedding model if not already available
+              MODEL_NAME="${EmbeddingModel}"
+              echo "Checking for model: $MODEL_NAME"
+              if ! ollama list 2>/dev/null | grep -q "$MODEL_NAME"; then
+                echo "Pulling embedding model: $MODEL_NAME"
+                ollama pull "$MODEL_NAME" || echo "Warning: Failed to pull model $MODEL_NAME"
+              else
+                echo "Model $MODEL_NAME already available"
+              fi
+              
+              # Verify model is available
+              echo "Available models:"
+              ollama list || echo "Warning: Failed to list models"
+              
+              # Keep Ollama running in foreground
+              wait $OLLAMA_PID
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref OllamaLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ollama
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - 'ollama list >/dev/null 2>&1 || exit 1'
+            Interval: 30
+            Timeout: 10
+            Retries: 3
+            StartPeriod: 300
+
+  OllamaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/isms-${Environment}-ollama'
+      RetentionInDays: 7
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-ollama-logs'
+        - Key: Environment
+          Value: !Ref Environment
+
+  OllamaServiceDiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: ollama
+      NamespaceId: !Ref ServiceDiscoveryNamespaceId
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 60
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+
+  OllamaService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - OllamaTaskDefinition
+      - OllamaServiceDiscoveryService
+    Properties:
+      ServiceName: !Sub 'isms-${Environment}-ollama'
+      Cluster: !Ref ClusterName
+      TaskDefinition: !Ref OllamaTaskDefinition
+      DesiredCount: !Ref MinTaskCount
+      EnableExecuteCommand: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnet1Id
+            - !Ref PrivateSubnet2Id
+          SecurityGroups:
+            - !Ref ECSSecurityGroupId
+      ServiceRegistries:
+        - RegistryArn: !GetAtt OllamaServiceDiscoveryService.Arn
+      HealthCheckGracePeriodSeconds: 180
+      CapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 100
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-ollama'
+        - Key: Environment
+          Value: !Ref Environment
+
+  OllamaAutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn:
+      - OllamaService
+    Properties:
+      MaxCapacity: !Ref MaxTaskCount
+      MinCapacity: !Ref MinTaskCount
+      ResourceId: !Sub 'service/${ClusterName}/isms-${Environment}-ollama'
+      RoleARN: !Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService'
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+Outputs:
+  OllamaServiceName:
+    Description: Ollama service name
+    Value: !Ref OllamaService
+    Export:
+      Name: !Sub '${AWS::StackName}-OllamaServiceName'
+
+  OllamaServiceUrl:
+    Description: Ollama service URL (for service discovery)
+    Value: 'http://ollama.local:11434'
+    Export:
+      Name: !Sub '${AWS::StackName}-OllamaServiceUrl'
+
+  OllamaTaskDefinitionArn:
+    Description: Ollama task definition ARN
+    Value: !Ref OllamaTaskDefinition
+    Export:
+      Name: !Sub '${AWS::StackName}-OllamaTaskDefinitionArn'
+

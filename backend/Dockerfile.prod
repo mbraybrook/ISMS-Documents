@@ -38,13 +38,13 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies + Prisma CLI (needed for migrations)
+# Install production dependencies + Prisma CLI (needed for migrations) + tsx (needed for scripts)
 # Use BuildKit cache mount for npm dependencies
-# Prisma CLI is in devDependencies, so we install it separately
+# Prisma CLI and tsx are in devDependencies, so we install them separately
 # Note: Using npm install instead of npm ci since package-lock.json may not exist
 RUN --mount=type=cache,target=/root/.npm \
     npm install --only=production && \
-    npm install prisma@^5.7.1 --no-save
+    npm install prisma@^5.7.1 tsx --no-save
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
@@ -57,6 +57,10 @@ RUN mkdir -p prisma/migrations && \
 
 # Copy scripts needed at runtime
 COPY scripts ./scripts
+
+# Copy src directory for scripts that use tsx (like backfill-control-embeddings)
+# These scripts need TypeScript source files to run
+COPY --from=builder /app/src ./src
 
 # Copy and make startup scripts executable
 COPY scripts/start.sh /usr/local/bin/start.sh
