@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "prebuild": "npm run db:generate",
     "build": "tsc",
+    "prettype-check": "npm run db:generate",
     "type-check": "tsc --noEmit",
     "start": "node dist/index.js",
     "test": "jest",
