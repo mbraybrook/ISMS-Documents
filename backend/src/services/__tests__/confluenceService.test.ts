@@ -66,7 +66,7 @@ describe('confluenceService', () => {
       const url = confluenceService.generateConfluenceUrl(baseUrl, spaceKey, pageId);
 
       // Assert
-      expect(url).toBe('https://test.atlassian.net/pages/viewpage.action?pageId=page-123');
+      expect(url).toBe('https://test.atlassian.net/wiki/spaces/TEST/pages/page-123');
     });
 
     it('should handle different base URLs', () => {
@@ -79,7 +79,7 @@ describe('confluenceService', () => {
       const url = confluenceService.generateConfluenceUrl(baseUrl, spaceKey, pageId);
 
       // Assert
-      expect(url).toBe('https://company.atlassian.net/pages/viewpage.action?pageId=page-456');
+      expect(url).toBe('https://company.atlassian.net/wiki/spaces/SPACE/pages/page-456');
     });
   });
 

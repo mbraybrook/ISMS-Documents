@@ -35,6 +35,7 @@ import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
 import { generateCSV } from '../utils/tableUtils';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Asset {
   id: string;
@@ -75,6 +76,7 @@ interface Classification {
 }
 
 export function AssetsPage() {
+  usePageTitle('Assets', true);
   const toast = useToast();
   const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);

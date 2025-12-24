@@ -51,6 +51,7 @@ import { SearchIcon, EditIcon, DeleteIcon, AddIcon, ChevronDownIcon, ChevronUpIc
 import { Link as RouterLink } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Risk {
   id: string;
@@ -76,6 +77,7 @@ interface Legislation {
 }
 
 export function LegislationPage() {
+  usePageTitle('Legislation', true);
   const toast = useToast();
   const { user } = useAuth();
   const [legislation, setLegislation] = useState<Legislation[]>([]);

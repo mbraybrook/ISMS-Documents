@@ -38,7 +38,7 @@ describe('DocumentReviewDates', () => {
       ownerUserId: 'user-1',
     };
 
-    it('should display review dates as text', () => {
+    it('should display editable date inputs for existing documents', () => {
       render(
         <DocumentReviewDates
           formData={mockFormData}
@@ -49,13 +49,17 @@ describe('DocumentReviewDates', () => {
         />
       );
 
-      expect(screen.getByText(/Last Review Date/i)).toBeInTheDocument();
-      expect(screen.getByText(/Next Review Date/i)).toBeInTheDocument();
-      expect(screen.queryByLabelText('Last Review Date')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Next Review Date')).not.toBeInTheDocument();
+      const lastReviewInput = screen.getByLabelText('Last Review Date');
+      const nextReviewInput = screen.getByLabelText('Next Review Date');
+
+      expect(lastReviewInput).toHaveAttribute('type', 'date');
+      expect(nextReviewInput).toHaveAttribute('type', 'date');
+      expect(lastReviewInput).not.toHaveAttribute('readonly');
+      expect(nextReviewInput).not.toHaveAttribute('readonly');
     });
 
-    it('should show helper text about version updates', () => {
+    it('should call onChange when dates change for existing documents', async () => {
+      const user = userEvent.setup();
       render(
         <DocumentReviewDates
           formData={mockFormData}
@@ -66,10 +70,19 @@ describe('DocumentReviewDates', () => {
         />
       );
 
-      expect(screen.getByText(/Review dates are updated when you update the document version/i)).toBeInTheDocument();
+      const nextReviewInput = screen.getByLabelText('Next Review Date');
+      await user.clear(nextReviewInput);
+      await user.type(nextReviewInput, '2026-01-01');
+
+      // The onChange is called multiple times during typing, check the last call
+      const calls = mockOnChange.mock.calls;
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall[0]).toHaveProperty('nextReviewDate');
+      // The value might be partial during typing, so just verify onChange was called
+      expect(mockOnChange).toHaveBeenCalled();
     });
 
-    it('should not show helper text when readOnly', () => {
+    it('should disable inputs when readOnly is true for existing documents', () => {
       render(
         <DocumentReviewDates
           formData={mockFormData}
@@ -80,7 +93,11 @@ describe('DocumentReviewDates', () => {
         />
       );
 
-      expect(screen.queryByText(/Review dates are updated when you update the document version/i)).not.toBeInTheDocument();
+      const lastReviewInput = screen.getByLabelText('Last Review Date');
+      const nextReviewInput = screen.getByLabelText('Next Review Date');
+
+      expect(lastReviewInput).toHaveAttribute('readonly');
+      expect(nextReviewInput).toHaveAttribute('readonly');
     });
   });
 

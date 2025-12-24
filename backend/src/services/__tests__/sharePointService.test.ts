@@ -517,6 +517,141 @@ describe('sharePointService', () => {
       consoleSpy.mockRestore();
     });
 
+    it('should parse Excel document URL with :x: segment using direct path', async () => {
+      // Arrange
+      const url =
+        'https://paythrultd.sharepoint.com/:x:/r/sites/Compliance/Shared%20Documents/Paythru%20ISMS/Clauses/RM-ISMS_SoA.xlsx?d=w8aa9fe66e14f4ba9834603dd7ec8f569&csf=1&web=1&e=tY262F';
+      const mockDriveItem = {
+        id: 'item-1',
+        name: 'RM-ISMS_SoA.xlsx',
+        webUrl: 'https://paythrultd.sharepoint.com/sites/Compliance/Shared%20Documents/Paythru%20ISMS/Clauses/RM-ISMS_SoA.xlsx',
+        parentReference: {
+          siteId: 'site-1',
+          driveId: 'drive-1',
+        },
+      };
+      mockApi.get
+        .mockRejectedValueOnce(new Error('Shares endpoint failed'))
+        .mockResolvedValueOnce(mockDriveItem);
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+      // Act
+      const result = await sharePointService.parseSharePointUrl('token', url);
+
+      // Assert
+      expect(mockGraphClient.api).toHaveBeenCalledWith(
+        expect.stringContaining('/sites/paythrultd.sharepoint.com:/sites/Compliance/Shared Documents/Paythru ISMS/Clauses/RM-ISMS_SoA.xlsx:/driveItem')
+      );
+      expect(result).toEqual({
+        siteId: 'site-1',
+        driveId: 'drive-1',
+        itemId: 'item-1',
+        name: 'RM-ISMS_SoA.xlsx',
+        webUrl: mockDriveItem.webUrl,
+      });
+      consoleSpy.mockRestore();
+    });
+
+    it('should parse Excel document URL with :x: segment using fallback search when direct path fails', async () => {
+      // Arrange
+      const url =
+        'https://paythrultd.sharepoint.com/:x:/r/sites/Compliance/Shared%20Documents/Paythru%20ISMS/Clauses/RM-ISMS_SoA.xlsx?d=w8aa9fe66e14f4ba9834603dd7ec8f569&csf=1&web=1&e=tY262F';
+      const mockSite = {
+        id: 'site-1',
+      };
+      const mockDriveItem = {
+        id: 'item-1',
+        name: 'RM-ISMS_SoA.xlsx',
+        webUrl: 'https://paythrultd.sharepoint.com/sites/Compliance/Shared%20Documents/Paythru%20ISMS/Clauses/RM-ISMS_SoA.xlsx',
+        parentReference: {
+          siteId: 'site-1',
+          driveId: 'drive-1',
+        },
+      };
+      const mockSearchResults = {
+        value: [mockDriveItem],
+      };
+      mockApi.get
+        .mockRejectedValueOnce(new Error('Shares endpoint failed'))
+        .mockRejectedValueOnce(new Error('Direct path failed'))
+        .mockResolvedValueOnce(mockSite)
+        .mockResolvedValueOnce(mockSearchResults);
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+      // Act
+      const result = await sharePointService.parseSharePointUrl('token', url);
+
+      // Assert
+      expect(mockGraphClient.api).toHaveBeenCalledWith(
+        expect.stringContaining('/sites/paythrultd.sharepoint.com:/sites/Compliance')
+      );
+      expect(mockGraphClient.api).toHaveBeenCalledWith(
+        expect.stringContaining('/sites/site-1/drive/root/search')
+      );
+      expect(result).toEqual({
+        siteId: 'site-1',
+        driveId: 'drive-1',
+        itemId: 'item-1',
+        name: 'RM-ISMS_SoA.xlsx',
+        webUrl: mockDriveItem.webUrl,
+      });
+      consoleSpy.mockRestore();
+    });
+
+    it('should parse Word document URL with :w: segment using site and filename search', async () => {
+      // Arrange
+      const url =
+        'https://paythrultd.sharepoint.com/:w:/r/sites/Compliance/_layouts/15/Doc.aspx?sourcedoc=%7B6A5651B5-4B0D-4E4F-860C-86C2EE320762%7D&file=System%20planning%20and%20acceptance.docx';
+      const mockSite = {
+        id: 'site-1',
+      };
+      const mockDrives = {
+        value: [
+          {
+            id: 'drive-1',
+          },
+        ],
+      };
+      const mockDriveItem = {
+        id: 'item-1',
+        name: 'System planning and acceptance.docx',
+        webUrl: 'https://paythrultd.sharepoint.com/sites/Compliance/Shared%20Documents/System%20planning%20and%20acceptance.docx',
+        parentReference: {
+          siteId: 'site-1',
+          driveId: 'drive-1',
+        },
+      };
+      const mockSearchResults = {
+        value: [mockDriveItem],
+      };
+      mockApi.get
+        .mockRejectedValueOnce(new Error('Shares endpoint failed'))
+        .mockResolvedValueOnce(mockSite)
+        .mockResolvedValueOnce(mockDrives)
+        .mockRejectedValueOnce(new Error('Item by ID failed'))
+        .mockResolvedValueOnce(mockSearchResults);
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+      // Act
+      const result = await sharePointService.parseSharePointUrl('token', url);
+
+      // Assert
+      expect(mockGraphClient.api).toHaveBeenCalledWith(
+        expect.stringContaining('/sites/paythrultd.sharepoint.com:/sites/Compliance')
+      );
+      expect(mockGraphClient.api).toHaveBeenCalledWith(
+        expect.stringContaining('/sites/site-1/drives')
+      );
+      expect(result).toEqual({
+        siteId: 'site-1',
+        driveId: 'drive-1',
+        itemId: 'item-1',
+        name: 'System planning and acceptance.docx',
+        webUrl: mockDriveItem.webUrl,
+      });
+      consoleSpy.mockRestore();
+    });
+
     it('should return null when all parsing attempts fail', async () => {
       // Arrange
       const url = 'https://invalid-url.com';

@@ -49,6 +49,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { DataTable, Column, FilterConfig, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
 import { formatBoolean, generateCSV } from '../utils/tableUtils';
 import { useDebounce } from '../hooks/useDebounce';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Risk {
   id: string;
@@ -131,6 +132,7 @@ const RISK_NATURES = ['STATIC', 'INSTANCE'];
 const TREATMENT_CATEGORIES = ['RETAIN', 'MODIFY', 'SHARE', 'AVOID'];
 
 export function RisksPage() {
+  usePageTitle('Risks', true);
   const toast = useToast();
   const { user, getEffectiveRole } = useAuth();
   const effectiveRole = getEffectiveRole();

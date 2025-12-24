@@ -19,6 +19,7 @@ import {
 } from '@chakra-ui/react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface SoAExport {
   id: string;
@@ -32,6 +33,7 @@ interface SoAExport {
 }
 
 export function SoAPage() {
+  usePageTitle('Statement of Applicability', true);
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [exports, setExports] = useState<SoAExport[]>([]);

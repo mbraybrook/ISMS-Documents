@@ -159,24 +159,57 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
       setLoading(true);
 
       // Create supplier - convert isSaaS to serviceSubType for backend compatibility
+      // Include all data (risk, criticality, and compliance) in the initial create call
+      // Note: Backend validation expects optional fields to be omitted if null, not sent as null
       const { isSaaS, ...supplierData } = step1Data;
-      const supplier = await supplierApi.createSupplier({
+      
+      // Build payload, only including fields that have values (omit null/empty)
+      const payload: any = {
         ...supplierData,
-        serviceSubType: isSaaS ? 'SAAS' : null, // Convert checkbox to enum value
         status: 'IN_ONBOARDING',
         lifecycleState: 'DRAFT',
-      });
+      };
 
-      // Update supplier with risk & criticality snapshot data first
-      const snapshotUpdate: any = {};
-      if (step2Data.riskRating) snapshotUpdate.overallRiskRating = step2Data.riskRating;
-      if (step2Data.rationale) snapshotUpdate.riskRationale = step2Data.rationale;
-      if (step3Data.criticality) snapshotUpdate.criticality = step3Data.criticality;
-      if (step3Data.rationale) snapshotUpdate.criticalityRationale = step3Data.rationale;
-      
-      if (Object.keys(snapshotUpdate).length > 0) {
-        await supplierApi.updateSupplier(supplier.id, snapshotUpdate);
+      // Add serviceSubType only if it has a value
+      if (isSaaS) {
+        payload.serviceSubType = 'SAAS';
       }
+
+      // Add risk and criticality data only if they have values
+      if (step2Data.riskRating) {
+        payload.overallRiskRating = step2Data.riskRating;
+      }
+      if (step2Data.rationale) {
+        payload.riskRationale = step2Data.rationale;
+      }
+      if (step3Data.criticality) {
+        payload.criticality = step3Data.criticality;
+      }
+      if (step3Data.rationale) {
+        payload.criticalityRationale = step3Data.rationale;
+      }
+
+      // Add compliance statuses only if they have values (not null or empty string)
+      if (step4Data.pciStatus && step4Data.pciStatus !== '') {
+        payload.pciStatus = step4Data.pciStatus;
+      }
+      if (step4Data.iso27001Status && step4Data.iso27001Status !== '') {
+        payload.iso27001Status = step4Data.iso27001Status;
+      }
+      if (step4Data.iso22301Status && step4Data.iso22301Status !== '') {
+        payload.iso22301Status = step4Data.iso22301Status;
+      }
+      if (step4Data.iso9001Status && step4Data.iso9001Status !== '') {
+        payload.iso9001Status = step4Data.iso9001Status;
+      }
+      if (step4Data.gdprStatus && step4Data.gdprStatus !== '') {
+        payload.gdprStatus = step4Data.gdprStatus;
+      }
+      if (step4Data.complianceEvidenceLinks.length > 0) {
+        payload.complianceEvidenceLinks = step4Data.complianceEvidenceLinks;
+      }
+
+      const supplier = await supplierApi.createSupplier(payload);
 
       // Create risk assessment (non-blocking - continue even if it fails)
       if (step2Data.riskRating) {
@@ -205,17 +238,6 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
           console.warn('Failed to create criticality assessment (non-critical):', assessmentError);
           // Continue - assessment creation is not critical for supplier creation
         }
-      }
-
-      // Update supplier with compliance data (non-blocking)
-      try {
-        await supplierApi.updateSupplier(supplier.id, {
-          ...step4Data,
-          complianceEvidenceLinks: step4Data.complianceEvidenceLinks.length > 0 ? step4Data.complianceEvidenceLinks : null,
-        });
-      } catch (complianceError: any) {
-        console.warn('Failed to update compliance data (non-critical):', complianceError);
-        // Continue - compliance update is not critical for supplier creation
       }
 
       toast({
@@ -412,7 +434,10 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
                 <FormLabel>PCI Status</FormLabel>
                 <Select
                   value={step4Data.pciStatus || ''}
-                  onChange={(e) => setStep4Data({ ...step4Data, pciStatus: e.target.value as PciStatus || null })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setStep4Data({ ...step4Data, pciStatus: value === '' ? null : (value as PciStatus) });
+                  }}
                 >
                   <option value="">Unknown</option>
                   <option value="PASS">Pass</option>
@@ -425,7 +450,10 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
                 <FormLabel>ISO 27001 Status</FormLabel>
                 <Select
                   value={step4Data.iso27001Status || ''}
-                  onChange={(e) => setStep4Data({ ...step4Data, iso27001Status: e.target.value as IsoStatus || null })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setStep4Data({ ...step4Data, iso27001Status: value === '' ? null : (value as IsoStatus) });
+                  }}
                 >
                   <option value="">Unknown</option>
                   <option value="CERTIFIED">Certified</option>
@@ -439,7 +467,10 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
                 <FormLabel>ISO 22301 Status</FormLabel>
                 <Select
                   value={step4Data.iso22301Status || ''}
-                  onChange={(e) => setStep4Data({ ...step4Data, iso22301Status: e.target.value as IsoStatus || null })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setStep4Data({ ...step4Data, iso22301Status: value === '' ? null : (value as IsoStatus) });
+                  }}
                 >
                   <option value="">Unknown</option>
                   <option value="CERTIFIED">Certified</option>
@@ -453,7 +484,10 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
                 <FormLabel>ISO 9001 Status</FormLabel>
                 <Select
                   value={step4Data.iso9001Status || ''}
-                  onChange={(e) => setStep4Data({ ...step4Data, iso9001Status: e.target.value as IsoStatus || null })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setStep4Data({ ...step4Data, iso9001Status: value === '' ? null : (value as IsoStatus) });
+                  }}
                 >
                   <option value="">Unknown</option>
                   <option value="CERTIFIED">Certified</option>
@@ -467,7 +501,10 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
                 <FormLabel>GDPR Status</FormLabel>
                 <Select
                   value={step4Data.gdprStatus || ''}
-                  onChange={(e) => setStep4Data({ ...step4Data, gdprStatus: e.target.value as GdprStatus || null })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setStep4Data({ ...step4Data, gdprStatus: value === '' ? null : (value as GdprStatus) });
+                  }}
                 >
                   <option value="">Unknown</option>
                   <option value="ADEQUATE">Adequate</option>

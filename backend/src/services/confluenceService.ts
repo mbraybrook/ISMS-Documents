@@ -122,13 +122,14 @@ export async function listConfluencePages(
 
 /**
  * Generate Confluence URL for a page
+ * Format: ${baseUrl}/wiki/spaces/${spaceKey}/pages/${pageId}
  */
 export function generateConfluenceUrl(
   baseUrl: string,
   spaceKey: string,
   pageId: string
 ): string {
-  return `${baseUrl}/pages/viewpage.action?pageId=${pageId}`;
+  return `${baseUrl}/wiki/spaces/${spaceKey}/pages/${pageId}`;
 }
 
 /**

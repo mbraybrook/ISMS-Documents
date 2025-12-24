@@ -46,6 +46,7 @@ import { SetReviewDateModal } from '../components/SetReviewDateModal';
 import { DocumentFormModal } from '../components/DocumentFormModal';
 import { VersionUpdateModal } from '../components/VersionUpdateModal';
 import { useAuth } from '../contexts/AuthContext';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface ReviewTask {
   id: string;
@@ -121,6 +122,7 @@ interface DashboardData {
 }
 
 export function ReviewsPage() {
+  usePageTitle('Reviews', true);
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);

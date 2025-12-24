@@ -2,8 +2,10 @@ import { Box, Button, Heading, VStack, Text } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { DataSensitivityFooter } from '../components/DataSensitivityFooter';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export function UnauthorizedPage() {
+  usePageTitle('Unauthorized', true);
   const navigate = useNavigate();
   const { getEffectiveRole } = useAuth();
 

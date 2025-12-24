@@ -2,8 +2,10 @@ import { Box, Heading, VStack, Text, Badge, Button } from '@chakra-ui/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getDepartmentDisplayName } from '../types/risk';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export function ProfilePage() {
+  usePageTitle('Profile', true);
   const { user, logout, getUserDepartment } = useAuth();
   const navigate = useNavigate();
 

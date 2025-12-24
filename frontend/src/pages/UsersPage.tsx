@@ -30,6 +30,7 @@ import {
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import { Department, getDepartmentDisplayName } from '../types/risk';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 type UserRole = 'ADMIN' | 'EDITOR' | 'STAFF' | 'CONTRIBUTOR';
 
@@ -42,6 +43,7 @@ interface User {
 }
 
 export function UsersPage() {
+  usePageTitle('Users', true);
   const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);

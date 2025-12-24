@@ -22,6 +22,7 @@ import { TrustCenterStats } from '../components/TrustCenterStats';
 import { TrustCenterCertifications } from '../components/TrustCenterCertifications';
 import { TrustCenterDocumentation } from '../components/TrustCenterDocumentation';
 import { TrustCenterFooter } from '../components/TrustCenterFooter';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface TrustCenterSupplier {
   id: string;
@@ -32,6 +33,7 @@ interface TrustCenterSupplier {
 }
 
 export function TrustCenterPage() {
+  usePageTitle('Trust Centre', false);
   const { isAuthenticated, hasAcceptedTerms } = useTrustAuth();
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<TrustCategoryGroup[]>([]);

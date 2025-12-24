@@ -47,6 +47,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Risk } from '../types/risk';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface AssetCategory {
   id: string;
@@ -61,6 +62,7 @@ interface AssetCategory {
 }
 
 export function AssetCategoriesPage() {
+  usePageTitle('Asset Categories', true);
   const toast = useToast();
   const { user } = useAuth();
   const [categories, setCategories] = useState<AssetCategory[]>([]);

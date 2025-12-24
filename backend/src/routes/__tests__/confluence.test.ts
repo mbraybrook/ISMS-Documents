@@ -300,7 +300,7 @@ describe('Confluence API', () => {
   describe('GET /api/confluence/url', () => {
     it('should return generated Confluence URL when baseUrl is configured', async () => {
       // Arrange
-      const expectedUrl = 'https://confluence.example.com/pages/viewpage.action?pageId=page-123';
+      const expectedUrl = 'https://confluence.example.com/wiki/spaces/TEST/pages/page-123';
       (generateConfluenceUrl as jest.Mock).mockReturnValue(expectedUrl);
 
       // Act

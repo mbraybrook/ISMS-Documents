@@ -214,6 +214,71 @@ export async function listSharePointItems(
 }
 
 /**
+ * Search for items in a SharePoint drive
+ * Searches across the entire drive (always from root for comprehensive results)
+ */
+export async function searchSharePointItems(
+  accessToken: string,
+  siteId: string,
+  driveId: string,
+  query: string,
+  _folderId?: string // Kept for API compatibility but search always uses root
+): Promise<SharePointItem[]> {
+  try {
+    const client = createGraphClient(accessToken);
+    // Always search from root - SharePoint search typically searches the entire drive
+    const apiPath = `/sites/${siteId}/drives/${driveId}/root/search(q='${encodeURIComponent(query)}')`;
+
+    // Add query parameters to select specific fields
+    const queryParams = new URLSearchParams({
+      $select: 'id,name,webUrl,lastModifiedDateTime,createdDateTime,size,folder,file,createdBy,lastModifiedBy',
+      $top: '1000', // Limit to 1000 results
+    });
+    const apiPathWithQuery = `${apiPath}?${queryParams.toString()}`;
+    
+    console.log('[SharePointService] Searching items:', {
+      apiPath: apiPathWithQuery,
+      query,
+      siteId,
+      driveId,
+    });
+
+    const response = await client.api(apiPathWithQuery).get();
+    const items = (response.value || []) as SharePointItem[];
+    
+    console.log('[SharePointService] Search results:', {
+      itemCount: items.length,
+      query,
+      siteId,
+      driveId,
+    });
+
+    return items;
+  } catch (error: any) {
+    const errorDetails: any = {
+      error: error.message,
+      code: error.code,
+      statusCode: error.statusCode,
+      status: error.status,
+      body: error.body,
+      query,
+      siteId,
+      driveId,
+    };
+
+    // Check for permission-related errors
+    if (error.statusCode === 403 || error.statusCode === 401) {
+      errorDetails.permissionIssue = true;
+      errorDetails.suggestion = 'Check that the token has Sites.Read.All and Files.Read.All scopes, and that admin consent has been granted';
+    }
+
+    console.error('[SharePointService] Error searching SharePoint items:', errorDetails);
+    // Re-throw the error so the route handler can handle it properly
+    throw error;
+  }
+}
+
+/**
  * Generate SharePoint URL for an item
  * If accessToken is provided, attempts to fetch the actual webUrl from SharePoint
  * Otherwise returns null (cannot generate a valid web URL without access token)
@@ -445,29 +510,191 @@ export async function parseSharePointUrl(
       console.log('Shares endpoint failed, trying direct URL parsing:', shareError);
     }
     
-    // Alternative: Parse URL and use /sites endpoint
-    // Extract hostname and server-relative path from URL
+    // Parse URL to extract components
     const urlObj = new URL(url);
     const hostname = urlObj.hostname;
     const pathname = decodeURIComponent(urlObj.pathname);
+    const searchParams = urlObj.searchParams;
     
-    // Try to get the drive item using the path
-    try {
-      const driveItem = await client
-        .api(`/sites/${hostname}:${pathname}:/driveItem`)
-        .get();
-      
-      if (driveItem.parentReference) {
-        return {
-          siteId: driveItem.parentReference.siteId,
-          driveId: driveItem.parentReference.driveId,
-          itemId: driveItem.id,
-          name: driveItem.name,
-          webUrl: driveItem.webUrl,
-        };
+    // Check if this is a document URL with :x:, :w:, :p:, :t: segments or _layouts
+    // Pattern: /:x:/r/path/to/file or /:w:/r/path/to/file
+    const documentTypeMatch = pathname.match(/\/:([xwpt]):\/r\/(.+)/);
+    const isLayoutsUrl = pathname.includes('_layouts');
+    
+    // Prioritize _layouts URLs even if they have :w: segments, as they use query parameters
+    if (isLayoutsUrl) {
+      // This is a _layouts URL (e.g., /:w:/r/sites/Compliance/_layouts/15/Doc.aspx?sourcedoc=...)
+      // Extract site name from path (e.g., /sites/Compliance from /:w:/r/sites/Compliance/...)
+      const siteMatch = pathname.match(/\/sites\/([^/]+)/);
+      if (siteMatch) {
+        const siteName = siteMatch[1];
+        const serverRelativePath = `/sites/${siteName}`;
+        
+        try {
+          // Get the site
+          const site = await client
+            .api(`/sites/${hostname}:${serverRelativePath}`)
+            .get();
+          
+          // Get the default drive for the site
+          const drives = await client
+            .api(`/sites/${site.id}/drives`)
+            .get();
+          
+          if (drives.value && drives.value.length > 0) {
+            const driveId = drives.value[0].id;
+            
+            // Try to extract document GUID from sourcedoc parameter
+            const sourcedoc = searchParams.get('sourcedoc');
+            if (sourcedoc) {
+              // Remove curly braces from GUID (keep hyphens)
+              const documentId = sourcedoc.replace(/[{}]/g, '');
+              
+              try {
+                // Try to get the item by ID
+                const driveItem = await client
+                  .api(`/drives/${driveId}/items/${documentId}`)
+                  .get();
+                
+                if (driveItem.parentReference) {
+                  return {
+                    siteId: driveItem.parentReference.siteId || site.id,
+                    driveId: driveItem.parentReference.driveId || driveId,
+                    itemId: driveItem.id,
+                    name: driveItem.name,
+                    webUrl: driveItem.webUrl,
+                  };
+                }
+              } catch (itemError) {
+                console.log('Failed to get item by ID, trying search:', itemError);
+              }
+            }
+            
+            // If we can't get by ID, try searching by filename
+            const filename = searchParams.get('file');
+            if (filename) {
+              try {
+                // Search for the file in the drive using the correct Graph API syntax
+                const searchQuery = encodeURIComponent(filename);
+                const searchResults = await client
+                  .api(`/sites/${site.id}/drive/root/search(q='${searchQuery}')`)
+                  .get();
+                
+                if (searchResults.value && searchResults.value.length > 0) {
+                  // Find exact match by filename
+                  const exactMatch = searchResults.value.find(
+                    (item: any) => item.name === filename
+                  );
+                  const driveItem = exactMatch || searchResults.value[0];
+                  
+                  if (driveItem.parentReference) {
+                    return {
+                      siteId: driveItem.parentReference.siteId || site.id,
+                      driveId: driveItem.parentReference.driveId || driveId,
+                      itemId: driveItem.id,
+                      name: driveItem.name,
+                      webUrl: driveItem.webUrl,
+                    };
+                  }
+                }
+              } catch (searchError) {
+                console.log('File search failed:', searchError);
+              }
+            }
+          }
+        } catch (siteError) {
+          console.log('Site-based parsing failed:', siteError);
+        }
       }
-    } catch (pathError) {
-      console.log('Direct path parsing failed:', pathError);
+    } else if (documentTypeMatch) {
+      // This is a direct file path URL (e.g., /:x:/r/sites/Compliance/Shared Documents/file.xlsx)
+      const serverRelativePath = `/${documentTypeMatch[2]}`;
+      
+      try {
+        // Try to get the drive item directly using the path
+        const driveItem = await client
+          .api(`/sites/${hostname}:${serverRelativePath}:/driveItem`)
+          .get();
+        
+        if (driveItem.parentReference) {
+          return {
+            siteId: driveItem.parentReference.siteId,
+            driveId: driveItem.parentReference.driveId,
+            itemId: driveItem.id,
+            name: driveItem.name,
+            webUrl: driveItem.webUrl,
+          };
+        }
+      } catch (pathError) {
+        console.log('Direct path parsing failed, trying site-based approach:', pathError);
+        
+        // Fallback: Extract site name and search for file
+        const siteMatch = serverRelativePath.match(/\/sites\/([^/]+)/);
+        if (siteMatch) {
+          const siteName = siteMatch[1];
+          const sitePath = `/sites/${siteName}`;
+          
+          try {
+            // Get the site
+            const site = await client
+              .api(`/sites/${hostname}:${sitePath}`)
+              .get();
+            
+            // Extract filename from path
+            const filename = serverRelativePath.split('/').pop();
+            if (filename) {
+              try {
+                // Search for the file in the drive
+                const searchQuery = encodeURIComponent(filename);
+                const searchResults = await client
+                  .api(`/sites/${site.id}/drive/root/search(q='${searchQuery}')`)
+                  .get();
+                
+                if (searchResults.value && searchResults.value.length > 0) {
+                  // Find exact match by filename
+                  const exactMatch = searchResults.value.find(
+                    (item: any) => item.name === filename
+                  );
+                  const driveItem = exactMatch || searchResults.value[0];
+                  
+                  if (driveItem.parentReference) {
+                    return {
+                      siteId: driveItem.parentReference.siteId || site.id,
+                      driveId: driveItem.parentReference.driveId,
+                      itemId: driveItem.id,
+                      name: driveItem.name,
+                      webUrl: driveItem.webUrl,
+                    };
+                  }
+                }
+              } catch (searchError) {
+                console.log('File search failed:', searchError);
+              }
+            }
+          } catch (siteError) {
+            console.log('Site-based parsing failed:', siteError);
+          }
+        }
+      }
+    } else {
+      // Standard SharePoint URL - try to get the drive item using the path
+      try {
+        const driveItem = await client
+          .api(`/sites/${hostname}:${pathname}:/driveItem`)
+          .get();
+        
+        if (driveItem.parentReference) {
+          return {
+            siteId: driveItem.parentReference.siteId,
+            driveId: driveItem.parentReference.driveId,
+            itemId: driveItem.id,
+            name: driveItem.name,
+            webUrl: driveItem.webUrl,
+          };
+        }
+      } catch (pathError) {
+        console.log('Direct path parsing failed:', pathError);
+      }
     }
     
     // Last resort: Try to get site by hostname and search for the file

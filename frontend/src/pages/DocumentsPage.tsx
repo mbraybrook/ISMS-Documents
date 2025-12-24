@@ -26,12 +26,12 @@ import {
   Checkbox,
 } from '@chakra-ui/react';
 import { DeleteIcon, ViewIcon, ExternalLinkIcon, EditIcon, RepeatIcon, BellIcon, WarningIcon, TimeIcon } from '@chakra-ui/icons';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { authService } from '../services/authService';
 import { DocumentFormModal } from '../components/DocumentFormModal';
 import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Document {
   id: string;
@@ -64,8 +64,8 @@ interface User {
 }
 
 export function DocumentsPage() {
+  usePageTitle('Documents', true);
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [allDocuments, setAllDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -978,14 +978,9 @@ export function DocumentsPage() {
       <HStack justify="space-between">
         <Heading size="lg">Documents</Heading>
         {canEdit && (
-          <HStack>
-            <Button colorScheme="green" variant="outline" onClick={() => navigate('/admin/documents/documents/import')}>
-              Mass Import
-            </Button>
-            <Button colorScheme="blue" onClick={handleCreate}>
-              Create Document
-            </Button>
-          </HStack>
+          <Button colorScheme="blue" onClick={handleCreate}>
+            Create Document
+          </Button>
         )}
       </HStack>
 

@@ -452,8 +452,8 @@ describe('Risks API', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             OR: expect.arrayContaining([
-              { title: { contains: 'test' } },
-              { description: { contains: 'test' } },
+              { title: { contains: 'test', mode: 'insensitive' } },
+              { description: { contains: 'test', mode: 'insensitive' } },
             ]),
           }),
         })

@@ -7,12 +7,14 @@ import { prisma } from '../lib/prisma';
 import {
   getSharePointItem,
   listSharePointItems,
+  searchSharePointItems,
   generateSharePointUrl,
   parseSharePointUrl,
   getDefaultDrive,
   listDrives,
   getSharePointSite,
   listUserSites,
+  SharePointItem,
 } from '../services/sharePointService';
 import { config } from '../config';
 
@@ -36,6 +38,7 @@ router.get(
     query('driveId').optional().isString(),
     query('folderPath').optional().isString(),
     query('folderId').optional().isString(),
+    query('search').optional().isString(),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -73,6 +76,7 @@ router.get(
       }
       const folderPath = req.query.folderPath as string | undefined;
       const folderId = req.query.folderId as string | undefined;
+      const searchQuery = req.query.search as string | undefined;
 
       console.log('[SharePoint] Configuration check:', {
         siteIdFromQuery: req.query.siteId,
@@ -83,6 +87,7 @@ router.get(
         driveIdUsed: driveId,
         siteIdEmpty: !siteId,
         driveIdEmpty: !driveId,
+        searchQuery,
       });
 
       if (!siteId) {
@@ -110,25 +115,46 @@ router.get(
         console.log('[SharePoint] Using default drive ID:', driveId);
       }
 
-      console.log('[SharePoint] Attempting to list items with:', {
-        siteId,
-        driveId,
-        folderPath,
-        folderId,
-      });
-
       // Try to list items - if it fails with invalid drive, try to get available drives
       try {
-        let items = await listSharePointItems(
-          accessToken,
-          siteId,
-          driveId,
-          folderPath,
-          folderId
-        );
+        let items: SharePointItem[];
+        
+        // If search query is provided, use search instead of listing
+        if (searchQuery && searchQuery.trim().length > 0) {
+          console.log('[SharePoint] Searching items with query:', {
+            siteId,
+            driveId,
+            searchQuery,
+            folderId,
+          });
+          
+          items = await searchSharePointItems(
+            accessToken,
+            siteId,
+            driveId,
+            searchQuery.trim(),
+            folderId
+          );
+        } else {
+          console.log('[SharePoint] Attempting to list items with:', {
+            siteId,
+            driveId,
+            folderPath,
+            folderId,
+          });
+          
+          items = await listSharePointItems(
+            accessToken,
+            siteId,
+            driveId,
+            folderPath,
+            folderId
+          );
+        }
 
         // If no items found and no drive ID was explicitly provided, try other drives
-        if (items.length === 0 && !req.query.driveId) {
+        // (but only if we're not searching - search already covers the whole drive)
+        if (items.length === 0 && !req.query.driveId && !searchQuery) {
           console.log('[SharePoint] Default drive returned empty, trying other drives...');
           const availableDrives = await listDrives(accessToken, siteId);
           const documentLibraries = availableDrives.filter((d: any) => d.driveType === 'documentLibrary');

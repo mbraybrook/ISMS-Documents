@@ -9,6 +9,8 @@ import {
   Button,
   VStack,
   FormControl,
+  FormLabel,
+  Select,
   Checkbox,
   Text,
   AlertDialog,
@@ -18,6 +20,7 @@ import {
   AlertDialogContent,
   AlertDialogOverlay,
   useToast,
+  Divider,
 } from '@chakra-ui/react';
 import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
@@ -145,12 +148,62 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4}>
+              {/* File Selection Section - First, only when creating */}
+              {!document && (
+                <>
+                  <FormControl isRequired>
+                    <FormLabel>Storage Location</FormLabel>
+                    <Select
+                      value={formData.storageLocation}
+                      onChange={(e) => handleFormChange({ storageLocation: e.target.value })}
+                      isDisabled={readOnly}
+                    >
+                      <option value="SHAREPOINT">SharePoint</option>
+                      <option value="CONFLUENCE">Confluence</option>
+                    </Select>
+                  </FormControl>
+
+                  {formData.storageLocation === 'SHAREPOINT' && (
+                    <SharePointDocumentSection
+                      formData={formData}
+                      readOnly={readOnly}
+                      document={document}
+                      onFileSelect={sharePointIntegration.handleFileSelect}
+                      onUrlParse={sharePointIntegration.handleParseUrl}
+                      sharePointUrl={sharePointIntegration.sharePointUrl}
+                      setSharePointUrl={sharePointIntegration.setSharePointUrl}
+                      parsingUrl={sharePointIntegration.parsingUrl}
+                      urlError={sharePointIntegration.urlError}
+                      setUrlError={sharePointIntegration.setUrlError}
+                      documentUrl={sharePointIntegration.documentUrl}
+                      loadingUrl={sharePointIntegration.loadingUrl}
+                      showReplaceOptions={sharePointIntegration.showReplaceOptions}
+                      onToggleReplace={() => sharePointIntegration.setShowReplaceOptions(!sharePointIntegration.showReplaceOptions)}
+                      browserOpen={sharePointIntegration.browserOpen}
+                      setBrowserOpen={sharePointIntegration.setBrowserOpen}
+                    />
+                  )}
+
+                  {formData.storageLocation === 'CONFLUENCE' && (
+                    <ConfluenceDocumentSection
+                      formData={formData}
+                      onChange={handleFormChange}
+                      readOnly={readOnly}
+                    />
+                  )}
+
+                  <Divider />
+                </>
+              )}
+
+              {/* Document Details Section */}
               <DocumentFormFields
                 formData={formData}
                 onChange={handleFormChange}
                 readOnly={readOnly}
                 onVersionUpdateClick={modals.onVersionUpdateOpen}
                 document={document}
+                hideStorageLocation={!document}
               />
 
               {canEditOwner && (
@@ -163,7 +216,8 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                 />
               )}
 
-              {formData.storageLocation === 'SHAREPOINT' && (
+              {/* File Selection Section - For edit mode */}
+              {document && formData.storageLocation === 'SHAREPOINT' && (
                 <SharePointDocumentSection
                   formData={formData}
                   readOnly={readOnly}
@@ -184,7 +238,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                 />
               )}
 
-              {formData.storageLocation === 'CONFLUENCE' && (
+              {document && formData.storageLocation === 'CONFLUENCE' && (
                 <ConfluenceDocumentSection
                   formData={formData}
                   onChange={handleFormChange}

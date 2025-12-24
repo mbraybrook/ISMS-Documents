@@ -40,8 +40,10 @@ import {
 } from '@chakra-ui/react';
 import { AxiosError } from 'axios';
 import { acknowledgmentApi, AcknowledgmentStats, DocumentAcknowledgmentDetails } from '../services/api';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export function AcknowledgmentReportingPage() {
+  usePageTitle('Acknowledgment Reporting', true);
   const [stats, setStats] = useState<AcknowledgmentStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [documentDetails, setDocumentDetails] = useState<DocumentAcknowledgmentDetails | null>(null);

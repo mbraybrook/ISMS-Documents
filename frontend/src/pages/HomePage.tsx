@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowForwardIcon } from '@chakra-ui/icons';
 import api, { riskDashboardApi } from '../services/api';
 import { RiskDashboardSummary } from '../types/riskDashboard';
+import { usePageTitle } from '../hooks/usePageTitle';
 import {
   PieChart,
   Pie,
@@ -101,6 +102,7 @@ interface DashboardData {
 }
 
 export function HomePage() {
+  usePageTitle('Dashboard', true);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [riskDashboardData, setRiskDashboardData] = useState<RiskDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);

@@ -23,6 +23,7 @@ import {
 } from '@chakra-ui/react';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import api from '../services/api';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Document {
   id: string;
@@ -48,6 +49,7 @@ interface User {
 }
 
 export function StaffDocumentsPage() {
+  usePageTitle('Staff Documents', true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [allDocuments, setAllDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
