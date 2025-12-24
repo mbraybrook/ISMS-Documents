@@ -119,4 +119,3 @@ Update to mention microservices:
 
 - Keep existing content structure where possible
 - Add new sections for microservices without removing important existing information
-- Ensure environment variable examples include microservice URLs
