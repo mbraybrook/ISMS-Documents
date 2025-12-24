@@ -17,7 +17,7 @@
     "test:ci": "npm run test:ci --workspace=backend && npm run test:coverage --workspace=frontend",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend",
+    "lint": "npm run type-check --workspace=backend && npm run lint --workspace=backend && npm run type-check --workspace=frontend && npm run lint --workspace=frontend",
     "lint:check": "npm run lint:check --workspace=backend && npm run lint:check --workspace=frontend",
     "lint:fix": "npm run lint:fix --workspace=frontend && npm run lint:fix --workspace=backend",
     "lint:track": "node scripts/track-warnings.js",

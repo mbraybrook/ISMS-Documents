@@ -189,20 +189,20 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
         payload.criticalityRationale = step3Data.rationale;
       }
 
-      // Add compliance statuses only if they have values (not null or empty string)
-      if (step4Data.pciStatus && step4Data.pciStatus !== '') {
+      // Add compliance statuses only if they have values (not null)
+      if (step4Data.pciStatus) {
         payload.pciStatus = step4Data.pciStatus;
       }
-      if (step4Data.iso27001Status && step4Data.iso27001Status !== '') {
+      if (step4Data.iso27001Status) {
         payload.iso27001Status = step4Data.iso27001Status;
       }
-      if (step4Data.iso22301Status && step4Data.iso22301Status !== '') {
+      if (step4Data.iso22301Status) {
         payload.iso22301Status = step4Data.iso22301Status;
       }
-      if (step4Data.iso9001Status && step4Data.iso9001Status !== '') {
+      if (step4Data.iso9001Status) {
         payload.iso9001Status = step4Data.iso9001Status;
       }
-      if (step4Data.gdprStatus && step4Data.gdprStatus !== '') {
+      if (step4Data.gdprStatus) {
         payload.gdprStatus = step4Data.gdprStatus;
       }
       if (step4Data.complianceEvidenceLinks.length > 0) {
