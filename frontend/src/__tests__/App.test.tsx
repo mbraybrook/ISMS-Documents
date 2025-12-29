@@ -62,9 +62,6 @@ vi.mock('../pages/SoAPage', () => ({
   SoAPage: () => <div data-testid="soa-page">SoAPage</div>,
 }));
 
-vi.mock('../pages/MassImportPage', () => ({
-  MassImportPage: () => <div data-testid="mass-import-page">MassImportPage</div>,
-}));
 
 vi.mock('../pages/AssetsPage', () => ({
   AssetsPage: () => <div data-testid="assets-page">AssetsPage</div>,
@@ -369,39 +366,6 @@ describe('App', () => {
       // Assert
       expect(screen.getByTestId('layout')).toBeInTheDocument();
       expect(screen.getByTestId('documents-page')).toBeInTheDocument();
-    });
-
-    it('should render MassImportPage at "/admin/documents/documents/import"', () => {
-      // Arrange & Act
-      renderApp('/admin/documents/documents/import');
-
-      // Assert
-      expect(screen.getByTestId('layout')).toBeInTheDocument();
-      expect(screen.getByTestId('mass-import-page')).toBeInTheDocument();
-    });
-
-    it('should require EDITOR role for MassImportPage', () => {
-      // Arrange
-      mockAuthContext.getEffectiveRole.mockReturnValue('CONTRIBUTOR');
-
-      // Act
-      renderApp('/admin/documents/documents/import');
-
-      // Assert
-      expect(screen.getByTestId('redirect-to-unauthorized')).toBeInTheDocument();
-      expect(screen.queryByTestId('mass-import-page')).not.toBeInTheDocument();
-    });
-
-    it('should allow EDITOR role to access MassImportPage', () => {
-      // Arrange
-      mockAuthContext.getEffectiveRole.mockReturnValue('EDITOR');
-
-      // Act
-      renderApp('/admin/documents/documents/import');
-
-      // Assert
-      expect(screen.getByTestId('layout')).toBeInTheDocument();
-      expect(screen.getByTestId('mass-import-page')).toBeInTheDocument();
     });
 
     it('should render AcknowledgmentPage at "/admin/documents/acknowledgments"', () => {

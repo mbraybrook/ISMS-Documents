@@ -18,8 +18,10 @@ import { useNavigate } from 'react-router-dom';
 import { useTrustAuth } from '../contexts/TrustAuthContext';
 import { trustApi } from '../services/trustApi';
 import { DataSensitivityFooter } from '../components/DataSensitivityFooter';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export function TrustCenterLoginPage() {
+  usePageTitle('Login', false);
   const navigate = useNavigate();
   const { login } = useTrustAuth();
   const toast = useToast();

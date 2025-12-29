@@ -41,6 +41,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { trustApi } from '../services/trustApi';
 import type { ExternalUser, TrustDocSetting, TrustDocument, UserDetails } from '../types/trust';
 import { AxiosError } from 'axios';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 // Certification Form Component
 function CertificationForm({
@@ -165,6 +166,7 @@ function CertificationForm({
 }
 
 export function TrustCenterAdminPage() {
+  usePageTitle('Trust Centre Administration', true);
   const { user } = useAuth();
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();

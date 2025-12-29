@@ -21,6 +21,7 @@ import { ControlFormModal } from '../components/ControlFormModal';
 import { DataTable, Column, FilterConfig, ActionButton, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
 import { formatBoolean, generateCSV } from '../utils/tableUtils';
 import { Control as ControlType } from '../types/control';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 // Local Control type that matches API response (without createdAt/updatedAt, and with null instead of undefined)
 interface Control {
@@ -115,6 +116,7 @@ const formatCategory = (category: string | null): string => {
 };
 
 export function ControlsPage() {
+  usePageTitle('Controls', true);
   const toast = useToast();
   const [controls, setControls] = useState<Control[]>([]);
   const [loading, setLoading] = useState(true);

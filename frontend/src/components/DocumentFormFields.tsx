@@ -16,6 +16,7 @@ interface DocumentFormFieldsProps {
   readOnly?: boolean;
   onVersionUpdateClick?: () => void;
   document: Document | null;
+  hideStorageLocation?: boolean;
 }
 
 export function DocumentFormFields({
@@ -24,6 +25,7 @@ export function DocumentFormFields({
   readOnly = false,
   onVersionUpdateClick,
   document,
+  hideStorageLocation = false,
 }: DocumentFormFieldsProps) {
   return (
     <>
@@ -61,17 +63,19 @@ export function DocumentFormFields({
         </Select>
       </FormControl>
 
-      <FormControl isRequired>
-        <FormLabel>Storage Location</FormLabel>
-        <Select
-          value={formData.storageLocation}
-          onChange={(e) => onChange({ storageLocation: e.target.value })}
-          isDisabled={readOnly}
-        >
-          <option value="SHAREPOINT">SharePoint</option>
-          <option value="CONFLUENCE">Confluence</option>
-        </Select>
-      </FormControl>
+      {!hideStorageLocation && (
+        <FormControl isRequired>
+          <FormLabel>Storage Location</FormLabel>
+          <Select
+            value={formData.storageLocation}
+            onChange={(e) => onChange({ storageLocation: e.target.value })}
+            isDisabled={readOnly}
+          >
+            <option value="SHAREPOINT">SharePoint</option>
+            <option value="CONFLUENCE">Confluence</option>
+          </Select>
+        </FormControl>
+      )}
 
       <FormControl isRequired>
         <FormLabel>Version</FormLabel>

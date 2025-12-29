@@ -553,6 +553,8 @@ router.put(
     body('ownerUserId').optional().isUUID(),
     body('requiresAcknowledgement').optional().isBoolean(),
     body('lastChangedDate').optional().isISO8601(),
+    body('lastReviewDate').optional().isISO8601(),
+    body('nextReviewDate').optional().isISO8601(),
     body('versionNotes').optional().isString(),
   ],
   validate,

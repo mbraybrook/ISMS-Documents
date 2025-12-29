@@ -178,11 +178,11 @@ router.get(
         where.mitigationImplemented = mitigationImplemented === 'true';
       }
       
-      // Handle search query - search in title and description
+      // Handle search query - search in title and description (case-insensitive)
       if (search) {
         where.OR = [
-          { title: { contains: search as string } },
-          { description: { contains: search as string } },
+          { title: { contains: search as string, mode: 'insensitive' } },
+          { description: { contains: search as string, mode: 'insensitive' } },
         ];
       }
 

@@ -3,8 +3,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DataSensitivityFooter } from '../components/DataSensitivityFooter';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export function LoginPage() {
+  usePageTitle('Login', true);
   const { login, isAuthenticated, user, getEffectiveRole } = useAuth();
   const navigate = useNavigate();
 

@@ -19,6 +19,7 @@ import {
 } from '@chakra-ui/react';
 import api from '../services/api';
 import { authService } from '../services/authService';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Document {
   id: string;
@@ -44,6 +45,7 @@ interface Document {
 }
 
 export function AcknowledgmentPage() {
+  usePageTitle('Acknowledgment', true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [documentUrls, setDocumentUrls] = useState<Record<string, string>>({});

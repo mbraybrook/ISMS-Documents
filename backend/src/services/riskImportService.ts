@@ -261,8 +261,9 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
               updatedAt: new Date(),
             },
           });
-          interestedPartyId = newParty.id;
-          interestedPartyMap.set(interestedPartyName.toLowerCase(), interestedPartyId);
+          const newPartyId: string = newParty.id;
+          interestedPartyId = newPartyId;
+          interestedPartyMap.set(interestedPartyName.toLowerCase(), newPartyId);
         }
         // Ensure interestedPartyId is defined (should always be after the if block)
         if (!interestedPartyId) {
@@ -292,8 +293,9 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
                 updatedAt: new Date(),
               },
             });
-            categoryId = newCategory.id;
-            assetCategoryMap.set(assetCategoryName.toLowerCase(), categoryId);
+            const newCategoryId: string = newCategory.id;
+            categoryId = newCategoryId;
+            assetCategoryMap.set(assetCategoryName.toLowerCase(), newCategoryId);
           }
           assetCategoryId = categoryId ?? null;
         }

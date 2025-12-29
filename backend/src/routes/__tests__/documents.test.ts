@@ -426,8 +426,8 @@ describe('Documents API', () => {
       prisma.document.findMany.mockResolvedValue(mockDocuments);
       prisma.document.count.mockResolvedValue(1);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
-      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/pages/viewpage.action?pageId=page-123');
-      prisma.document.update.mockResolvedValue({ ...mockDocuments[0], documentUrl: 'https://test.atlassian.net/pages/viewpage.action?pageId=page-123' });
+      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/wiki/spaces/TEST/pages/page-123');
+      prisma.document.update.mockResolvedValue({ ...mockDocuments[0], documentUrl: 'https://test.atlassian.net/wiki/spaces/TEST/pages/page-123' });
 
       await request(app)
         .get('/api/documents')
@@ -843,7 +843,7 @@ describe('Documents API', () => {
         },
       };
 
-      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/pages/viewpage.action?pageId=page-123');
+      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/wiki/spaces/TEST/pages/page-123');
       prisma.document.create.mockResolvedValue(newDocument);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 
@@ -1082,7 +1082,7 @@ describe('Documents API', () => {
       };
 
       prisma.document.findUnique.mockResolvedValue(existingDocument);
-      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/pages/viewpage.action?pageId=new-page');
+      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/wiki/spaces/NEW/pages/new-page');
       prisma.document.update.mockResolvedValue(updatedDocument);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 

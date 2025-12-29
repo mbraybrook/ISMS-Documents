@@ -296,10 +296,10 @@ router.get(
       });
 
       // Create map of entraObjectId -> local user
-      const localUserMapByEntraId = new Map(
+      const localUserMapByEntraId = new Map<string | null, User>(
         localUsers.map((u: User) => [u.entraObjectId, u])
       );
-      const localUserMapByEmail = new Map(
+      const localUserMapByEmail = new Map<string, User>(
         localUsers.map((u: User) => [u.email.toLowerCase(), u])
       );
 
@@ -490,10 +490,10 @@ router.get(
       );
 
       const localUsers = await prisma.user.findMany();
-      const localUserMapByEntraId = new Map(
+      const localUserMapByEntraId = new Map<string | null, User>(
         localUsers.map((u: User) => [u.entraObjectId, u])
       );
-      const localUserMapByEmail = new Map(
+      const localUserMapByEmail = new Map<string, User>(
         localUsers.map((u: User) => [u.email.toLowerCase(), u])
       );
 

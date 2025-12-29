@@ -196,7 +196,7 @@ describe('Assets API', () => {
       expect(prisma.asset.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            owner: { contains: 'Owner 1' },
+            owner: { contains: 'Owner 1', mode: 'insensitive' },
           }),
         })
       );
@@ -217,11 +217,11 @@ describe('Assets API', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             OR: [
-              { nameSerialNo: { contains: 'test' } },
-              { model: { contains: 'test' } },
-              { manufacturer: { contains: 'test' } },
-              { primaryUser: { contains: 'test' } },
-              { location: { contains: 'test' } },
+              { nameSerialNo: { contains: 'test', mode: 'insensitive' } },
+              { model: { contains: 'test', mode: 'insensitive' } },
+              { manufacturer: { contains: 'test', mode: 'insensitive' } },
+              { primaryUser: { contains: 'test', mode: 'insensitive' } },
+              { location: { contains: 'test', mode: 'insensitive' } },
             ],
           }),
         })

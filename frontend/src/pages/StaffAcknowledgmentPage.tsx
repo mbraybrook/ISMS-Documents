@@ -25,6 +25,7 @@ import {
 import { ExternalLinkIcon, CheckIcon } from '@chakra-ui/icons';
 import api from '../services/api';
 import { authService } from '../services/authService';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Document {
   id: string;
@@ -53,6 +54,7 @@ interface Document {
 const OVERDUE_ACKNOWLEDGMENT_DAYS = 30;
 
 export function StaffAcknowledgmentPage() {
+  usePageTitle('Staff Acknowledgment', true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [documentUrls, setDocumentUrls] = useState<Record<string, string>>({});

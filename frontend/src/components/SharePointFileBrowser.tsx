@@ -24,9 +24,14 @@ import {
   Badge,
   FormControl,
   FormLabel,
+  Input,
+  InputGroup,
+  InputLeftElement,
+  InputRightElement,
+  IconButton,
 } from '@chakra-ui/react';
-import { useState, useEffect, useRef } from 'react';
-import { ChevronRightIcon } from '@chakra-ui/icons';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { ChevronRightIcon, SearchIcon, CloseIcon } from '@chakra-ui/icons';
 import api from '../services/api';
 import { authService } from '../services/authService';
 import { sharePointApi } from '../services/api';
@@ -89,8 +94,11 @@ export function SharePointFileBrowser({
   const [currentDriveId, setCurrentDriveId] = useState<string | undefined>(driveId);
   const [availableSites, setAvailableSites] = useState<Array<{ id: string; displayName: string; name: string; webUrl: string }>>([]);
   const [loadingSites, setLoadingSites] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const initialLoadRef = useRef(false);
   const manualSiteChangeRef = useRef(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -125,7 +133,15 @@ export function SharePointFileBrowser({
       setError(null);
       setSelectedSiteId(siteId || defaultSiteId);
       setAvailableSites([]);
+      setSearchQuery('');
+      setIsSearching(false);
       initialLoadRef.current = false;
+      
+      // Clear search timeout if modal closes
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, siteId, defaultSiteId, allowSiteSelection]);
@@ -217,7 +233,7 @@ export function SharePointFileBrowser({
     }
   };
 
-  const loadItems = async (folderId?: string, folderPath?: string, overrideSiteId?: string) => {
+  const loadItems = useCallback(async (folderId?: string, folderPath?: string, overrideSiteId?: string, search?: string) => {
     setLoading(true);
     setError(null);
 
@@ -266,6 +282,11 @@ export function SharePointFileBrowser({
       
       if (folderId) params.folderId = folderId;
       if (folderPath) params.folderPath = folderPath;
+      
+      // Add search query if provided
+      if (search && search.trim().length > 0) {
+        params.search = search.trim();
+      }
 
       console.log('[SharePointFileBrowser] Loading items:', {
         effectiveSiteId,
@@ -277,6 +298,7 @@ export function SharePointFileBrowser({
         driveIdToUse: params.driveId,
         folderId,
         folderPath,
+        search,
       });
 
       const response = await api.get('/api/sharepoint/items', {
@@ -330,10 +352,14 @@ export function SharePointFileBrowser({
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedSiteId, siteId, currentDriveId, driveId, toast]);
 
   const handleFolderClick = (item: SharePointItem) => {
     if (!item.folder) return;
+
+    // Clear search when navigating to a folder
+    setSearchQuery('');
+    setIsSearching(false);
 
     const newBreadcrumb: BreadcrumbItem = {
       id: item.id,
@@ -345,10 +371,48 @@ export function SharePointFileBrowser({
   };
 
   const handleBreadcrumbClick = (index: number) => {
+    // Clear search when navigating breadcrumbs
+    setSearchQuery('');
+    setIsSearching(false);
+    
     const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
     setBreadcrumbs(newBreadcrumbs);
     const target = newBreadcrumbs[newBreadcrumbs.length - 1];
     loadItems(target.id || undefined, undefined, selectedSiteId);
+  };
+
+  // Debounced search handler
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // If search is cleared, reload items normally
+    if (!value || value.trim().length === 0) {
+      setIsSearching(false);
+      const currentBreadcrumb = breadcrumbs[breadcrumbs.length - 1];
+      loadItems(currentBreadcrumb.id || undefined, undefined, selectedSiteId);
+      return;
+    }
+
+    // Set searching state immediately for better UX
+    setIsSearching(true);
+
+    // Debounce the actual search API call
+    searchTimeoutRef.current = setTimeout(() => {
+      const currentBreadcrumb = breadcrumbs[breadcrumbs.length - 1];
+      loadItems(currentBreadcrumb.id || undefined, undefined, selectedSiteId, value.trim());
+    }, 500); // 500ms debounce
+  }, [breadcrumbs, selectedSiteId, loadItems]);
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setIsSearching(false);
+    const currentBreadcrumb = breadcrumbs[breadcrumbs.length - 1];
+    loadItems(currentBreadcrumb.id || undefined, undefined, selectedSiteId);
   };
 
   const handleFileSelect = (item: SharePointItem) => {
@@ -474,6 +538,8 @@ export function SharePointFileBrowser({
                         setBreadcrumbs([{ id: null, name: 'Root', path: null }]);
                         setItems([]);
                         setError(null);
+                        setSearchQuery('');
+                        setIsSearching(false);
                         // Load items with the new site ID - use overrideSiteId to ensure we use the new value
                         // even if state hasn't updated yet. Don't pass driveId so backend gets default.
                         await loadItems(undefined, undefined, newSiteId);
@@ -492,8 +558,42 @@ export function SharePointFileBrowser({
               </FormControl>
             )}
 
-            {/* Breadcrumbs */}
-            <HStack spacing={2} flexWrap="wrap">
+            {/* Search Input */}
+            <FormControl>
+              <InputGroup>
+                <InputLeftElement pointerEvents="none">
+                  <SearchIcon color="gray.300" />
+                </InputLeftElement>
+                <Input
+                  placeholder="Search files and folders..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      handleClearSearch();
+                    }
+                  }}
+                  pr={searchQuery ? '2.5rem' : undefined}
+                />
+                {searchQuery && (
+                  <InputRightElement width="2.5rem">
+                    <IconButton
+                      aria-label="Clear search"
+                      icon={<CloseIcon />}
+                      size="xs"
+                      variant="ghost"
+                      onClick={handleClearSearch}
+                      h="1.75rem"
+                      w="1.75rem"
+                    />
+                  </InputRightElement>
+                )}
+              </InputGroup>
+            </FormControl>
+
+            {/* Breadcrumbs - Hide when searching */}
+            {!isSearching && (
+              <HStack spacing={2} flexWrap="wrap">
               {breadcrumbs.map((crumb, index) => (
                 <HStack key={index} spacing={1}>
                   {index > 0 && <ChevronRightIcon color="gray.400" />}
@@ -515,6 +615,7 @@ export function SharePointFileBrowser({
                 </HStack>
               ))}
             </HStack>
+            )}
 
             {error && (
               <Box p={3} bg="red.50" borderRadius="md" color="red.700">
@@ -525,7 +626,7 @@ export function SharePointFileBrowser({
             {loading ? (
               <Box textAlign="center" p={8}>
                 <Spinner size="xl" />
-                <Text mt={4}>Loading files...</Text>
+                <Text mt={4}>{isSearching ? 'Searching...' : 'Loading files...'}</Text>
               </Box>
             ) : (
               <Box overflowY="auto" maxH="400px">
@@ -543,7 +644,9 @@ export function SharePointFileBrowser({
                     {items.length === 0 ? (
                       <Tr>
                         <Td colSpan={multiSelect ? 5 : 4} textAlign="center" py={8}>
-                          <Text color="gray.500">No items found</Text>
+                          <Text color="gray.500">
+                            {isSearching ? `No results found for "${searchQuery}"` : 'No items found'}
+                          </Text>
                         </Td>
                       </Tr>
                     ) : (

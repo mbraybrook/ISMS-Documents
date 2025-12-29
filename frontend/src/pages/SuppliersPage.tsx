@@ -37,6 +37,7 @@ import { useNavigate } from 'react-router-dom';
 import { supplierApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Supplier } from '../types/supplier';
+import { usePageTitle } from '../hooks/usePageTitle';
 import {
   getSupplierStatusDisplayName,
   getCriticalityDisplayName,
@@ -70,6 +71,7 @@ const CreditCardIcon = (props: IconProps) => (
 );
 
 export function SuppliersPage() {
+  usePageTitle('Suppliers', true);
   const toast = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();

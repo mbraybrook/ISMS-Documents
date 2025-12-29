@@ -26,6 +26,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { ArrowForwardIcon, CheckCircleIcon } from '@chakra-ui/icons';
 import api from '../services/api';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface StaffDashboardData {
   pendingAcknowledgmentsCount: number;
@@ -49,6 +50,7 @@ interface StaffDashboardData {
 }
 
 export function StaffHomePage() {
+  usePageTitle('Staff Dashboard', true);
   const [dashboardData, setDashboardData] = useState<StaffDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();

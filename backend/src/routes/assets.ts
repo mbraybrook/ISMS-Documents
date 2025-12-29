@@ -55,15 +55,15 @@ router.get(
       
       if (categoryId) where.assetCategoryId = categoryId;
       if (classificationId) where.classificationId = classificationId;
-      if (owner) where.owner = { contains: owner as string };
+      if (owner) where.owner = { contains: owner as string, mode: 'insensitive' };
       
       if (search) {
         where.OR = [
-          { nameSerialNo: { contains: search as string } },
-          { model: { contains: search as string } },
-          { manufacturer: { contains: search as string } },
-          { primaryUser: { contains: search as string } },
-          { location: { contains: search as string } },
+          { nameSerialNo: { contains: search as string, mode: 'insensitive' } },
+          { model: { contains: search as string, mode: 'insensitive' } },
+          { manufacturer: { contains: search as string, mode: 'insensitive' } },
+          { primaryUser: { contains: search as string, mode: 'insensitive' } },
+          { location: { contains: search as string, mode: 'insensitive' } },
         ];
       }
 

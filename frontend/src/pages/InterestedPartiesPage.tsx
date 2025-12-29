@@ -65,6 +65,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { generateCSV } from '../utils/tableUtils';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface InterestedParty {
   id: string;
@@ -94,6 +95,7 @@ const INTERESTED_PARTY_GROUPS = [
 ];
 
 export function InterestedPartiesPage() {
+  usePageTitle('Interested Parties', true);
   const toast = useToast();
   const { user } = useAuth();
   const [interestedParties, setInterestedParties] = useState<InterestedParty[]>([]);

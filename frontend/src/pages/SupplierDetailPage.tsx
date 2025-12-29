@@ -41,6 +41,7 @@ import { ArrowBackIcon, DeleteIcon, AddIcon, InfoIcon } from '@chakra-ui/icons';
 import { supplierApi } from '../services/api';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { Supplier, SupplierContact, SupplierStatus, SupplierType, ServiceSubType, RiskRating, PciStatus, IsoStatus, GdprStatus, PerformanceRating, SupplierLifecycleState, TrustCenterCategory } from '../types/supplier';
 import {
   getLifecycleStateDisplayName,
@@ -63,6 +64,9 @@ export function SupplierDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Set page title dynamically based on supplier name
+  usePageTitle(supplier ? `Supplier: ${supplier.name}` : 'Supplier Details', true);
   const [saving, setSaving] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const { isOpen: isEvidenceBrowserOpen, onOpen: onEvidenceBrowserOpen, onClose: onEvidenceBrowserClose } = useDisclosure();
