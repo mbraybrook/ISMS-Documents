@@ -247,6 +247,7 @@ Resources:
 
 Conditions:
   ValidateAccount: !Equals [!Ref AWS::AccountId, !Ref AwsAccountId]
+  HasGitHubOrg: !Not [!Equals [!Ref GitHubOrg, '']]
 
 Outputs:
   LoadBalancerDNSName:
@@ -298,8 +299,6 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-GitHubActionsRoleArn'
 
-Conditions:
-  HasGitHubOrg: !Not [!Equals [!Ref GitHubOrg, '']]
 
 
 

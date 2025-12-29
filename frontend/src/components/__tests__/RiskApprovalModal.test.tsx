@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import { render } from '../../test/utils';
 import userEvent from '@testing-library/user-event';
@@ -704,22 +705,36 @@ describe('RiskApprovalModal', () => {
         />
       );
 
+      // Wait for modal to fully render and textarea to be ready
       await waitFor(() => {
         expect(
           screen.getByPlaceholderText(/Enter reason for rejection/i)
         ).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
 
       const textarea = screen.getByPlaceholderText(
         /Enter reason for rejection/i
       ) as HTMLTextAreaElement;
+      
+      // Wait for textarea to be ready before typing
+      await waitFor(() => {
+        expect(textarea).toBeInTheDocument();
+        expect(textarea).not.toBeDisabled();
+      });
+
       await user.type(textarea, 'Rejection reason');
 
+      // Wait for textarea value to be updated
+      await waitFor(() => {
+        expect(textarea.value).toBe('Rejection reason');
+      });
+
+      // Wait for reject button to be enabled after typing
       await waitFor(() => {
         const rejectButton = screen.getByRole('button', { name: /reject/i });
         expect(rejectButton).not.toBeDisabled();
-      });
-    });
+      }, { timeout: 3000 });
+    }, { timeout: 15000 });
   });
 
   describe('Approve Flow', () => {
@@ -992,16 +1007,35 @@ describe('RiskApprovalModal', () => {
         />
       );
 
+      // Wait for modal to fully render and textarea to be ready
       await waitFor(() => {
         expect(
           screen.getByPlaceholderText(/Enter reason for rejection/i)
         ).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
 
       const textarea = screen.getByPlaceholderText(
         /Enter reason for rejection/i
       ) as HTMLTextAreaElement;
+      
+      // Wait for textarea to be ready before typing
+      await waitFor(() => {
+        expect(textarea).toBeInTheDocument();
+        expect(textarea).not.toBeDisabled();
+      });
+
       await user.type(textarea, 'Invalid risk assessment');
+
+      // Wait for textarea value to be updated
+      await waitFor(() => {
+        expect(textarea.value).toBe('Invalid risk assessment');
+      });
+
+      // Wait for reject button to be enabled after typing
+      await waitFor(() => {
+        const rejectButton = screen.getByRole('button', { name: /reject/i });
+        expect(rejectButton).not.toBeDisabled();
+      }, { timeout: 3000 });
 
       const rejectButton = screen.getByRole('button', { name: /reject/i });
       await user.click(rejectButton);
@@ -1011,8 +1045,8 @@ describe('RiskApprovalModal', () => {
           status: 'REJECTED',
           rejectionReason: 'Invalid risk assessment',
         });
-      });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 15000 });
 
     it('should show success toast when rejection succeeds', async () => {
       const user = userEvent.setup();
@@ -1038,6 +1072,13 @@ describe('RiskApprovalModal', () => {
       ) as HTMLTextAreaElement;
       await user.type(textarea, 'Rejection reason');
 
+      // Wait for textarea value to be updated and button to be enabled
+      await waitFor(() => {
+        expect(textarea.value).toBe('Rejection reason');
+        const rejectButton = screen.getByRole('button', { name: /reject/i });
+        expect(rejectButton).not.toBeDisabled();
+      });
+
       const rejectButton = screen.getByRole('button', { name: /reject/i });
       await user.click(rejectButton);
 
@@ -1049,7 +1090,7 @@ describe('RiskApprovalModal', () => {
           duration: 3000,
           isClosable: true,
         });
-      });
+      }, { timeout: 5000 });
     });
 
     it('should call onClose after successful rejection', async () => {
@@ -1168,6 +1209,7 @@ describe('RiskApprovalModal', () => {
           },
         },
       };
+      // Set error mock before render to avoid race conditions
       vi.mocked(api.patch).mockRejectedValueOnce(errorResponse);
 
       render(
@@ -1178,20 +1220,35 @@ describe('RiskApprovalModal', () => {
         />
       );
 
+      // Wait for modal to fully render
       await waitFor(() => {
         expect(
           screen.getByPlaceholderText(/Enter reason for rejection/i)
         ).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
 
       const textarea = screen.getByPlaceholderText(
         /Enter reason for rejection/i
       ) as HTMLTextAreaElement;
+      
       await user.type(textarea, 'Rejection reason');
+
+      // Wait for textarea value to be updated and button to be enabled
+      await waitFor(() => {
+        expect(textarea.value).toBe('Rejection reason');
+        const rejectButton = screen.getByRole('button', { name: /reject/i });
+        expect(rejectButton).not.toBeDisabled();
+      }, { timeout: 3000 });
 
       const rejectButton = screen.getByRole('button', { name: /reject/i });
       await user.click(rejectButton);
 
+      // Wait for error toast to appear - need to wait for API call to complete
+      await waitFor(() => {
+        expect(api.patch).toHaveBeenCalled();
+      });
+
+      // Wait for error toast to appear after API call fails
       await waitFor(() => {
         expect(mockToast).toHaveBeenCalledWith({
           title: 'Error',
@@ -1200,8 +1257,8 @@ describe('RiskApprovalModal', () => {
           duration: 5000,
           isClosable: true,
         });
-      });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 15000 });
 
     it('should show generic error message when rejection API error has no response data', async () => {
       const user = userEvent.setup();

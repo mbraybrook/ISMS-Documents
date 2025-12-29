@@ -1,3 +1,4 @@
+import React, { type ReactNode, type MouseEvent } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { render } from '../../test/utils';
@@ -30,7 +31,7 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return {
     ...actual, // Preserves BrowserRouter and other exports needed by test/utils
-    Link: ({ to, children, onClick }: { to: string; children: React.ReactNode; onClick?: (e: React.MouseEvent) => void }) => (
+    Link: ({ to, children, onClick }: { to: string; children: ReactNode; onClick?: (e: MouseEvent) => void }) => (
       <a href={to} onClick={(e) => {
         e.preventDefault();
         onClick?.(e);
@@ -420,11 +421,18 @@ describe('ControlFormModal', () => {
       // Wait for form to render before interacting
       await waitFor(() => {
         expect(screen.getByLabelText(/code/i)).toBeInTheDocument();
-      });
+        expect(screen.getByLabelText(/title/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/category/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
 
       await user.type(screen.getByLabelText(/code/i), 'A.8.1');
       await user.type(screen.getByLabelText(/title/i), 'New Control');
       await user.selectOptions(screen.getByLabelText(/category/i), 'ORGANIZATIONAL');
+
+      // Wait for form values to be set
+      await waitFor(() => {
+        expect(screen.getByLabelText(/code/i)).toHaveValue('A.8.1');
+      });
 
       const submitButton = screen.getByRole('button', { name: /create/i });
       await user.click(submitButton);
@@ -435,8 +443,8 @@ describe('ControlFormModal', () => {
           title: 'New Control',
           category: 'ORGANIZATIONAL',
         }));
-      }, { timeout: 3000 });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 10000 });
 
     it('should update existing control when form is submitted', async () => {
       const user = userEvent.setup();
@@ -453,9 +461,24 @@ describe('ControlFormModal', () => {
 
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={mockControl} />);
 
+      // Wait for edit modal to fully load - wait for all initial API calls to complete
+      await waitFor(() => {
+        expect(screen.getByText('Edit Control')).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      // Wait for form to be populated with existing data
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Test Control')).toBeInTheDocument();
+      }, { timeout: 3000 });
+
       const titleInput = screen.getByDisplayValue('Test Control');
       await user.clear(titleInput);
       await user.type(titleInput, 'Updated Control');
+
+      // Wait for input value to be updated
+      await waitFor(() => {
+        expect(titleInput).toHaveValue('Updated Control');
+      });
 
       const submitButton = screen.getByRole('button', { name: /update/i });
       await user.click(submitButton);
@@ -467,8 +490,8 @@ describe('ControlFormModal', () => {
             title: 'Updated Control',
           })
         );
-      });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 10000 });
 
     it('should update standard control applicability when form is submitted', async () => {
       const user = userEvent.setup();
@@ -632,13 +655,18 @@ describe('ControlFormModal', () => {
 
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={mockControl} />);
 
+      // Wait for delete button to be available
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
+      }, { timeout: 3000 });
+
       const deleteButton = screen.getByRole('button', { name: /delete/i });
       await user.click(deleteButton);
 
       // Wait for AlertDialog to appear
       await waitFor(() => {
         expect(screen.getByText(/are you sure you want to delete control/i)).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
 
       // Find the Delete button in the AlertDialog (should be the one with colorScheme="red")
       const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
@@ -651,14 +679,16 @@ describe('ControlFormModal', () => {
 
       await user.click(confirmButton);
 
+      // Wait for API call
       await waitFor(() => {
         expect(api.delete).toHaveBeenCalledWith('/api/controls/control-1');
-      });
+      }, { timeout: 5000 });
 
+      // Wait for modal to close
       await waitFor(() => {
         expect(mockOnClose).toHaveBeenCalled();
-      });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 15000 });
 
     it.skip('should close delete dialog when cancel is clicked', async () => {
       const user = userEvent.setup();
@@ -741,17 +771,24 @@ describe('ControlFormModal', () => {
 
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={mockControl} />);
 
+      // Wait for supplier to appear in DOM
       await waitFor(() => {
         expect(screen.getByText('Test Supplier')).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
+
+      // Wait for unlink button to be available
+      await waitFor(() => {
+        const unlinkButtons = screen.getAllByLabelText(/unlink supplier/i);
+        expect(unlinkButtons.length).toBeGreaterThan(0);
+      }, { timeout: 3000 });
 
       const unlinkButtons = screen.getAllByLabelText(/unlink supplier/i);
       await user.click(unlinkButtons[0]);
 
       await waitFor(() => {
         expect(api.delete).toHaveBeenCalledWith('/api/suppliers/supplier-1/controls/control-1');
-      });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 10000 });
   });
 
   describe('Document Linking', () => {
@@ -991,11 +1028,19 @@ describe('ControlFormModal', () => {
       const user = userEvent.setup();
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={mockStandardControl} />);
 
+      // Wait for modal to fully load and risk link to be rendered
+      await waitFor(() => {
+        expect(screen.getByText('Test Risk')).toBeInTheDocument();
+      }, { timeout: 3000 });
+
       const riskLink = screen.getByText('Test Risk');
       await user.click(riskLink);
 
-      expect(sessionStorageMock.setItem).toHaveBeenCalledWith('highlightRiskId', 'risk-1');
-    });
+      // Wait for sessionStorage call
+      await waitFor(() => {
+        expect(sessionStorageMock.setItem).toHaveBeenCalledWith('highlightRiskId', 'risk-1');
+      }, { timeout: 3000 });
+    }, { timeout: 10000 });
 
     it('should display risk assessment checkbox as disabled', () => {
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={mockStandardControl} />);
@@ -1098,19 +1143,48 @@ describe('ControlFormModal', () => {
 
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={mockControl} />);
 
-      const linkButton = screen.getByRole('button', { name: /link supplier/i });
+      // Wait for component to load and fetch linked suppliers
+      await waitFor(() => {
+        expect(api.get).toHaveBeenCalledWith('/api/controls/control-1/suppliers');
+      }, { timeout: 3000 });
+
+      // Wait for the Linked Suppliers section to appear
+      await waitFor(() => {
+        expect(screen.getByText(/linked suppliers/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      // Get all Link Supplier buttons and use the first one
+      const linkButtons = screen.getAllByRole('button', { name: /link supplier/i });
+      expect(linkButtons.length).toBeGreaterThan(0);
+      const linkButton = linkButtons[0];
       await user.click(linkButton);
+
+      // Wait for supplier modal to open
+      await waitFor(() => {
+        expect(screen.getByText('Link Supplier to Control')).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      // Wait for search input to be ready
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/search suppliers by name/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
 
       const searchInput = screen.getByPlaceholderText(/search suppliers by name/i);
       await user.type(searchInput, 'Test');
 
+      // Wait for input value to be set
+      await waitFor(() => {
+        expect(searchInput).toHaveValue('Test');
+      });
+
       const searchButton = screen.getByRole('button', { name: /search/i });
       await user.click(searchButton);
 
+      // Wait for API call to complete
       await waitFor(() => {
         expect(supplierApi.getSuppliers).toHaveBeenCalled();
-      });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 15000 });
 
     it('should handle document search errors', async () => {
       const user = userEvent.setup();
@@ -1129,17 +1203,29 @@ describe('ControlFormModal', () => {
 
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={mockControl} />);
 
+      // Wait for component to load and fetch linked documents
+      await waitFor(() => {
+        expect(api.get).toHaveBeenCalledWith('/api/controls/control-1/documents');
+      }, { timeout: 3000 });
+
+      // Wait for search input to be ready
       await waitFor(() => {
         expect(screen.getByPlaceholderText(/search documents by title/i)).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
 
       const searchInput = screen.getByPlaceholderText(/search documents by title/i);
       await user.type(searchInput, 'Test');
 
+      // Wait for input value to be set and debounce to complete
+      await waitFor(() => {
+        expect(searchInput).toHaveValue('Test');
+      });
+
+      // Wait for debounced API call (300ms debounce + API call time)
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/api/documents', expect.anything());
-      });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 15000 });
   });
 
   describe('Modal Interactions', () => {

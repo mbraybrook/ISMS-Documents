@@ -126,7 +126,20 @@ router.get(
         take: 50,
       });
 
-      res.json(exports);
+      // Transform response to use generatedBy instead of User
+      const transformedExports = exports.map((exportItem) => ({
+        id: exportItem.id,
+        generatedAt: exportItem.generatedAt,
+        exportFormat: exportItem.exportFormat,
+        filePath: exportItem.filePath,
+        generatedBy: exportItem.User ? {
+          id: exportItem.User.id,
+          displayName: exportItem.User.displayName,
+          email: exportItem.User.email,
+        } : null,
+      }));
+
+      res.json(transformedExports);
     } catch (error) {
       console.error('Error fetching SoA exports:', error);
       res.status(500).json({ error: 'Failed to fetch SoA exports' });

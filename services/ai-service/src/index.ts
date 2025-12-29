@@ -54,3 +54,4 @@ app.listen(PORT, () => {
   console.log(`[AIService] OLLAMA_MODEL: ${process.env.OLLAMA_MODEL || 'nomic-embed-text'}`);
 });
 
+

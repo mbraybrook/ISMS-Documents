@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Heading,
@@ -41,10 +41,21 @@ export function SupplierExitPlanTab({
   const [exitPlan, setExitPlan] = useState<SupplierExitPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Ref to store debounce timeout for text input updates
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchExitPlan();
   }, [supplierId]);
+
+  // Cleanup debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const fetchExitPlan = async () => {
     try {
@@ -88,7 +99,29 @@ export function SupplierExitPlanTab({
     }
   };
 
-  const handleUpdateSection = async (sectionName: string, sectionData: any) => {
+  const handleUpdateSection = async (sectionName: string, sectionData: any, immediate = false) => {
+    // For immediate updates (checkboxes, buttons), call API right away
+    // For text inputs, debounce the API call
+    if (immediate) {
+      // Clear any pending debounced calls
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
+      await performUpdate(sectionName, sectionData);
+    } else {
+      // Debounce text input updates (500ms delay)
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      debounceTimeoutRef.current = setTimeout(() => {
+        performUpdate(sectionName, sectionData);
+        debounceTimeoutRef.current = null;
+      }, 500);
+    }
+  };
+
+  const performUpdate = async (sectionName: string, sectionData: any) => {
     try {
       setSaving(true);
       const updateData: any = {};
@@ -140,7 +173,7 @@ export function SupplierExitPlanTab({
               handleUpdateSection(sectionName, {
                 ...section,
                 completed: e.target.checked,
-              });
+              }, true); // Immediate update for checkbox
             }}
           >
             Completed
@@ -162,10 +195,20 @@ export function SupplierExitPlanTab({
                           onChange={(e) => {
                             const newValues = [...values];
                             newValues[index] = e.target.value;
+                            // Update local state immediately for UI responsiveness
+                            if (exitPlan) {
+                              const updatedPlan = { ...exitPlan };
+                              const sectionData = updatedPlan[sectionName as keyof SupplierExitPlan] as any;
+                              if (sectionData) {
+                                sectionData[field.key] = newValues;
+                                setExitPlan(updatedPlan);
+                              }
+                            }
+                            // Debounced API call
                             handleUpdateSection(sectionName, {
                               ...section,
                               [field.key]: newValues,
-                            });
+                            }, false); // Debounced update for text input
                           }}
                           isReadOnly={!canEdit}
                         />
@@ -179,7 +222,7 @@ export function SupplierExitPlanTab({
                               handleUpdateSection(sectionName, {
                                 ...section,
                                 [field.key]: newValues,
-                              });
+                              }, true); // Immediate update for delete button
                             }}
                           />
                         )}
@@ -193,7 +236,7 @@ export function SupplierExitPlanTab({
                           handleUpdateSection(sectionName, {
                             ...section,
                             [field.key]: [...values, ''],
-                          });
+                          }, true); // Immediate update for add button
                         }}
                       >
                         Add {field.label}
@@ -211,10 +254,20 @@ export function SupplierExitPlanTab({
                   <Textarea
                     value={section[field.key] || ''}
                     onChange={(e) => {
+                      // Update local state immediately for UI responsiveness
+                      if (exitPlan) {
+                        const updatedPlan = { ...exitPlan };
+                        const sectionData = updatedPlan[sectionName as keyof SupplierExitPlan] as any;
+                        if (sectionData) {
+                          sectionData[field.key] = e.target.value;
+                          setExitPlan(updatedPlan);
+                        }
+                      }
+                      // Debounced API call
                       handleUpdateSection(sectionName, {
                         ...section,
                         [field.key]: e.target.value,
-                      });
+                      }, false); // Debounced update for textarea
                     }}
                     isReadOnly={!canEdit}
                     rows={4}
@@ -229,10 +282,20 @@ export function SupplierExitPlanTab({
                 <Input
                   value={section[field.key] || ''}
                   onChange={(e) => {
+                    // Update local state immediately for UI responsiveness
+                    if (exitPlan) {
+                      const updatedPlan = { ...exitPlan };
+                      const sectionData = updatedPlan[sectionName as keyof SupplierExitPlan] as any;
+                      if (sectionData) {
+                        sectionData[field.key] = e.target.value;
+                        setExitPlan(updatedPlan);
+                      }
+                    }
+                    // Debounced API call
                     handleUpdateSection(sectionName, {
                       ...section,
                       [field.key]: e.target.value,
-                    });
+                    }, false); // Debounced update for text input
                   }}
                   isReadOnly={!canEdit}
                 />

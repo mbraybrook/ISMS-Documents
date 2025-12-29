@@ -227,3 +227,4 @@ docker compose down -v
 2. Rebuild without cache: `docker compose build --no-cache`
 3. Check Dockerfile syntax and dependencies
 
+

@@ -469,10 +469,17 @@ describe('SoA API', () => {
         .expect(200);
 
       // Assert
-      // Dates are serialized to strings in JSON responses
+      // Response should be transformed to use generatedBy instead of User
       const expectedExports = mockExports.map(exp => ({
-        ...exp,
+        id: exp.id,
         generatedAt: exp.generatedAt.toISOString(),
+        exportFormat: exp.exportFormat,
+        filePath: exp.filePath,
+        generatedBy: {
+          id: exp.User.id,
+          displayName: exp.User.displayName,
+          email: exp.User.email,
+        },
       }));
       expect(response.body).toEqual(expectedExports);
       expect(prisma.soAExport.findMany).toHaveBeenCalledWith({
@@ -505,6 +512,31 @@ describe('SoA API', () => {
       expect(response.body).toEqual([]);
     });
 
+    it('should handle exports with null User relation', async () => {
+      // Arrange
+      const exportsWithNullUser = [
+        {
+          id: 'export-1',
+          generatedByUserId: 'user-123',
+          exportFormat: 'EXCEL',
+          filePath: null,
+          generatedAt: new Date('2024-01-01'),
+          User: null,
+        },
+      ];
+      prisma.soAExport.findMany.mockResolvedValue(exportsWithNullUser);
+
+      // Act
+      const response = await request(app)
+        .get('/api/soa/exports')
+        .expect(200);
+
+      // Assert
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].generatedBy).toBeNull();
+      expect(response.body[0].User).toBeUndefined();
+    });
+
     it('should limit results to 50 exports', async () => {
       // Arrange
       const manyExports = Array.from({ length: 100 }, (_, i) => ({
@@ -528,6 +560,7 @@ describe('SoA API', () => {
 
       // Assert
       expect(response.body).toHaveLength(50);
+      expect(response.body[0].generatedBy).toBeDefined();
       expect(prisma.soAExport.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           take: 50,
@@ -551,17 +584,19 @@ describe('SoA API', () => {
       );
     });
 
-    it('should include user information in response', async () => {
+    it('should include user information in response as generatedBy', async () => {
       // Act
       const response = await request(app)
         .get('/api/soa/exports')
         .expect(200);
 
       // Assert
-      expect(response.body[0].User).toBeDefined();
-      expect(response.body[0].User.id).toBe('user-123');
-      expect(response.body[0].User.displayName).toBe('Test User');
-      expect(response.body[0].User.email).toBe('test@paythru.com');
+      expect(response.body[0].generatedBy).toBeDefined();
+      expect(response.body[0].generatedBy.id).toBe('user-123');
+      expect(response.body[0].generatedBy.displayName).toBe('Test User');
+      expect(response.body[0].generatedBy.email).toBe('test@paythru.com');
+      // User should not be in response (transformed to generatedBy)
+      expect(response.body[0].User).toBeUndefined();
     });
 
     it('should handle errors when fetching exports fails', async () => {

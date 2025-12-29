@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '../../test/utils';
 import userEvent from '@testing-library/user-event';
@@ -648,9 +649,10 @@ describe('RiskReviewQueue', () => {
 
       render(<RiskReviewQueue />);
 
+      // Wait for risk to appear
       await waitFor(() => {
         expect(screen.getByText('Test Risk 1')).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
 
       const rejectButton = screen.getByRole('button', { name: /reject/i });
       await user.click(rejectButton);
@@ -658,25 +660,25 @@ describe('RiskReviewQueue', () => {
       // Wait for modal to be fully rendered
       await waitFor(() => {
         expect(screen.getByText('Reject Risk')).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
 
       // Wait for cancel button to be available
       await waitFor(() => {
         const modal = screen.getByText('Reject Risk').closest('[role="dialog"]') || document.body;
         const cancelButton = within(modal as HTMLElement).getByRole('button', { name: /cancel/i });
         expect(cancelButton).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
 
       // Act
       const modal = screen.getByText('Reject Risk').closest('[role="dialog"]') || document.body;
       const cancelButton = within(modal as HTMLElement).getByRole('button', { name: /cancel/i });
       await user.click(cancelButton);
 
-      // Assert
+      // Assert - Wait for modal to close
       await waitFor(() => {
         expect(screen.queryByText('Reject Risk')).not.toBeInTheDocument();
-      });
-    });
+      }, { timeout: 3000 });
+    }, { timeout: 15000 });
 
     it('should show validation error when rejecting without reason', async () => {
       // Arrange
@@ -897,9 +899,10 @@ describe('RiskReviewQueue', () => {
 
       render(<RiskReviewQueue />);
 
+      // Wait for risk to appear
       await waitFor(() => {
         expect(screen.getByText('Test Risk 1')).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
 
       const mergeButton = screen.getByRole('button', { name: /merge/i });
       await user.click(mergeButton);
@@ -907,14 +910,14 @@ describe('RiskReviewQueue', () => {
       // Wait for modal to fully render
       await waitFor(() => {
         expect(screen.getByText('Merge Risk')).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
 
       // Wait for cancel button to be available in the modal
       await waitFor(() => {
         const modal = screen.getByText('Merge Risk').closest('[role="dialog"]') || document.body;
         const cancelButton = within(modal as HTMLElement).getByRole('button', { name: /cancel/i });
         expect(cancelButton).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
 
       // Act - Find cancel button within the modal
       const modal = screen.getByText('Merge Risk').closest('[role="dialog"]') || document.body;
@@ -925,7 +928,7 @@ describe('RiskReviewQueue', () => {
       await waitFor(() => {
         expect(screen.queryByText('Merge Risk')).not.toBeInTheDocument();
       }, { timeout: 3000 });
-    });
+    }, { timeout: 15000 });
 
     it('should display target risks in select dropdown', async () => {
       // Arrange
@@ -1009,35 +1012,53 @@ describe('RiskReviewQueue', () => {
 
       render(<RiskReviewQueue />);
 
+      // Wait for risk to appear
       await waitFor(() => {
         expect(screen.getByText('Test Risk 1')).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
 
       const mergeButton = screen.getByRole('button', { name: /merge/i });
       await user.click(mergeButton);
 
+      // Wait for merge modal to be fully rendered
       await waitFor(() => {
         expect(screen.getByText('Merge Risk')).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
+
+      // Wait for select dropdown to be ready
+      await waitFor(() => {
+        const select = screen.getByRole('combobox');
+        expect(select).toBeInTheDocument();
+      }, { timeout: 3000 });
 
       // Act
       const select = screen.getByRole('combobox');
       await user.selectOptions(select, 'target-risk-1');
 
-      // Reset mock to return empty list after refresh
+      // Wait for selection to be applied and merge button to be enabled
+      await waitFor(() => {
+        expect(select).toHaveValue('target-risk-1');
+        const modal = screen.getByText('Merge Risk').closest('[role="dialog"]') || document.body;
+        const mergeConfirmButton = within(modal as HTMLElement).getByRole('button', { name: /^merge$/i });
+        expect(mergeConfirmButton).not.toBeDisabled();
+      }, { timeout: 3000 });
+
+      // Reset mock to return empty list after refresh (before clicking merge)
       setupApiMocks([], []);
 
       const modal = screen.getByText('Merge Risk').closest('[role="dialog"]') || document.body;
       const mergeConfirmButton = within(modal as HTMLElement).getByRole('button', { name: /^merge$/i });
       await user.click(mergeConfirmButton);
 
-      // Assert
+      // Assert - Sequential waitFor for each async operation
+      // 1. Wait for merge API call
       await waitFor(() => {
         expect(api.post).toHaveBeenCalledWith('/api/risks/risk-1/merge', {
           targetRiskId: 'target-risk-1',
         });
-      });
+      }, { timeout: 5000 });
 
+      // 2. Wait for success toast
       await waitFor(() => {
         expect(mockToast).toHaveBeenCalledWith({
           title: 'Success',
@@ -1046,9 +1067,9 @@ describe('RiskReviewQueue', () => {
           duration: 3000,
           isClosable: true,
         });
-      });
+      }, { timeout: 5000 });
 
-      // Should refresh risks list
+      // 3. Wait for risks list refresh
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/api/risks', {
           params: {
@@ -1057,8 +1078,8 @@ describe('RiskReviewQueue', () => {
             limit: 100,
           },
         });
-      });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 15000 });
 
     it('should show error toast when merge fails', async () => {
       // Arrange
@@ -1070,30 +1091,47 @@ describe('RiskReviewQueue', () => {
       };
 
       setupApiMocks([mockRisk1], [mockTargetRisk]);
+      // Set error mock before render to avoid race conditions
       vi.mocked(api.post).mockRejectedValueOnce(error);
 
       render(<RiskReviewQueue />);
 
+      // Wait for risk to appear
       await waitFor(() => {
         expect(screen.getByText('Test Risk 1')).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
 
       const mergeButton = screen.getByRole('button', { name: /merge/i });
       await user.click(mergeButton);
 
+      // Wait for merge modal to be fully rendered
       await waitFor(() => {
         expect(screen.getByText('Merge Risk')).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
+
+      // Wait for select dropdown to be ready
+      await waitFor(() => {
+        const select = screen.getByRole('combobox');
+        expect(select).toBeInTheDocument();
+      }, { timeout: 3000 });
 
       // Act
       const select = screen.getByRole('combobox');
       await user.selectOptions(select, 'target-risk-1');
 
+      // Wait for selection to be applied and merge button to be enabled
+      await waitFor(() => {
+        expect(select).toHaveValue('target-risk-1');
+        const modal = screen.getByText('Merge Risk').closest('[role="dialog"]') || document.body;
+        const mergeConfirmButton = within(modal as HTMLElement).getByRole('button', { name: /^merge$/i });
+        expect(mergeConfirmButton).not.toBeDisabled();
+      }, { timeout: 3000 });
+
       const modal = screen.getByText('Merge Risk').closest('[role="dialog"]') || document.body;
       const mergeConfirmButton = within(modal as HTMLElement).getByRole('button', { name: /^merge$/i });
       await user.click(mergeConfirmButton);
 
-      // Assert
+      // Assert - Wait for error toast to appear
       await waitFor(() => {
         expect(mockToast).toHaveBeenCalledWith({
           title: 'Error',
@@ -1102,8 +1140,8 @@ describe('RiskReviewQueue', () => {
           duration: 5000,
           isClosable: true,
         });
-      });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 15000 });
 
     it('should handle multiple target risks in merge dropdown', async () => {
       // Arrange

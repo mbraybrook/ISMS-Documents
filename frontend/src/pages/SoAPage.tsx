@@ -28,7 +28,7 @@ interface SoAExport {
     id: string;
     displayName: string;
     email: string;
-  };
+  } | null;
 }
 
 export function SoAPage() {
@@ -187,7 +187,7 @@ export function SoAPage() {
                       {exportItem.exportFormat}
                     </Badge>
                   </Td>
-                  <Td>{exportItem.generatedBy.displayName}</Td>
+                  <Td>{exportItem.generatedBy?.displayName || 'Unknown'}</Td>
                 </Tr>
               ))}
             </Tbody>

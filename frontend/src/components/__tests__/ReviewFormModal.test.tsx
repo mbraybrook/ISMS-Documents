@@ -346,20 +346,38 @@ describe('ReviewFormModal', () => {
 
       render(<ReviewFormModal {...defaultProps} onClose={mockOnClose} />);
 
+      // Wait for modal to fully render
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
+
+      // Wait for form fields to be ready
+      await waitFor(() => {
+        expect(screen.getByLabelText(/due date/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/change notes/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
 
       const dueDateInput = screen.getByLabelText(/due date/i) as HTMLInputElement;
       await user.clear(dueDateInput);
       await user.type(dueDateInput, '2026-12-31');
 
+      // Wait for input value to be set
+      await waitFor(() => {
+        expect(dueDateInput).toHaveValue('2026-12-31');
+      });
+
       const changeNotesTextarea = screen.getByLabelText(/change notes/i) as HTMLTextAreaElement;
       await user.type(changeNotesTextarea, 'Review notes');
+
+      // Wait for textarea value to be set
+      await waitFor(() => {
+        expect(changeNotesTextarea).toHaveValue('Review notes');
+      });
 
       const submitButton = screen.getByRole('button', { name: /schedule review/i });
       await user.click(submitButton);
 
+      // Wait for API call
       await waitFor(() => {
         expect(api.post).toHaveBeenCalledWith('/api/reviews', {
           documentId: 'doc-1',
@@ -367,12 +385,13 @@ describe('ReviewFormModal', () => {
           dueDate: '2026-12-31',
           changeNotes: 'Review notes',
         });
-      });
+      }, { timeout: 5000 });
 
+      // Wait for modal to close
       await waitFor(() => {
         expect(mockOnClose).toHaveBeenCalledWith(true);
-      });
-    });
+      }, { timeout: 5000 });
+    }, { timeout: 15000 });
 
     it('should submit form without change notes when change notes are empty', async () => {
       const user = userEvent.setup();

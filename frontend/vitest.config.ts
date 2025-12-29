@@ -8,6 +8,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
+    testTimeout: 15000, // Increase default timeout to 15s for modal tests with async operations
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

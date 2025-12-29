@@ -32,3 +32,4 @@ CREATE UNIQUE INDEX "EntraIdUserCache_entraObjectId_key" ON "EntraIdUserCache"("
 -- CreateIndex
 CREATE INDEX "EntraIdUserCache_email_idx" ON "EntraIdUserCache"("email");
 
+
