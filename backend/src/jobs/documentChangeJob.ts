@@ -26,10 +26,11 @@ export function startDocumentChangeJob(schedule = '0 2 * * *'): void {
       try {
         const result = await checkDocumentChanges();
         log.info('[DocumentChangeJob] Scheduled check completed', result);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error instanceof Error ? error : new Error(String(error));
         log.error('[DocumentChangeJob] Scheduled check failed', {
-          error: error.message,
-          stack: error.stack,
+          error: err.message,
+          stack: err.stack,
         });
         // Don't throw - we want the job to continue running
       }
@@ -62,10 +63,11 @@ export async function runDocumentChangeCheck(): Promise<void> {
   try {
     const result = await checkDocumentChanges();
     log.info('[DocumentChangeJob] Manual check completed', result);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
     log.error('[DocumentChangeJob] Manual check failed', {
-      error: error.message,
-      stack: error.stack,
+      error: err.message,
+      stack: err.stack,
     });
     throw error;
   }

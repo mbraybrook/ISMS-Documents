@@ -151,10 +151,11 @@ app.listen(PORT, () => {
   // Start scheduled jobs
   try {
     startDocumentChangeJob();
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
     log.error('Failed to start document change job', {
-      error: error.message,
-      stack: error.stack,
+      error: err.message,
+      stack: err.stack,
     });
     // Don't prevent server from starting if job fails
   }
