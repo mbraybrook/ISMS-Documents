@@ -124,6 +124,9 @@ model Document {
   nextReviewDate          DateTime?
   requiresAcknowledgement Boolean                 @default(false)
   lastChangedDate         DateTime?
+  hasChanged               Boolean                 @default(false)
+  lastChecked              DateTime?
+  lastModified             DateTime?
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
   documentUrl             String?

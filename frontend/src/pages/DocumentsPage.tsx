@@ -25,7 +25,7 @@ import {
   Td,
   Checkbox,
 } from '@chakra-ui/react';
-import { DeleteIcon, ViewIcon, ExternalLinkIcon, EditIcon, RepeatIcon, BellIcon, WarningIcon, TimeIcon } from '@chakra-ui/icons';
+import { DeleteIcon, ViewIcon, ExternalLinkIcon, EditIcon, RepeatIcon, BellIcon, WarningIcon, TimeIcon, SmallCloseIcon } from '@chakra-ui/icons';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { authService } from '../services/authService';
@@ -44,6 +44,9 @@ interface Document {
   nextReviewDate: string | null;
   requiresAcknowledgement?: boolean;
   lastChangedDate?: string | null;
+  hasChanged?: boolean;
+  lastChecked?: string | null;
+  lastModified?: string | null;
   owner: {
     id: string;
     displayName: string;
@@ -77,7 +80,9 @@ export function DocumentsPage() {
     ownerId: '',
     search: '',
     requiresAcknowledgement: '',
+    hasChanged: '',
   });
+  const [refreshingFlags, setRefreshingFlags] = useState(false);
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -238,6 +243,74 @@ export function DocumentsPage() {
     onClose();
     setSelectedDocument(null);
     fetchDocuments();
+  };
+
+  const handleResetFlag = async (doc: Document, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await api.post(`/api/documents/${doc.id}/reset-flag`);
+      toast({
+        title: 'Success',
+        description: 'Change flag reset',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+        position: 'top-right',
+      });
+      // Update local state
+      setAllDocuments((prev) =>
+        prev.map((d) =>
+          d.id === doc.id
+            ? { ...d, hasChanged: false, lastChecked: new Date().toISOString() }
+            : d
+        )
+      );
+      setDocuments((prev) =>
+        prev.map((d) =>
+          d.id === doc.id
+            ? { ...d, hasChanged: false, lastChecked: new Date().toISOString() }
+            : d
+        )
+      );
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to reset flag',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
+    }
+  };
+
+  const handleRefreshFlags = async () => {
+    try {
+      setRefreshingFlags(true);
+      const response = await api.get('/api/documents/flags');
+      const result = response.data;
+      toast({
+        title: 'Flags Refreshed',
+        description: `Checked ${result.checked} documents. ${result.changed} changed, ${result.errors} errors, ${result.skipped} skipped.`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
+      // Refresh documents to get updated flags
+      await fetchDocuments();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to refresh flags',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
+    } finally {
+      setRefreshingFlags(false);
+    }
   };
 
   const getDocumentUrl = async (doc: Document): Promise<string | null> => {
@@ -541,6 +614,12 @@ export function DocumentsPage() {
       filtered = filtered.filter((doc) => !doc.requiresAcknowledgement);
     }
 
+    if (filters.hasChanged === 'true') {
+      filtered = filtered.filter((doc) => doc.hasChanged === true);
+    } else if (filters.hasChanged === 'false') {
+      filtered = filtered.filter((doc) => doc.hasChanged === false || !doc.hasChanged);
+    }
+
     if (sortField) {
       filtered = [...filtered].sort((a, b) => {
         let aVal: any = a[sortField as keyof Document];
@@ -639,6 +718,12 @@ export function DocumentsPage() {
       width: '110px',
       sortable: true,
     },
+    {
+      key: 'hasChanged',
+      header: 'Change Status',
+      width: '130px',
+      sortable: false,
+    },
   ];
 
   const filterConfigs: FilterConfig[] = [
@@ -685,6 +770,16 @@ export function DocumentsPage() {
         { value: '', label: 'All' },
         { value: 'true', label: 'Yes' },
         { value: 'false', label: 'No' },
+      ],
+    },
+    {
+      key: 'hasChanged',
+      type: 'select',
+      placeholder: 'Change Status',
+      options: [
+        { value: '', label: 'All' },
+        { value: 'true', label: 'Changed Only' },
+        { value: 'false', label: 'Current Only' },
       ],
     },
   ];
@@ -943,6 +1038,33 @@ export function DocumentsPage() {
           )}
         </Td>
         <Td px={2} onClick={(e) => e.stopPropagation()}>
+          <HStack spacing={2}>
+            {doc.lastChecked === null ? (
+              <Badge colorScheme="gray" fontSize="xs">
+                Not Checked
+              </Badge>
+            ) : doc.hasChanged === true ? (
+              <>
+                <Badge colorScheme="red" fontSize="xs">
+                  Changed
+                </Badge>
+                <IconButton
+                  aria-label="Reset flag"
+                  icon={<SmallCloseIcon />}
+                  size="xs"
+                  colorScheme="red"
+                  variant="ghost"
+                  onClick={(e) => handleResetFlag(doc, e)}
+                />
+              </>
+            ) : (
+              <Badge colorScheme="green" fontSize="xs">
+                Current
+              </Badge>
+            )}
+          </HStack>
+        </Td>
+        <Td px={2} onClick={(e) => e.stopPropagation()}>
           <HStack spacing={1}>
             {actions.map((action, idx) => {
               if (action.isVisible && !action.isVisible(doc)) return null;
@@ -977,11 +1099,24 @@ export function DocumentsPage() {
     <VStack spacing={6} align="stretch">
       <HStack justify="space-between">
         <Heading size="lg">Documents</Heading>
-        {canEdit && (
-          <Button colorScheme="blue" onClick={handleCreate}>
-            Create Document
-          </Button>
-        )}
+        <HStack spacing={2}>
+          {canEdit && (
+            <>
+              <Button
+                colorScheme="blue"
+                variant="outline"
+                onClick={handleRefreshFlags}
+                isLoading={refreshingFlags}
+                leftIcon={<RepeatIcon />}
+              >
+                Refresh Flags
+              </Button>
+              <Button colorScheme="blue" onClick={handleCreate}>
+                Create Document
+              </Button>
+            </>
+          )}
+        </HStack>
       </HStack>
 
       {/* Bulk actions bar */}
@@ -1017,7 +1152,7 @@ export function DocumentsPage() {
           setCurrentPage(1);
         }}
         onClearFilters={() => {
-          setFilters({ type: '', status: '', ownerId: '', search: '', requiresAcknowledgement: '' });
+          setFilters({ type: '', status: '', ownerId: '', search: '', requiresAcknowledgement: '', hasChanged: '' });
           setCurrentPage(1);
         }}
         showFiltersHeading={true}

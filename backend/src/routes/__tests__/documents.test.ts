@@ -96,6 +96,14 @@ jest.mock('../../clients/aiServiceClient', () => ({
   similaritySearchRemote: jest.fn(),
 }));
 
+jest.mock('../../services/documentChangeService', () => ({
+  checkDocumentChanges: jest.fn(),
+}));
+
+jest.mock('../../services/documentChangeService', () => ({
+  checkDocumentChanges: jest.fn(),
+}));
+
 jest.mock('../../config', () => ({
   config: {
     sharePoint: {
@@ -426,8 +434,8 @@ describe('Documents API', () => {
       prisma.document.findMany.mockResolvedValue(mockDocuments);
       prisma.document.count.mockResolvedValue(1);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
-      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/wiki/spaces/TEST/pages/page-123');
-      prisma.document.update.mockResolvedValue({ ...mockDocuments[0], documentUrl: 'https://test.atlassian.net/wiki/spaces/TEST/pages/page-123' });
+      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/pages/viewpage.action?pageId=page-123');
+      prisma.document.update.mockResolvedValue({ ...mockDocuments[0], documentUrl: 'https://test.atlassian.net/pages/viewpage.action?pageId=page-123' });
 
       await request(app)
         .get('/api/documents')
@@ -843,7 +851,7 @@ describe('Documents API', () => {
         },
       };
 
-      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/wiki/spaces/TEST/pages/page-123');
+      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/pages/viewpage.action?pageId=page-123');
       prisma.document.create.mockResolvedValue(newDocument);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 
@@ -1082,7 +1090,7 @@ describe('Documents API', () => {
       };
 
       prisma.document.findUnique.mockResolvedValue(existingDocument);
-      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/wiki/spaces/NEW/pages/new-page');
+      generateConfluenceUrl.mockReturnValue('https://test.atlassian.net/pages/viewpage.action?pageId=new-page');
       prisma.document.update.mockResolvedValue(updatedDocument);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 
@@ -2680,6 +2688,100 @@ describe('Documents API', () => {
           type: 'POLICY',
         })
         .expect(500);
+    });
+  });
+
+  describe('GET /api/documents/flags', () => {
+    it('should refresh flags for all documents', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const documentChangeService = require('../../services/documentChangeService');
+      documentChangeService.checkDocumentChanges.mockResolvedValue({
+        checked: 10,
+        changed: 3,
+        errors: 0,
+        skipped: 2,
+      });
+
+      const response = await request(app)
+        .get('/api/documents/flags')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        checked: 10,
+        changed: 3,
+        errors: 0,
+        skipped: 2,
+      });
+      expect(documentChangeService.checkDocumentChanges).toHaveBeenCalled();
+    });
+
+    it('should handle errors gracefully', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const documentChangeService = require('../../services/documentChangeService');
+      documentChangeService.checkDocumentChanges.mockRejectedValue(
+        new Error('Service error')
+      );
+
+      const response = await request(app)
+        .get('/api/documents/flags')
+        .expect(500);
+
+      expect(response.body.error).toBe('Failed to refresh document flags');
+    });
+  });
+
+  describe('POST /api/documents/:id/reset-flag', () => {
+    it('should reset hasChanged flag for a document', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440001';
+      const mockDocument = {
+        id: docId,
+        title: 'Test Document',
+        hasChanged: true,
+        lastChecked: new Date('2024-01-01T00:00:00Z'),
+        owner: {
+          id: '550e8400-e29b-41d4-a716-446655440002',
+          displayName: 'Test User',
+          email: 'test@example.com',
+        },
+      };
+
+      prisma.document.findUnique.mockResolvedValue(mockDocument);
+      prisma.document.update.mockResolvedValue({
+        ...mockDocument,
+        hasChanged: false,
+        lastChecked: new Date(),
+      });
+
+      const response = await request(app)
+        .post(`/api/documents/${docId}/reset-flag`)
+        .expect(200);
+
+      expect(response.body.hasChanged).toBe(false);
+      expect(prisma.document.update).toHaveBeenCalledWith({
+        where: { id: docId },
+        data: {
+          hasChanged: false,
+          lastChecked: expect.any(Date),
+        },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+            },
+          },
+        },
+      });
+    });
+
+    it('should return 404 when document not found', async () => {
+      const docId = '550e8400-e29b-41d4-a716-446655440000';
+      prisma.document.findUnique.mockResolvedValue(null);
+
+      await request(app)
+        .post(`/api/documents/${docId}/reset-flag`)
+        .expect(404);
     });
   });
 });

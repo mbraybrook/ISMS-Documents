@@ -11,6 +11,7 @@ import { generateConfluenceUrl } from '../services/confluenceService';
 import { invalidateCacheRemote } from '../clients/documentServiceClient';
 import { config } from '../config';
 import { generateEmbeddingRemote, similaritySearchRemote } from '../clients/aiServiceClient';
+import { checkDocumentChanges } from '../services/documentChangeService';
 
 const router = Router();
 
@@ -210,6 +211,27 @@ router.get(
     } catch (error) {
       console.error('Error fetching documents:', error);
       res.status(500).json({ error: 'Failed to fetch documents' });
+    }
+  }
+);
+
+
+// GET /api/documents/flags - refresh flags for all documents
+// NOTE: This must be defined BEFORE /:id route to avoid route conflict
+router.get(
+  '/flags',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await checkDocumentChanges();
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error refreshing document flags:', error);
+      res.status(500).json({
+        error: 'Failed to refresh document flags',
+        details: error.message,
+      });
     }
   }
 );
@@ -1592,4 +1614,61 @@ router.delete(
 );
 
 export { router as documentsRouter };
+
+// POST /api/documents/:id/reset-flag - reset hasChanged flag for a document
+router.post(
+  "/:id/reset-flag",
+  authenticateToken,
+  [param("id").isUUID()],
+  validate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const document = await prisma.document.findUnique({
+        where: { id },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      // Update document to reset flag and update lastChecked
+      const updated = await prisma.document.update({
+        where: { id },
+        data: {
+          hasChanged: false,
+          lastChecked: new Date(),
+        },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error.code === "P2025") {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      console.error("Error resetting document flag:", error);
+      res.status(500).json({ error: "Failed to reset document flag" });
+    }
+  }
+);
+
 

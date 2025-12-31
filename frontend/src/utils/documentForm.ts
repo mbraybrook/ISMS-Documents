@@ -35,6 +35,9 @@ export interface Document {
   confluenceSpaceKey?: string;
   confluencePageId?: string;
   documentUrl?: string | null;
+  hasChanged?: boolean;
+  lastChecked?: string | null;
+  lastModified?: string | null;
 }
 
 /**

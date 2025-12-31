@@ -27,6 +27,7 @@ import { trustRouter } from './routes/trust';
 import { trustAuthRouter } from './routes/trust/auth';
 import { errorHandler } from './middleware/errorHandler';
 import { globalLimiter } from './middleware/rateLimit';
+import { startDocumentChangeJob } from './jobs/documentChangeJob';
 
 const app = express();
 
@@ -146,6 +147,17 @@ app.listen(PORT, () => {
     hasClientSecret: !!config.auth.clientSecret,
     redirectUri: config.auth.redirectUri,
   });
+
+  // Start scheduled jobs
+  try {
+    startDocumentChangeJob();
+  } catch (error: any) {
+    log.error('Failed to start document change job', {
+      error: error.message,
+      stack: error.stack,
+    });
+    // Don't prevent server from starting if job fails
+  }
 });
 
 
