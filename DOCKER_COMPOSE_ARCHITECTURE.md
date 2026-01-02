@@ -228,3 +228,5 @@ docker compose down -v
 3. Check Dockerfile syntax and dependencies
 
 
+
+

@@ -1,0 +1,454 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ISMS Application - Single EC2 Instance Deployment'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - staging
+      - production
+    Description: Environment name
+
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    AllowedValues:
+      - t3.small
+      - t3.medium
+      - t3.large
+    Description: EC2 instance type
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 Key Pair name for SSH access
+
+  AllowedSSHCIDR:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: CIDR block allowed for SSH access (restrict for production)
+
+  DomainName:
+    Type: String
+    Default: ''
+    Description: Domain name for the application (optional, for CloudFront)
+
+  CertificateArn:
+    Type: String
+    Default: ''
+    Description: ACM Certificate ARN for CloudFront (optional, if using CloudFront)
+
+  EnableCloudFront:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable CloudFront distribution (for ACM SSL)
+
+  VolumeSize:
+    Type: Number
+    Default: 50
+    MinValue: 20
+    MaxValue: 500
+    Description: EBS volume size in GB
+
+  BackupS3Bucket:
+    Type: String
+    Default: ''
+    Description: S3 bucket name for database backups (optional)
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Instance Configuration
+        Parameters:
+          - Environment
+          - InstanceType
+          - KeyPairName
+          - AllowedSSHCIDR
+          - VolumeSize
+      - Label:
+          default: Networking
+        Parameters:
+          - DomainName
+          - CertificateArn
+          - EnableCloudFront
+      - Label:
+          default: Backup
+        Parameters:
+          - BackupS3Bucket
+
+Resources:
+  # VPC (use existing or create new)
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-vpc'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-igw'
+        - Key: Environment
+          Value: !Ref Environment
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # Public Subnet
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-public-subnet'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Route Table for Public Subnet
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-public-rt'
+        - Key: Environment
+          Value: !Ref Environment
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # Security Group
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub 'isms-${Environment}-sg'
+      GroupDescription: Security group for ISMS EC2 instance
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedSSHCIDR
+          Description: SSH access
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP access
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS access
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-sg'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # IAM Role for EC2
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'isms-${Environment}-ec2-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies: !If
+        - HasBackupBucket
+        - - PolicyName: CloudWatchLogs
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                    - logs:DescribeLogStreams
+                  Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/isms-ec2-*'
+          - PolicyName: S3BackupAccess
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - s3:PutObject
+                    - s3:GetObject
+                    - s3:DeleteObject
+                    - s3:ListBucket
+                  Resource:
+                    - !Sub '${BackupS3Bucket}/*'
+                    - !Sub '${BackupS3Bucket}'
+        - - PolicyName: CloudWatchLogs
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                    - logs:DescribeLogStreams
+                  Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/isms-ec2-*'
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-ec2-role'
+        - Key: Environment
+          Value: !Ref Environment
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub 'isms-${Environment}-ec2-profile'
+      Roles:
+        - !Ref EC2Role
+
+  # EBS Volume for data persistence
+  DataVolume:
+    Type: AWS::EC2::Volume
+    Properties:
+      Size: !Ref VolumeSize
+      VolumeType: gp3
+      Encrypted: true
+      AvailabilityZone: !GetAtt PublicSubnet.AvailabilityZone
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-data-volume'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # EC2 Instance
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref AWS::Region
+        - AMI
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      SubnetId: !Ref PublicSubnet
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          # Install required packages
+          yum install -y docker git
+          systemctl start docker
+          systemctl enable docker
+          usermod -a -G docker ec2-user
+          # Install Docker Compose
+          curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+          # Attach and mount data volume
+          DEVICE=/dev/xvdf
+          if [ -b $DEVICE ]; then
+            mkfs -t ext4 $DEVICE
+            mkdir -p /opt/isms
+            mount $DEVICE /opt/isms
+            echo "$DEVICE /opt/isms ext4 defaults,nofail 0 2" >> /etc/fstab
+          fi
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'isms-${Environment}-ec2'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Attach data volume to instance
+  VolumeAttachment:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      InstanceId: !Ref EC2Instance
+      VolumeId: !Ref DataVolume
+      Device: /dev/xvdf
+
+  # CloudFront Distribution (optional)
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Condition: EnableCloudFrontCondition
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub 'ISMS Application - ${Environment}'
+        DefaultRootObject: index.html
+        Origins:
+          - Id: EC2Origin
+            DomainName: !GetAtt EC2Instance.PublicIp
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        DefaultCacheBehavior:
+          TargetOriginId: EC2Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - DELETE
+            - GET
+            - HEAD
+            - OPTIONS
+            - PATCH
+            - POST
+            - PUT
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: true
+            Cookies:
+              Forward: all
+          MinTTL: 0
+          DefaultTTL: 3600
+          MaxTTL: 86400
+          Compress: true
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        Aliases:
+          - !If
+            - HasDomain
+            - !Ref DomainName
+            - !Ref AWS::NoValue
+        PriceClass: PriceClass_100
+
+  # CloudWatch Alarms
+  HighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'isms-${Environment}-high-cpu'
+      AlarmDescription: Alert when CPU utilization exceeds 80%
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref EC2Instance
+      TreatMissingData: notBreaching
+
+  LowMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'isms-${Environment}-low-memory'
+      AlarmDescription: Alert when available memory is low
+      MetricName: mem_used_percent
+      Namespace: ISMS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 90
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref EC2Instance
+      TreatMissingData: notBreaching
+
+Conditions:
+  EnableCloudFrontCondition: !Equals [!Ref EnableCloudFront, 'true']
+  HasDomain: !Not [!Equals [!Ref DomainName, '']]
+  HasBackupBucket: !Not [!Equals [!Ref BackupS3Bucket, '']]
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-0c55b159cbfafe1f0  # Amazon Linux 2023 - Update with current AMI
+    us-west-2:
+      AMI: ami-0c55b159cbfafe1f0  # Amazon Linux 2023 - Update with current AMI
+    eu-west-1:
+      AMI: ami-0c55b159cbfafe1f0  # Amazon Linux 2023 - Update with current AMI
+    eu-west-2:
+      AMI: ami-099400d52583dd8c4  # Amazon Linux 2023 (al2023-ami-2023.9.20251208.0-kernel-6.1-x86_64)
+    ap-southeast-1:
+      AMI: ami-0c55b159cbfafe1f0  # Amazon Linux 2023 - Update with current AMI
+
+Outputs:
+  InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref EC2Instance
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceId'
+
+  PublicIP:
+    Description: Public IP address of the EC2 instance
+    Value: !GetAtt EC2Instance.PublicIp
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicIP'
+
+  SecurityGroupId:
+    Description: Security Group ID
+    Value: !Ref SecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityGroupId'
+
+  CloudFrontDomainName:
+    Condition: EnableCloudFrontCondition
+    Description: CloudFront distribution domain name
+    Value: !GetAtt CloudFrontDistribution.DomainName
+    Export:
+      Name: !Sub '${AWS::StackName}-CloudFrontDomainName'
+
+  CloudFrontDistributionId:
+    Condition: EnableCloudFrontCondition
+    Description: CloudFront distribution ID
+    Value: !Ref CloudFrontDistribution
+    Export:
+      Name: !Sub '${AWS::StackName}-CloudFrontDistributionId'
+
