@@ -21,7 +21,13 @@ import {
   AlertDialogOverlay,
   useToast,
   Divider,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
 } from '@chakra-ui/react';
+import { NotesTab } from './NotesTab';
 import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { VersionUpdateModal } from './VersionUpdateModal';
@@ -143,172 +149,187 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
     <Modal isOpen={isOpen} onClose={onClose} size="xl">
       <ModalOverlay />
       <ModalContent>
-        <form onSubmit={handleSubmit}>
-          <ModalHeader>{readOnly ? 'View Document' : document ? 'Edit Document' : 'Create Document'}</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4}>
-              {/* File Selection Section - First, only when creating */}
-              {!document && (
-                <>
-                  <FormControl isRequired>
-                    <FormLabel>Storage Location</FormLabel>
-                    <Select
-                      value={formData.storageLocation}
-                      onChange={(e) => handleFormChange({ storageLocation: e.target.value })}
-                      isDisabled={readOnly}
-                    >
-                      <option value="SHAREPOINT">SharePoint</option>
-                      <option value="CONFLUENCE">Confluence</option>
-                    </Select>
-                  </FormControl>
+        <ModalHeader>{readOnly ? 'View Document' : document ? 'Edit Document' : 'Create Document'}</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody p={0}>
+          <Tabs isLazy colorScheme="blue" display="flex" flexDirection="column" h="70vh">
+            <TabList px={6} pt={2}>
+              <Tab>Details</Tab>
+              {document && canEditOwner && <Tab>Notes</Tab>}
+            </TabList>
+            <TabPanels flex={1} overflowY="hidden">
+              <TabPanel h="100%" overflowY="auto">
+                <form id="document-form" onSubmit={handleSubmit}>
+                  <VStack spacing={4}>
+                    {/* File Selection Section - First, only when creating */}
+                    {!document && (
+                      <>
+                        <FormControl isRequired>
+                          <FormLabel>Storage Location</FormLabel>
+                          <Select
+                            value={formData.storageLocation}
+                            onChange={(e) => handleFormChange({ storageLocation: e.target.value })}
+                            isDisabled={readOnly}
+                          >
+                            <option value="SHAREPOINT">SharePoint</option>
+                            <option value="CONFLUENCE">Confluence</option>
+                          </Select>
+                        </FormControl>
 
-                  {formData.storageLocation === 'SHAREPOINT' && (
-                    <SharePointDocumentSection
-                      formData={formData}
-                      readOnly={readOnly}
-                      document={document}
-                      onFileSelect={sharePointIntegration.handleFileSelect}
-                      onUrlParse={sharePointIntegration.handleParseUrl}
-                      sharePointUrl={sharePointIntegration.sharePointUrl}
-                      setSharePointUrl={sharePointIntegration.setSharePointUrl}
-                      parsingUrl={sharePointIntegration.parsingUrl}
-                      urlError={sharePointIntegration.urlError}
-                      setUrlError={sharePointIntegration.setUrlError}
-                      documentUrl={sharePointIntegration.documentUrl}
-                      loadingUrl={sharePointIntegration.loadingUrl}
-                      showReplaceOptions={sharePointIntegration.showReplaceOptions}
-                      onToggleReplace={() => sharePointIntegration.setShowReplaceOptions(!sharePointIntegration.showReplaceOptions)}
-                      browserOpen={sharePointIntegration.browserOpen}
-                      setBrowserOpen={sharePointIntegration.setBrowserOpen}
-                    />
-                  )}
+                        {formData.storageLocation === 'SHAREPOINT' && (
+                          <SharePointDocumentSection
+                            formData={formData}
+                            readOnly={readOnly}
+                            document={document}
+                            onFileSelect={sharePointIntegration.handleFileSelect}
+                            onUrlParse={sharePointIntegration.handleParseUrl}
+                            sharePointUrl={sharePointIntegration.sharePointUrl}
+                            setSharePointUrl={sharePointIntegration.setSharePointUrl}
+                            parsingUrl={sharePointIntegration.parsingUrl}
+                            urlError={sharePointIntegration.urlError}
+                            setUrlError={sharePointIntegration.setUrlError}
+                            documentUrl={sharePointIntegration.documentUrl}
+                            loadingUrl={sharePointIntegration.loadingUrl}
+                            showReplaceOptions={sharePointIntegration.showReplaceOptions}
+                            onToggleReplace={() => sharePointIntegration.setShowReplaceOptions(!sharePointIntegration.showReplaceOptions)}
+                            browserOpen={sharePointIntegration.browserOpen}
+                            setBrowserOpen={sharePointIntegration.setBrowserOpen}
+                          />
+                        )}
 
-                  {formData.storageLocation === 'CONFLUENCE' && (
-                    <ConfluenceDocumentSection
+                        {formData.storageLocation === 'CONFLUENCE' && (
+                          <ConfluenceDocumentSection
+                            formData={formData}
+                            onChange={handleFormChange}
+                            readOnly={readOnly}
+                          />
+                        )}
+
+                        <Divider />
+                      </>
+                    )}
+
+                    {/* Document Details Section */}
+                    <DocumentFormFields
                       formData={formData}
                       onChange={handleFormChange}
                       readOnly={readOnly}
+                      onVersionUpdateClick={modals.onVersionUpdateOpen}
+                      document={document}
+                      hideStorageLocation={!document}
                     />
-                  )}
 
-                  <Divider />
-                </>
+                    {canEditOwner && (
+                      <DocumentOwnerSelection
+                        formData={formData}
+                        onChange={handleFormChange}
+                        readOnly={readOnly}
+                        users={users}
+                        loadingUsers={loadingUsers}
+                      />
+                    )}
+
+                    {/* File Selection Section - For edit mode */}
+                    {document && formData.storageLocation === 'SHAREPOINT' && (
+                      <SharePointDocumentSection
+                        formData={formData}
+                        readOnly={readOnly}
+                        document={document}
+                        onFileSelect={sharePointIntegration.handleFileSelect}
+                        onUrlParse={sharePointIntegration.handleParseUrl}
+                        sharePointUrl={sharePointIntegration.sharePointUrl}
+                        setSharePointUrl={sharePointIntegration.setSharePointUrl}
+                        parsingUrl={sharePointIntegration.parsingUrl}
+                        urlError={sharePointIntegration.urlError}
+                        setUrlError={sharePointIntegration.setUrlError}
+                        documentUrl={sharePointIntegration.documentUrl}
+                        loadingUrl={sharePointIntegration.loadingUrl}
+                        showReplaceOptions={sharePointIntegration.showReplaceOptions}
+                        onToggleReplace={() => sharePointIntegration.setShowReplaceOptions(!sharePointIntegration.showReplaceOptions)}
+                        browserOpen={sharePointIntegration.browserOpen}
+                        setBrowserOpen={sharePointIntegration.setBrowserOpen}
+                      />
+                    )}
+
+                    {document && formData.storageLocation === 'CONFLUENCE' && (
+                      <ConfluenceDocumentSection
+                        formData={formData}
+                        onChange={handleFormChange}
+                        readOnly={readOnly}
+                      />
+                    )}
+
+                    <DocumentReviewDates
+                      formData={formData}
+                      onChange={handleFormChange}
+                      readOnly={readOnly}
+                      document={document}
+                      isReviewContext={isReviewContext}
+                    />
+
+                    <FormControl>
+                      <Checkbox
+                        isChecked={formData.requiresAcknowledgement}
+                        onChange={(e) => handleFormChange({ requiresAcknowledgement: e.target.checked })}
+                        isDisabled={readOnly}
+                      >
+                        Requires Staff Acknowledgment
+                      </Checkbox>
+                      {formData.type === 'POLICY' && (
+                        <Text fontSize="sm" color="gray.600" mt={1} ml={6}>
+                          Policy documents default to requiring staff acknowledgment, but this can be changed if needed.
+                        </Text>
+                      )}
+                    </FormControl>
+
+                    {document && (
+                      <DocumentControlLinking
+                        linkedControls={controlLinking.linkedControls}
+                        controlSearchTerm={controlLinking.controlSearchTerm}
+                        setControlSearchTerm={controlLinking.setControlSearchTerm}
+                        availableControls={controlLinking.availableControls}
+                        suggestedControls={controlLinking.suggestedControls}
+                        searchingControls={controlLinking.searchingControls}
+                        loadingControls={controlLinking.loadingControls}
+                        loadingSuggestedControls={controlLinking.loadingSuggestedControls}
+                        onSearchControls={controlLinking.searchControls}
+                        onLinkControl={controlLinking.handleLinkControl}
+                        onUnlinkControl={controlLinking.handleUnlinkControl}
+                        onControlClick={handleControlClick}
+                        readOnly={readOnly}
+                      />
+                    )}
+                  </VStack>
+                </form>
+              </TabPanel>
+              {document && canEditOwner && (
+                <TabPanel h="100%">
+                  <NotesTab documentId={document.id} />
+                </TabPanel>
               )}
+            </TabPanels>
+          </Tabs>
+        </ModalBody>
 
-              {/* Document Details Section */}
-              <DocumentFormFields
-                formData={formData}
-                onChange={handleFormChange}
-                readOnly={readOnly}
-                onVersionUpdateClick={modals.onVersionUpdateOpen}
-                document={document}
-                hideStorageLocation={!document}
-              />
-
-              {canEditOwner && (
-                <DocumentOwnerSelection
-                  formData={formData}
-                  onChange={handleFormChange}
-                  readOnly={readOnly}
-                  users={users}
-                  loadingUsers={loadingUsers}
-                />
+        <ModalFooter>
+          <Button variant="ghost" mr={3} onClick={onClose}>
+            {readOnly ? 'Close' : 'Cancel'}
+          </Button>
+          {!readOnly && (
+            <>
+              {!document && (
+                <Button colorScheme="blue" type="submit" form="document-form" isLoading={loading}>
+                  Create
+                </Button>
               )}
-
-              {/* File Selection Section - For edit mode */}
-              {document && formData.storageLocation === 'SHAREPOINT' && (
-                <SharePointDocumentSection
-                  formData={formData}
-                  readOnly={readOnly}
-                  document={document}
-                  onFileSelect={sharePointIntegration.handleFileSelect}
-                  onUrlParse={sharePointIntegration.handleParseUrl}
-                  sharePointUrl={sharePointIntegration.sharePointUrl}
-                  setSharePointUrl={sharePointIntegration.setSharePointUrl}
-                  parsingUrl={sharePointIntegration.parsingUrl}
-                  urlError={sharePointIntegration.urlError}
-                  setUrlError={sharePointIntegration.setUrlError}
-                  documentUrl={sharePointIntegration.documentUrl}
-                  loadingUrl={sharePointIntegration.loadingUrl}
-                  showReplaceOptions={sharePointIntegration.showReplaceOptions}
-                  onToggleReplace={() => sharePointIntegration.setShowReplaceOptions(!sharePointIntegration.showReplaceOptions)}
-                  browserOpen={sharePointIntegration.browserOpen}
-                  setBrowserOpen={sharePointIntegration.setBrowserOpen}
-                />
-              )}
-
-              {document && formData.storageLocation === 'CONFLUENCE' && (
-                <ConfluenceDocumentSection
-                  formData={formData}
-                  onChange={handleFormChange}
-                  readOnly={readOnly}
-                />
-              )}
-
-              <DocumentReviewDates
-                formData={formData}
-                onChange={handleFormChange}
-                readOnly={readOnly}
-                document={document}
-                isReviewContext={isReviewContext}
-              />
-
-              <FormControl>
-                <Checkbox
-                  isChecked={formData.requiresAcknowledgement}
-                  onChange={(e) => handleFormChange({ requiresAcknowledgement: e.target.checked })}
-                  isDisabled={readOnly}
-                >
-                  Requires Staff Acknowledgment
-                </Checkbox>
-                {formData.type === 'POLICY' && (
-                  <Text fontSize="sm" color="gray.600" mt={1} ml={6}>
-                    Policy documents default to requiring staff acknowledgment, but this can be changed if needed.
-                  </Text>
-                )}
-              </FormControl>
-
               {document && (
-                <DocumentControlLinking
-                  linkedControls={controlLinking.linkedControls}
-                  controlSearchTerm={controlLinking.controlSearchTerm}
-                  setControlSearchTerm={controlLinking.setControlSearchTerm}
-                  availableControls={controlLinking.availableControls}
-                  suggestedControls={controlLinking.suggestedControls}
-                  searchingControls={controlLinking.searchingControls}
-                  loadingControls={controlLinking.loadingControls}
-                  loadingSuggestedControls={controlLinking.loadingSuggestedControls}
-                  onSearchControls={controlLinking.searchControls}
-                  onLinkControl={controlLinking.handleLinkControl}
-                  onUnlinkControl={controlLinking.handleUnlinkControl}
-                  onControlClick={handleControlClick}
-                  readOnly={readOnly}
-                />
+                <Button colorScheme="blue" type="submit" form="document-form" isLoading={loading}>
+                  Update
+                </Button>
               )}
-            </VStack>
-          </ModalBody>
-
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onClose}>
-              {readOnly ? 'Close' : 'Cancel'}
-            </Button>
-            {!readOnly && (
-              <>
-                {!document && (
-                  <Button colorScheme="blue" type="submit" isLoading={loading}>
-                    Create
-                  </Button>
-                )}
-                {document && (
-                  <Button colorScheme="blue" type="submit" isLoading={loading}>
-                    Update
-                  </Button>
-                )}
-              </>
-            )}
-          </ModalFooter>
-        </form>
+            </>
+          )}
+        </ModalFooter>
       </ModalContent>
 
       <AlertDialog
@@ -356,6 +377,6 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
         onClose={modals.onControlModalClose}
         control={modals.selectedControl}
       />
-    </Modal>
+    </Modal >
   );
 }

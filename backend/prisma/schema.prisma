@@ -129,6 +129,7 @@ model Document {
   lastModified             DateTime?
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
+  Note                    Note[]
   documentUrl             String?
   Acknowledgment          Acknowledgment[]
   owner                   User                    @relation("DocumentOwner", fields: [ownerUserId], references: [id])
@@ -364,6 +365,7 @@ model User {
   supplierRelationshipOwner Supplier[] @relation("SupplierRelationshipOwner")
   supplierCreatedBy         Supplier[] @relation("SupplierCreatedBy")
   supplierUpdatedBy         Supplier[] @relation("SupplierUpdatedBy")
+  authoredNotes             Note[]
 
   @@index([entraObjectId])
   @@index([email])
@@ -598,4 +600,18 @@ model Supplier {
   @@index([lifecycleState])
   @@index([showInTrustCenter])
   @@index([trustCenterCategory])
+}
+
+model Note {
+  id          String   @id @default(uuid())
+  documentId  String
+  authorId    String
+  content     String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  author      User     @relation(fields: [authorId], references: [id])
+
+  @@index([documentId])
+  @@index([authorId])
 }
