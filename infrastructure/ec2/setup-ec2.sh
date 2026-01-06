@@ -215,6 +215,47 @@ if ! id -u isms &> /dev/null; then
     print_success "Application user 'isms' created"
 else
     print_warning "User 'isms' already exists"
+    # Ensure user is in docker group
+    usermod -aG docker isms
+fi
+
+# Configure passwordless sudo for deployment operations (required for deploy.sh)
+print_step "Configuring sudo permissions for isms user..."
+if [ -d /etc/sudoers.d ]; then
+    # Remove old isms-nginx file if it exists (replaced by isms-deploy)
+    if [ -f /etc/sudoers.d/isms-nginx ]; then
+        print_info "Removing old isms-nginx sudoers file (replaced by isms-deploy)..."
+        rm -f /etc/sudoers.d/isms-nginx
+    fi
+    
+    # Create unified isms-deploy sudoers file
+    cat > /etc/sudoers.d/isms-deploy <<'EOF'
+# Allow isms user to perform deployment operations without password
+# This file replaces the old isms-nginx file and includes all deployment operations
+
+# Nginx operations
+isms ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+isms ALL=(ALL) NOPASSWD: /bin/systemctl status nginx
+
+# File operations for deployment
+isms ALL=(ALL) NOPASSWD: /bin/cp
+isms ALL=(ALL) NOPASSWD: /bin/mkdir
+isms ALL=(ALL) NOPASSWD: /usr/bin/chown
+isms ALL=(ALL) NOPASSWD: /usr/bin/chmod
+isms ALL=(ALL) NOPASSWD: /usr/bin/touch
+isms ALL=(ALL) NOPASSWD: /bin/rm
+EOF
+    chmod 0440 /etc/sudoers.d/isms-deploy
+    
+    # Validate sudoers syntax
+    if visudo -c -f /etc/sudoers.d/isms-deploy 2>/dev/null; then
+        print_success "Sudo permissions configured for deployment operations"
+    else
+        print_warning "Sudo configuration validation failed, but file created"
+        print_warning "Please verify manually: visudo -c -f /etc/sudoers.d/isms-deploy"
+    fi
+else
+    print_warning "sudoers.d directory not found, skipping sudo configuration"
 fi
 
 # Create application directories

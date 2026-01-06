@@ -180,10 +180,10 @@ fi
 # Restore instructions
 echo ""
 echo "To restore this backup:"
-echo "  1. Stop the application: docker compose -f docker-compose.ec2.yml down"
+echo "  1. Stop the application: docker-compose -f docker-compose.ec2.yml down"
 echo "  2. Restore database:"
 echo "     gunzip < $BACKUP_FILE | docker exec -i isms-postgres-ec2 pg_restore -U $DB_USER -d $DB_NAME -c"
-echo "  3. Start the application: docker compose -f docker-compose.ec2.yml up -d"
+echo "  3. Start the application: docker-compose -f docker-compose.ec2.yml up -d"
 
 
 

@@ -78,6 +78,67 @@ aws cloudformation create-stack \
   --profile pt-sandbox
 ```
 
+**Updating SSH IP Address When It Changes:**
+
+If your IP address changes, you can update the security group without recreating the stack by using `update-stack`. You can automatically fetch your current IP address and use it in the command:
+
+**Option 1: Automatic IP Detection (Recommended)**
+
+```bash
+MY_IP=$(curl -s https://checkip.amazonaws.com)
+aws cloudformation update-stack \
+  --stack-name isms-ec2-production \
+  --template-body file://infrastructure/templates/ec2-single-instance.yaml \
+  --parameters \
+    ParameterKey=Environment,ParameterValue=production \
+    ParameterKey=InstanceType,ParameterValue=t3.medium \
+    ParameterKey=KeyPairName,ParameterValue=mark.braybrook-sandbox \
+    ParameterKey=AllowedSSHCIDR,ParameterValue=${MY_IP}/32 \
+    ParameterKey=VolumeSize,ParameterValue=50 \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region eu-west-2 \
+  --profile pt-sandbox
+```
+
+**Option 2: Using the Helper Script (Recommended)**
+
+For convenience, use the `update-ssh-ip.sh` helper script which automates the entire process:
+
+```bash
+# Basic usage (uses defaults: isms-ec2-production, eu-west-2, pt-sandbox)
+./infrastructure/ec2/update-ssh-ip.sh
+
+# With custom options
+./infrastructure/ec2/update-ssh-ip.sh \
+  --stack-name isms-ec2-production \
+  --region eu-west-2 \
+  --profile pt-sandbox
+
+# Dry run to see what would change
+./infrastructure/ec2/update-ssh-ip.sh --dry-run
+
+# Use alternative IP service
+./infrastructure/ec2/update-ssh-ip.sh --ip-service https://checkip.amazonaws.com
+
+# Show help
+./infrastructure/ec2/update-ssh-ip.sh --help
+```
+
+The script automatically:
+- Detects your current public IP address
+- Retrieves current stack parameters
+- Compares IP addresses (skips update if unchanged)
+- Updates only the `AllowedSSHCIDR` parameter
+- Waits for the stack update to complete
+- Provides clear status messages
+
+**Note:** The `/32` suffix means "this specific IP address only" (single host CIDR block). The `-s` flag in curl suppresses progress output.
+
+**Alternative IP services** (if `api.ipify.org` is unavailable):
+- `curl -s ifconfig.me`
+- `curl -s https://icanhazip.com`
+- `curl -s https://checkip.amazonaws.com`
+
 #### Option B: Manual EC2 Launch
 
 1. Launch EC2 instance:
@@ -274,12 +335,321 @@ sudo systemctl start isms
 
 ## Maintenance
 
-### Updating the Application
+### Publishing a New Version
+
+The `deploy.sh` script can run in two modes:
+1. **Local Mode** (Recommended): Run from your local machine - automatically copies files and deploys
+2. **Remote Mode**: Run directly on EC2 instance
+
+#### Method 1: Automated Deployment from Local Machine (Recommended)
+
+The easiest way to deploy is to run the script from your local machine. It will automatically:
+- Copy all necessary files to EC2
+- Copy files from `/tmp` to final locations on EC2
+- Build Docker images
+- Deploy the application
+
+**Usage:**
 
 ```bash
-cd /opt/isms
-sudo -u isms ./infrastructure/ec2/deploy.sh --pull
+# From your local machine (in the project root)
+cd /home/developer/dev/ISMS-Documentation
+
+# Set EC2 connection details (or use command-line arguments)
+export EC2_HOST=18.171.58.205
+export EC2_USER=ec2-user
+export EC2_SSH_KEY=~/.ssh/mark.braybrook-sandbox.pem
+
+# Run deployment (automatically uses --no-cache for fresh builds)
+./infrastructure/ec2/deploy.sh --no-cache
 ```
+
+**Or use command-line arguments:**
+
+```bash
+./infrastructure/ec2/deploy.sh \
+  --ec2-host 18.171.58.205 \
+  --ec2-user ec2-user \
+  --ec2-ssh-key ~/.ssh/mark.braybrook-sandbox.pem \
+  --no-cache
+```
+
+**What it does:**
+1. Prepares files locally (excludes node_modules, .git, etc.)
+2. Transfers files to EC2 `/tmp/isms-deploy/` directory
+3. Copies files from `/tmp` to `/opt/isms/` on EC2
+4. Runs the deployment script on EC2
+5. Builds Docker images without cache
+6. Deploys the application
+
+**Options:**
+```bash
+# Skip database backup
+./infrastructure/ec2/deploy.sh --ec2-host 18.171.58.205 --skip-backup --no-cache
+
+# Skip migrations
+./infrastructure/ec2/deploy.sh --ec2-host 18.171.58.205 --skip-migrate --no-cache
+
+# Skip building (use existing images)
+./infrastructure/ec2/deploy.sh --ec2-host 18.171.58.205 --no-build
+```
+
+#### Method 2: Manual Copy Files via SCP/rsync
+
+**Most EC2 instances don't have Git access to private repositories.** Use this method:
+
+1. **From your local machine, copy updated files to EC2:**
+   ```bash
+   # Copy all application files
+   scp -i your-key.pem -r \
+     docker-compose.ec2.yml \
+     backend \
+     frontend \
+     services \
+     infrastructure/ec2/*.sh \
+     ec2-user@<EC2_PUBLIC_IP>:/tmp/
+   ```
+
+2. **SSH into the EC2 instance:**
+   ```bash
+   ssh -i your-key.pem ec2-user@<EC2_PUBLIC_IP>
+   ```
+
+3. **Move files to the application directory:**
+   ```bash
+   cd /opt/isms
+   sudo cp -r /tmp/backend ./
+   sudo cp -r /tmp/frontend ./
+   sudo cp -r /tmp/services ./
+   sudo cp /tmp/docker-compose.ec2.yml ./
+   sudo chown -R isms:isms /opt/isms
+   ```
+
+4. **Run the deployment script with `--no-cache` flag:**
+   ```bash
+   sudo -u isms ./infrastructure/ec2/deploy.sh --no-cache
+   ```
+
+   This will:
+   - **Rebuild images without cache** (ensures all changes are included)
+   - Read the VERSION file and update VITE_APP_VERSION in .env
+   - Create a database backup (automatic)
+   - Build new Docker images
+   - Run database migrations
+   - Restart all services
+   - Verify health checks
+
+   **Alternative: Using rsync (more efficient for updates):**
+   ```bash
+   # From your local machine - sync only changed files
+   rsync -avz --exclude 'node_modules' --exclude '.git' \
+     -e "ssh -i your-key.pem" \
+     ./backend/ \
+     ./frontend/ \
+     ./services/ \
+     docker-compose.ec2.yml \
+     infrastructure/ec2/*.sh \
+     ec2-user@<EC2_PUBLIC_IP>:/opt/isms/
+   
+   # Then on EC2, run deploy
+   ssh -i your-key.pem ec2-user@<EC2_PUBLIC_IP>
+   cd /opt/isms
+   sudo chown -R isms:isms /opt/isms
+   sudo -u isms ./infrastructure/ec2/deploy.sh --no-cache
+   ```
+
+#### Method 3: Git-Based Deployment (Only if Git is Configured)
+
+**Note:** This only works if your EC2 instance has Git access to the repository (e.g., public repo, SSH keys configured, or GitHub token).
+
+1. **SSH into the EC2 instance:**
+   ```bash
+   ssh -i your-key.pem ec2-user@<EC2_PUBLIC_IP>
+   ```
+
+2. **Navigate to the application directory:**
+   ```bash
+   cd /opt/isms
+   ```
+
+3. **Run the deployment script with `--pull` flag:**
+   ```bash
+   sudo -u isms ./infrastructure/ec2/deploy.sh --pull
+   ```
+
+   This will:
+   - Attempt to pull the latest code from Git (fails gracefully if Git isn't available)
+   - **Automatically rebuild images without cache** (ensures all changes are included)
+   - Read the VERSION file and update VITE_APP_VERSION in .env
+   - Create a database backup (automatic)
+   - Build new Docker images
+   - Run database migrations
+   - Restart all services
+   - Verify health checks
+
+   **Important:** The `--pull` flag automatically uses `--no-cache` to ensure Docker doesn't use cached layers. If Git pull fails (no access), the script continues and still rebuilds without cache.
+
+#### Method 4: Manual Code Update (Alternative)
+
+This is the same as Method 1 above. Use SCP/rsync to copy files, then run deploy with `--no-cache`.
+
+#### Deployment Options
+
+The `deploy.sh` script supports several options and can run in two modes:
+
+**Local Mode (Recommended - from your machine):**
+```bash
+# Automated deployment from local machine (copies files and deploys)
+./infrastructure/ec2/deploy.sh \
+  --ec2-host 18.171.58.205 \
+  --ec2-user ec2-user \
+  --ec2-ssh-key ~/.ssh/mark.braybrook-sandbox.pem \
+  --no-cache
+
+# Or use environment variables
+export EC2_HOST=18.171.58.205
+export EC2_USER=ec2-user
+export EC2_SSH_KEY=~/.ssh/mark.braybrook-sandbox.pem
+./infrastructure/ec2/deploy.sh --no-cache
+```
+
+**Remote Mode (on EC2 instance):**
+```bash
+# After copying files via SCP/rsync, rebuild without cache
+sudo -u isms ./infrastructure/ec2/deploy.sh --no-cache
+
+# If Git is configured, pull and deploy (automatically rebuilds without cache)
+sudo -u isms ./infrastructure/ec2/deploy.sh --pull
+
+# Force rebuild without cache (useful if changes aren't appearing)
+sudo -u isms ./infrastructure/ec2/deploy.sh --no-cache
+
+# Skip database backup (not recommended for production)
+sudo -u isms ./infrastructure/ec2/deploy.sh --skip-backup
+
+# Skip database migrations (use only if no schema changes)
+sudo -u isms ./infrastructure/ec2/deploy.sh --skip-migrate
+
+# Skip building images (use existing images)
+sudo -u isms ./infrastructure/ec2/deploy.sh --no-build
+
+# Combine options
+sudo -u isms ./infrastructure/ec2/deploy.sh --pull --skip-backup
+```
+
+**Important Notes:**
+- **Most EC2 instances don't have Git access** - Use Method 1 (SCP/rsync) instead
+- The `--pull` flag only works if Git is configured and has repository access
+- Both `--pull` and `--no-cache` force fresh builds without Docker cache
+- If you copy files via SCP/rsync, use `--no-cache` (not `--pull`)
+- If you're not seeing expected changes, always use `--no-cache` to force a fresh build
+
+#### What Happens During Deployment
+
+The deployment script performs these steps in order:
+
+1. **Pull Latest Code** (if `--pull` flag is used and Git is available)
+   - Attempts to update code from Git repository
+   - Fails gracefully if Git isn't configured or accessible
+   - **Note:** Most deployments use SCP/rsync instead (see Method 1 above)
+
+2. **Database Backup** (unless `--skip-backup`)
+   - Creates timestamped backup: `backups/backup-YYYYMMDD-HHMMSS.sql.gz`
+   - Keeps last 7 backups, removes older ones
+
+3. **Build Docker Images** (unless `--no-build`)
+   - Builds all services: backend, frontend, document-service, ai-service
+   - Uses Docker Compose with buildx
+
+4. **Stop Services**
+   - Gracefully stops all running containers
+
+5. **Database Migrations** (unless `--skip-migrate`)
+   - Starts PostgreSQL container
+   - Waits for database to be ready
+   - Runs Prisma migrations
+
+6. **Start Services**
+   - Starts all containers in detached mode
+
+7. **Health Checks**
+   - Verifies backend health endpoint
+   - Verifies frontend health endpoint
+   - Reloads Nginx configuration
+
+#### Verifying the Deployment
+
+After deployment, verify everything is working:
+
+```bash
+# Check service status
+docker-compose -f docker-compose.ec2.yml ps
+
+# Check service health
+curl http://localhost/api/health
+curl http://localhost/health
+
+# View logs
+docker-compose -f docker-compose.ec2.yml logs -f
+
+# Check specific service logs
+docker-compose -f docker-compose.ec2.yml logs -f backend
+docker-compose -f docker-compose.ec2.yml logs -f frontend
+```
+
+#### Rolling Back a Deployment
+
+If a deployment fails or causes issues:
+
+1. **Stop the services:**
+   ```bash
+   cd /opt/isms
+   docker compose -f docker-compose.ec2.yml down
+   ```
+
+2. **Restore from backup:**
+   ```bash
+   # List available backups
+   ls -lh backups/
+   
+   # Restore database (replace with actual backup filename)
+   gunzip < backups/backup-YYYYMMDD-HHMMSS.sql.gz | \
+     docker exec -i isms-postgres-ec2 pg_restore -U postgres -d isms_db -c
+   ```
+
+3. **Revert code changes:**
+   ```bash
+   # If using Git
+   cd /opt/isms
+   git checkout <previous-commit-hash>
+   sudo -u isms ./infrastructure/ec2/deploy.sh --no-build
+   ```
+
+4. **Or rebuild from previous code:**
+   ```bash
+   cd /opt/isms
+   sudo -u isms ./infrastructure/ec2/deploy.sh
+   ```
+
+#### Best Practices
+
+1. **Always backup before deploying:**
+   - The script does this automatically, but verify backups exist
+
+2. **Test in staging first:**
+   - Deploy to a staging environment before production
+
+3. **Monitor during deployment:**
+   - Watch logs in another terminal: `docker-compose -f docker-compose.ec2.yml logs -f`
+
+4. **Deploy during low-traffic periods:**
+   - Services will be briefly unavailable during restart
+
+5. **Keep deployment window small:**
+   - The entire process typically takes 5-10 minutes
+
+6. **Verify health checks:**
+   - Ensure all services pass health checks before considering deployment complete
 
 ### Database Backups
 
@@ -292,14 +662,14 @@ sudo -u isms ./infrastructure/ec2/backup.sh --s3-bucket your-bucket
 Restore from backup:
 ```bash
 # Stop services
-docker compose -f docker-compose.ec2.yml down
+docker-compose -f docker-compose.ec2.yml down
 
 # Restore database
 gunzip < backups/backup-YYYYMMDD-HHMMSS.sql.gz | \
   docker exec -i isms-postgres-ec2 pg_restore -U postgres -d isms_db -c
 
 # Start services
-docker compose -f docker-compose.ec2.yml up -d
+docker-compose -f docker-compose.ec2.yml up -d
 ```
 
 ### Viewing Logs
@@ -329,7 +699,7 @@ aws logs tail /ecs/isms-ec2-backend --follow --region eu-west-2
 
 1. **Check Docker logs:**
    ```bash
-   docker compose -f docker-compose.ec2.yml logs
+   docker-compose -f docker-compose.ec2.yml logs
    ```
 
 2. **Check resource usage:**
@@ -388,20 +758,44 @@ aws logs tail /ecs/isms-ec2-backend --follow --region eu-west-2
 
 ### Out of Disk Space
 
+The deployment script now automatically checks disk space and cleans up before deployment. However, if you're still running out of space:
+
 1. **Check disk usage:**
    ```bash
    df -h
    docker system df
    ```
 
-2. **Clean up:**
+2. **Manual cleanup:**
    ```bash
-   # Remove old backups
-   find /opt/isms/backups -name "*.sql.gz" -mtime +7 -delete
+   # Remove old backups (keeping last 3)
+   ls -t /opt/isms/backups/backup-*.sql.gz | tail -n +4 | xargs rm -f
    
-   # Clean Docker
-   docker system prune -a --volumes
+   # Clean Docker (removes unused containers, images, build cache, volumes)
+   docker system prune -a --volumes -f
+   
+   # Remove old images for services (keeps latest)
+   docker images --format "{{.Repository}}:{{.Tag}}" | \
+     grep -E "isms-(backend|frontend|document-service|ai-service)" | \
+     grep -v "latest" | xargs docker rmi -f
+   
+   # Clean build cache (frees significant space)
+   docker builder prune -f
    ```
+
+**Automatic Cleanup:**
+The deployment script automatically:
+- Checks disk usage before deployment
+- Cleans up if usage is ≥80%
+- Removes old backups (keeps last 5)
+- Removes old Docker images before building
+- Cleans build cache after no-cache builds
+- Removes dangling images after builds
+
+**Disk Space Optimization Tips:**
+1. **Use `--no-cache` sparingly**: It uses more space during builds but cleans up after
+2. **Monitor backups**: Old backups can accumulate - the script keeps last 5
+3. **Check Docker images**: Old image versions can take significant space
 
 ## Scaling Considerations
 
