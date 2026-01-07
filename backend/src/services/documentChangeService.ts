@@ -28,6 +28,7 @@ export async function checkSingleDocument(documentId: string): Promise<boolean |
         sharePointItemId: true,
         lastChecked: true,
         lastModified: true,
+        hasChanged: true,
       },
     });
 
@@ -94,10 +95,15 @@ export async function checkSingleDocument(documentId: string): Promise<boolean |
     }
 
     // Determine if document has changed
-    let hasChanged = false;
+    // Preserve existing hasChanged flag - only set to true if new change detected
+    let hasChanged = document.hasChanged || false;
     if (document.lastChecked) {
       // Document was checked before - compare dates
-      hasChanged = sharePointLastModified > document.lastChecked;
+      if (sharePointLastModified > document.lastChecked) {
+        // New change detected - set flag to true
+        hasChanged = true;
+      }
+      // If no new change, keep existing hasChanged value (don't clear it)
     } else {
       // First check - don't mark as changed, just record the date
       hasChanged = false;
@@ -180,6 +186,7 @@ export async function checkDocumentChanges(
         sharePointItemId: true,
         lastChecked: true,
         lastModified: true,
+        hasChanged: true,
       },
     });
 
@@ -231,10 +238,15 @@ export async function checkDocumentChanges(
           }
 
           // Determine if document has changed
-          let hasChanged = false;
+          // Preserve existing hasChanged flag - only set to true if new change detected
+          let hasChanged = doc.hasChanged || false;
           if (doc.lastChecked) {
             // Document was checked before - compare dates
-            hasChanged = sharePointLastModified > doc.lastChecked;
+            if (sharePointLastModified > doc.lastChecked) {
+              // New change detected - set flag to true
+              hasChanged = true;
+            }
+            // If no new change, keep existing hasChanged value (don't clear it)
           } else {
             // First check - don't mark as changed, just record the date
             hasChanged = false;

@@ -1234,22 +1234,6 @@ deploy_on_ec2() {
     print_success "Deployment completed successfully!"
     echo ""
     
-    # Verify deployment - check if key files are in the built bundle
-    print_step "Verifying deployment..."
-    if docker ps | grep -q "isms-frontend-ec2"; then
-        MAIN_JS=$(docker exec isms-frontend-ec2 ls -1 /usr/share/nginx/html/assets/*.js 2>/dev/null | head -1 || echo "")
-        if [ -n "$MAIN_JS" ]; then
-            if docker exec isms-frontend-ec2 grep -q "Version Notes\|versionNotes" "$MAIN_JS" 2>/dev/null; then
-                print_success "Deployment verification: Feature code found in built bundle"
-            else
-                print_warning "Deployment verification: Feature code NOT found in built bundle"
-                print_warning "This may indicate the build didn't include your changes"
-                print_info "Run: ./infrastructure/ec2/verify-deployment.sh for detailed analysis"
-            fi
-        fi
-    fi
-    echo ""
-    
     # Show final disk usage
     print_step "Final disk usage:"
     df -h / | awk 'NR==1 || NR==2'
@@ -1270,13 +1254,6 @@ deploy_on_ec2() {
     echo ""
     echo "To clean up Docker (if needed):"
     echo "  docker system prune -a --volumes"
-    echo ""
-    print_warning "IMPORTANT: Browser Cache"
-    echo "  If you don't see your changes in the browser:"
-    echo "  1. Do a hard refresh: Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac)"
-    echo "  2. Clear browser cache completely"
-    echo "  3. Try in an incognito/private window"
-    echo "  4. Check DevTools Network tab to verify the correct JS file is loaded"
     echo ""
 }
 

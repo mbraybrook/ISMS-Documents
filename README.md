@@ -212,10 +212,11 @@ For detailed architecture information, see [`DOCKER_COMPOSE_ARCHITECTURE.md`](DO
 
 ## Production Deployment
 
-The application can be deployed using two approaches:
+The application can be deployed using three approaches:
 
-1. **AWS ECS (Recommended)**: Fully managed container orchestration with auto-scaling, blue/green deployments, and integrated CI/CD
-2. **Docker Compose**: Self-managed deployment suitable for smaller environments or on-premises
+1. **AWS ECS (Recommended for high-traffic)**: Fully managed container orchestration with auto-scaling, blue/green deployments, and integrated CI/CD
+2. **Single EC2 Instance (Recommended for cost-effective)**: Cost-effective single-instance deployment running all services on one EC2 instance
+3. **Docker Compose**: Self-managed deployment suitable for smaller environments or on-premises
 
 ### Option 1: AWS ECS Deployment (Recommended)
 
@@ -245,7 +246,57 @@ See [`infrastructure/README.md`](infrastructure/README.md) for infrastructure ov
 - `check-embeddings-simple.sh`: Check embedding status
 - `seed-system-data.sh`: Seed system data to existing environments
 
-### Option 2: Docker Compose Deployment
+### Option 2: Single EC2 Instance Deployment (Cost-Effective)
+
+A cost-effective deployment option that runs all application components on a single EC2 instance. Ideal for low-to-medium traffic deployments where cost optimization is a priority.
+
+**Architecture:**
+- All services run on a single EC2 instance (t3.medium/t3.large)
+- **Backend** (Node.js/Express API)
+- **Frontend** (React/Vite)
+- **Document Service** (PDF conversion microservice)
+- **AI Service** (Embeddings microservice)
+- **Ollama** (LLM service)
+- **PostgreSQL** (Database)
+- **Nginx** (Reverse proxy and SSL termination)
+- Optional CloudFront distribution for SSL/ACM certificates
+
+**For complete deployment instructions, see [`infrastructure/ec2/README.md`](infrastructure/ec2/README.md)** - this is the comprehensive EC2 deployment guide.
+
+**Quick Start:**
+1. Launch EC2 instance using CloudFormation template (`infrastructure/templates/ec2-single-instance.yaml`)
+2. Run initial server setup script (`infrastructure/ec2/setup-ec2.sh`)
+3. Deploy application using deployment script (`infrastructure/ec2/deploy.sh`)
+4. Configure SSL certificate (Let's Encrypt or CloudFront + ACM)
+5. Set up monitoring and backups
+
+**Deployment Script:**
+The `infrastructure/ec2/deploy.sh` script supports automated deployment from your local machine:
+```bash
+# From your local machine (automatically copies files and deploys)
+./infrastructure/ec2/deploy.sh \
+  --ec2-host <EC2_IP> \
+  --ec2-user ec2-user \
+  --ec2-ssh-key ~/.ssh/your-key.pem \
+  --no-cache
+```
+
+**When to Use EC2 Deployment:**
+- Low-to-medium traffic (< 1000 requests/minute)
+- Cost optimization is a priority
+- Single-instance deployment is acceptable
+- You need full control over the infrastructure
+
+**When to Scale to ECS:**
+- High traffic (> 1000 requests/minute consistently)
+- Need auto-scaling capabilities
+- Require 99.9%+ SLA with high availability
+- Need blue/green deployments with zero downtime
+
+**Migration Path:**
+The EC2 deployment can be migrated to ECS when scaling is needed. See `infrastructure/ec2/README.md` for migration instructions.
+
+### Option 3: Docker Compose Deployment
 
 ### Prerequisites
 
@@ -674,9 +725,14 @@ Before deploying to production:
 ├── docs/                  # Documentation and plans
 ├── e2e/                   # End-to-end tests (Playwright)
 ├── infrastructure/        # AWS CloudFormation templates and deployment scripts
-│   ├── templates/         # CloudFormation templates (VPC, ECS, Aurora, etc.)
+│   ├── templates/         # CloudFormation templates (VPC, ECS, Aurora, EC2, etc.)
 │   ├── parameters/        # Environment-specific parameters
 │   ├── appspecs/          # CodeDeploy AppSpec files
+│   ├── ec2/               # EC2 single-instance deployment scripts and configs
+│   │   ├── README.md      # Comprehensive EC2 deployment guide
+│   │   ├── deploy.sh      # Automated deployment script
+│   │   ├── setup-ec2.sh   # Initial server setup script
+│   │   └── update-ssh-ip.sh # Helper script to update SSH IP in CloudFormation
 │   └── scripts/           # Deployment helper scripts
 │       ├── deploy-utils.sh          # Main deployment utility
 │       ├── backfill-control-embeddings.sh  # Backfill control embeddings
@@ -684,7 +740,8 @@ Before deploying to production:
 │       └── seed-system-data.sh      # Seed system data
 ├── .github/workflows/     # GitHub Actions CI/CD workflows
 ├── docker-compose.yml     # Docker Compose for development
-└── docker-compose.prod.yml # Docker Compose for production
+├── docker-compose.prod.yml # Docker Compose for production (self-managed)
+└── docker-compose.ec2.yml # Docker Compose for EC2 single-instance deployment
 ```
 
 ## Code Quality & Linting
@@ -810,6 +867,8 @@ See [`infrastructure/DEPLOYMENT.md`](infrastructure/DEPLOYMENT.md) for detailed 
 
 ### Infrastructure Deployment Scripts
 
+#### ECS Deployment Scripts
+
 The `infrastructure/scripts/` directory contains deployment utilities for AWS ECS deployments:
 
 - **`deploy-utils.sh`**: Main deployment utility script
@@ -829,6 +888,26 @@ The `infrastructure/scripts/` directory contains deployment utilities for AWS EC
 - **`validate-templates.sh`**: Validate CloudFormation templates
 
 See [`infrastructure/DEPLOYMENT.md`](infrastructure/DEPLOYMENT.md) for detailed usage instructions.
+
+#### EC2 Deployment Scripts
+
+The `infrastructure/ec2/` directory contains deployment utilities for single EC2 instance deployments:
+
+- **`deploy.sh`**: Automated deployment script (can run from local machine or EC2 instance)
+  - Automatically copies files to EC2 and deploys
+  - Builds Docker images, runs migrations, starts services
+  - Supports `--no-cache` for fresh builds, `--skip-backup`, `--skip-migrate` options
+  - See `infrastructure/ec2/deploy.sh --help` for full usage
+
+- **`setup-ec2.sh`**: Initial server setup script
+  - Installs Docker, Docker Compose, Nginx, Certbot, AWS CLI
+  - Configures firewall and automatic security updates
+
+- **`update-ssh-ip.sh`**: Helper script to update SSH IP address in CloudFormation stack
+  - Automatically detects current IP and updates security group
+  - Useful when your IP address changes
+
+See [`infrastructure/ec2/README.md`](infrastructure/ec2/README.md) for detailed usage instructions.
 
 ### Backend
 - `npm run dev --workspace=backend` - Start backend dev server

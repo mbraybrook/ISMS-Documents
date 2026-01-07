@@ -89,7 +89,7 @@ app.use(helmet({
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
+      frameSrc: ["'self'", "https://login.microsoftonline.com"],
     },
   },
   crossOriginEmbedderPolicy: false, // Allow embedding for PDFs
