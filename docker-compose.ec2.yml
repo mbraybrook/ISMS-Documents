@@ -158,6 +158,9 @@ services:
     restart: unless-stopped
     ports:
       - "4000:4000"
+    volumes:
+      # Mount docs directory for ISO 27002 seed script
+      - ./docs:/docs:ro
     environment:
       - NODE_ENV=production
       - PORT=4000

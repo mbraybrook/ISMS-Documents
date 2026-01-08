@@ -96,8 +96,14 @@ export function parseISO27002Controls(filePath: string): ParsedControl[] {
     const controlHeadingMatch = line.match(/^(?:\s*\d+\.\s+)?####\s+(.+)$/);
     if (controlHeadingMatch) {
       // Check if next few lines contain a table (indicates this is a control heading)
-      const nextLines = lines.slice(i + 1, Math.min(i + 5, lines.length));
-      const hasTable = nextLines.some(l => l.match(/^\+[-=]+\+/));
+      // Look further ahead (up to 10 lines) to catch tables that might have blank lines before them
+      const nextLines = lines.slice(i + 1, Math.min(i + 10, lines.length));
+      // Table pattern: lines starting with + and containing - or = (table borders)
+      // Also accept lines that are clearly table rows (containing | characters in a table-like pattern)
+      const hasTable = nextLines.some(l => 
+        l.match(/^\+.*[-=].*\+/) || // Table border line
+        (l.match(/^\|/) && l.match(/\|.*\|/)) // Table row with multiple columns
+      );
       
       if (hasTable) {
         // Save previous control if exists

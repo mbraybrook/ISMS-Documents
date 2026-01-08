@@ -50,9 +50,9 @@ NO_PROMPT=false
 SKIP_IP_UPDATE=false
 
 # EC2 connection settings (can be set via environment variables or arguments)
-EC2_HOST="${EC2_HOST:-}"
+EC2_HOST="${EC2_HOST:-18.171.58.205}"
 EC2_USER="${EC2_USER:-ec2-user}"
-EC2_SSH_KEY="${EC2_SSH_KEY:-}"
+EC2_SSH_KEY="${EC2_SSH_KEY:-$HOME/.ssh/mark.braybrook-sandbox.pem}"
 
 # CloudFormation settings for IP management
 CF_STACK_NAME="${CF_STACK_NAME:-isms-ec2-production}"

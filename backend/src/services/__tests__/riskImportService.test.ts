@@ -518,6 +518,42 @@ ${dataRows.join('\n')}`;
       expect(mockRiskService.updateRiskControls).toHaveBeenCalledWith(riskId, ['A.8.3', 'A.5.9']);
     });
 
+    it('should link controls when control codes are in "8.25" format (without A. prefix)', async () => {
+      // Arrange
+      const csvContent = createCSVContent(
+        standardHeaders,
+        ['1,May-18,STATIC,MD,Server,Client,Threat 1,Risk 1,Controls,3,4,5,24,2,24,ACCEPT,Additional,2,3,4,18,2,18,Y,MITIGATE,"8.25, 5.9"']
+      );
+      mockFs.readFileSync.mockReturnValue(csvContent);
+      mockRiskService.parseControlCodes.mockReturnValue(['8.25', '5.9']);
+
+      // Act
+      await importRisksFromCSV('/path/to/file.csv');
+
+      // Assert
+      expect(mockRiskService.parseControlCodes).toHaveBeenCalledWith('8.25, 5.9');
+      const riskId = mockPrisma.risk.create.mock.calls[0][0].data.id;
+      expect(mockRiskService.updateRiskControls).toHaveBeenCalledWith(riskId, ['8.25', '5.9']);
+    });
+
+    it('should link controls when control codes mix formats ("A.8.25" and "5.9")', async () => {
+      // Arrange
+      const csvContent = createCSVContent(
+        standardHeaders,
+        ['1,May-18,STATIC,MD,Server,Client,Threat 1,Risk 1,Controls,3,4,5,24,2,24,ACCEPT,Additional,2,3,4,18,2,18,Y,MITIGATE,"A.8.25, 5.9"']
+      );
+      mockFs.readFileSync.mockReturnValue(csvContent);
+      mockRiskService.parseControlCodes.mockReturnValue(['A.8.25', '5.9']);
+
+      // Act
+      await importRisksFromCSV('/path/to/file.csv');
+
+      // Assert
+      expect(mockRiskService.parseControlCodes).toHaveBeenCalledWith('A.8.25, 5.9');
+      const riskId = mockPrisma.risk.create.mock.calls[0][0].data.id;
+      expect(mockRiskService.updateRiskControls).toHaveBeenCalledWith(riskId, ['A.8.25', '5.9']);
+    });
+
     it('should not link controls when Annex A controls are empty', async () => {
       // Arrange
       const csvContent = createCSVContent(

@@ -2,6 +2,7 @@
 import {
   calculateRiskScore,
   parseControlCodes,
+  normalizeControlCode,
   validateStatusTransition,
   calculateCIAFromWizard,
   calculateMitigatedScore,
@@ -70,6 +71,33 @@ describe('riskService', () => {
     it('should filter out empty strings', () => {
       const result = parseControlCodes('A.8.3, , A.5.9');
       expect(result).toEqual(['A.8.3', 'A.5.9']);
+    });
+  });
+
+  describe('normalizeControlCode', () => {
+    it('should remove "A." prefix from control codes', () => {
+      expect(normalizeControlCode('A.8.25')).toBe('8.25');
+      expect(normalizeControlCode('A.5.9')).toBe('5.9');
+      expect(normalizeControlCode('A.1.1')).toBe('1.1');
+    });
+
+    it('should handle codes without "A." prefix', () => {
+      expect(normalizeControlCode('8.25')).toBe('8.25');
+      expect(normalizeControlCode('5.9')).toBe('5.9');
+    });
+
+    it('should handle case-insensitive prefix removal', () => {
+      expect(normalizeControlCode('a.8.25')).toBe('8.25');
+      expect(normalizeControlCode('A.8.25')).toBe('8.25');
+    });
+
+    it('should trim whitespace', () => {
+      expect(normalizeControlCode('  A.8.25  ')).toBe('8.25');
+      expect(normalizeControlCode('  8.25  ')).toBe('8.25');
+    });
+
+    it('should not remove "A." from middle of code', () => {
+      expect(normalizeControlCode('8.A.25')).toBe('8.A.25');
     });
   });
 
@@ -196,9 +224,14 @@ describe('riskService', () => {
       const riskId = 'risk-1';
       const controlCodes = ['A.1.1', 'A.1.2'];
 
+      // Mock findUnique for exact matches
       mockPrisma.control.findUnique
-        .mockResolvedValueOnce({ id: 'control-1', code: 'A.1.1' })
-        .mockResolvedValueOnce(null);
+        .mockResolvedValueOnce({ id: 'control-1', code: 'A.1.1', isStandardControl: false })
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null); // Second call for normalized lookup
+
+      // Mock findMany for normalized lookup (returns empty)
+      mockPrisma.control.findMany.mockResolvedValueOnce([]);
 
       mockPrisma.control.create.mockResolvedValueOnce({ id: 'control-2', code: 'A.1.2' });
 
@@ -207,6 +240,80 @@ describe('riskService', () => {
       expect(mockPrisma.riskControl.deleteMany).toHaveBeenCalledWith({ where: { riskId } });
       expect(mockPrisma.riskControl.create).toHaveBeenCalledTimes(2);
       expect(mockPrisma.$executeRaw).toHaveBeenCalled();
+    });
+
+    it('should find standard control when code has "A." prefix but standard control does not', async () => {
+      const riskId = 'risk-1';
+      const controlCodes = ['A.8.25'];
+
+      // First lookup fails (exact match)
+      mockPrisma.control.findUnique
+        .mockResolvedValueOnce(null) // No exact match for "A.8.25"
+        .mockResolvedValueOnce(null); // No match for "8.25" either
+
+      // findMany finds the standard control
+      mockPrisma.control.findMany.mockResolvedValueOnce([
+        { id: 'standard-control-1', code: '8.25', isStandardControl: true },
+      ]);
+
+      await updateRiskControls(riskId, controlCodes);
+
+      // Should use the standard control, not create a new one
+      expect(mockPrisma.control.create).not.toHaveBeenCalled();
+      expect(mockPrisma.riskControl.create).toHaveBeenCalledWith({
+        data: {
+          riskId,
+          controlId: 'standard-control-1',
+        },
+      });
+    });
+
+    it('should find standard control when code does not have "A." prefix but standard control does', async () => {
+      const riskId = 'risk-1';
+      const controlCodes = ['8.25'];
+
+      // First lookup finds nothing
+      mockPrisma.control.findUnique
+        .mockResolvedValueOnce(null) // No exact match for "8.25"
+        .mockResolvedValueOnce({ id: 'standard-control-1', code: 'A.8.25', isStandardControl: true });
+
+      await updateRiskControls(riskId, controlCodes);
+
+      // Should use the standard control, not create a new one
+      expect(mockPrisma.control.create).not.toHaveBeenCalled();
+      expect(mockPrisma.riskControl.create).toHaveBeenCalledWith({
+        data: {
+          riskId,
+          controlId: 'standard-control-1',
+        },
+      });
+    });
+
+    it('should prefer standard control over custom control when both exist', async () => {
+      const riskId = 'risk-1';
+      const controlCodes = ['8.25'];
+
+      // First lookup finds nothing
+      mockPrisma.control.findUnique
+        .mockResolvedValueOnce(null) // No exact match for "8.25"
+        .mockResolvedValueOnce(null); // No match for "A.8.25" either
+
+      // findMany finds both standard and custom
+      mockPrisma.control.findMany.mockResolvedValueOnce([
+        { id: 'custom-control-1', code: '8.25', isStandardControl: false },
+        { id: 'standard-control-1', code: 'A.8.25', isStandardControl: true },
+      ]);
+
+      await updateRiskControls(riskId, controlCodes);
+
+      // Should use the standard control
+      expect(mockPrisma.control.create).not.toHaveBeenCalled();
+      expect(mockPrisma.riskControl.create).toHaveBeenCalledWith({
+        data: {
+          riskId,
+          controlId: 'standard-control-1',
+        },
+      });
     });
   });
 });

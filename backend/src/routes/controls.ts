@@ -5,6 +5,7 @@ import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
 import { computeAndStoreControlEmbedding } from '../services/embeddingService';
+import { normalizeControlCode } from '../services/riskService';
 
 const router = Router();
 
@@ -321,9 +322,19 @@ router.post(
   async (req: AuthRequest, res: Response) => {
     try {
       // Prevent creating controls with ISO 27002 codes if they already exist as standard controls
+      // Check both exact code and normalized code (handles "8.25" vs "A.8.25" formats)
       const code = req.body.code as string;
-      const existingStandard = await prisma.control.findUnique({
-        where: { code },
+      const normalizedCode = normalizeControlCode(code);
+      
+      const existingStandard = await prisma.control.findFirst({
+        where: {
+          isStandardControl: true,
+          OR: [
+            { code: code },
+            { code: normalizedCode },
+            { code: `A.${normalizedCode}` },
+          ],
+        },
         select: { isStandardControl: true },
       });
       

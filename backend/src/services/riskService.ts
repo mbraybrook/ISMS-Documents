@@ -66,31 +66,81 @@ export function parseControlCodes(rawString: string | null | undefined): string[
 }
 
 /**
+ * Normalize control code by removing "A." prefix if present
+ * Example: "A.8.25" -> "8.25", "8.25" -> "8.25"
+ */
+export function normalizeControlCode(code: string): string {
+  return code.trim().replace(/^A\./i, '');
+}
+
+/**
+ * Find control by code, handling both "8.25" and "A.8.25" formats
+ * Prefers standard controls over custom controls when multiple matches exist
+ */
+async function findControlByCode(code: string) {
+  const normalized = normalizeControlCode(code);
+  
+  // Try exact match first (normalized code)
+  let control = await prisma.control.findUnique({
+    where: { code: normalized },
+  });
+  if (control) return control;
+  
+  // Try with "A." prefix
+  control = await prisma.control.findUnique({
+    where: { code: `A.${normalized}` },
+  });
+  if (control) return control;
+  
+  // If still not found, try finding by normalized code (handles both formats)
+  const controls = await prisma.control.findMany({
+    where: {
+      OR: [
+        { code: normalized },
+        { code: `A.${normalized}` },
+      ],
+    },
+  });
+  
+  // Prefer standard control if multiple exist
+  const standardControl = controls.find(c => c.isStandardControl);
+  return standardControl || controls[0] || null;
+}
+
+/**
  * Update risk-control associations based on annexAControlsRaw
  */
 export async function updateRiskControls(riskId: string, controlCodes: string[]) {
   // Find or create controls by code
   const controls = await Promise.all(
     controlCodes.map(async (code) => {
-      let control = await prisma.control.findUnique({
-        where: { code },
-      });
+      // Use normalized lookup to handle both "8.25" and "A.8.25" formats
+      let control = await findControlByCode(code);
 
       if (!control) {
-        // Create control if it doesn't exist
-        control = await prisma.control.create({
-          data: {
-            id: randomUUID(),
-            code,
-            title: `Control ${code}`,
-            description: `Annex A Control ${code}`,
-            selectedForRiskAssessment: false,
-            selectedForContractualObligation: false,
-            selectedForLegalRequirement: false,
-            selectedForBusinessRequirement: false,
-            updatedAt: new Date(),
-          },
-        });
+        // Check if standard control exists with normalized code before creating
+        const normalizedCode = normalizeControlCode(code);
+        const standardControl = await findControlByCode(normalizedCode);
+        
+        if (standardControl?.isStandardControl) {
+          // Use existing standard control instead of creating duplicate
+          control = standardControl;
+        } else {
+          // Only create if truly no matching control exists
+          control = await prisma.control.create({
+            data: {
+              id: randomUUID(),
+              code,
+              title: `Control ${code}`,
+              description: `Annex A Control ${code}`,
+              selectedForRiskAssessment: false,
+              selectedForContractualObligation: false,
+              selectedForLegalRequirement: false,
+              selectedForBusinessRequirement: false,
+              updatedAt: new Date(),
+            },
+          });
+        }
       }
 
       return control;
