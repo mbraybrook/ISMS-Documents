@@ -186,7 +186,7 @@ export function parseISO27002Controls(filePath: string): ParsedControl[] {
       // Remove blockquote markers
       cleanLine = cleanLine.replace(/^>\s*/, '');
       // Remove markdown links but keep text
-      cleanLine = cleanLine.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+      cleanLine = cleanLine.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
       // Remove underline markers
       cleanLine = cleanLine.replace(/\{\.underline\}/g, '');
       

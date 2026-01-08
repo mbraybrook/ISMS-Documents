@@ -16,6 +16,7 @@ jest.mock('../../lib/prisma', () => ({
   prisma: {
     control: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
     },
     riskControl: {
@@ -225,13 +226,15 @@ describe('riskService', () => {
       const controlCodes = ['A.1.1', 'A.1.2'];
 
       // Mock findUnique for exact matches
+      // For 'A.1.1': findUnique with "1.1" returns control, so no further calls needed
+      // For 'A.1.2': findUnique with "1.2" returns null, findUnique with "A.1.2" returns null, then findMany returns empty
       mockPrisma.control.findUnique
-        .mockResolvedValueOnce({ id: 'control-1', code: 'A.1.1', isStandardControl: false })
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null); // Second call for normalized lookup
+        .mockResolvedValueOnce({ id: 'control-1', code: 'A.1.1', isStandardControl: false }) // First control found
+        .mockResolvedValueOnce(null) // Second control: normalized "1.2" not found
+        .mockResolvedValueOnce(null); // Second control: "A.1.2" not found
 
-      // Mock findMany for normalized lookup (returns empty)
-      mockPrisma.control.findMany.mockResolvedValueOnce([]);
+      // Mock findMany for normalized lookup (returns empty, so control will be created)
+      mockPrisma.control.findMany.mockResolvedValue([]);
 
       mockPrisma.control.create.mockResolvedValueOnce({ id: 'control-2', code: 'A.1.2' });
 
@@ -252,7 +255,7 @@ describe('riskService', () => {
         .mockResolvedValueOnce(null); // No match for "8.25" either
 
       // findMany finds the standard control
-      mockPrisma.control.findMany.mockResolvedValueOnce([
+      mockPrisma.control.findMany.mockResolvedValue([
         { id: 'standard-control-1', code: '8.25', isStandardControl: true },
       ]);
 
@@ -272,10 +275,15 @@ describe('riskService', () => {
       const riskId = 'risk-1';
       const controlCodes = ['8.25'];
 
-      // First lookup finds nothing
+      // Mock findControlByCode('8.25') calls:
+      // 1. findUnique with "8.25" (normalized) - returns null
+      // 2. findUnique with "A.8.25" - returns standard control
       mockPrisma.control.findUnique
         .mockResolvedValueOnce(null) // No exact match for "8.25"
         .mockResolvedValueOnce({ id: 'standard-control-1', code: 'A.8.25', isStandardControl: true });
+
+      // Mock findMany (shouldn't be called since findUnique returns early, but mock it for safety)
+      mockPrisma.control.findMany.mockResolvedValue([]);
 
       await updateRiskControls(riskId, controlCodes);
 
@@ -299,7 +307,7 @@ describe('riskService', () => {
         .mockResolvedValueOnce(null); // No match for "A.8.25" either
 
       // findMany finds both standard and custom
-      mockPrisma.control.findMany.mockResolvedValueOnce([
+      mockPrisma.control.findMany.mockResolvedValue([
         { id: 'custom-control-1', code: '8.25', isStandardControl: false },
         { id: 'standard-control-1', code: 'A.8.25', isStandardControl: true },
       ]);

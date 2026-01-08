@@ -27,6 +27,7 @@ jest.mock('../../lib/prisma', () => ({
     control: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -516,7 +517,7 @@ describe('Controls API', () => {
         isStandardControl: false,
       };
 
-      prisma.control.findUnique.mockResolvedValue(null); // No existing standard control
+      prisma.control.findFirst.mockResolvedValue(null); // No existing standard control
       prisma.control.create.mockResolvedValue(newControl);
 
       const response = await request(app)
@@ -547,7 +548,7 @@ describe('Controls API', () => {
         isStandardControl: false,
       };
 
-      prisma.control.findUnique.mockResolvedValue(null);
+      prisma.control.findFirst.mockResolvedValue(null);
       prisma.control.create.mockResolvedValue(newControl);
 
       await request(app)
@@ -579,7 +580,7 @@ describe('Controls API', () => {
         justification: null,
       };
 
-      prisma.control.findUnique.mockResolvedValue(null);
+      prisma.control.findFirst.mockResolvedValue(null);
       prisma.control.create.mockResolvedValue(newControl);
 
       await request(app)
@@ -600,7 +601,7 @@ describe('Controls API', () => {
         justification: '',
       };
 
-      prisma.control.findUnique.mockResolvedValue(null);
+      prisma.control.findFirst.mockResolvedValue(null);
       prisma.control.create.mockResolvedValue(newControl);
 
       await request(app)
@@ -631,7 +632,7 @@ describe('Controls API', () => {
         isStandardControl: true,
       };
 
-      prisma.control.findUnique.mockResolvedValue(existingStandard);
+      prisma.control.findFirst.mockResolvedValue(existingStandard);
 
       const response = await request(app)
         .post('/api/controls')
@@ -669,7 +670,7 @@ describe('Controls API', () => {
       const error: any = new Error('Unique constraint failed');
       error.code = 'P2002';
 
-      prisma.control.findUnique.mockResolvedValue(null);
+      prisma.control.findFirst.mockResolvedValue(null);
       prisma.control.create.mockRejectedValue(error);
 
       const response = await request(app)
@@ -687,7 +688,7 @@ describe('Controls API', () => {
       const originalError = console.error;
       console.error = jest.fn();
 
-      prisma.control.findUnique.mockResolvedValue(null);
+      prisma.control.findFirst.mockResolvedValue(null);
       prisma.control.create.mockRejectedValue(new Error('Database error'));
 
       await request(app)
@@ -711,7 +712,7 @@ describe('Controls API', () => {
         guidance: null,
       };
 
-      prisma.control.findUnique.mockResolvedValue(null);
+      prisma.control.findFirst.mockResolvedValue(null);
       prisma.control.create.mockResolvedValue(newControl);
       computeAndStoreControlEmbedding.mockRejectedValue(new Error('Embedding error'));
 
