@@ -25,6 +25,7 @@ export interface Risk {
   riskCategory: string | null;
   riskNature: string | null;
   archived: boolean;
+  archivedDate: string | null;
   expiryDate: string | null;
   lastReviewDate: string | null;
   nextReviewDate: string | null;

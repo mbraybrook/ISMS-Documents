@@ -9,6 +9,7 @@ import {
   getRiskLevel,
   hasPolicyNonConformance,
   updateRiskControls,
+  updateControlApplicability,
 } from '../riskService';
 
 // 1. Mock the module to return the defined structure (INLINED to avoid hoisting issues)
@@ -322,6 +323,43 @@ describe('riskService', () => {
           controlId: 'standard-control-1',
         },
       });
+    });
+  });
+
+  describe('updateControlApplicability', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should set selectedForRiskAssessment to true when control is linked to non-archived risk', async () => {
+      mockPrisma.$executeRaw.mockResolvedValue(1);
+
+      await updateControlApplicability();
+
+      // $executeRaw is called with a Prisma SQL template literal (array)
+      const call = mockPrisma.$executeRaw.mock.calls[0][0];
+      const sqlString = Array.isArray(call) ? call[0] : call;
+      expect(sqlString).toContain('UPDATE "Control"');
+      expect(sqlString).toContain('"Risk"."archived" = false');
+    });
+
+    it('should set selectedForRiskAssessment to false when control is only linked to archived risks', async () => {
+      mockPrisma.$executeRaw.mockResolvedValue(1);
+
+      await updateControlApplicability();
+
+      // The SQL should exclude archived risks
+      // $executeRaw is called with a Prisma SQL template literal (array)
+      const call = mockPrisma.$executeRaw.mock.calls[0][0];
+      const sqlString = Array.isArray(call) ? call[0] : call;
+      expect(sqlString).toContain('"Risk"."archived" = false');
+    });
+
+    it('should handle errors gracefully', async () => {
+      const error = new Error('Database error');
+      mockPrisma.$executeRaw.mockRejectedValue(error);
+
+      await expect(updateControlApplicability()).rejects.toThrow('Database error');
     });
   });
 });

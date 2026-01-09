@@ -36,10 +36,18 @@ describe('riskDashboardService', () => {
         quarterly_series: [],
       });
       expect(prisma.risk.findMany).toHaveBeenCalledWith({
-        where: { archived: false },
+        where: {
+          OR: [
+            { archived: false },
+            { archived: true, archivedDate: null },
+            { archived: true, archivedDate: { gt: expect.any(Date) } },
+          ],
+        },
         select: {
           dateAdded: true,
           createdAt: true,
+          archived: true,
+          archivedDate: true,
           calculatedScore: true,
           mitigatedScore: true,
           mitigationImplemented: true,
@@ -47,7 +55,7 @@ describe('riskDashboardService', () => {
       });
     });
 
-    it('should exclude archived risks', async () => {
+    it('should exclude archived risks with past archive dates', async () => {
       // Arrange
       const mockRisks = [
         {
@@ -73,10 +81,18 @@ describe('riskDashboardService', () => {
 
       // Assert
       expect(prisma.risk.findMany).toHaveBeenCalledWith({
-        where: { archived: false },
+        where: {
+          OR: [
+            { archived: false },
+            { archived: true, archivedDate: null },
+            { archived: true, archivedDate: { gt: expect.any(Date) } },
+          ],
+        },
         select: {
           dateAdded: true,
           createdAt: true,
+          archived: true,
+          archivedDate: true,
           calculatedScore: true,
           mitigatedScore: true,
           mitigationImplemented: true,
@@ -85,12 +101,105 @@ describe('riskDashboardService', () => {
       expect(result.latest_snapshot.total_risk_score).toBe(30);
     });
 
+    it('should exclude risks archived with past archive dates from current snapshot', async () => {
+      // Arrange
+      // Create a past date that's definitely in the past
+      // Use a fixed past date to ensure it's always before 'now' in the service
+      const pastDate = new Date('2020-01-01T00:00:00Z'); // Definitely in the past
+      
+      const mockRisks = [
+        {
+          dateAdded: new Date('2024-01-15'),
+          createdAt: new Date('2024-01-15'),
+          archived: false,
+          archivedDate: null,
+          calculatedScore: 10,
+          mitigatedScore: null,
+          mitigationImplemented: false,
+        },
+        {
+          dateAdded: new Date('2024-02-15'),
+          createdAt: new Date('2024-02-15'),
+          archived: true,
+          archivedDate: pastDate, // Archived in the past (will be filtered out)
+          calculatedScore: 20,
+          mitigatedScore: null,
+          mitigationImplemented: false,
+        },
+      ];
+
+      (prisma.risk.findMany as jest.Mock).mockResolvedValue(mockRisks);
+
+      // Act
+      const result = await getRiskDashboardSummary();
+
+      // Assert
+      // Only the non-archived risk should be included in current snapshot
+      // The archived risk with past date should be filtered out in currentRisks filter
+      // The filter checks: if (!risk.archived) return true; (first risk passes)
+      // For second risk: if (risk.archivedDate === null) return true; (false)
+      // return risk.archivedDate > now; (false, since pastDate < now, so excluded)
+      expect(result.latest_snapshot.total_risk_score).toBe(10);
+    });
+
+    it('should include risks archived in future in current snapshot', async () => {
+      // Arrange
+      const now = new Date();
+      const futureDate = new Date(now.getTime() + 86400000); // Tomorrow
+      const mockRisks = [
+        {
+          dateAdded: new Date('2024-01-15'),
+          createdAt: new Date('2024-01-15'),
+          archived: true,
+          archivedDate: futureDate, // Archived in the future
+          calculatedScore: 10,
+          mitigatedScore: null,
+          mitigationImplemented: false,
+        },
+      ];
+
+      (prisma.risk.findMany as jest.Mock).mockResolvedValue(mockRisks);
+
+      // Act
+      const result = await getRiskDashboardSummary();
+
+      // Assert
+      // Risk archived in future should be included
+      expect(result.latest_snapshot.total_risk_score).toBe(10);
+    });
+
+    it('should include risks with null archive date (backward compatibility)', async () => {
+      // Arrange
+      const mockRisks = [
+        {
+          dateAdded: new Date('2024-01-15'),
+          createdAt: new Date('2024-01-15'),
+          archived: true,
+          archivedDate: null, // Backward compatibility
+          calculatedScore: 10,
+          mitigatedScore: null,
+          mitigationImplemented: false,
+        },
+      ];
+
+      (prisma.risk.findMany as jest.Mock).mockResolvedValue(mockRisks);
+
+      // Act
+      const result = await getRiskDashboardSummary();
+
+      // Assert
+      // Risk with null archive date should be included for backward compatibility
+      expect(result.latest_snapshot.total_risk_score).toBe(10);
+    });
+
     it('should calculate snapshot correctly for risks with no mitigation', async () => {
       // Arrange
       const mockRisks = [
         {
           dateAdded: new Date('2024-01-15'),
           createdAt: new Date('2024-01-15'),
+          archived: false,
+          archivedDate: null,
           calculatedScore: 10,
           mitigatedScore: null,
           mitigationImplemented: false,
@@ -98,6 +207,8 @@ describe('riskDashboardService', () => {
         {
           dateAdded: new Date('2024-01-20'),
           createdAt: new Date('2024-01-20'),
+          archived: false,
+          archivedDate: null,
           calculatedScore: 20,
           mitigatedScore: null,
           mitigationImplemented: false,

@@ -1,6 +1,6 @@
 import React, { type ReactNode, type MouseEvent } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { render } from '../../test/utils';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
@@ -1025,7 +1025,6 @@ describe('ControlFormModal', () => {
     });
 
     it('should store risk ID in sessionStorage when risk link is clicked', async () => {
-      const user = userEvent.setup();
       render(<ControlFormModal isOpen={true} onClose={mockOnClose} control={mockStandardControl} />);
 
       // Wait for modal to fully load and risk link to be rendered
@@ -1033,8 +1032,16 @@ describe('ControlFormModal', () => {
         expect(screen.getByText('Test Risk')).toBeInTheDocument();
       }, { timeout: 3000 });
 
-      const riskLink = screen.getByText('Test Risk');
-      await user.click(riskLink);
+      // Find the anchor element (the mocked Link renders as an <a> tag)
+      const riskLink = screen.getByText('Test Risk').closest('a');
+      
+      if (!riskLink) {
+        throw new Error('Risk link not found');
+      }
+
+      // Use fireEvent.click instead of userEvent to avoid focus-related issues
+      // This is acceptable here as we're testing the onClick handler, not user interaction behavior
+      fireEvent.click(riskLink);
 
       // Wait for sessionStorage call
       await waitFor(() => {

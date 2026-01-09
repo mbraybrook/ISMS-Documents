@@ -173,10 +173,14 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     });
 
     // ===== RISK STATISTICS =====
-    // Get all non-archived risks
+    // Get all risks, excluding those archived with archive date in the past
     const allRisks = await prisma.risk.findMany({
       where: {
-        archived: false,
+        OR: [
+          { archived: false },
+          { archived: true, archivedDate: null }, // Backward compatibility: include risks marked archived but no date set
+          { archived: true, archivedDate: { gt: now } }, // Include risks archived in the future
+        ],
       },
       select: {
         id: true,

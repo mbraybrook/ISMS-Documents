@@ -286,9 +286,9 @@ describe('similarityService', () => {
       await findSimilarRisksForRisk(riskId);
 
       // Assert
+      // Archived filter was removed to include archived risks in duplicate detection
       expect(mockPrisma.risk.findMany).toHaveBeenCalledWith({
         where: {
-          archived: false,
           id: { not: riskId },
         },
         select: expect.any(Object),
@@ -552,9 +552,9 @@ describe('similarityService', () => {
       await checkSimilarityForNewRisk(riskData);
 
       // Assert
+      // Archived filter was removed to include archived risks in duplicate detection
       expect(mockPrisma.risk.findMany).toHaveBeenCalledWith({
         where: {
-          archived: false,
           id: { not: 'risk-1' },
         },
         select: expect.any(Object),
@@ -576,10 +576,9 @@ describe('similarityService', () => {
       await checkSimilarityForNewRisk(riskData);
 
       // Assert
+      // Archived filter was removed to include archived risks in duplicate detection
       expect(mockPrisma.risk.findMany).toHaveBeenCalledWith({
-        where: {
-          archived: false,
-        },
+        where: {},
         select: expect.any(Object),
         take: 100,
       });

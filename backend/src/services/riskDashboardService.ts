@@ -36,14 +36,23 @@ function getQuarter(date: Date): number {
  * Groups risks by year and quarter based on dateAdded field
  */
 export async function getRiskDashboardSummary(): Promise<RiskDashboardSummary> {
-  // Get all non-archived risks with necessary fields
+  // Get all risks with necessary fields
+  // For current statistics: exclude risks that are archived and have an archive date in the past
+  // For quarterly data: we'll filter per quarter based on archive date
+  const now = new Date();
   const risks = await prisma.risk.findMany({
     where: {
-      archived: false,
+      OR: [
+        { archived: false },
+        { archived: true, archivedDate: null }, // Backward compatibility: include risks marked archived but no date set
+        { archived: true, archivedDate: { gt: now } }, // Include risks archived in the future
+      ],
     },
     select: {
       dateAdded: true,
       createdAt: true,
+      archived: true,
+      archivedDate: true,
       calculatedScore: true,
       mitigatedScore: true,
       mitigationImplemented: true,
@@ -59,7 +68,17 @@ export async function getRiskDashboardSummary(): Promise<RiskDashboardSummary> {
     risk_score_delta: 0,
   };
 
-  risks.forEach((risk: {
+  // Filter risks for current snapshot: exclude archived risks with archive date in the past
+  const currentRisks = risks.filter((risk: {
+    archived: boolean;
+    archivedDate: Date | null;
+  }) => {
+    if (!risk.archived) return true;
+    if (risk.archivedDate === null) return true; // Backward compatibility
+    return risk.archivedDate > now;
+  });
+
+  currentRisks.forEach((risk: {
     calculatedScore: number;
     mitigatedScore: number | null;
     mitigationImplemented: boolean;
@@ -93,6 +112,8 @@ export async function getRiskDashboardSummary(): Promise<RiskDashboardSummary> {
   risks.forEach((risk: {
     dateAdded: Date | null;
     createdAt: Date;
+    archived: boolean;
+    archivedDate: Date | null;
     calculatedScore: number;
     mitigatedScore: number | null;
     mitigationImplemented: boolean;
@@ -111,19 +132,34 @@ export async function getRiskDashboardSummary(): Promise<RiskDashboardSummary> {
     const quarter = getQuarter(dateToUse);
     const key = `${year}-Q${quarter}`;
 
-    if (!quarterlyMap.has(key)) {
-      quarterlyMap.set(key, {
-        year,
-        quarter,
-        risks: [],
+    // Calculate end of quarter date
+    const endOfQuarterMonth = (quarter - 1) * 3 + 2; // Last month of quarter (0-indexed: 2, 5, 8, 11)
+    const endOfQuarter = new Date(year, endOfQuarterMonth + 1, 0, 23, 59, 59, 999); // Last moment of last day of quarter
+
+    // Include risk in quarter if:
+    // - Risk is not archived, OR
+    // - Risk is archived but archivedDate is null (backward compat), OR
+    // - Risk is archived but archivedDate is after the end of this quarter
+    const shouldIncludeInQuarter = 
+      !risk.archived || 
+      risk.archivedDate === null || 
+      (risk.archivedDate && risk.archivedDate > endOfQuarter);
+
+    if (shouldIncludeInQuarter) {
+      if (!quarterlyMap.has(key)) {
+        quarterlyMap.set(key, {
+          year,
+          quarter,
+          risks: [],
+        });
+      }
+
+      quarterlyMap.get(key)!.risks.push({
+        calculatedScore: risk.calculatedScore,
+        mitigatedScore: risk.mitigatedScore,
+        mitigationImplemented: risk.mitigationImplemented,
       });
     }
-
-    quarterlyMap.get(key)!.risks.push({
-      calculatedScore: risk.calculatedScore,
-      mitigatedScore: risk.mitigatedScore,
-      mitigationImplemented: risk.mitigationImplemented,
-    });
   });
 
   // Calculate metrics for each quarter

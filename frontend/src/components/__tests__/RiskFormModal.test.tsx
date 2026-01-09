@@ -404,7 +404,7 @@ describe.skip('RiskFormModal', () => {
       });
     });
 
-    it('should allow toggling archived checkbox', async () => {
+    it('should allow toggling archived checkbox and show archive date picker', async () => {
       const user = userEvent.setup();
       render(<RiskFormModal {...defaultProps} />);
 
@@ -423,6 +423,38 @@ describe.skip('RiskFormModal', () => {
       await user.click(archivedCheckbox);
 
       expect(archivedCheckbox).toBeChecked();
+
+      // Archive date picker should appear when archived is checked
+      await waitFor(() => {
+        expect(screen.getByLabelText(/archive date/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should set default archive date to current date when archiving', async () => {
+      const user = userEvent.setup();
+      render(<RiskFormModal {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Additional Details')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText('Additional Details'));
+
+      await waitFor(() => {
+        const archivedCheckbox = screen.getByLabelText(/archived/i);
+        expect(archivedCheckbox).toBeInTheDocument();
+      });
+
+      const archivedCheckbox = screen.getByLabelText(/archived/i);
+      await user.click(archivedCheckbox);
+
+      await waitFor(() => {
+        const archiveDateInput = screen.getByLabelText(/archive date/i) as HTMLInputElement;
+        expect(archiveDateInput).toBeInTheDocument();
+        // Should have today's date as default
+        const today = new Date().toISOString().split('T')[0];
+        expect(archiveDateInput.value).toBe(today);
+      });
     });
 
     it('should allow toggling supplier risk checkbox', async () => {

@@ -59,6 +59,7 @@ interface Risk {
   riskCategory: string | null;
   riskNature: string | null;
   archived: boolean;
+  archivedDate: string | null;
   expiryDate: string | null;
   lastReviewDate: string | null;
   nextReviewDate: string | null;
@@ -160,7 +161,7 @@ export function RisksPage() {
     return {
       riskCategory: '',
       riskNature: '',
-      archived: false,
+      archived: 'false' as 'false' | 'true' | 'all',
       ownerId: '',
       treatmentCategory: '',
       mitigationImplemented: params.get('mitigationImplemented') || '',
@@ -270,7 +271,14 @@ export function RisksPage() {
       const params = new URLSearchParams();
       if (filters.riskCategory) params.append('riskCategory', filters.riskCategory);
       if (filters.riskNature) params.append('riskNature', filters.riskNature);
-      if (filters.archived) params.append('archived', 'true');
+      if (filters.archived === 'all') {
+        params.append('archived', 'all');
+      } else if (filters.archived === 'true') {
+        params.append('archived', 'true');
+      } else if (filters.archived === 'false' || !filters.archived) {
+        // Default to 'false' (Active Only) if empty or explicitly 'false'
+        params.append('archived', 'false');
+      }
       if (filters.ownerId) params.append('ownerId', filters.ownerId);
       if (filters.treatmentCategory) params.append('treatmentCategory', filters.treatmentCategory);
       if (filters.mitigationImplemented !== '')
@@ -563,7 +571,7 @@ export function RisksPage() {
     let count = 0;
     if (filters.riskCategory) count++;
     if (filters.riskNature) count++;
-    if (filters.archived) count++;
+    if (filters.archived && filters.archived !== 'all' && filters.archived !== 'false') count++;
     if (filters.ownerId) count++;
     if (filters.treatmentCategory) count++;
     if (filters.mitigationImplemented) count++;
@@ -735,17 +743,24 @@ export function RisksPage() {
         minW: '300px',
         render: (risk) => (
           <Tooltip label={risk.title} placement="top-start">
-            <Text
-              fontWeight="medium"
-              fontSize="sm"
-              whiteSpace="normal"
-              noOfLines={2}
-              textOverflow="ellipsis"
-              overflow="hidden"
-              lineHeight="1.4"
-            >
-              {risk.title}
-            </Text>
+            <VStack align="start" spacing={0}>
+              <Text
+                fontWeight="medium"
+                fontSize="sm"
+                whiteSpace="normal"
+                noOfLines={2}
+                textOverflow="ellipsis"
+                overflow="hidden"
+                lineHeight="1.4"
+              >
+                {risk.title}
+              </Text>
+              {risk.archived && risk.archivedDate && (
+                <Text fontSize="xs" color="gray.500" mt={1}>
+                  Archived: {new Date(risk.archivedDate).toLocaleDateString()}
+                </Text>
+              )}
+            </VStack>
           </Tooltip>
         ),
       });
@@ -1091,10 +1106,11 @@ export function RisksPage() {
     {
       key: 'archived',
       type: 'select',
-      placeholder: 'Show Archived',
+      placeholder: '',
       options: [
-        { value: 'true', label: 'Show Archived' },
-        { value: 'false', label: 'Hide Archived' },
+        { value: 'false', label: 'Active Only' },
+        { value: 'true', label: 'Archived Only' },
+        { value: 'all', label: 'All Risks' },
       ],
     },
     {
@@ -1272,7 +1288,14 @@ export function RisksPage() {
       const params = new URLSearchParams();
       if (filters.riskCategory) params.append('riskCategory', filters.riskCategory);
       if (filters.riskNature) params.append('riskNature', filters.riskNature);
-      if (filters.archived) params.append('archived', 'true');
+      if (filters.archived === 'all') {
+        params.append('archived', 'all');
+      } else if (filters.archived === 'true') {
+        params.append('archived', 'true');
+      } else if (filters.archived === 'false' || !filters.archived) {
+        // Default to 'false' (Active Only) if empty or explicitly 'false'
+        params.append('archived', 'false');
+      }
       if (filters.ownerId) params.append('ownerId', filters.ownerId);
       if (filters.treatmentCategory) params.append('treatmentCategory', filters.treatmentCategory);
       if (filters.mitigationImplemented !== '')
@@ -1463,6 +1486,116 @@ export function RisksPage() {
                             More Actions
                           </MenuButton>
                           <MenuList>
+                            <MenuItem
+                              onClick={async () => {
+                                const selectedRisks = risks.filter(r => selectedRiskIds.has(r.id));
+                                const archivedRisks = selectedRisks.filter(r => r.archived);
+                                const activeRisks = selectedRisks.filter(r => !r.archived);
+                                
+                                if (archivedRisks.length > 0 && activeRisks.length > 0) {
+                                  // Mixed selection - archive active ones, unarchive archived ones
+                                  try {
+                                    const archivePromises = activeRisks.map(risk =>
+                                      api.put(`/api/risks/${risk.id}`, {
+                                        archived: true,
+                                        archivedDate: new Date().toISOString().split('T')[0],
+                                      })
+                                    );
+                                    const unarchivePromises = archivedRisks.map(risk =>
+                                      api.put(`/api/risks/${risk.id}`, {
+                                        archived: false,
+                                        archivedDate: null,
+                                      })
+                                    );
+                                    await Promise.all([...archivePromises, ...unarchivePromises]);
+                                    toast({
+                                      title: 'Success',
+                                      description: `Archived ${activeRisks.length} risk(s) and unarchived ${archivedRisks.length} risk(s)`,
+                                      status: 'success',
+                                      duration: 3000,
+                                      isClosable: true,
+                                    });
+                                    fetchRisks();
+                                    setSelectedRiskIds(new Set());
+                                  } catch (error: any) {
+                                    toast({
+                                      title: 'Error',
+                                      description: error.response?.data?.error || 'Failed to update risks',
+                                      status: 'error',
+                                      duration: 5000,
+                                      isClosable: true,
+                                    });
+                                  }
+                                } else if (activeRisks.length > 0) {
+                                  // All active - archive them
+                                  try {
+                                    await Promise.all(
+                                      activeRisks.map(risk =>
+                                        api.put(`/api/risks/${risk.id}`, {
+                                          archived: true,
+                                          archivedDate: new Date().toISOString().split('T')[0],
+                                        })
+                                      )
+                                    );
+                                    toast({
+                                      title: 'Success',
+                                      description: `Archived ${activeRisks.length} risk(s)`,
+                                      status: 'success',
+                                      duration: 3000,
+                                      isClosable: true,
+                                    });
+                                    fetchRisks();
+                                    setSelectedRiskIds(new Set());
+                                  } catch (error: any) {
+                                    toast({
+                                      title: 'Error',
+                                      description: error.response?.data?.error || 'Failed to archive risks',
+                                      status: 'error',
+                                      duration: 5000,
+                                      isClosable: true,
+                                    });
+                                  }
+                                } else if (archivedRisks.length > 0) {
+                                  // All archived - unarchive them
+                                  try {
+                                    await Promise.all(
+                                      archivedRisks.map(risk =>
+                                        api.put(`/api/risks/${risk.id}`, {
+                                          archived: false,
+                                          archivedDate: null,
+                                        })
+                                      )
+                                    );
+                                    toast({
+                                      title: 'Success',
+                                      description: `Unarchived ${archivedRisks.length} risk(s)`,
+                                      status: 'success',
+                                      duration: 3000,
+                                      isClosable: true,
+                                    });
+                                    fetchRisks();
+                                    setSelectedRiskIds(new Set());
+                                  } catch (error: any) {
+                                    toast({
+                                      title: 'Error',
+                                      description: error.response?.data?.error || 'Failed to unarchive risks',
+                                      status: 'error',
+                                      duration: 5000,
+                                      isClosable: true,
+                                    });
+                                  }
+                                }
+                              }}
+                            >
+                              {(() => {
+                                const selectedRisks = risks.filter(r => selectedRiskIds.has(r.id));
+                                const allArchived = selectedRisks.length > 0 && selectedRisks.every(r => r.archived);
+                                const allActive = selectedRisks.length > 0 && selectedRisks.every(r => !r.archived);
+                                if (allArchived) return 'Unarchive Selected';
+                                if (allActive) return 'Archive Selected';
+                                return 'Archive/Unarchive Selected';
+                              })()}
+                            </MenuItem>
                             <MenuItem
                               onClick={() => {
                                 const selectedRisks = risks.filter(r => selectedRiskIds.has(r.id));
@@ -1662,7 +1795,7 @@ export function RisksPage() {
                 search: searchInput,
                 riskCategory: filters.riskCategory,
                 riskNature: filters.riskNature,
-                archived: filters.archived ? 'true' : '',
+                archived: filters.archived || 'false',
                 treatmentCategory: filters.treatmentCategory,
                 riskLevel: filters.riskLevel,
                 mitigationImplemented: filters.mitigationImplemented,
@@ -1677,7 +1810,7 @@ export function RisksPage() {
                   setSearchInput(value);
                   // Actual filter update happens via debouncedSearch effect
                 } else if (key === 'archived') {
-                  setFilters({ ...filters, archived: value === 'true', page: 1 });
+                  setFilters({ ...filters, archived: value, page: 1 });
                 } else {
                   setFilters({ ...filters, [key]: value, page: 1 });
                 }
@@ -1686,7 +1819,7 @@ export function RisksPage() {
                 setFilters({
                   riskCategory: '',
                   riskNature: '',
-                  archived: false,
+                  archived: 'false' as 'false' | 'true' | 'all',
                   ownerId: '',
                   treatmentCategory: '',
                   mitigationImplemented: '',

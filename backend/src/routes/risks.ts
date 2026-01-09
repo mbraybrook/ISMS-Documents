@@ -14,6 +14,7 @@ import {
   getRiskLevel,
   parseControlCodes,
   updateRiskControls,
+  updateControlApplicability,
   calculateCIAFromWizard,
   validateStatusTransition,
   hasPolicyNonConformance,
@@ -45,7 +46,7 @@ router.get(
     query('sortOrder').optional().isIn(['asc', 'desc']),
     query('riskCategory').optional().isString(),
     query('riskNature').optional().isIn(['STATIC', 'INSTANCE']),
-    query('archived').optional().isBoolean(),
+    query('archived').optional().isIn(['true', 'false', 'all']),
     query('ownerId').optional().isUUID(),
     query('treatmentCategory').optional().isIn(['RETAIN', 'MODIFY', 'SHARE', 'AVOID']),
     query('mitigationImplemented').optional().isBoolean(),
@@ -140,8 +141,11 @@ router.get(
         if (department) {
           where.department = department;
         }
-        // Default to showing non-archived risks unless explicitly requested
-        if (archived !== undefined) {
+        // Handle archived filter: 'true' = archived only, 'false' = active only, 'all' = both
+        if (archived === 'all') {
+          // Don't filter by archived - show all risks
+          // where.archived is not set, so all risks are included
+        } else if (archived !== undefined) {
           where.archived = archived === 'true';
         } else {
           where.archived = false;
@@ -456,6 +460,7 @@ router.post(
     body('riskCategory').optional().isIn(['INFORMATION_SECURITY', 'OPERATIONAL', 'FINANCIAL', 'COMPLIANCE', 'REPUTATIONAL', 'STRATEGIC', 'OTHER']),
     body('riskNature').optional().isIn(['STATIC', 'INSTANCE']),
     body('archived').optional().isBoolean(),
+    body('archivedDate').optional().isISO8601().toDate(),
     body('expiryDate').optional().isISO8601().toDate(),
     body('lastReviewDate').optional().isISO8601().toDate(),
     body('nextReviewDate').optional().isISO8601().toDate(),
@@ -513,6 +518,7 @@ router.post(
         riskCategory,
         riskNature,
         archived,
+        archivedDate,
         expiryDate,
         lastReviewDate,
         nextReviewDate,
@@ -664,6 +670,7 @@ router.post(
           riskCategory: riskCategory as any, // Type will be correct after TS server restart
           riskNature: riskNature as any, // Type will be correct after TS server restart
           archived: archived ?? false,
+          archivedDate: archivedDate ? new Date(archivedDate) : (archived ? new Date() : null),
           expiryDate: expiryDate ? new Date(expiryDate) : null,
           lastReviewDate: lastReviewDate ? new Date(lastReviewDate) : null,
           nextReviewDate: nextReviewDate ? new Date(nextReviewDate) : null,
@@ -763,6 +770,7 @@ router.put(
     body('riskCategory').optional().isIn(['INFORMATION_SECURITY', 'OPERATIONAL', 'FINANCIAL', 'COMPLIANCE', 'REPUTATIONAL', 'STRATEGIC', 'OTHER']),
     body('riskNature').optional().isIn(['STATIC', 'INSTANCE']),
     body('archived').optional().isBoolean(),
+    body('archivedDate').optional().isISO8601().toDate(),
     body('expiryDate').optional().isISO8601().toDate(),
     body('lastReviewDate').optional().isISO8601().toDate(),
     body('nextReviewDate').optional().isISO8601().toDate(),
@@ -892,6 +900,25 @@ router.put(
         });
       }
 
+      // Handle archivedDate: set when archiving, clear when unarchiving
+      if (updateData.archived !== undefined) {
+        if (updateData.archived === true) {
+          // When archiving: set archivedDate to current date if not already set
+          const existingArchivedDate = (existing as any).archivedDate;
+          if (!existingArchivedDate && updateData.archivedDate === undefined) {
+            updateData.archivedDate = new Date();
+          } else if (updateData.archivedDate !== undefined) {
+            updateData.archivedDate = updateData.archivedDate ? new Date(updateData.archivedDate) : null;
+          }
+        } else if (updateData.archived === false) {
+          // When unarchiving: clear archivedDate
+          updateData.archivedDate = null;
+        }
+      } else if (updateData.archivedDate !== undefined) {
+        // Allow archivedDate to be set independently
+        updateData.archivedDate = updateData.archivedDate ? new Date(updateData.archivedDate) : null;
+      }
+
       // Handle date conversions
       if (updateData.dateAdded) {
         updateData.dateAdded = new Date(updateData.dateAdded);
@@ -1006,6 +1033,11 @@ router.put(
       if (updateData.annexAControlsRaw !== undefined) {
         const controlCodes = parseControlCodes(updateData.annexAControlsRaw);
         await updateRiskControls(risk.id, controlCodes);
+      }
+
+      // Update control applicability if archived status changed
+      if (updateData.archived !== undefined) {
+        await updateControlApplicability();
       }
 
       // Recompute embedding if title, threatDescription, or description changed

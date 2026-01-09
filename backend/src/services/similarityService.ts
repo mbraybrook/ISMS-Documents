@@ -64,10 +64,9 @@ export async function findSimilarRisksForRisk(riskId: string, limit: number = 10
       }
     }
 
-    // Get all non-archived risks (excluding current risk) with embedding field
+    // Get all risks (including archived) (excluding current risk) with embedding field
     const allRisks = await prisma.risk.findMany({
       where: {
-        archived: false,
         id: { not: riskId },
       },
       select: {
@@ -184,10 +183,8 @@ export async function checkSimilarityForNewRisk(
       return [];
     }
 
-    // Get all non-archived risks (excluding the risk being edited if provided) with embedding field
-    const where: any = {
-      archived: false,
-    };
+    // Get all risks (including archived) (excluding the risk being edited if provided) with embedding field
+    const where: any = {};
     if (riskData.excludeId) {
       where.id = { not: riskData.excludeId };
     }

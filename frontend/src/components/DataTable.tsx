@@ -298,11 +298,16 @@ export function DataTable<T>({
               }
 
               if (filter.type === 'select') {
+                const selectValue = filterValues[filter.key];
                 return (
                   <Select
                     key={filter.key}
-                    placeholder={filter.placeholder || `Filter by ${filter.label || filter.key}`}
-                    value={filterValues[filter.key] || ''}
+                    placeholder={
+                      filter.placeholder === '' 
+                        ? undefined 
+                        : (filter.placeholder !== undefined ? filter.placeholder : `Filter by ${filter.label || filter.key}`)
+                    }
+                    value={selectValue !== undefined && selectValue !== null && selectValue !== '' ? selectValue : ''}
                     onChange={(e) => onFilterChange(filter.key, e.target.value)}
                     maxW="200px"
                   >

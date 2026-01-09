@@ -263,6 +263,7 @@ model Risk {
   interestedPartyId             String
   threatDescription             String?
   archived                      Boolean           @default(false)
+  archivedDate                  DateTime?
   expiryDate                    DateTime?
   lastReviewDate                DateTime?
   nextReviewDate                DateTime?
@@ -307,6 +308,7 @@ model Risk {
   @@index([nextReviewDate])
   @@index([expiryDate])
   @@index([archived])
+  @@index([archivedDate])
   @@index([riskNature])
   @@index([riskCategory])
   @@index([calculatedScore])

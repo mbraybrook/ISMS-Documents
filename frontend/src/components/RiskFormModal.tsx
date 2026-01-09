@@ -142,6 +142,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
     riskCategory: '',
     riskNature: '',
     archived: false,
+    archivedDate: '',
     expiryDate: '',
     lastReviewDate: '',
     nextReviewDate: '',
@@ -360,6 +361,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         riskCategory: templateRisk.riskCategory || '',
         riskNature: templateRisk.riskNature || '',
         archived: false,
+        archivedDate: '',
         expiryDate: templateRisk.expiryDate ? new Date(templateRisk.expiryDate).toISOString().split('T')[0] : '',
         lastReviewDate: templateRisk.lastReviewDate ? new Date(templateRisk.lastReviewDate).toISOString().split('T')[0] : '',
         nextReviewDate: templateRisk.nextReviewDate ? new Date(templateRisk.nextReviewDate).toISOString().split('T')[0] : '',
@@ -534,6 +536,9 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           riskCategory: risk.riskCategory || risk.riskType || '',
           riskNature: risk.riskNature || '',
           archived: risk.archived || false,
+          archivedDate: risk.archivedDate
+            ? new Date(risk.archivedDate).toISOString().split('T')[0]
+            : '',
           expiryDate: risk.expiryDate
             ? new Date(risk.expiryDate).toISOString().split('T')[0]
             : '',
@@ -595,8 +600,9 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           dateAdded: new Date().toISOString().split('T')[0],
           riskCategory: '',
           riskNature: '',
-          archived: false,
-          expiryDate: '',
+        archived: false,
+        archivedDate: '',
+        expiryDate: '',
           lastReviewDate: '',
           nextReviewDate: '',
           ownerUserId: '',
@@ -956,6 +962,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       if (payload.description === '') payload.description = undefined;
       if (payload.riskCategory === '') payload.riskCategory = undefined;
       if (payload.riskNature === '') payload.riskNature = undefined;
+      if (payload.archivedDate === '') payload.archivedDate = undefined;
       if (payload.expiryDate === '') payload.expiryDate = undefined;
       if (payload.lastReviewDate === '') payload.lastReviewDate = undefined;
       if (payload.nextReviewDate === '') payload.nextReviewDate = undefined;
@@ -1551,7 +1558,16 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                       <FormControl>
                         <Checkbox
                           isChecked={formData.archived}
-                          onChange={(e) => setFormData({ ...formData, archived: e.target.checked })}
+                          onChange={(e) => {
+                            const newArchived = e.target.checked;
+                            setFormData({ 
+                              ...formData, 
+                              archived: newArchived,
+                              archivedDate: newArchived && !formData.archivedDate 
+                                ? new Date().toISOString().split('T')[0] 
+                                : (!newArchived ? '' : formData.archivedDate)
+                            });
+                          }}
                           isDisabled={viewMode}
                         >
                           Archived
@@ -1559,6 +1575,20 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                         <Text fontSize="xs" color="gray.500" mt={1}>
                           Archived risks are hidden by default. Instance risks are typically archived when they expire.
                         </Text>
+                        {formData.archived && (
+                          <FormControl mt={3}>
+                            <FormLabel fontSize="sm">Archive Date</FormLabel>
+                            <Input
+                              type="date"
+                              value={formData.archivedDate}
+                              onChange={(e) => setFormData({ ...formData, archivedDate: e.target.value })}
+                              isDisabled={viewMode}
+                            />
+                            <Text fontSize="xs" color="gray.500" mt={1}>
+                              The date when this risk was archived. Archived risks are excluded from risk scoring and control selection after this date.
+                            </Text>
+                          </FormControl>
+                        )}
                       </FormControl>
 
                       <FormControl>
