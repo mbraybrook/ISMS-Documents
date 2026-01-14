@@ -204,9 +204,21 @@ export function DataTable<T>({
   const renderSortableHeader = (column: Column<T>, index: number) => {
     const isSorted = sortConfig && sortConfig.field === column.key;
     const isAsc = isSorted && sortConfig.direction === 'asc';
-    const isSticky = column.sticky && index === 0;
-    // Calculate sticky left position: checkbox (50px if selection enabled)
-    const stickyLeft = isSticky && enableSelection ? '50px' : (isSticky ? '0px' : undefined);
+    const isSticky = column.sticky;
+    // Calculate sticky left position: sum of widths of all non-sticky columns before this one
+    let stickyLeft: string | undefined = undefined;
+    if (isSticky) {
+      let leftOffset = enableSelection ? 50 : 0; // Checkbox width if enabled
+      for (let i = 0; i < index; i++) {
+        if (!columns[i].sticky) {
+          // Estimate width: use minW if available, otherwise default to 150px
+          const width = columns[i].minW || columns[i].width || '150px';
+          const widthNum = parseInt(width.replace('px', ''), 10);
+          leftOffset += widthNum || 150;
+        }
+      }
+      stickyLeft = `${leftOffset}px`;
+    }
 
     return (
       <Th
@@ -490,8 +502,22 @@ export function DataTable<T>({
               : String(value);
           }
 
-          const isSticky = column.sticky && columns.indexOf(column) === 0;
-          const stickyLeft = isSticky && enableSelection ? '50px' : (isSticky ? '0px' : undefined);
+          const columnIndex = columns.indexOf(column);
+          const isSticky = column.sticky;
+          // Calculate sticky left position: sum of widths of all non-sticky columns before this one
+          let stickyLeft: string | undefined = undefined;
+          if (isSticky) {
+            let leftOffset = enableSelection ? 50 : 0; // Checkbox width if enabled
+            for (let i = 0; i < columnIndex; i++) {
+              if (!columns[i].sticky) {
+                // Estimate width: use minW if available, otherwise default to 150px
+                const width = columns[i].minW || columns[i].width || '150px';
+                const widthNum = parseInt(width.replace('px', ''), 10);
+                leftOffset += widthNum || 150;
+              }
+            }
+            stickyLeft = `${leftOffset}px`;
+          }
           return (
             <Td
               key={column.key}

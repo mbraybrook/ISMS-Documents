@@ -27,9 +27,19 @@ fi
 
 # Run Prisma migrations
 # migrate deploy is idempotent - it will only apply pending migrations
+# Migrations are now idempotent (use IF NOT EXISTS) to handle cases where objects already exist
 echo "[$(date -Iseconds)] Running database migrations..."
 if ! npx prisma migrate deploy; then
   echo "ERROR: Database migration failed"
+  echo ""
+  echo "If the error mentions 'already exists' or 'relation already exists', this usually means:"
+  echo "  1. The migration was applied manually or through a different process"
+  echo "  2. The migration history is out of sync with the database state"
+  echo ""
+  echo "To resolve this, you can:"
+  echo "  1. Mark the migration as applied: npx prisma migrate resolve --applied <migration_name>"
+  echo "  2. Or use the helper script: ./scripts/resolve-migration-conflict.sh <migration_name> --applied"
+  echo ""
   echo "This is a fatal error. The application will not start without a properly migrated database."
   exit 1
 fi

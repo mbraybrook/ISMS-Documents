@@ -323,7 +323,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
                 </Button>
               )}
               {document && (
-                <Button colorScheme="blue" type="submit" form="document-form" isLoading={loading}>
+                <Button colorScheme="blue" onClick={handleSubmit} isLoading={loading}>
                   Update
                 </Button>
               )}

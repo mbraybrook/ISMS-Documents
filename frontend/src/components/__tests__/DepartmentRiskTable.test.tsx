@@ -219,19 +219,21 @@ describe('DepartmentRiskTable', () => {
       });
     });
 
-    it('should fetch and display risks on mount', async () => {
+    it('should fetch and display risks on mount without department filter', async () => {
       // Arrange & Act - custom render wraps in act() and waits for all effects
       render(<DepartmentRiskTable />);
 
-      // Assert
+      // Assert - Contributors can now view all risks by default (no department pre-filter)
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/api/risks', expect.objectContaining({
           params: expect.objectContaining({
             page: 1,
             limit: 20,
-            department: 'FINANCE',
           }),
         }));
+        // Department should not be in params unless explicitly filtered
+        const call = (api.get as ReturnType<typeof vi.fn>).mock.calls[0];
+        expect(call[1].params.department).toBeUndefined();
       });
 
       await waitFor(() => {
@@ -450,20 +452,23 @@ describe('DepartmentRiskTable', () => {
         expect(searchInput.value.length).toBeGreaterThan(0);
       }, { timeout: 2000 });
 
-      // Find and click clear filters button
+      // Wait for filter to be applied and clear button to appear
+      // The clear button appears when activeFilterCount > 0
       const clearButton = await waitFor(() => {
         const button = screen.queryByText(/clear all/i);
         if (!button) throw new Error('Clear button not found');
         return button;
       }, { timeout: 2000 });
 
-      await user.click(clearButton);
-
-      // Assert - Verify that clear button is functional
-      // The actual API call behavior and filter reset logic is tested through integration tests
-      // This test verifies the UI component is interactive and the button can be clicked
+      // Assert - Verify that clear button is present before clicking
       expect(clearButton).toBeInTheDocument();
-      // Verify search input is cleared (user-visible behavior)
+
+      // Act - Click the clear button
+      await user.click(clearButton);
+      
+      // Assert - Verify that search input is cleared (user-visible behavior)
+      // Note: The clear button will disappear after clearing (since activeFilterCount becomes 0),
+      // so we don't check for its presence after clicking
       await waitFor(() => {
         expect(searchInput.value).toBe('');
       }, { timeout: 2000 });
@@ -748,18 +753,18 @@ describe('DepartmentRiskTable', () => {
   });
 
   describe('Department Filtering Logic', () => {
-    it('should pre-filter by user department on mount', async () => {
+    it('should not pre-filter by user department on mount - Contributors can view all risks', async () => {
       // Arrange
       mockGetUserDepartment.mockReturnValue('HR');
 
       // Act
       render(<DepartmentRiskTable />);
 
-      // Assert
+      // Assert - Contributors can now view all risks by default (no department pre-filter)
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/api/risks', expect.objectContaining({
-          params: expect.objectContaining({
-            department: 'HR',
+          params: expect.not.objectContaining({
+            department: expect.anything(),
           }),
         }));
       });
@@ -789,9 +794,8 @@ describe('DepartmentRiskTable', () => {
       });
     });
 
-    it('should not use test department override when department filter is cleared', async () => {
+    it('should clear department filter completely when clear filters is clicked', async () => {
       // Arrange
-      // When testDepartment is set, effectiveDepartment = testDepartment || department = 'OPERATIONS'
       localStorageMock.getItem.mockReturnValue('OPERATIONS');
       mockGetUserDepartment.mockReturnValue('FINANCE'); // User's actual department
       mockUseAuth.mockReturnValue({
@@ -806,9 +810,24 @@ describe('DepartmentRiskTable', () => {
         expect(api.get).toHaveBeenCalled();
       });
 
-      // Act - Clear department filter using the "Clear all filters" button
-      // This will reset department to effectiveDepartment
+      // Act - Set a department filter first, then clear it
       const user = userEvent.setup();
+      const selects = screen.getAllByRole('combobox');
+      const departmentSelect = Array.from(selects).find((select) => {
+        const options = Array.from(select.querySelectorAll('option'));
+        return options.some((opt) => opt.textContent?.includes('Department'));
+      });
+
+      if (departmentSelect) {
+        await user.selectOptions(departmentSelect, 'HR');
+        await waitFor(() => {
+          const calls = (api.get as ReturnType<typeof vi.fn>).mock.calls;
+          const lastCall = calls[calls.length - 1];
+          expect(lastCall[1].params.department).toBe('HR');
+        });
+      }
+
+      // Now clear all filters
       const clearButton = await waitFor(() => {
         const button = screen.queryByText(/clear all/i);
         if (!button) throw new Error('Clear button not found');
@@ -817,30 +836,25 @@ describe('DepartmentRiskTable', () => {
 
       await user.click(clearButton);
 
-      // Assert - When filters are cleared, department resets to effectiveDepartment
-      // Since testDepartment is set to 'OPERATIONS', effectiveDepartment is 'OPERATIONS'
-      // Note: The component sends testDepartment in params when department filter is active
-      // This is by design - when you clear filters, it resets to effectiveDepartment
-      // and if testDepartment is set, it will be included in the API call
+      // Assert - When filters are cleared, department should be empty (not reset to effectiveDepartment)
       await waitFor(() => {
         const calls = (api.get as ReturnType<typeof vi.fn>).mock.calls;
         const lastCall = calls[calls.length - 1];
-        // Department resets to effectiveDepartment which is 'OPERATIONS' (testDepartment)
-        expect(lastCall[1].params.department).toBe('OPERATIONS');
-        // When department filter is active and testDepartment is set, it IS sent (by design)
-        // This test name is misleading - the actual behavior is that testDepartment IS used
-        // when filters are cleared because department resets to effectiveDepartment
+        // Department should be cleared (not in params or empty string)
+        expect(lastCall[1].params.department).toBeUndefined();
       }, { timeout: 2000 });
     });
 
-    it('should update department filter when effective department changes', async () => {
-      // Arrange - Start with FINANCE, but clear department filter first
+    it('should allow manual department filter selection', async () => {
+      // Arrange - Contributors can view all risks, but can filter by department
       mockGetUserDepartment.mockReturnValue('FINANCE');
       render(<DepartmentRiskTable />);
 
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/api/risks', expect.objectContaining({
-          params: expect.objectContaining({ department: 'FINANCE' }),
+          params: expect.not.objectContaining({
+            department: expect.anything(),
+          }),
         }));
       });
 

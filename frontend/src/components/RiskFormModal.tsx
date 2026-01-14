@@ -1253,7 +1253,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                         <Select
                           value={formData.interestedPartyId}
                           onChange={(e) => setFormData({ ...formData, interestedPartyId: e.target.value })}
-                          isReadOnly={viewMode}
+                          isDisabled={viewMode}
                           placeholder="Select an interested party"
                         >
                           {Array.isArray(interestedParties) && interestedParties.map((party) => (
@@ -1762,6 +1762,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                                   step={1}
                                   value={formData.confidentialityScore}
                                   onChange={(val) => setFormData({ ...formData, confidentialityScore: val })}
+                                  isDisabled={viewMode}
                                 >
                                   <SliderMark value={1} left="50%" transform="translateX(-50%)" mt="-10px" fontSize="xs">
                                     1
@@ -2533,7 +2534,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                             value={controlSearchTerm}
                             onChange={(e) => setControlSearchTerm(e.target.value)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' && controlSearchTerm.trim()) {
+                              if (e.key === 'Enter' && controlSearchTerm.trim() && !viewMode) {
                                 // Try to find and add control by code
                                 const found = controls.find(
                                   (c) =>
@@ -2546,6 +2547,8 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                                 }
                               }
                             }}
+                            isReadOnly={viewMode}
+                            isDisabled={viewMode}
                           />
                         </InputGroup>
                       </FormControl>
@@ -2571,11 +2574,15 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                               <Box
                                 key={control.id}
                                 p={2}
-                                _hover={{ bg: 'gray.100', cursor: 'pointer' }}
+                                _hover={viewMode ? {} : { bg: 'gray.100', cursor: 'pointer' }}
                                 onClick={() => {
-                                  setSelectedControlIds([...selectedControlIds, control.id]);
-                                  setControlSearchTerm('');
+                                  if (!viewMode) {
+                                    setSelectedControlIds([...selectedControlIds, control.id]);
+                                    setControlSearchTerm('');
+                                  }
                                 }}
+                                cursor={viewMode ? 'not-allowed' : 'pointer'}
+                                opacity={viewMode ? 0.6 : 1}
                               >
                                 <Text fontWeight="medium">{control.code}</Text>
                                 <Text fontSize="sm" color="gray.600">
@@ -2600,8 +2607,11 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                                   </TagLabel>
                                   <TagCloseButton
                                     onClick={() => {
-                                      setSelectedControlIds(selectedControlIds.filter((id) => id !== controlId));
+                                      if (!viewMode) {
+                                        setSelectedControlIds(selectedControlIds.filter((id) => id !== controlId));
+                                      }
                                     }}
+                                    isDisabled={viewMode}
                                   />
                                 </Tag>
                               );

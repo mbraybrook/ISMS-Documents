@@ -45,6 +45,7 @@ import { DeleteIcon, DownloadIcon, HamburgerIcon } from '@chakra-ui/icons';
 import api from '../services/api';
 import { RiskFormModal } from '../components/RiskFormModal';
 import { DepartmentRiskTable } from '../components/DepartmentRiskTable';
+import { StaffRiskTable } from '../components/StaffRiskTable';
 import { useAuth } from '../contexts/AuthContext';
 import { DataTable, Column, FilterConfig, PaginationConfig, SortConfig, CSVExportConfig } from '../components/DataTable';
 import { formatBoolean, generateCSV } from '../utils/tableUtils';
@@ -733,6 +734,19 @@ export function RisksPage() {
   const buildColumns = useMemo((): Column<Risk>[] => {
     const cols: Column<Risk>[] = [];
 
+    // Date Added column - always first, always visible
+    cols.push({
+      key: 'dateAdded',
+      header: 'Date Added',
+      sortable: true,
+      minW: '130px',
+      render: (risk) => (
+        <Text fontSize="sm">
+          {risk.dateAdded ? new Date(risk.dateAdded).toLocaleDateString() : 'N/A'}
+        </Text>
+      ),
+    });
+
     if (visibleColumns.title) {
       cols.push({
         key: 'title',
@@ -1208,6 +1222,7 @@ export function RisksPage() {
     enabled: true,
     filename: `risks_export_${new Date().toISOString().split('T')[0]}.csv`,
     headers: [
+      'Date Added',
       'Title',
       'Risk Category',
       'Risk Nature',
@@ -1230,7 +1245,6 @@ export function RisksPage() {
       'Residual Treatment',
       'Mitigation Implemented',
       'Controls',
-      'Date Added',
     ],
     getRowData: (risk) => {
       const riskValue = risk.confidentialityScore + risk.integrityScore + risk.availabilityScore;
@@ -1245,6 +1259,7 @@ export function RisksPage() {
       const controls = risk.riskControls.map((rc: { control: { code: string } }) => rc.control.code).join('; ');
 
       return [
+        risk.dateAdded,
         risk.title,
         risk.riskCategory || '',
         risk.riskNature || '',
@@ -1267,7 +1282,6 @@ export function RisksPage() {
         risk.residualRiskTreatmentCategory || '',
         formatBoolean(risk.mitigationImplemented),
         controls || 'None',
-        risk.dateAdded,
       ];
     },
     onExport: () => {
@@ -1435,6 +1449,11 @@ export function RisksPage() {
       </Tr>
     );
   }, [user, selectedRiskIds, getRowBgColor, handleEdit, handleSelectRisk, buildColumns, risks]);
+
+  // For Staff, show read-only StaffRiskTable
+  if (effectiveRole === 'STAFF') {
+    return <StaffRiskTable />;
+  }
 
   // For Contributors, show simplified DepartmentRiskTable
   if (effectiveRole === 'CONTRIBUTOR') {

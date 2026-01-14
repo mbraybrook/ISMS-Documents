@@ -316,9 +316,9 @@ async function seedControls(data: Record<string, unknown>[]) {
   console.log(`Seeding ${data.length} controls...`);
   for (const item of data) {
     await prisma.control.upsert({
-      where: { id: item.id },
+      where: { code: item.code as string }, // Use code as unique identifier
       update: {
-        code: item.code,
+        // Don't update code since it's the unique identifier
         title: item.title,
         description: item.description,
         selectedForRiskAssessment: item.selectedForRiskAssessment ?? false,

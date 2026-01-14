@@ -64,6 +64,9 @@ export function Layout({ children }: LayoutProps) {
                       <Link as={RouterLink} to="/admin/staff/documents" fontSize="sm">
                         Documents
                       </Link>
+                      <Link as={RouterLink} to="/admin/risks/risks" fontSize="sm">
+                        Risk Register
+                      </Link>
                     </>
                   ) : effectiveRole === 'CONTRIBUTOR' ? (
                     // Navigation for CONTRIBUTOR (Staff access + Risk contribution)

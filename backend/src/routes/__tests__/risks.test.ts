@@ -251,7 +251,7 @@ describe('Risks API', () => {
       expect(response.body.pagination.total).toBe(1);
     });
 
-    it('should filter by department for CONTRIBUTOR users', async () => {
+    it('should allow CONTRIBUTOR users to view all risks (no department filter)', async () => {
       const contributorUser = mockUsers.contributor('OPERATIONS');
       prisma.user.findUnique.mockResolvedValue(contributorUser);
       prisma.risk.findMany.mockResolvedValue([]);
@@ -261,24 +261,40 @@ describe('Risks API', () => {
         .get('/api/risks')
         .expect(200);
 
+      // Contributors can now see all risks - no department filter applied by default
       expect(prisma.risk.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            department: 'OPERATIONS',
             archived: false,
           }),
         })
       );
+      // Department should not be in where clause unless explicitly filtered
+      const findManyCall = prisma.risk.findMany.mock.calls[0][0];
+      expect(findManyCall.where.department).toBeUndefined();
     });
 
-    it('should return 403 when CONTRIBUTOR has no department', async () => {
-      const contributorUser = mockUsers.contributor();
-      contributorUser.department = null;
-      prisma.user.findUnique.mockResolvedValue(contributorUser);
+    it('should allow STAFF users to view all risks', async () => {
+      const staffUser = mockUsers.staff();
+      prisma.user.findUnique.mockResolvedValue(staffUser);
+      prisma.risk.findMany.mockResolvedValue([]);
+      prisma.risk.count.mockResolvedValue(0);
 
       await request(app)
         .get('/api/risks')
-        .expect(403);
+        .expect(200);
+
+      // Staff can see all risks - no department filter, archived defaults to false
+      expect(prisma.risk.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            archived: false,
+          }),
+        })
+      );
+      // Department should not be in where clause unless explicitly filtered
+      const findManyCall = prisma.risk.findMany.mock.calls[0][0];
+      expect(findManyCall.where.department).toBeUndefined();
     });
 
     it('should filter by status', async () => {
@@ -1126,6 +1142,20 @@ describe('Risks API', () => {
         .expect(403);
     });
 
+    it('should return 403 when STAFF tries to create a risk', async () => {
+      const staffUser = mockUsers.staff();
+      prisma.user.findUnique.mockResolvedValue(staffUser);
+
+      await request(app)
+        .post('/api/risks')
+        .send({
+          title: 'New Risk',
+        })
+        .expect(403);
+
+      expect(prisma.risk.create).not.toHaveBeenCalled();
+    });
+
     it('should restrict CONTRIBUTOR status to DRAFT or PROPOSED', async () => {
       const contributorUser = mockUsers.contributor('OPERATIONS');
       const partyId = '550e8400-e29b-41d4-a716-446655440010';
@@ -1458,6 +1488,39 @@ describe('Risks API', () => {
         .expect(403);
     });
 
+    it('should return 403 when STAFF tries to edit a risk', async () => {
+      const riskId = '550e8400-e29b-41d4-a716-446655440001';
+      const existingRisk = {
+        id: riskId,
+        title: 'Existing Risk',
+        department: 'OPERATIONS',
+        owner: {
+          id: '550e8400-e29b-41d4-a716-446655440030',
+          displayName: 'Test Owner',
+          email: 'owner@paythru.com',
+        },
+        interestedParty: {
+          id: '550e8400-e29b-41d4-a716-446655440010',
+          name: 'Test Party',
+          group: null,
+        },
+        riskControls: [],
+      };
+      const staffUser = mockUsers.staff();
+
+      prisma.risk.findUnique.mockResolvedValue(existingRisk);
+      prisma.user.findUnique.mockResolvedValue(staffUser);
+
+      await request(app)
+        .put(`/api/risks/${riskId}`)
+        .send({
+          title: 'Updated',
+        })
+        .expect(403);
+
+      expect(prisma.risk.update).not.toHaveBeenCalled();
+    });
+
     it('should prevent CONTRIBUTOR from setting status to ACTIVE', async () => {
       const riskId = '550e8400-e29b-41d4-a716-446655440001';
       const existingRisk = {
@@ -1487,6 +1550,39 @@ describe('Risks API', () => {
           status: 'ACTIVE',
         })
         .expect(403);
+    });
+
+    it('should prevent CONTRIBUTOR from changing department field', async () => {
+      const riskId = '550e8400-e29b-41d4-a716-446655440001';
+      const existingRisk = {
+        id: riskId,
+        title: 'Existing Risk',
+        department: 'OPERATIONS',
+        owner: {
+          id: '550e8400-e29b-41d4-a716-446655440030',
+          displayName: 'Test Owner',
+          email: 'owner@paythru.com',
+        },
+        interestedParty: {
+          id: '550e8400-e29b-41d4-a716-446655440010',
+          name: 'Test Party',
+          group: null,
+        },
+        riskControls: [],
+      };
+      const contributorUser = mockUsers.contributor('OPERATIONS');
+
+      prisma.risk.findUnique.mockResolvedValue(existingRisk);
+      prisma.user.findUnique.mockResolvedValue(contributorUser);
+
+      await request(app)
+        .put(`/api/risks/${riskId}`)
+        .send({
+          department: 'FINANCE',
+        })
+        .expect(403);
+
+      expect(prisma.risk.update).not.toHaveBeenCalled();
     });
 
     it('should allow ADMIN to test as CONTRIBUTOR with testDepartment', async () => {

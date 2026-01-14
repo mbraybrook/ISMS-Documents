@@ -22,8 +22,17 @@ export function RoleSwitcher() {
     const newRole = getEffectiveRole();
     
     // If switching to STAFF and not already on a staff route, navigate to staff dashboard
-    if (newRole === 'STAFF' && !location.pathname.startsWith('/admin/staff')) {
-      navigate('/admin/staff', { replace: true });
+    // Staff can access: /admin/staff, /admin/staff/*, /admin/risks/risks, /admin/profile
+    if (newRole === 'STAFF') {
+      const isValidStaffRoute = 
+        location.pathname.startsWith('/admin/staff') || 
+        location.pathname === '/admin/risks/risks' ||
+        location.pathname === '/admin/profile';
+      
+      // Only redirect if on an invalid route
+      if (!isValidStaffRoute && !location.pathname.startsWith('/admin/login') && !location.pathname.startsWith('/unauthorized')) {
+        navigate('/admin/staff', { replace: true });
+      }
     }
     // If switching to CONTRIBUTOR, only redirect if on an invalid route
     // Contributors can access: /admin/staff, /admin/staff/*, /admin/risks/department, /admin/profile
@@ -39,7 +48,7 @@ export function RoleSwitcher() {
       }
     }
     // If switching away from STAFF and on a staff route, navigate to admin dashboard
-    else if (newRole !== 'STAFF' && (newRole as string) !== 'CONTRIBUTOR' && location.pathname.startsWith('/admin/staff')) {
+    else if ((newRole as string) !== 'STAFF' && (newRole as string) !== 'CONTRIBUTOR' && location.pathname.startsWith('/admin/staff')) {
       navigate('/admin', { replace: true });
     }
     // If switching away from CONTRIBUTOR and on department risks route, navigate to main risks page

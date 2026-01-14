@@ -3,23 +3,19 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   Heading,
-  Button,
-  HStack,
   VStack,
   Badge,
-  useDisclosure,
   Text,
   useToast,
   Tooltip,
+  useDisclosure,
 } from '@chakra-ui/react';
 import api from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
-import { RiskWizardModal } from './RiskWizardModal';
-import { RiskFormModal } from './RiskFormModal';
 import { Risk } from '../types/risk';
 import { DataTable, Column, FilterConfig, PaginationConfig, SortConfig } from '../components/DataTable';
 import { useDebounce } from '../hooks/useDebounce';
 import { getDepartmentDisplayName } from '../types/risk';
+import { RiskFormModal } from './RiskFormModal';
 
 const RISK_CATEGORIES = [
   'INFORMATION_SECURITY',
@@ -42,26 +38,14 @@ const DEPARTMENTS = [
   { value: 'MARKETING', label: 'Marketing' },
 ];
 
-export function DepartmentRiskTable() {
+export function StaffRiskTable() {
   const toast = useToast();
-  const { user, getUserDepartment, roleOverride } = useAuth();
   const [risks, setRisks] = useState<Risk[]>([]);
   const [loading, setLoading] = useState(true);
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
+  const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
   const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
   
-  const department = getUserDepartment();
-  
-  // Get test department override if in test mode
-  const testDepartment = roleOverride === 'CONTRIBUTOR' && user?.role === 'ADMIN' 
-    ? localStorage.getItem('departmentOverride')
-    : null;
-  
-  // Determine effective department (test override or real department)
-  const effectiveDepartment = testDepartment || department;
-  
-  // Filters and pagination - start with empty department filter to allow viewing all risks
+  // Filters and pagination
   const [filters, setFilters] = useState({
     riskCategory: '',
     riskNature: '',
@@ -71,7 +55,7 @@ export function DepartmentRiskTable() {
     riskLevel: '',
     search: '',
     status: '',
-    department: '', // Start with empty - Contributors can view all risks
+    department: '',
     sortBy: 'calculatedScore',
     sortOrder: 'desc' as 'asc' | 'desc',
     page: 1,
@@ -101,28 +85,6 @@ export function DepartmentRiskTable() {
     setSearchInput(filters.search);
   }, [filters.search]);
 
-  // Only set department filter on initial mount if user is Contributor (not in test mode)
-  // This allows Contributors to see all risks by default, but they can filter by department if needed
-  // In test mode (testDepartment set), automatically set the department filter to enable testing
-  useEffect(() => {
-    // In test mode, automatically set department filter to testDepartment
-    if (testDepartment && filters.department === '') {
-      setFilters(prev => ({ ...prev, department: testDepartment }));
-      return;
-    }
-    
-    // Only auto-set on initial load if we have an effective department and no filter is set
-    // Don't force it if user has cleared the filter
-    if (effectiveDepartment && filters.department === '' && !testDepartment) {
-      // Only set on initial mount - check if this is the first render
-      const hasSetInitialFilter = sessionStorage.getItem('contributorRiskFilterInitialized');
-      if (!hasSetInitialFilter) {
-        sessionStorage.setItem('contributorRiskFilterInitialized', 'true');
-        // Don't auto-set - let Contributors see all risks by default
-      }
-    }
-  }, [effectiveDepartment, filters.department, testDepartment]);
-
   const fetchRisks = useCallback(async () => {
     try {
       setLoading(true);
@@ -143,19 +105,7 @@ export function DepartmentRiskTable() {
       if (filters.riskLevel) params.riskLevel = filters.riskLevel;
       if (filters.search) params.search = filters.search;
       if (filters.status) params.status = filters.status;
-      // Only send department param if explicitly set (not empty)
-      if (filters.department) {
-        params.department = filters.department;
-      }
-      
-      // Include testDepartment if testing AND department filter is active
-      // This allows testing Contributor filtering when department is selected,
-      // but also allows removing the filter to see all risks
-      if (testDepartment && filters.department) {
-        params.testDepartment = testDepartment;
-        // Use view=department to trigger Contributor filtering only when department filter is active
-        params.view = 'department';
-      }
+      if (filters.department) params.department = filters.department;
 
       const response = await api.get('/api/risks', { params });
       setRisks(response.data.data || []);
@@ -174,31 +124,11 @@ export function DepartmentRiskTable() {
     } finally {
       setLoading(false);
     }
-  }, [filters, testDepartment, toast]);
+  }, [filters, toast]);
 
   useEffect(() => {
     fetchRisks();
   }, [fetchRisks]);
-
-  const handleEdit = useCallback((risk: Risk) => {
-    // Check if risk belongs to Contributor's department
-    const riskDepartment = risk.department;
-    const canEdit = effectiveDepartment && riskDepartment === effectiveDepartment;
-    
-    if (!canEdit) {
-      toast({
-        title: 'Cannot Edit',
-        description: 'You can only edit risks from your department.',
-        status: 'warning',
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-    
-    setSelectedRisk(risk);
-    onEditOpen();
-  }, [onEditOpen, effectiveDepartment, toast]);
 
   const handlePageChange = (newPage: number) => {
     setFilters({ ...filters, page: newPage });
@@ -212,6 +142,16 @@ export function DepartmentRiskTable() {
       sortOrder: filters.sortBy === field && filters.sortOrder === 'asc' ? 'desc' : 'asc',
       page: 1,
     });
+  };
+
+  const handleView = useCallback((risk: Risk) => {
+    setSelectedRisk(risk);
+    onViewOpen();
+  }, [onViewOpen]);
+
+  const handleClose = () => {
+    onViewClose();
+    setSelectedRisk(null);
   };
 
   const getRiskLevelColor = (level: 'LOW' | 'MEDIUM' | 'HIGH'): string => {
@@ -335,26 +275,15 @@ export function DepartmentRiskTable() {
         key: 'department',
         header: 'Department',
         minW: '150px',
-        render: (risk) => {
-          const riskDepartment = risk.department;
-          const isEditable = effectiveDepartment && riskDepartment === effectiveDepartment;
-          return (
-            <HStack spacing={2}>
-              {risk.department ? (
-                <Badge colorScheme={isEditable ? 'teal' : 'gray'}>
-                  {getDepartmentDisplayName(risk.department as any)}
-                </Badge>
-              ) : (
-                <Text color="gray.400">N/A</Text>
-              )}
-              {effectiveDepartment && riskDepartment && riskDepartment !== effectiveDepartment && (
-                <Badge colorScheme="orange" fontSize="xs">
-                  Read-only
-                </Badge>
-              )}
-            </HStack>
-          );
-        },
+        render: (risk) => (
+          risk.department ? (
+            <Badge colorScheme="teal">
+              {getDepartmentDisplayName(risk.department as any)}
+            </Badge>
+          ) : (
+            <Text color="gray.400">N/A</Text>
+          )
+        ),
       },
       {
         key: 'status',
@@ -414,7 +343,7 @@ export function DepartmentRiskTable() {
         render: (risk) => <Text>{risk.owner ? risk.owner.displayName : 'N/A'}</Text>,
       },
     ];
-  }, [effectiveDepartment]);
+  }, []);
 
   const paginationConfig: PaginationConfig = {
     mode: 'server',
@@ -434,25 +363,10 @@ export function DepartmentRiskTable() {
     onSort: handleSort,
   };
 
-  const handleSuccess = () => {
-    fetchRisks();
-  };
-
-  const handleClose = () => {
-    onEditClose();
-    setSelectedRisk(null);
-    fetchRisks();
-  };
-
   return (
     <Box p={8}>
       <VStack spacing={4} align="stretch">
-        <HStack justify="space-between">
-          <Heading size="lg">Department Risks</Heading>
-          <Button colorScheme="blue" onClick={onOpen}>
-            New Risk
-          </Button>
-        </HStack>
+        <Heading size="lg">Risk Register</Heading>
 
         <DataTable
           title=""
@@ -462,7 +376,7 @@ export function DepartmentRiskTable() {
           emptyMessage={
             filters.department || filters.search || filters.status
               ? 'No risks match your current filters.'
-              : 'Get started by creating your first risk.'
+              : 'No risks found.'
           }
           filters={filterConfigs}
           filterValues={{
@@ -490,7 +404,7 @@ export function DepartmentRiskTable() {
               riskLevel: '',
               search: '',
               status: '',
-              department: '', // Clear department filter to show all risks
+              department: '',
               sortBy: 'calculatedScore',
               sortOrder: 'desc',
               page: 1,
@@ -502,27 +416,16 @@ export function DepartmentRiskTable() {
           sortConfig={sortConfig}
           getRowId={(risk) => risk.id}
           pagination={paginationConfig}
-          onRowClick={(risk) => {
-            // Only allow editing if risk belongs to Contributor's department
-            const riskDepartment = risk.department;
-            const canEdit = effectiveDepartment && riskDepartment === effectiveDepartment;
-            if (canEdit) {
-              handleEdit(risk);
-            }
-          }}
+          onRowClick={handleView}
         />
       </VStack>
 
-      <RiskWizardModal isOpen={isOpen} onClose={onClose} onSuccess={handleSuccess} />
       {selectedRisk && (
         <RiskFormModal
-          isOpen={isEditOpen}
+          isOpen={isViewOpen}
           onClose={handleClose}
-          risk={{
-            ...selectedRisk,
-            // Ensure department is included (needed for backend validation when testing)
-            department: selectedRisk.department || effectiveDepartment || null,
-          }}
+          risk={selectedRisk}
+          viewMode={true}
         />
       )}
     </Box>

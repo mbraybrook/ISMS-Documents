@@ -38,7 +38,7 @@ const validate = (req: any, res: Response, next: any) => {
 router.get(
   '/',
   authenticateToken,
-  requireRole('ADMIN', 'EDITOR', 'CONTRIBUTOR'),
+  requireRole('ADMIN', 'EDITOR', 'CONTRIBUTOR', 'STAFF'),
   [
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
@@ -76,7 +76,7 @@ router.get(
       }
 
       const userRole = user.role as string;
-      const userDepartment = user.department;
+      const _userDepartment = user.department;
 
       const {
         page = '1',
@@ -115,23 +115,29 @@ router.get(
       const isTestingAsContributor = testDepartment && userRole === 'ADMIN' && view === 'department';
       
       // Permission-based filtering
-      if (userRole === 'CONTRIBUTOR' || isTestingAsContributor) {
-        // Determine effective department
-        let effectiveDepartment: string | null = null;
-        
-        if (isTestingAsContributor && testDepartment) {
-          // ADMIN testing as CONTRIBUTOR - use test department
-          effectiveDepartment = testDepartment as string;
-        } else if (userRole === 'CONTRIBUTOR') {
-          // Real CONTRIBUTOR - use database department
-          effectiveDepartment = userDepartment;
+      if (userRole === 'STAFF') {
+        // Staff: Can see all risks (no department filter), cannot see archived risks by default
+        // Only apply department filter if explicitly requested
+        if (department) {
+          where.department = department;
         }
-        
-        // Contributors can only see their department's risks
-        if (effectiveDepartment) {
-          where.department = effectiveDepartment;
+        // Staff cannot see archived risks by default
+        if (archived === 'all') {
+          // Don't filter by archived - show all risks
+          // where.archived is not set, so all risks are included
+        } else if (archived !== undefined) {
+          where.archived = archived === 'true';
         } else {
-          return res.status(403).json({ error: 'Contributors must have a department assigned' });
+          where.archived = false;
+        }
+      } else if (userRole === 'CONTRIBUTOR' || isTestingAsContributor) {
+        // Contributors: Can see all risks (no department restriction), cannot see archived risks
+        // Only apply department filter if explicitly requested
+        // For testing: use testDepartment when isTestingAsContributor is true
+        if (isTestingAsContributor && testDepartment) {
+          where.department = testDepartment;
+        } else if (department) {
+          where.department = department;
         }
         // Contributors cannot see archived risks
         where.archived = false;
@@ -511,6 +517,11 @@ router.post(
       const userRole = user.role as string;
       const userDepartment = user.department;
 
+      // Staff cannot create risks
+      if (userRole === 'STAFF') {
+        return res.status(403).json({ error: 'Staff users cannot create risks' });
+      }
+
       const {
         title,
         description,
@@ -825,6 +836,11 @@ router.put(
       const userRole = user.role as string;
       const userDepartment = user.department;
 
+      // Staff cannot edit risks
+      if (userRole === 'STAFF') {
+        return res.status(403).json({ error: 'Staff users cannot edit risks' });
+      }
+
       const { id } = req.params;
       const updateData: any = { ...req.body };
 
@@ -872,6 +888,14 @@ router.put(
         // Contributors cannot set status to ACTIVE
         if (updateData.status === 'ACTIVE') {
           return res.status(403).json({ error: 'Contributors cannot set risk status to ACTIVE' });
+        }
+
+        // Contributors cannot change the department of a risk
+        if (updateData.department !== undefined && updateData.department !== riskDepartment) {
+          return res.status(403).json({ 
+            error: 'Contributors cannot change the department of a risk',
+            details: { currentDepartment: riskDepartment, attemptedDepartment: updateData.department }
+          });
         }
 
         // Ensure department remains unchanged for Contributors (use effective department for testing)
