@@ -50,8 +50,12 @@ router.get(
     query('ownerId').optional().isUUID(),
     query('treatmentCategory').optional().isIn(['RETAIN', 'MODIFY', 'SHARE', 'AVOID']),
     query('mitigationImplemented').optional().isBoolean(),
+    query('mitigatedScorePresent').optional().isBoolean(),
     query('policyNonConformance').optional().isBoolean(),
     query('controlsApplied').optional().isBoolean(),
+    query('reviewStatus').optional().isIn(['overdue', 'upcoming']),
+    query('acceptedAboveAppetite').optional().isBoolean(),
+    query('riskIds').optional().isString(),
     query('riskLevel').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
     query('search').optional().isString(),
     query('dateAddedFrom').optional().isISO8601(),
@@ -89,6 +93,7 @@ router.get(
         ownerId,
         treatmentCategory,
         mitigationImplemented,
+        mitigatedScorePresent,
         riskLevel,
         search,
         dateAddedFrom,
@@ -101,6 +106,9 @@ router.get(
         testDepartment,
         policyNonConformance,
         controlsApplied,
+        reviewStatus,
+        acceptedAboveAppetite,
+        riskIds,
       } = req.query;
 
       const pageNum = parseInt(page as string, 10);
@@ -187,6 +195,9 @@ router.get(
       if (mitigationImplemented !== undefined) {
         where.mitigationImplemented = mitigationImplemented === 'true';
       }
+      if (mitigatedScorePresent !== undefined) {
+        where.mitigatedScore = mitigatedScorePresent === 'true' ? { not: null } : null;
+      }
       
       // Handle search query - search in title and description (case-insensitive)
       if (search) {
@@ -207,9 +218,30 @@ router.get(
         }
       }
 
+      if (reviewStatus) {
+        const now = new Date();
+        const thirtyDaysFromNow = new Date(now);
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+        if (reviewStatus === 'overdue') {
+          where.nextReviewDate = { lt: now };
+        } else if (reviewStatus === 'upcoming') {
+          where.nextReviewDate = { gte: now, lte: thirtyDaysFromNow };
+        }
+      }
+
       // Handle asset filters
       if (assetId) where.assetId = assetId as string;
       if (assetCategoryId) where.assetCategoryId = assetCategoryId as string;
+
+      if (riskIds) {
+        const ids = String(riskIds)
+          .split(',')
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0);
+        if (ids.length > 0) {
+          where.id = { in: ids };
+        }
+      }
       
       // Handle treatment category with OR condition
       if (treatmentCategory) {
@@ -255,9 +287,9 @@ router.get(
         countWhere.id = { in: filteredIds };
       }
 
-      // Apply policy non-conformance filter if specified
-      if (policyNonConformance !== undefined) {
-        const allRisksForNonConformance = await prisma.risk.findMany({
+      // Apply derived filters (policy non-conformance / accepted above appetite) if specified
+      if (policyNonConformance !== undefined || acceptedAboveAppetite !== undefined) {
+        const allRisksForDerivedFilters = await prisma.risk.findMany({
           where: countWhere,
           select: {
             id: true,
@@ -269,9 +301,11 @@ router.get(
             mitigatedLikelihood: true,
             mitigatedScore: true,
             mitigationDescription: true,
+            acceptedAt: true,
+            appetiteThreshold: true,
           },
         });
-        const filteredIds = allRisksForNonConformance
+        const filteredIds = allRisksForDerivedFilters
           .filter((r: {
             id: string;
             initialRiskTreatmentCategory: string | null;
@@ -282,9 +316,20 @@ router.get(
             mitigatedLikelihood: number | null;
             mitigatedScore: number | null;
             mitigationDescription: string | null;
+            acceptedAt: Date | null;
+            appetiteThreshold: number | null;
           }) => {
-            const hasNonConformance = hasPolicyNonConformance(r);
-            return policyNonConformance === 'true' ? hasNonConformance : !hasNonConformance;
+            let matches = true;
+            if (policyNonConformance !== undefined) {
+              const hasNonConformance = hasPolicyNonConformance(r);
+              matches = matches && (policyNonConformance === 'true' ? hasNonConformance : !hasNonConformance);
+            }
+            if (acceptedAboveAppetite !== undefined) {
+              const residualScore = r.mitigatedScore !== null ? r.mitigatedScore : r.calculatedScore;
+              const isAbove = Boolean(r.acceptedAt && r.appetiteThreshold !== null && residualScore > r.appetiteThreshold);
+              matches = matches && (acceptedAboveAppetite === 'true' ? isAbove : !isAbove);
+            }
+            return matches;
           })
           .map((r: { id: string }) => r.id);
         where.id = { in: filteredIds };
@@ -470,7 +515,12 @@ router.post(
     body('expiryDate').optional().isISO8601().toDate(),
     body('lastReviewDate').optional().isISO8601().toDate(),
     body('nextReviewDate').optional().isISO8601().toDate(),
+    body('reviewCadenceDays').optional().isInt({ min: 1, max: 3650 }),
     body('ownerUserId').optional().isUUID(),
+    body('acceptedByUserId').optional().isUUID(),
+    body('acceptedAt').optional().isISO8601().toDate(),
+    body('acceptanceRationale').optional().isString(),
+    body('appetiteThreshold').optional().isInt({ min: 1 }),
     body('assetCategory').optional().isString(),
     body('assetId').optional().custom((value) => {
       if (value === null || value === undefined || value === '') return true;
@@ -533,7 +583,12 @@ router.post(
         expiryDate,
         lastReviewDate,
         nextReviewDate,
+        reviewCadenceDays,
         ownerUserId,
+        acceptedByUserId,
+        acceptedAt,
+        acceptanceRationale,
+        appetiteThreshold,
         assetCategory,
         assetId,
         assetCategoryId,
@@ -685,7 +740,12 @@ router.post(
           expiryDate: expiryDate ? new Date(expiryDate) : null,
           lastReviewDate: lastReviewDate ? new Date(lastReviewDate) : null,
           nextReviewDate: nextReviewDate ? new Date(nextReviewDate) : null,
+        reviewCadenceDays: reviewCadenceDays ?? null,
           ownerUserId: finalOwnerUserId,
+        acceptedByUserId: acceptedByUserId ?? (acceptedAt ? user.id : null),
+        acceptedAt: acceptedAt ? new Date(acceptedAt) : null,
+        acceptanceRationale,
+        appetiteThreshold: appetiteThreshold ?? null,
           department: finalDepartment,
           status: finalStatus,
           wizardData: finalWizardData,
@@ -785,7 +845,12 @@ router.put(
     body('expiryDate').optional().isISO8601().toDate(),
     body('lastReviewDate').optional().isISO8601().toDate(),
     body('nextReviewDate').optional().isISO8601().toDate(),
+    body('reviewCadenceDays').optional().isInt({ min: 1, max: 3650 }),
     body('ownerUserId').optional().isUUID(),
+    body('acceptedByUserId').optional().isUUID(),
+    body('acceptedAt').optional().isISO8601().toDate(),
+    body('acceptanceRationale').optional().isString(),
+    body('appetiteThreshold').optional().isInt({ min: 1 }),
     body('assetCategory').optional().isString(),
     body('assetId').optional().custom((value) => {
       if (value === null || value === undefined || value === '') return true;
@@ -956,6 +1021,13 @@ router.put(
       if (updateData.nextReviewDate !== undefined) {
         updateData.nextReviewDate = updateData.nextReviewDate ? new Date(updateData.nextReviewDate) : null;
       }
+      if (updateData.acceptedAt !== undefined) {
+        updateData.acceptedAt = updateData.acceptedAt ? new Date(updateData.acceptedAt) : null;
+      }
+
+      if (updateData.acceptedAt && updateData.acceptedByUserId === undefined) {
+        updateData.acceptedByUserId = user.id;
+      }
 
       // Handle assetId and assetCategoryId - set to null if explicitly cleared
       if (updateData.assetId === '' || updateData.assetId === null) {
@@ -1018,6 +1090,16 @@ router.put(
           updateData.owner = { connect: { id: updateData.ownerUserId } };
         }
         delete updateData.ownerUserId;
+      }
+
+      // Transform acceptedByUserId to Prisma relation syntax
+      if (updateData.acceptedByUserId !== undefined) {
+        if (updateData.acceptedByUserId === null || updateData.acceptedByUserId === '') {
+          updateData.acceptedBy = { disconnect: true };
+        } else {
+          updateData.acceptedBy = { connect: { id: updateData.acceptedByUserId } };
+        }
+        delete updateData.acceptedByUserId;
       }
 
       // Transform assetId to Prisma relation syntax if needed

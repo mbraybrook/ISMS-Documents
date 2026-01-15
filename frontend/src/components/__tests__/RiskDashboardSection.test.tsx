@@ -3,11 +3,14 @@ import { screen, waitFor } from '@testing-library/react';
 import { render } from '../../test/utils';
 import '@testing-library/jest-dom/vitest';
 import { RiskDashboardSection } from '../RiskDashboardSection';
-import { riskDashboardApi } from '../../services/api';
+import api, { riskDashboardApi } from '../../services/api';
 import { RiskDashboardSummary } from '../../types/riskDashboard';
 
 // Mock the riskDashboardApi
 vi.mock('../../services/api', () => ({
+  default: {
+    get: vi.fn(),
+  },
   riskDashboardApi: {
     getSummary: vi.fn(),
   },
@@ -61,10 +64,93 @@ describe('RiskDashboardSection', () => {
         risk_score_delta: 500,
       },
     ],
+    risk_count: 12,
+    risk_levels: {
+      inherent: { LOW: 5, MEDIUM: 3, HIGH: 2 },
+      residual: { LOW: 6, MEDIUM: 2, HIGH: 2 },
+    },
+    heatmap: [
+      { likelihood: 3, impact: 4, count: 2 },
+      { likelihood: 2, impact: 2, count: 1 },
+    ],
+    by_department: {
+      OPERATIONS: { inherent: { LOW: 2, MEDIUM: 1, HIGH: 1 }, residual: { LOW: 2, MEDIUM: 1, HIGH: 1 } },
+    },
+    by_category: {
+      INFORMATION_SECURITY: { inherent: { LOW: 3, MEDIUM: 1, HIGH: 1 }, residual: { LOW: 3, MEDIUM: 1, HIGH: 1 } },
+    },
+    treatment_actions: {
+      total: 4,
+      open: 2,
+      in_progress: 1,
+      completed: 1,
+      overdue: 1,
+      completion_rate: 25,
+      effectiveness: { '3': 1, unrated: 3 },
+      overdue_items: [
+        {
+          id: 'action-1',
+          title: 'Update access controls',
+          riskId: 'risk-1',
+          riskTitle: 'Access risk',
+          ownerName: 'Alex',
+          dueDate: '2024-02-01T00:00:00.000Z',
+        },
+      ],
+    },
+    acceptance: {
+      accepted_count: 2,
+      accepted_above_appetite_count: 1,
+      average_age_days: 45,
+      oldest_age_days: 90,
+      accepted_above_appetite: [
+        {
+          id: 'risk-2',
+          title: 'Supplier outage risk',
+          residualScore: 30,
+          appetiteThreshold: 20,
+          acceptedAt: '2024-01-01T00:00:00.000Z',
+          ownerName: 'Morgan',
+        },
+      ],
+    },
+    reviews: {
+      overdue_count: 1,
+      upcoming_count: 2,
+      overdue: [
+        {
+          id: 'risk-3',
+          title: 'Legacy system risk',
+          nextReviewDate: '2024-01-10T00:00:00.000Z',
+          ownerName: 'Sam',
+        },
+      ],
+      upcoming: [
+        {
+          id: 'risk-4',
+          title: 'Cloud migration risk',
+          nextReviewDate: '2024-02-10T00:00:00.000Z',
+          ownerName: 'Lee',
+        },
+      ],
+    },
+    nonconformance: {
+      policy_nonconformance_count: 1,
+      missing_mitigation_count: 1,
+      missing_mitigation: [
+        {
+          id: 'risk-5',
+          title: 'Logging gap',
+          calculatedScore: 18,
+          mitigationImplemented: false,
+        },
+      ],
+    },
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue({ data: { data: [] } });
   });
 
   describe('Loading State', () => {
@@ -169,6 +255,18 @@ describe('RiskDashboardSection', () => {
       });
     });
 
+    it('should render new dashboard sections', async () => {
+      // Act
+      render(<RiskDashboardSection />);
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Filters')).toBeInTheDocument();
+        expect(screen.getByText('Risk Heatmap (Likelihood vs Impact)')).toBeInTheDocument();
+        expect(screen.getByText('Mitigation Gaps')).toBeInTheDocument();
+      });
+    });
+
     it('should render all KPI tiles with correct values', async () => {
       // Act
       render(<RiskDashboardSection />);
@@ -180,40 +278,43 @@ describe('RiskDashboardSection', () => {
 
       // Check all stat labels and values
       await waitFor(() => {
-        expect(screen.getByText('Total Risk Score')).toBeInTheDocument();
-        expect(screen.getByText('15,000')).toBeInTheDocument(); // Formatted with commas
-        expect(screen.getByText('Sum of all risk scores')).toBeInTheDocument();
+        expect(screen.getByText('Total Risks')).toBeInTheDocument();
+        expect(screen.getByText('12')).toBeInTheDocument(); // Risk count
+        expect(screen.getByText('Total Risk Score: 15,000')).toBeInTheDocument(); // Score in help text
       });
 
       await waitFor(() => {
         expect(screen.getByText('Implemented Mitigation Score')).toBeInTheDocument();
         expect(screen.getByText('8,000')).toBeInTheDocument();
-        expect(screen.getByText('Risks with implemented mitigations')).toBeInTheDocument();
+        expect(screen.getByText('Click to view mitigated risks with implemented controls')).toBeInTheDocument();
       });
 
       await waitFor(() => {
         expect(screen.getByText('Non-Implemented Mitigation Score')).toBeInTheDocument();
         expect(screen.getByText('5,000')).toBeInTheDocument();
-        expect(screen.getByText('Risks with mitigations not implemented')).toBeInTheDocument();
+        expect(screen.getByText('Click to view identified mitigations not implemented')).toBeInTheDocument();
       });
 
       await waitFor(() => {
         expect(screen.getByText('No Mitigation Score')).toBeInTheDocument();
         expect(screen.getByText('2,000')).toBeInTheDocument();
-        expect(screen.getByText('Risks without mitigations')).toBeInTheDocument();
+        expect(screen.getByText('Click to view risks with no mitigation data')).toBeInTheDocument();
       });
     });
 
     it('should format large numbers with commas correctly', async () => {
       // Arrange
       const largeNumberSummary: RiskDashboardSummary = {
+        ...mockSummary,
         latest_snapshot: {
+          ...mockSummary.latest_snapshot,
           total_risk_score: 1234567,
           implemented_mitigation_score: 987654,
           non_implemented_mitigation_score: 123456,
           no_mitigation_score: 123457,
           risk_score_delta: 0,
         },
+        risk_count: 1234,
         quarterly_series: [],
       };
       vi.mocked(riskDashboardApi.getSummary).mockResolvedValue(largeNumberSummary);
@@ -223,22 +324,14 @@ describe('RiskDashboardSection', () => {
 
       // Assert
       await waitFor(() => {
-        expect(screen.getByText('1,234,567')).toBeInTheDocument();
+        expect(screen.getByText('1,234')).toBeInTheDocument(); // Risk count
+        expect(screen.getByText('Total Risk Score: 1,234,567')).toBeInTheDocument(); // Score in help text
         expect(screen.getByText('987,654')).toBeInTheDocument();
         expect(screen.getByText('123,456')).toBeInTheDocument();
         expect(screen.getByText('123,457')).toBeInTheDocument();
       });
     });
 
-    it('should render breakdown chart section with heading', async () => {
-      // Act
-      render(<RiskDashboardSection />);
-
-      // Assert
-      await waitFor(() => {
-        expect(screen.getByText('Risk Score Breakdown')).toBeInTheDocument();
-      });
-    });
 
     it('should render quarterly trend chart section with heading', async () => {
       // Act
@@ -273,13 +366,7 @@ describe('RiskDashboardSection', () => {
     it('should show message when quarterly series is empty', async () => {
       // Arrange
       const summaryWithoutQuarterly: RiskDashboardSummary = {
-        latest_snapshot: {
-          total_risk_score: 15000,
-          implemented_mitigation_score: 8000,
-          non_implemented_mitigation_score: 5000,
-          no_mitigation_score: 2000,
-          risk_score_delta: 500,
-        },
+        ...mockSummary,
         quarterly_series: [],
       };
       vi.mocked(riskDashboardApi.getSummary).mockResolvedValue(summaryWithoutQuarterly);
@@ -301,7 +388,9 @@ describe('RiskDashboardSection', () => {
     it('should handle all zero values in snapshot', async () => {
       // Arrange
       const allZerosSummary: RiskDashboardSummary = {
+        ...mockSummary,
         latest_snapshot: {
+          ...mockSummary.latest_snapshot,
           total_risk_score: 0,
           implemented_mitigation_score: 0,
           non_implemented_mitigation_score: 0,
@@ -331,13 +420,7 @@ describe('RiskDashboardSection', () => {
     it('should handle single quarter in quarterly series', async () => {
       // Arrange
       const singleQuarterSummary: RiskDashboardSummary = {
-        latest_snapshot: {
-          total_risk_score: 15000,
-          implemented_mitigation_score: 8000,
-          non_implemented_mitigation_score: 5000,
-          no_mitigation_score: 2000,
-          risk_score_delta: 500,
-        },
+        ...mockSummary,
         quarterly_series: [
           {
             year: 2024,
@@ -422,7 +505,6 @@ describe('RiskDashboardSection', () => {
 
         expect(headingTexts).toContain('Risk Dashboard');
         expect(headingTexts).toContain('Latest Snapshot');
-        expect(headingTexts).toContain('Risk Score Breakdown');
         expect(headingTexts).toContain('Quarterly Trend');
       });
     });
@@ -436,13 +518,13 @@ describe('RiskDashboardSection', () => {
 
       // Wait for initial load
       await waitFor(() => {
-        expect(screen.getByText('15,000')).toBeInTheDocument();
+        expect(screen.getByText('12')).toBeInTheDocument(); // Risk count
       });
 
       // The component should show the loaded data
       // (This tests the comment in the code: "Don't set data to null")
       // Since the component doesn't have a refresh mechanism, the data persists
-      expect(screen.getByText('15,000')).toBeInTheDocument();
+      expect(screen.getByText('12')).toBeInTheDocument(); // Risk count
       expect(screen.getByText('Risk Dashboard')).toBeInTheDocument();
     });
   });

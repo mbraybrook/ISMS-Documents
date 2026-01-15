@@ -166,8 +166,12 @@ export function RisksPage() {
       ownerId: '',
       treatmentCategory: '',
       mitigationImplemented: params.get('mitigationImplemented') || '',
+      mitigatedScorePresent: params.get('mitigatedScorePresent') || '',
       policyNonConformance: params.get('policyNonConformance') || '',
       controlsApplied: '',
+      reviewStatus: params.get('reviewStatus') || '',
+      acceptedAboveAppetite: params.get('acceptedAboveAppetite') || '',
+      riskIds: params.get('riskIds') || '',
       riskLevel: params.get('riskLevel') || '',
       search: '',
       dateAddedFrom: '',
@@ -284,10 +288,16 @@ export function RisksPage() {
       if (filters.treatmentCategory) params.append('treatmentCategory', filters.treatmentCategory);
       if (filters.mitigationImplemented !== '')
         params.append('mitigationImplemented', filters.mitigationImplemented === 'true' ? 'true' : 'false');
+      if (filters.mitigatedScorePresent !== '')
+        params.append('mitigatedScorePresent', filters.mitigatedScorePresent === 'true' ? 'true' : 'false');
       if (filters.policyNonConformance !== '')
         params.append('policyNonConformance', filters.policyNonConformance === 'true' ? 'true' : 'false');
       if (filters.controlsApplied !== '')
         params.append('controlsApplied', filters.controlsApplied === 'true' ? 'true' : 'false');
+      if (filters.reviewStatus) params.append('reviewStatus', filters.reviewStatus);
+      if (filters.acceptedAboveAppetite !== '')
+        params.append('acceptedAboveAppetite', filters.acceptedAboveAppetite === 'true' ? 'true' : 'false');
+      if (filters.riskIds) params.append('riskIds', filters.riskIds);
       if (filters.riskLevel) {
         params.append('riskLevel', filters.riskLevel);
       }
@@ -338,9 +348,17 @@ export function RisksPage() {
   // Initialize filters from URL query parameters
   useEffect(() => {
     const mitigationImplementedParam = searchParams.get('mitigationImplemented');
+    const mitigatedScorePresentParam = searchParams.get('mitigatedScorePresent');
     const policyNonConformanceParam = searchParams.get('policyNonConformance');
     const riskLevelParam = searchParams.get('riskLevel');
     const assetCategoryIdParam = searchParams.get('assetCategoryId');
+    const statusParam = searchParams.get('status');
+    const departmentParam = searchParams.get('department');
+    const riskCategoryParam = searchParams.get('riskCategory');
+    const ownerIdParam = searchParams.get('ownerId');
+    const reviewStatusParam = searchParams.get('reviewStatus');
+    const acceptedAboveAppetiteParam = searchParams.get('acceptedAboveAppetite');
+    const riskIdsParam = searchParams.get('riskIds');
 
     
     // Skip if we're handling view/edit params (those are handled separately)
@@ -351,16 +369,35 @@ export function RisksPage() {
     }
 
     // Check if we have filter params that differ from current filters
-    const hasFilterParams = mitigationImplementedParam !== null || policyNonConformanceParam !== null || riskLevelParam !== null || assetCategoryIdParam !== null;
+    const hasFilterParams = mitigationImplementedParam !== null
+      || mitigatedScorePresentParam !== null
+      || policyNonConformanceParam !== null
+      || riskLevelParam !== null
+      || assetCategoryIdParam !== null
+      || statusParam !== null
+      || departmentParam !== null
+      || riskCategoryParam !== null
+      || ownerIdParam !== null
+      || reviewStatusParam !== null
+      || acceptedAboveAppetiteParam !== null
+      || riskIdsParam !== null;
     
     if (hasFilterParams) {
       // Always update filters when URL params are present to ensure they're applied
       setFilters(prev => ({
         ...prev,
         mitigationImplemented: mitigationImplementedParam !== null ? mitigationImplementedParam : prev.mitigationImplemented,
+        mitigatedScorePresent: mitigatedScorePresentParam !== null ? mitigatedScorePresentParam : prev.mitigatedScorePresent,
         policyNonConformance: policyNonConformanceParam !== null ? policyNonConformanceParam : prev.policyNonConformance,
         riskLevel: riskLevelParam !== null ? riskLevelParam : prev.riskLevel,
         assetCategoryId: assetCategoryIdParam !== null ? assetCategoryIdParam : prev.assetCategoryId,
+        status: statusParam !== null ? statusParam : prev.status,
+        department: departmentParam !== null ? departmentParam : prev.department,
+        riskCategory: riskCategoryParam !== null ? riskCategoryParam : prev.riskCategory,
+        ownerId: ownerIdParam !== null ? ownerIdParam : prev.ownerId,
+        reviewStatus: reviewStatusParam !== null ? reviewStatusParam : prev.reviewStatus,
+        acceptedAboveAppetite: acceptedAboveAppetiteParam !== null ? acceptedAboveAppetiteParam : prev.acceptedAboveAppetite,
+        riskIds: riskIdsParam !== null ? riskIdsParam : prev.riskIds,
         page: 1, // Reset to first page when filter changes
       }));
 
@@ -371,8 +408,12 @@ export function RisksPage() {
         setSearchParams(prev => {
           const newSearchParams = new URLSearchParams(prev);
           if (mitigationImplementedParam !== null) newSearchParams.delete('mitigationImplemented');
+          if (mitigatedScorePresentParam !== null) newSearchParams.delete('mitigatedScorePresent');
           if (policyNonConformanceParam !== null) newSearchParams.delete('policyNonConformance');
           if (riskLevelParam !== null) newSearchParams.delete('riskLevel');
+          if (reviewStatusParam !== null) newSearchParams.delete('reviewStatus');
+          if (acceptedAboveAppetiteParam !== null) newSearchParams.delete('acceptedAboveAppetite');
+          if (riskIdsParam !== null) newSearchParams.delete('riskIds');
           // Don't remove assetCategoryId - keep it in URL for better UX
           return newSearchParams;
         });
@@ -851,7 +892,7 @@ export function RisksPage() {
       minW: '200px',
       render: (risk) => (
         risk.interestedParty ? (
-          <Badge colorScheme="teal" as="a" href={`/risks/interested-parties`} cursor="pointer">
+          <Badge colorScheme="teal" as="a" href={`/admin/risks/interested-parties`} cursor="pointer">
             {risk.interestedParty.name}
             {risk.interestedParty.group && ` (${risk.interestedParty.group})`}
           </Badge>
@@ -1842,8 +1883,12 @@ export function RisksPage() {
                   ownerId: '',
                   treatmentCategory: '',
                   mitigationImplemented: '',
+                  mitigatedScorePresent: '',
                   policyNonConformance: '',
                   controlsApplied: '',
+                  reviewStatus: '',
+                  acceptedAboveAppetite: '',
+                  riskIds: '',
                   riskLevel: '',
                   search: '',
                   dateAddedFrom: '',

@@ -28,6 +28,8 @@ COPY libreoffice-font-config/registrymodifications.xcu /root/.config/libreoffice
 # Copy and make startup script executable
 COPY scripts/start-xvfb.sh /usr/local/bin/start-xvfb.sh
 RUN chmod +x /usr/local/bin/start-xvfb.sh
+COPY scripts/start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
 
 # Generate Prisma client during build
 RUN node node_modules/prisma/build/index.js generate
@@ -42,5 +44,5 @@ ENV SAL_USE_VCLPLUGIN=gen \
 
 EXPOSE 4000
 
-CMD ["sh", "-c", "start-xvfb.sh && npm run dev"]
+CMD ["/usr/local/bin/start.sh"]
 

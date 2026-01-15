@@ -35,6 +35,9 @@ jest.mock('../../lib/prisma', () => ({
     risk: {
       findMany: jest.fn(),
     },
+    riskTreatmentAction: {
+      findMany: jest.fn(),
+    },
     control: {
       findMany: jest.fn(),
     },
@@ -56,12 +59,12 @@ jest.mock('../../services/riskService', () => ({
 
 // Mock riskDashboardService
 jest.mock('../../services/riskDashboardService', () => ({
-  getRiskDashboardSummary: jest.fn(),
+  getRiskDashboardSummaryWithFilters: jest.fn(),
 }));
 
 import { prisma } from '../../lib/prisma';
 import { getRiskLevel, hasPolicyNonConformance } from '../../services/riskService';
-import { getRiskDashboardSummary } from '../../services/riskDashboardService';
+import { getRiskDashboardSummaryWithFilters } from '../../services/riskDashboardService';
 
 describe('Dashboard API', () => {
   let app: express.Application;
@@ -72,6 +75,7 @@ describe('Dashboard API', () => {
     app.use(express.json());
     app.use('/api/dashboard', dashboardRouter);
     jest.clearAllMocks();
+    (prisma.riskTreatmentAction.findMany as jest.Mock).mockResolvedValue([]);
     // Suppress console.error during tests to avoid noise from expected error handling
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -1235,9 +1239,45 @@ describe('Dashboard API', () => {
             risk_score_delta: 40,
           },
         ],
+        risk_count: 5,
+        risk_levels: {
+          inherent: { LOW: 1, MEDIUM: 2, HIGH: 3 },
+          residual: { LOW: 2, MEDIUM: 2, HIGH: 2 },
+        },
+        heatmap: [{ likelihood: 3, impact: 4, count: 2 }],
+        by_department: {},
+        by_category: {},
+        treatment_actions: {
+          total: 1,
+          open: 1,
+          in_progress: 0,
+          completed: 0,
+          overdue: 0,
+          completion_rate: 0,
+          effectiveness: {},
+          overdue_items: [],
+        },
+        acceptance: {
+          accepted_count: 0,
+          accepted_above_appetite_count: 0,
+          average_age_days: null,
+          oldest_age_days: null,
+          accepted_above_appetite: [],
+        },
+        reviews: {
+          overdue_count: 0,
+          upcoming_count: 0,
+          overdue: [],
+          upcoming: [],
+        },
+        nonconformance: {
+          policy_nonconformance_count: 0,
+          missing_mitigation_count: 0,
+          missing_mitigation: [],
+        },
       };
 
-      (getRiskDashboardSummary as jest.Mock).mockResolvedValue(mockSummary);
+      (getRiskDashboardSummaryWithFilters as jest.Mock).mockResolvedValue(mockSummary);
 
       // Act
       const response = await request(app)
@@ -1246,12 +1286,12 @@ describe('Dashboard API', () => {
 
       // Assert
       expect(response.body).toEqual(mockSummary);
-      expect(getRiskDashboardSummary).toHaveBeenCalled();
+      expect(getRiskDashboardSummaryWithFilters).toHaveBeenCalled();
     });
 
     it('should return 500 when service fails', async () => {
       // Arrange
-      (getRiskDashboardSummary as jest.Mock).mockRejectedValue(new Error('Service error'));
+      (getRiskDashboardSummaryWithFilters as jest.Mock).mockRejectedValue(new Error('Service error'));
 
       // Act
       const response = await request(app)

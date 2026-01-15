@@ -5,7 +5,7 @@ import { authService } from './authService';
 import { SimilarRisk, Risk } from '../types/risk';
 import { Supplier, SupplierExitPlan } from '../types/supplier';
 import { Control } from '../types/control';
-import { RiskDashboardSummary } from '../types/riskDashboard';
+import { RiskDashboardFilters, RiskDashboardSummary } from '../types/riskDashboard';
 
 const api = axios.create({
   baseURL: config.apiUrl,
@@ -185,8 +185,10 @@ export const riskDashboardApi = {
   /**
    * Get risk dashboard summary with quarterly aggregation
    */
-  getSummary: async (): Promise<RiskDashboardSummary> => {
-    const response = await api.get('/api/dashboard/risk-dashboard/summary');
+  getSummary: async (filters?: RiskDashboardFilters): Promise<RiskDashboardSummary> => {
+    const response = await api.get('/api/dashboard/risk-dashboard/summary', {
+      params: filters,
+    });
     return response.data;
   },
 };

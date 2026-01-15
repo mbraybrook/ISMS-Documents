@@ -8,12 +8,16 @@ jest.mock('../../lib/prisma', () => ({
     risk: {
       findMany: jest.fn(),
     },
+    riskTreatmentAction: {
+      findMany: jest.fn(),
+    },
   },
 }));
 
 describe('riskDashboardService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (prisma.riskTreatmentAction.findMany as jest.Mock).mockResolvedValue([]);
   });
 
   describe('getRiskDashboardSummary', () => {
@@ -25,7 +29,7 @@ describe('riskDashboardService', () => {
       const result = await getRiskDashboardSummary();
 
       // Assert
-      expect(result).toEqual({
+      expect(result).toEqual(expect.objectContaining({
         latest_snapshot: {
           total_risk_score: 0,
           implemented_mitigation_score: 0,
@@ -34,8 +38,17 @@ describe('riskDashboardService', () => {
           risk_score_delta: 0,
         },
         quarterly_series: [],
+      }));
+      expect(result.risk_count).toBe(0);
+      expect(result.risk_levels).toEqual({
+        inherent: { LOW: 0, MEDIUM: 0, HIGH: 0 },
+        residual: { LOW: 0, MEDIUM: 0, HIGH: 0 },
       });
-      expect(prisma.risk.findMany).toHaveBeenCalledWith({
+      expect(result.treatment_actions.total).toBe(0);
+      expect(result.acceptance.accepted_count).toBe(0);
+      expect(result.reviews.overdue_count).toBe(0);
+      expect(result.nonconformance.policy_nonconformance_count).toBe(0);
+      expect(prisma.risk.findMany).toHaveBeenCalledWith(expect.objectContaining({
         where: {
           OR: [
             { archived: false },
@@ -43,16 +56,19 @@ describe('riskDashboardService', () => {
             { archived: true, archivedDate: { gt: expect.any(Date) } },
           ],
         },
-        select: {
-          dateAdded: true,
-          createdAt: true,
-          archived: true,
-          archivedDate: true,
+        select: expect.objectContaining({
+          id: true,
           calculatedScore: true,
           mitigatedScore: true,
           mitigationImplemented: true,
-        },
-      });
+          owner: {
+            select: {
+              id: true,
+              displayName: true,
+            },
+          },
+        }),
+      }));
     });
 
     it('should exclude archived risks with past archive dates', async () => {
@@ -80,7 +96,7 @@ describe('riskDashboardService', () => {
       const result = await getRiskDashboardSummary();
 
       // Assert
-      expect(prisma.risk.findMany).toHaveBeenCalledWith({
+      expect(prisma.risk.findMany).toHaveBeenCalledWith(expect.objectContaining({
         where: {
           OR: [
             { archived: false },
@@ -88,16 +104,13 @@ describe('riskDashboardService', () => {
             { archived: true, archivedDate: { gt: expect.any(Date) } },
           ],
         },
-        select: {
-          dateAdded: true,
-          createdAt: true,
-          archived: true,
-          archivedDate: true,
+        select: expect.objectContaining({
+          id: true,
           calculatedScore: true,
           mitigatedScore: true,
           mitigationImplemented: true,
-        },
-      });
+        }),
+      }));
       expect(result.latest_snapshot.total_risk_score).toBe(30);
     });
 

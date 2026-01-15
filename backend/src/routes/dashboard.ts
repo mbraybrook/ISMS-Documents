@@ -3,7 +3,7 @@ import { Router, Response } from 'express';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { getRiskLevel, hasPolicyNonConformance } from '../services/riskService';
-import { getRiskDashboardSummary } from '../services/riskDashboardService';
+import { getRiskDashboardSummaryWithFilters } from '../services/riskDashboardService';
 
 const router = Router();
 
@@ -195,6 +195,16 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         mitigatedAvailabilityScore: true,
         mitigatedLikelihood: true,
         mitigationDescription: true,
+        acceptedAt: true,
+        appetiteThreshold: true,
+        nextReviewDate: true,
+        owner: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -217,6 +227,26 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       title: string;
       initialRiskTreatmentCategory: string | null;
     }> = [];
+    const acceptedAboveAppetite: Array<{
+      id: string;
+      title: string;
+      residualScore: number;
+      appetiteThreshold: number;
+      acceptedAt: Date;
+      ownerName: string | null;
+    }> = [];
+    const overdueReviews: Array<{
+      id: string;
+      title: string;
+      nextReviewDate: Date;
+      ownerName: string | null;
+    }> = [];
+    const upcomingReviews: Array<{
+      id: string;
+      title: string;
+      nextReviewDate: Date;
+      ownerName: string | null;
+    }> = [];
 
     allRisks.forEach((risk: {
       id: string;
@@ -226,6 +256,10 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       mitigationImplemented: boolean;
       residualRiskTreatmentCategory: string | null;
       initialRiskTreatmentCategory: string | null;
+      acceptedAt: Date | null;
+      appetiteThreshold: number | null;
+      nextReviewDate: Date | null;
+      owner: { displayName: string | null } | null;
     }) => {
       // Total risk score
       totalRiskScore += risk.calculatedScore;
@@ -277,10 +311,95 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
           initialRiskTreatmentCategory: risk.initialRiskTreatmentCategory,
         });
       }
+
+      if (risk.acceptedAt && risk.appetiteThreshold !== null) {
+        const residualScore = risk.mitigatedScore !== null ? risk.mitigatedScore : risk.calculatedScore;
+        if (residualScore > risk.appetiteThreshold) {
+          acceptedAboveAppetite.push({
+            id: risk.id,
+            title: risk.title,
+            residualScore,
+            appetiteThreshold: risk.appetiteThreshold,
+            acceptedAt: risk.acceptedAt,
+            ownerName: risk.owner?.displayName || null,
+          });
+        }
+      }
+
+      if (risk.nextReviewDate) {
+        if (risk.nextReviewDate < now) {
+          overdueReviews.push({
+            id: risk.id,
+            title: risk.title,
+            nextReviewDate: risk.nextReviewDate,
+            ownerName: risk.owner?.displayName || null,
+          });
+        } else if (risk.nextReviewDate <= thirtyDaysFromNow) {
+          upcomingReviews.push({
+            id: risk.id,
+            title: risk.title,
+            nextReviewDate: risk.nextReviewDate,
+            ownerName: risk.owner?.displayName || null,
+          });
+        }
+      }
     });
 
     // Risk score delta
     const riskScoreDelta = totalRiskScore - (implementedMitigationRiskScore + nonImplementedMitigationRiskScore);
+
+    const treatmentActions = await prisma.riskTreatmentAction.findMany({
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        dueDate: true,
+        effectivenessScore: true,
+        risk: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+    });
+
+    let actionsOpen = 0;
+    let actionsInProgress = 0;
+    let actionsCompleted = 0;
+    let actionsOverdue = 0;
+    const actionEffectiveness: Record<string, number> = {};
+    const overdueActions: Array<{
+      id: string;
+      title: string;
+      riskId: string;
+      riskTitle: string;
+      dueDate: Date | null;
+    }> = [];
+
+    treatmentActions.forEach((action) => {
+      if (action.status === 'COMPLETED') {
+        actionsCompleted++;
+      } else if (action.status === 'IN_PROGRESS') {
+        actionsInProgress++;
+      } else {
+        actionsOpen++;
+      }
+
+      if (action.dueDate && action.dueDate < now && action.status !== 'COMPLETED') {
+        actionsOverdue++;
+        overdueActions.push({
+          id: action.id,
+          title: action.title,
+          riskId: action.risk.id,
+          riskTitle: action.risk.title,
+          dueDate: action.dueDate,
+        });
+      }
+
+      const scoreKey = action.effectivenessScore ? String(action.effectivenessScore) : 'unrated';
+      actionEffectiveness[scoreKey] = (actionEffectiveness[scoreKey] || 0) + 1;
+    });
 
     // ===== CONTROL STATISTICS =====
     // Get all controls
@@ -520,6 +639,26 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         byTreatmentCategory: risksByTreatmentCategory,
         policyNonConformanceCount,
         withPolicyNonConformance: risksWithPolicyNonConformance.slice(0, 20),
+        acceptance: {
+          acceptedCount: allRisks.filter((risk) => risk.acceptedAt).length,
+          acceptedAboveAppetiteCount: acceptedAboveAppetite.length,
+          acceptedAboveAppetite: acceptedAboveAppetite.slice(0, 20),
+        },
+        reviews: {
+          overdueCount: overdueReviews.length,
+          upcomingCount: upcomingReviews.length,
+          overdue: overdueReviews.slice(0, 20),
+          upcoming: upcomingReviews.slice(0, 20),
+        },
+        treatmentActions: {
+          totalCount: treatmentActions.length,
+          openCount: actionsOpen,
+          inProgressCount: actionsInProgress,
+          completedCount: actionsCompleted,
+          overdueCount: actionsOverdue,
+          effectiveness: actionEffectiveness,
+          overdue: overdueActions.slice(0, 20),
+        },
       },
       controls: {
         totalCount: allControls.length,
@@ -692,7 +831,13 @@ router.get('/staff', authenticateToken, async (req: AuthRequest, res: Response) 
 // GET /api/risk-dashboard/summary - risk dashboard quarterly aggregation
 router.get('/risk-dashboard/summary', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const summary = await getRiskDashboardSummary();
+    const { department, riskCategory, ownerUserId, status } = req.query;
+    const summary = await getRiskDashboardSummaryWithFilters({
+      department: typeof department === 'string' ? department : undefined,
+      riskCategory: typeof riskCategory === 'string' ? riskCategory : undefined,
+      ownerUserId: typeof ownerUserId === 'string' ? ownerUserId : undefined,
+      status: typeof status === 'string' ? status : undefined,
+    });
     res.json(summary);
   } catch (error) {
     console.error('Error fetching risk dashboard summary:', error);

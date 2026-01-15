@@ -35,6 +35,11 @@ export interface Risk {
     email: string;
   } | null;
   ownerUserId: string | null;
+  acceptedByUserId?: string | null;
+  acceptedAt?: string | null;
+  acceptanceRationale?: string | null;
+  appetiteThreshold?: number | null;
+  reviewCadenceDays?: number | null;
   department: string | null;
   status: RiskStatus;
   wizardData: string | null;

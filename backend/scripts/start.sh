@@ -70,5 +70,8 @@ fi
 
 # Start the application
 echo "[$(date -Iseconds)] Starting application..."
+if [ "$NODE_ENV" = "development" ]; then
+  exec npm run dev
+fi
 exec npm start
 
