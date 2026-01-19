@@ -69,7 +69,7 @@ A comprehensive Information Security Management System (ISMS) platform that cent
    - `LLM_SIMILARITY_THRESHOLD`: Similarity threshold for AI suggestions (default: `70`)
   - `TRUST_CENTER_JWT_SECRET`: JWT secret for Trust Centre authentication (generate with `openssl rand -base64 32`)
   - `CORS_TRUST_CENTER_ORIGINS`: Comma-separated list of allowed Trust Centre origins (supports wildcards)
-   - `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USER`, `EMAIL_SMTP_PASS`, `EMAIL_FROM`: Email service configuration
+   - `EMAIL_FROM`: Email address to send from (must be a mailbox in your Microsoft 365 tenant, e.g., `trustcenter@paythru.com`). Email service uses Microsoft Graph API (requires `Mail.Send` application permission in Azure AD).
    
    Example for local development:
    ```bash
@@ -81,6 +81,7 @@ A comprehensive Information Security Management System (ISMS) platform that cent
    AUTH_REDIRECT_URI=http://localhost:3000
    LLM_BASE_URL=http://localhost:11434
    TRUST_CENTER_JWT_SECRET=your-jwt-secret-here
+   EMAIL_FROM=trustcenter@paythru.com
    ```
 
 3. **Set up database:**
@@ -942,11 +943,13 @@ See [`infrastructure/ec2/README.md`](infrastructure/ec2/README.md) for detailed 
    - **Important**: The platform type must be "Single-page application" (SPA), not "Web", for MSAL popup/redirect flows to work
 3. Assign required Graph permissions:
    - Go to **API permissions**
-   - Click **Add a permission** → **Microsoft Graph** → **Delegated permissions**
-   - Add the following:
+   - Click **Add a permission** → **Microsoft Graph**
+   - **Delegated permissions** (for user authentication):
      - `Sites.Read.All` or `Sites.ReadWrite.All`
      - `Files.Read.All` or `Files.ReadWrite.All`
      - `User.Read`
+   - **Application permissions** (for app-only operations like email sending):
+     - `Mail.Send` (required for Trust Center email notifications)
    - Click **Add permissions**
 4. Grant admin consent for the permissions (click **Grant admin consent for [Your Organization]**)
 5. Create a client secret (if required for backend):
@@ -975,7 +978,34 @@ See [`infrastructure/ec2/README.md`](infrastructure/ec2/README.md) for detailed 
    SHAREPOINT_DRIVE_ID=your-drive-id
    ```
 
-### 3. Confluence Setup
+### 3. Email Configuration (Microsoft Graph API)
+
+The Trust Center uses Microsoft Graph API to send email notifications. Setup requires:
+
+1. **Create a Shared Mailbox** (recommended) or use an existing user mailbox:
+   - Go to **Microsoft 365 Admin Center** → **Groups** → **Shared mailboxes**
+   - Click **Add a shared mailbox**
+   - Name: "Trust Center Notifications" (or similar)
+   - Email: `trustcenter@paythru.com` (or your preferred address)
+   - Click **Add**
+
+2. **Grant Mail.Send Permission** to your Azure AD app:
+   - Go to **Azure Portal** → **App Registrations** → Your App → **API Permissions**
+   - Click **Add a permission** → **Microsoft Graph** → **Application permissions**
+   - Add `Mail.Send`
+   - Click **Add permissions**
+   - **Important**: Click **Grant admin consent for [Your Organization]**
+
+3. **Configure Environment Variable**:
+   - Add to your `backend/.env` file:
+     ```bash
+     EMAIL_FROM=trustcenter@paythru.com
+     ```
+   - The email address must match the shared mailbox or user mailbox you created
+
+**Note**: The email service uses your existing Azure app credentials (`AZURE_APP_CLIENT_ID`, `AZURE_APP_CLIENT_SECRET`, `AZURE_TENANT_ID`) - no SMTP configuration needed.
+
+### 4. Confluence Setup
 
 1. Decide which spaces/pages will be used for "living" ISMS records
 2. Create an API token:
@@ -988,7 +1018,7 @@ See [`infrastructure/ec2/README.md`](infrastructure/ec2/README.md) for detailed 
    CONFLUENCE_API_TOKEN=your-api-token
    ```
 
-### 4. Ollama Setup (for AI Features)
+### 5. Ollama Setup (for AI Features)
 
 The application uses Ollama for semantic embeddings and similarity analysis. This enables AI-powered control suggestions for risks and documents.
 
@@ -1024,7 +1054,7 @@ The application uses Ollama for semantic embeddings and similarity analysis. Thi
 
 **Note**: AI features are optional. The application will work without Ollama, but control/risk suggestions will be disabled.
 
-### 5. Trust Centre Setup
+### 6. Trust Centre Setup
 
 The Trust Centre module allows external users to access selected documents. It uses separate authentication from the main application.
 

@@ -19,6 +19,7 @@ import {
 } from '../../services/sharePointService';
 import { logTrustAction } from '../../services/trustAuditService';
 import { canConvertToPdf, getPdfFilename } from '../../services/documentConversionService';
+import { sendUserApprovalEmail, sendAccessRevokedEmail, sendAccessRestoredEmail } from '../../services/emailService';
 import {
   convertToPdfRemote,
   watermarkPdfRemote,
@@ -770,7 +771,16 @@ router.post(
         getIpAddress(req)
       );
 
-      // TODO: Send approval email
+      // Send approval email (don't fail approval if email fails)
+      try {
+        await sendUserApprovalEmail(user.email, user.companyName);
+      } catch (emailError: any) {
+        // Log but don't fail approval
+        console.error('[TRUST] Failed to send approval email', {
+          error: emailError.message || String(emailError),
+          userId,
+        });
+      }
 
       res.json(user);
     } catch (error: any) {
@@ -1015,11 +1025,12 @@ router.put(
   '/admin/users/:userId/revoke',
   authenticateToken,
   requireRole('ADMIN', 'EDITOR'),
-  [param('userId').isString().notEmpty()],
+  [param('userId').isString().notEmpty(), body('sendEmail').optional().isBoolean()],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
       const { userId } = req.params;
+      const { sendEmail } = req.body;
       // Get internal user from database to get the ID
       const internalUser = req.user?.email ? await prisma.user.findUnique({
         where: { email: req.user.email },
@@ -1068,6 +1079,19 @@ router.put(
         getIpAddress(req)
       );
 
+      // Send revocation email if requested (don't fail revocation if email fails)
+      if (sendEmail === true) {
+        try {
+          await sendAccessRevokedEmail(user.email, user.companyName);
+        } catch (emailError: any) {
+          // Log but don't fail revocation
+          console.error('[TRUST] Failed to send revocation email', {
+            error: emailError.message || String(emailError),
+            userId,
+          });
+        }
+      }
+
       res.json(updatedUser);
     } catch (error: any) {
       console.error('[TRUST] Error revoking user access:', error);
@@ -1084,11 +1108,12 @@ router.put(
   '/admin/users/:userId/restore',
   authenticateToken,
   requireRole('ADMIN', 'EDITOR'),
-  [param('userId').isString().notEmpty()],
+  [param('userId').isString().notEmpty(), body('sendEmail').optional().isBoolean()],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
       const { userId } = req.params;
+      const { sendEmail } = req.body;
       // Get internal user from database to get the ID
       const internalUser = req.user?.email ? await prisma.user.findUnique({
         where: { email: req.user.email },
@@ -1134,6 +1159,19 @@ router.put(
         { email: user.email, companyName: user.companyName },
         getIpAddress(req)
       );
+
+      // Send restoration email if requested (don't fail restoration if email fails)
+      if (sendEmail === true) {
+        try {
+          await sendAccessRestoredEmail(user.email, user.companyName);
+        } catch (emailError: any) {
+          // Log but don't fail restoration
+          console.error('[TRUST] Failed to send restoration email', {
+            error: emailError.message || String(emailError),
+            userId,
+          });
+        }
+      }
 
       res.json(updatedUser);
     } catch (error: any) {

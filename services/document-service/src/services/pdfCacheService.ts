@@ -3,8 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-// Cache directory - use CACHE_DIR env var or default to /cache
-const CACHE_DIR = process.env.CACHE_DIR || '/cache';
+// Cache directory - use CACHE_DIR env var or default to local cache directory
+const CACHE_DIR = process.env.CACHE_DIR || path.join(process.cwd(), 'cache', 'pdf-conversions');
 
 // Ensure cache directory exists
 if (!fs.existsSync(CACHE_DIR)) {

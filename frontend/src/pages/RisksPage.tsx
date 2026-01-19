@@ -1339,36 +1339,54 @@ export function RisksPage() {
   // Define handleExport after csvExportConfig is available
   const handleExport = useCallback(async (format: 'CSV' | 'EXCEL' | 'PDF') => {
     try {
-      // Get all filtered risks (not just current page)
-      const params = new URLSearchParams();
-      if (filters.riskCategory) params.append('riskCategory', filters.riskCategory);
-      if (filters.riskNature) params.append('riskNature', filters.riskNature);
+      // Get all filtered risks (not just current page) - paginate through all pages
+      const baseParams = new URLSearchParams();
+      if (filters.riskCategory) baseParams.append('riskCategory', filters.riskCategory);
+      if (filters.riskNature) baseParams.append('riskNature', filters.riskNature);
       if (filters.archived === 'all') {
-        params.append('archived', 'all');
+        baseParams.append('archived', 'all');
       } else if (filters.archived === 'true') {
-        params.append('archived', 'true');
+        baseParams.append('archived', 'true');
       } else if (filters.archived === 'false' || !filters.archived) {
         // Default to 'false' (Active Only) if empty or explicitly 'false'
-        params.append('archived', 'false');
+        baseParams.append('archived', 'false');
       }
-      if (filters.ownerId) params.append('ownerId', filters.ownerId);
-      if (filters.treatmentCategory) params.append('treatmentCategory', filters.treatmentCategory);
+      if (filters.ownerId) baseParams.append('ownerId', filters.ownerId);
+      if (filters.treatmentCategory) baseParams.append('treatmentCategory', filters.treatmentCategory);
       if (filters.mitigationImplemented !== '')
-        params.append('mitigationImplemented', filters.mitigationImplemented === 'true' ? 'true' : 'false');
+        baseParams.append('mitigationImplemented', filters.mitigationImplemented === 'true' ? 'true' : 'false');
       if (filters.policyNonConformance !== '')
-        params.append('policyNonConformance', filters.policyNonConformance === 'true' ? 'true' : 'false');
+        baseParams.append('policyNonConformance', filters.policyNonConformance === 'true' ? 'true' : 'false');
       if (filters.controlsApplied !== '')
-        params.append('controlsApplied', filters.controlsApplied === 'true' ? 'true' : 'false');
-      if (filters.riskLevel) params.append('riskLevel', filters.riskLevel);
-      if (filters.search) params.append('search', filters.search);
-      if (filters.dateAddedFrom) params.append('dateAddedFrom', filters.dateAddedFrom);
-      if (filters.dateAddedTo) params.append('dateAddedTo', filters.dateAddedTo);
-      if (filters.assetCategoryId) params.append('assetCategoryId', filters.assetCategoryId);
-      params.append('page', '1');
-      params.append('limit', '10000'); // Get all matching risks
+        baseParams.append('controlsApplied', filters.controlsApplied === 'true' ? 'true' : 'false');
+      if (filters.riskLevel) baseParams.append('riskLevel', filters.riskLevel);
+      if (filters.search) baseParams.append('search', filters.search);
+      if (filters.dateAddedFrom) baseParams.append('dateAddedFrom', filters.dateAddedFrom);
+      if (filters.dateAddedTo) baseParams.append('dateAddedTo', filters.dateAddedTo);
+      if (filters.assetCategoryId) baseParams.append('assetCategoryId', filters.assetCategoryId);
 
-      const response = await api.get(`/api/risks?${params.toString()}`);
-      const allRisks = response.data.data || risks;
+      // Paginate through all risks (backend max limit is 100)
+      let allRisks: Risk[] = [];
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const params = new URLSearchParams(baseParams);
+        params.append('page', page.toString());
+        params.append('limit', '100'); // Backend max limit is 100
+
+        const response = await api.get(`/api/risks?${params.toString()}`);
+        const risks = response.data.data || [];
+        allRisks = [...allRisks, ...risks];
+
+        // Check if there are more pages
+        const totalPages = response.data.pagination?.totalPages || 1;
+        hasMore = page < totalPages && risks.length > 0;
+        page++;
+
+        // Safety limit to prevent infinite loops
+        if (page > 1000) break;
+      }
 
       if (format === 'CSV') {
         const rows = allRisks.map(csvExportConfig.getRowData);
@@ -1796,8 +1814,6 @@ export function RisksPage() {
                   Export
                 </MenuButton>
                 <MenuList>
-                  <MenuItem onClick={() => handleExport('CSV')}>Export as CSV</MenuItem>
-                  <MenuItem onClick={() => handleExport('EXCEL')}>Export as Excel</MenuItem>
                   <MenuItem onClick={() => handleExport('PDF')}>Export as PDF</MenuItem>
                 </MenuList>
               </Menu>

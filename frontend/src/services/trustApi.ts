@@ -290,13 +290,17 @@ export const trustApi = {
     return response.data;
   },
 
-  async revokeUserAccess(userId: string): Promise<ExternalUser> {
-    const response = await apiInternal.put(`/api/trust/admin/users/${userId}/revoke`);
+  async revokeUserAccess(userId: string, sendEmail?: boolean): Promise<ExternalUser> {
+    const response = await apiInternal.put(`/api/trust/admin/users/${userId}/revoke`, {
+      sendEmail: sendEmail === true,
+    });
     return response.data;
   },
 
-  async restoreUserAccess(userId: string): Promise<ExternalUser> {
-    const response = await apiInternal.put(`/api/trust/admin/users/${userId}/restore`);
+  async restoreUserAccess(userId: string, sendEmail?: boolean): Promise<ExternalUser> {
+    const response = await apiInternal.put(`/api/trust/admin/users/${userId}/restore`, {
+      sendEmail: sendEmail === true,
+    });
     return response.data;
   },
 

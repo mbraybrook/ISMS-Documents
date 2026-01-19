@@ -10,6 +10,7 @@ import { loginLimiter, registerLimiter, passwordResetLimiter } from '../../middl
 import { logTrustAction } from '../../services/trustAuditService';
 import { authenticateTrustToken, TrustAuthRequest } from '../../middleware/trustAuth';
 import { log } from '../../lib/logger';
+import { sendNewPendingRequestEmail, getAdminEmails } from '../../services/emailService';
 
 const router = Router();
 
@@ -94,6 +95,20 @@ router.post(
 
       // Log registration
       await logTrustAction('USER_REGISTERED', undefined, user.id, undefined, undefined, { companyName }, getIpAddress(req));
+
+      // Send admin notification email (don't fail registration if email fails)
+      try {
+        const adminEmails = await getAdminEmails();
+        if (adminEmails.length > 0) {
+          await sendNewPendingRequestEmail(adminEmails, user.email, user.companyName);
+        }
+      } catch (emailError: any) {
+        // Log but don't fail registration
+        log.error('[TRUST_AUTH] Failed to send admin notification email', {
+          error: emailError.message || String(emailError),
+          userId: user.id,
+        });
+      }
 
       res.status(201).json({
         id: user.id,

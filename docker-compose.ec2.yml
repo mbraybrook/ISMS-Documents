@@ -201,12 +201,6 @@ services:
       - LLM_BASE_URL=http://ollama:11434
       - LLM_MODEL=${LLM_MODEL:-llama2}
       - LLM_SIMILARITY_THRESHOLD=${LLM_SIMILARITY_THRESHOLD:-70}
-      # Email configuration (optional)
-      - EMAIL_SMTP_HOST=${EMAIL_SMTP_HOST:-}
-      - EMAIL_SMTP_PORT=${EMAIL_SMTP_PORT:-587}
-      - EMAIL_SMTP_USER=${EMAIL_SMTP_USER:-}
-      - EMAIL_SMTP_PASS=${EMAIL_SMTP_PASS:-}
-      - EMAIL_FROM=${EMAIL_FROM:-}
     env_file:
       - .env
       - ./backend/.env

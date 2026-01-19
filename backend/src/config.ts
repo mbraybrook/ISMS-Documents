@@ -1,8 +1,26 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
-// Load .env file from current directory (standard behavior)
-// Environment variables from docker-compose.yml or system will override
-dotenv.config();
+// Load .env files in order of precedence:
+// 1. Root .env (shared config: AUTH_*, etc.)
+// 2. Backend .env (backend-specific: DATABASE_URL, SEED_SCOPE, etc.) - can override root
+// 3. Backend .env.local (local development overrides) - can override both
+// Environment variables from docker-compose.yml or system will override all
+
+// Load root .env first (two levels up from src/config.ts: src -> backend -> root)
+// This contains shared configuration like AUTH_TENANT_ID, AUTH_CLIENT_ID, etc.
+const rootEnvPath = path.resolve(__dirname, '../../.env');
+dotenv.config({ path: rootEnvPath, override: false });
+
+// Then load backend .env (one level up from src/config.ts: src -> backend)
+// This contains backend-specific settings like DATABASE_URL, SEED_SCOPE
+// override: true allows backend .env to override root .env values
+const backendEnvPath = path.resolve(__dirname, '../.env');
+dotenv.config({ path: backendEnvPath, override: true });
+
+// Finally load backend .env.local for local development overrides
+// This can override both root and backend .env values
+dotenv.config({ path: '.env.local', override: true });
 
 // DATABASE_URL must be in PostgreSQL format
 const databaseUrl = process.env.DATABASE_URL;
@@ -106,6 +124,8 @@ export const config = {
     smtpPass: process.env.EMAIL_SMTP_PASS || '',
     from: process.env.EMAIL_FROM || '',
   },
+  // Frontend URL for email links
+  frontendUrl: process.env.FRONTEND_URL || (process.env.AUTH_REDIRECT_URI ? process.env.AUTH_REDIRECT_URI.replace(/\/$/, '') : 'http://localhost:3000'),
   // Document service configuration
   documentService: {
     baseUrl: process.env.DOCUMENT_SERVICE_URL || 'http://document-service:4001',

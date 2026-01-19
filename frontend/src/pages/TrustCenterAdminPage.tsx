@@ -36,6 +36,13 @@ import {
   FormControl,
   FormLabel,
   useDisclosure,
+  AlertDialog,
+  AlertDialogOverlay,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogBody,
+  AlertDialogFooter,
+  Checkbox,
 } from '@chakra-ui/react';
 import { useAuth } from '../contexts/AuthContext';
 import { trustApi } from '../services/trustApi';
@@ -221,6 +228,14 @@ export function TrustCenterAdminPage() {
   const [statusFilter, setStatusFilter] = useState<'pending' | 'approved' | 'all'>('all');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'revoked'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const { isOpen: isRevokeOpen, onOpen: onRevokeOpen, onClose: onRevokeClose } = useDisclosure();
+  const [userToRevoke, setUserToRevoke] = useState<string | null>(null);
+  const [sendRevokeEmail, setSendRevokeEmail] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const { isOpen: isRestoreOpen, onOpen: onRestoreOpen, onClose: onRestoreClose } = useDisclosure();
+  const [userToRestore, setUserToRestore] = useState<string | null>(null);
+  const [sendRestoreEmail, setSendRestoreEmail] = useState(true); // Default to checked
+  const restoreCancelRef = useRef<HTMLButtonElement>(null);
 
   const loadData = useCallback(async (preserveScroll = false) => {
     try {
@@ -395,19 +410,28 @@ export function TrustCenterAdminPage() {
     }
   };
 
-  const handleRevokeAccess = async (userId: string) => {
-    if (!confirm('Are you sure you want to revoke access for this user?')) {
+  const handleRevokeAccess = (userId: string) => {
+    setUserToRevoke(userId);
+    setSendRevokeEmail(false);
+    onRevokeOpen();
+  };
+
+  const confirmRevokeAccess = async () => {
+    if (!userToRevoke) {
       return;
     }
 
     try {
-      await trustApi.revokeUserAccess(userId);
+      await trustApi.revokeUserAccess(userToRevoke, sendRevokeEmail);
       toast({
         title: 'Access revoked',
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
+      onRevokeClose();
+      setUserToRevoke(null);
+      setSendRevokeEmail(false);
       loadUsers();
     } catch (error: unknown) {
       const axiosError = error as AxiosError<{ error?: string }>;
@@ -421,19 +445,28 @@ export function TrustCenterAdminPage() {
     }
   };
 
-  const handleRestoreAccess = async (userId: string) => {
-    if (!confirm('Are you sure you want to restore access for this user?')) {
+  const handleRestoreAccess = (userId: string) => {
+    setUserToRestore(userId);
+    setSendRestoreEmail(true); // Default to checked
+    onRestoreOpen();
+  };
+
+  const confirmRestoreAccess = async () => {
+    if (!userToRestore) {
       return;
     }
 
     try {
-      await trustApi.restoreUserAccess(userId);
+      await trustApi.restoreUserAccess(userToRestore, sendRestoreEmail);
       toast({
         title: 'Access restored',
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
+      onRestoreClose();
+      setUserToRestore(null);
+      setSendRestoreEmail(true);
       loadUsers();
     } catch (error: unknown) {
       const axiosError = error as AxiosError<{ error?: string }>;
@@ -1273,6 +1306,81 @@ export function TrustCenterAdminPage() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Revoke Access Confirmation Dialog */}
+      <AlertDialog
+        isOpen={isRevokeOpen}
+        leastDestructiveRef={cancelRef}
+        onClose={onRevokeClose}
+        closeOnOverlayClick={false}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Revoke Access
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              <Text mb={4}>
+                Are you sure you want to revoke access for this user? This action will prevent them from accessing the Trust Center.
+              </Text>
+              <Checkbox
+                isChecked={sendRevokeEmail}
+                onChange={(e) => setSendRevokeEmail(e.target.checked)}
+              >
+                Send notification email to user
+              </Checkbox>
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onRevokeClose}>
+                Cancel
+              </Button>
+              <Button colorScheme="red" onClick={confirmRevokeAccess} ml={3}>
+                Revoke Access
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+
+      {/* Restore Access Confirmation Dialog */}
+      <AlertDialog
+        isOpen={isRestoreOpen}
+        leastDestructiveRef={restoreCancelRef}
+        onClose={onRestoreClose}
+        closeOnOverlayClick={false}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Restore Access
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              <Text mb={4}>
+                Are you sure you want to restore access for this user? This action will allow them to access the Trust Center again.
+              </Text>
+              <Checkbox
+                isChecked={sendRestoreEmail}
+                onChange={(e) => setSendRestoreEmail(e.target.checked)}
+                defaultChecked={true}
+              >
+                Send notification email to user
+              </Checkbox>
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button ref={restoreCancelRef} onClick={onRestoreClose}>
+                Cancel
+              </Button>
+              <Button colorScheme="green" onClick={confirmRestoreAccess} ml={3}>
+                Restore Access
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Box>
   );
 }
