@@ -14,7 +14,9 @@ export interface QuarterlyDataPoint {
 export interface LatestSnapshot {
   total_risk_score: number;
   implemented_mitigation_score: number;
+  implemented_mitigation_count: number;
   non_implemented_mitigation_score: number;
+  non_implemented_mitigation_count: number;
   no_mitigation_score: number;
   risk_score_delta: number;
 }
@@ -79,6 +81,7 @@ export interface RiskDashboardSummary {
   };
   nonconformance: {
     policy_nonconformance_count: number;
+    policy_nonconformance_score: number;
     missing_mitigation_count: number;
     missing_mitigation: Array<{
       id: string;
@@ -184,7 +187,9 @@ export async function getRiskDashboardSummaryWithFilters(
   const currentSnapshot: LatestSnapshot = {
     total_risk_score: 0,
     implemented_mitigation_score: 0,
+    implemented_mitigation_count: 0,
     non_implemented_mitigation_score: 0,
+    non_implemented_mitigation_count: 0,
     no_mitigation_score: 0,
     risk_score_delta: 0,
   };
@@ -205,8 +210,10 @@ export async function getRiskDashboardSummaryWithFilters(
     if (risk.mitigatedScore !== null) {
       if (risk.mitigationImplemented) {
         currentSnapshot.implemented_mitigation_score += risk.mitigatedScore;
+        currentSnapshot.implemented_mitigation_count += 1;
       } else {
         currentSnapshot.non_implemented_mitigation_score += risk.mitigatedScore;
+        currentSnapshot.non_implemented_mitigation_count += 1;
       }
     } else {
       currentSnapshot.no_mitigation_score += risk.calculatedScore;
@@ -316,13 +323,16 @@ export async function getRiskDashboardSummaryWithFilters(
   });
 
   // Get latest snapshot (most recent quarter, or use current snapshot if no quarterly data)
+  // Note: For counts, we always use current snapshot since quarterly data doesn't track counts
   let latest_snapshot: LatestSnapshot;
   if (quarterlySeries.length > 0) {
     const latest = quarterlySeries[quarterlySeries.length - 1];
     latest_snapshot = {
       total_risk_score: latest.total_risk_score,
       implemented_mitigation_score: latest.implemented_mitigation_score,
+      implemented_mitigation_count: currentSnapshot.implemented_mitigation_count,
       non_implemented_mitigation_score: latest.non_implemented_mitigation_score,
+      non_implemented_mitigation_count: currentSnapshot.non_implemented_mitigation_count,
       no_mitigation_score: latest.no_mitigation_score,
       risk_score_delta: latest.risk_score_delta,
     };
@@ -363,6 +373,7 @@ export async function getRiskDashboardSummaryWithFilters(
   const reviewUpcoming: Array<{ id: string; title: string; nextReviewDate: Date; ownerName: string | null }> = [];
 
   let policyNonConformanceCount = 0;
+  let policyNonConformanceScore = 0;
 
   currentRisks.forEach((risk) => {
     const inherentLevel = getRiskLevel(risk.calculatedScore);
@@ -423,6 +434,7 @@ export async function getRiskDashboardSummaryWithFilters(
     });
     if (hasNonConformance) {
       policyNonConformanceCount++;
+      policyNonConformanceScore += risk.calculatedScore;
     }
 
     if (risk.acceptedAt && risk.appetiteThreshold !== null) {
@@ -572,6 +584,7 @@ export async function getRiskDashboardSummaryWithFilters(
     },
     nonconformance: {
       policy_nonconformance_count: policyNonConformanceCount,
+      policy_nonconformance_score: policyNonConformanceScore,
       missing_mitigation_count: missingMitigation.length,
       missing_mitigation: missingMitigation.slice(0, 20),
     },

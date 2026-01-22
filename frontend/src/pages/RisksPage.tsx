@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Heading,
@@ -136,6 +136,7 @@ const TREATMENT_CATEGORIES = ['RETAIN', 'MODIFY', 'SHARE', 'AVOID'];
 export function RisksPage() {
   usePageTitle('Risks', true);
   const toast = useToast();
+  const navigate = useNavigate();
   const { user, getEffectiveRole } = useAuth();
   const effectiveRole = getEffectiveRole();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -173,6 +174,8 @@ export function RisksPage() {
       acceptedAboveAppetite: params.get('acceptedAboveAppetite') || '',
       riskIds: params.get('riskIds') || '',
       riskLevel: params.get('riskLevel') || '',
+      likelihood: params.get('likelihood') || '',
+      impact: params.get('impact') || '',
       search: '',
       dateAddedFrom: '',
       dateAddedTo: '',
@@ -301,6 +304,8 @@ export function RisksPage() {
       if (filters.riskLevel) {
         params.append('riskLevel', filters.riskLevel);
       }
+      if (filters.likelihood) params.append('likelihood', filters.likelihood);
+      if (filters.impact) params.append('impact', filters.impact);
       if (filters.search) params.append('search', filters.search);
       if (filters.dateAddedFrom) params.append('dateAddedFrom', filters.dateAddedFrom);
       if (filters.dateAddedTo) params.append('dateAddedTo', filters.dateAddedTo);
@@ -1115,13 +1120,14 @@ export function RisksPage() {
                   <Text
                     fontSize="xs"
                     as="a"
-                    href={`/risks/controls`}
+                    href={`/admin/risks/controls`}
                     color="blue.600"
                     _hover={{ textDecoration: 'underline', color: 'blue.800' }}
                     cursor="pointer"
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
-                      window.location.href = `/risks/controls`;
+                      navigate('/admin/risks/controls');
                     }}
                   >
                     {rc.control.code}
@@ -1906,6 +1912,8 @@ export function RisksPage() {
                   acceptedAboveAppetite: '',
                   riskIds: '',
                   riskLevel: '',
+                  likelihood: '',
+                  impact: '',
                   search: '',
                   dateAddedFrom: '',
                   dateAddedTo: '',

@@ -33,7 +33,9 @@ describe('riskDashboardService', () => {
         latest_snapshot: {
           total_risk_score: 0,
           implemented_mitigation_score: 0,
+          implemented_mitigation_count: 0,
           non_implemented_mitigation_score: 0,
+          non_implemented_mitigation_count: 0,
           no_mitigation_score: 0,
           risk_score_delta: 0,
         },
@@ -48,6 +50,7 @@ describe('riskDashboardService', () => {
       expect(result.acceptance.accepted_count).toBe(0);
       expect(result.reviews.overdue_count).toBe(0);
       expect(result.nonconformance.policy_nonconformance_count).toBe(0);
+      expect(result.nonconformance.policy_nonconformance_score).toBe(0);
       expect(prisma.risk.findMany).toHaveBeenCalledWith(expect.objectContaining({
         where: {
           OR: [
@@ -237,7 +240,9 @@ describe('riskDashboardService', () => {
       expect(result.latest_snapshot).toEqual({
         total_risk_score: 30,
         implemented_mitigation_score: 0,
+        implemented_mitigation_count: 0,
         non_implemented_mitigation_score: 0,
+        non_implemented_mitigation_count: 0,
         no_mitigation_score: 30,
         risk_score_delta: 30,
       });
@@ -271,7 +276,9 @@ describe('riskDashboardService', () => {
       expect(result.latest_snapshot).toEqual({
         total_risk_score: 30,
         implemented_mitigation_score: 13,
+        implemented_mitigation_count: 2,
         non_implemented_mitigation_score: 0,
+        non_implemented_mitigation_count: 0,
         no_mitigation_score: 0,
         risk_score_delta: 17,
       });
@@ -305,7 +312,9 @@ describe('riskDashboardService', () => {
       expect(result.latest_snapshot).toEqual({
         total_risk_score: 30,
         implemented_mitigation_score: 0,
+        implemented_mitigation_count: 0,
         non_implemented_mitigation_score: 13,
+        non_implemented_mitigation_count: 2,
         no_mitigation_score: 0,
         risk_score_delta: 30,
       });
@@ -346,7 +355,9 @@ describe('riskDashboardService', () => {
       expect(result.latest_snapshot).toEqual({
         total_risk_score: 45,
         implemented_mitigation_score: 8,
+        implemented_mitigation_count: 1,
         non_implemented_mitigation_score: 5,
+        non_implemented_mitigation_count: 1,
         no_mitigation_score: 10,
         risk_score_delta: 37,
       });
@@ -665,7 +676,9 @@ describe('riskDashboardService', () => {
       expect(result.latest_snapshot).toEqual({
         total_risk_score: 20,
         implemented_mitigation_score: 8,
+        implemented_mitigation_count: 1,
         non_implemented_mitigation_score: 0,
+        non_implemented_mitigation_count: 0,
         no_mitigation_score: 0,
         risk_score_delta: 12,
       });
@@ -977,10 +990,13 @@ describe('riskDashboardService', () => {
       });
 
       // Latest snapshot should be from 2024 Q3 (most recent quarter)
+      // Counts come from currentSnapshot (all current risks), not just latest quarter
       expect(result.latest_snapshot).toEqual({
         total_risk_score: 55, // 30 + 25
         implemented_mitigation_score: 10,
+        implemented_mitigation_count: 2, // 2023 Q4 + 2024 Q3
         non_implemented_mitigation_score: 0,
+        non_implemented_mitigation_count: 1, // 2024 Q1
         no_mitigation_score: 30,
         risk_score_delta: 45,
       });

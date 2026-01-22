@@ -94,13 +94,14 @@ describe('SoAPage', () => {
       });
     });
 
-    it('should render Generate SoA (PDF) button as disabled', async () => {
+    it('should only render Generate SoA (Excel) button', async () => {
       render(<SoAPage />);
 
       await waitFor(() => {
-        const pdfButton = screen.getByRole('button', { name: /Generate SoA \(PDF\)/ });
-        expect(pdfButton).toBeInTheDocument();
-        expect(pdfButton).toBeDisabled();
+        const excelButton = screen.getByRole('button', { name: /Generate SoA \(Excel\)/ });
+        expect(excelButton).toBeInTheDocument();
+        // PDF button does not exist in the current implementation
+        expect(screen.queryByRole('button', { name: /Generate SoA \(PDF\)/ })).not.toBeInTheDocument();
       });
     });
   });

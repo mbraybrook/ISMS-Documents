@@ -25,7 +25,8 @@
     "db:status": "npx prisma migrate status",
     "backfill-embeddings": "tsx scripts/backfill-embeddings.ts",
     "backfill-control-embeddings": "tsx scripts/backfill-control-embeddings.ts",
-    "check-control-embeddings": "tsx scripts/check-control-embeddings.ts"
+    "check-control-embeddings": "tsx scripts/check-control-embeddings.ts",
+    "update-control-applicability": "tsx scripts/update-control-applicability.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

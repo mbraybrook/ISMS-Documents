@@ -5,7 +5,7 @@ import { backfillControlEmbeddings } from '../src/services/embeddingService';
 
 const prisma = new PrismaClient();
 
-type SeedScope = 'reference' | 'full' | 'none';
+type SeedScope = 'system' | 'reference' | 'full' | 'none';
 
 interface SeedData {
   classifications?: Record<string, unknown>[];
@@ -33,7 +33,9 @@ function loadSeedData(scope: SeedScope): SeedData {
     return data;
   }
 
-  // Reference data (always loaded for 'reference' and 'full')
+  // Reference data (loaded for 'system', 'reference', and 'full')
+  // 'system' scope only seeds essential system data if missing (idempotent create-only)
+  // 'reference' and 'full' scopes use upsert (create or update)
   const referenceFiles = [
     'classifications.json',
     'asset-categories.json',
@@ -99,55 +101,115 @@ function loadSeedData(scope: SeedScope): SeedData {
 /**
  * Seed Classifications
  */
-async function seedClassifications(data: Record<string, unknown>[]) {
+async function seedClassifications(data: Record<string, unknown>[], createOnly: boolean = false) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} classifications...`);
+  let created = 0;
+  let skipped = 0;
+  
   for (const item of data) {
-    await prisma.classification.upsert({
-      where: { id: item.id },
-      update: {
-        name: item.name,
-        description: item.description,
-        updatedAt: new Date(),
-      },
-      create: {
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
-        updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
-      },
-    });
+    if (createOnly) {
+      // Only create if missing (system scope - preserve manual changes)
+      const existing = await prisma.classification.findUnique({
+        where: { id: item.id },
+      });
+      if (existing) {
+        skipped++;
+        continue;
+      }
+      await prisma.classification.create({
+        data: {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    } else {
+      // Upsert (reference/full scope - can update existing)
+      await prisma.classification.upsert({
+        where: { id: item.id },
+        update: {
+          name: item.name,
+          description: item.description,
+          updatedAt: new Date(),
+        },
+        create: {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    }
   }
-  console.log(`✓ Seeded ${data.length} classifications`);
+  if (createOnly && skipped > 0) {
+    console.log(`✓ Seeded ${created} classifications (${skipped} already existed, skipped)`);
+  } else {
+    console.log(`✓ Seeded ${created} classifications`);
+  }
 }
 
 /**
  * Seed Asset Categories
  */
-async function seedAssetCategories(data: Record<string, unknown>[]) {
+async function seedAssetCategories(data: Record<string, unknown>[], createOnly: boolean = false) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} asset categories...`);
+  let created = 0;
+  let skipped = 0;
+  
   for (const item of data) {
-    await prisma.assetCategory.upsert({
-      where: { id: item.id },
-      update: {
-        name: item.name,
-        description: item.description,
-        updatedAt: new Date(),
-      },
-      create: {
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
-        updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
-      },
-    });
+    if (createOnly) {
+      // Only create if missing (system scope - preserve manual changes)
+      const existing = await prisma.assetCategory.findUnique({
+        where: { id: item.id },
+      });
+      if (existing) {
+        skipped++;
+        continue;
+      }
+      await prisma.assetCategory.create({
+        data: {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    } else {
+      // Upsert (reference/full scope - can update existing)
+      await prisma.assetCategory.upsert({
+        where: { id: item.id },
+        update: {
+          name: item.name,
+          description: item.description,
+          updatedAt: new Date(),
+        },
+        create: {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    }
   }
-  console.log(`✓ Seeded ${data.length} asset categories`);
+  if (createOnly && skipped > 0) {
+    console.log(`✓ Seeded ${created} asset categories (${skipped} already existed, skipped)`);
+  } else {
+    console.log(`✓ Seeded ${created} asset categories`);
+  }
 }
 
 /**
@@ -310,54 +372,111 @@ async function seedRisks(data: Record<string, unknown>[]) {
 /**
  * Seed Controls
  */
-async function seedControls(data: Record<string, unknown>[]) {
+async function seedControls(data: Record<string, unknown>[], createOnly: boolean = false) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} controls...`);
+  let created = 0;
+  let skipped = 0;
+  
   for (const item of data) {
-    await prisma.control.upsert({
-      where: { code: item.code as string }, // Use code as unique identifier
-      update: {
-        // Don't update code since it's the unique identifier
-        title: item.title,
-        description: item.description,
-        selectedForRiskAssessment: item.selectedForRiskAssessment ?? false,
-        selectedForContractualObligation: item.selectedForContractualObligation ?? false,
-        selectedForLegalRequirement: item.selectedForLegalRequirement ?? false,
-        selectedForBusinessRequirement: item.selectedForBusinessRequirement ?? false,
-        justification: item.justification,
-        controlText: item.controlText,
-        purpose: item.purpose,
-        guidance: item.guidance,
-        otherInformation: item.otherInformation,
-        category: item.category,
-        isStandardControl: item.isStandardControl ?? false,
-        implemented: item.implemented ?? false,
-        updatedAt: new Date(),
-      },
-      create: {
-        id: item.id,
-        code: item.code,
-        title: item.title,
-        description: item.description,
-        selectedForRiskAssessment: item.selectedForRiskAssessment ?? false,
-        selectedForContractualObligation: item.selectedForContractualObligation ?? false,
-        selectedForLegalRequirement: item.selectedForLegalRequirement ?? false,
-        selectedForBusinessRequirement: item.selectedForBusinessRequirement ?? false,
-        justification: item.justification,
-        controlText: item.controlText,
-        purpose: item.purpose,
-        guidance: item.guidance,
-        otherInformation: item.otherInformation,
-        category: item.category,
-        isStandardControl: item.isStandardControl ?? false,
-        implemented: item.implemented ?? false,
-        createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
-        updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
-      },
-    });
+    if (createOnly) {
+      // Only create if missing (system scope - preserve manual changes and risk associations)
+      const existing = await prisma.control.findUnique({
+        where: { code: item.code as string },
+      });
+      if (existing) {
+        skipped++;
+        continue;
+      }
+      await prisma.control.create({
+        data: {
+          id: item.id,
+          code: item.code,
+          title: item.title,
+          description: item.description,
+          selectedForRiskAssessment: item.selectedForRiskAssessment ?? false,
+          selectedForContractualObligation: item.selectedForContractualObligation ?? false,
+          selectedForLegalRequirement: item.selectedForLegalRequirement ?? false,
+          selectedForBusinessRequirement: item.selectedForBusinessRequirement ?? false,
+          justification: item.justification,
+          controlText: item.controlText,
+          purpose: item.purpose,
+          guidance: item.guidance,
+          otherInformation: item.otherInformation,
+          category: item.category,
+          isStandardControl: item.isStandardControl ?? false,
+          implemented: item.implemented ?? false,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    } else {
+      // Upsert (reference/full scope - can update existing)
+      // IMPORTANT: Preserve selectedForRiskAssessment if control is linked to risks
+      const existing = await prisma.control.findUnique({
+        where: { code: item.code as string },
+        include: {
+          riskControls: true,
+        },
+      });
+      
+      // If control exists and is linked to risks, preserve selectedForRiskAssessment
+      const preserveRiskAssessment = existing && existing.riskControls.length > 0 
+        ? existing.selectedForRiskAssessment 
+        : (item.selectedForRiskAssessment ?? false);
+      
+      await prisma.control.upsert({
+        where: { code: item.code as string },
+        update: {
+          // Don't update code since it's the unique identifier
+          title: item.title,
+          description: item.description,
+          // Preserve selectedForRiskAssessment if control is linked to risks
+          selectedForRiskAssessment: preserveRiskAssessment,
+          selectedForContractualObligation: item.selectedForContractualObligation ?? false,
+          selectedForLegalRequirement: item.selectedForLegalRequirement ?? false,
+          selectedForBusinessRequirement: item.selectedForBusinessRequirement ?? false,
+          justification: item.justification,
+          controlText: item.controlText,
+          purpose: item.purpose,
+          guidance: item.guidance,
+          otherInformation: item.otherInformation,
+          category: item.category,
+          isStandardControl: item.isStandardControl ?? false,
+          implemented: item.implemented ?? false,
+          updatedAt: new Date(),
+        },
+        create: {
+          id: item.id,
+          code: item.code,
+          title: item.title,
+          description: item.description,
+          selectedForRiskAssessment: item.selectedForRiskAssessment ?? false,
+          selectedForContractualObligation: item.selectedForContractualObligation ?? false,
+          selectedForLegalRequirement: item.selectedForLegalRequirement ?? false,
+          selectedForBusinessRequirement: item.selectedForBusinessRequirement ?? false,
+          justification: item.justification,
+          controlText: item.controlText,
+          purpose: item.purpose,
+          guidance: item.guidance,
+          otherInformation: item.otherInformation,
+          category: item.category,
+          isStandardControl: item.isStandardControl ?? false,
+          implemented: item.implemented ?? false,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    }
   }
-  console.log(`✓ Seeded ${data.length} controls`);
+  if (createOnly && skipped > 0) {
+    console.log(`✓ Seeded ${created} controls (${skipped} already existed, skipped)`);
+  } else {
+    console.log(`✓ Seeded ${created} controls`);
+  }
 }
 
 /**
@@ -453,81 +572,154 @@ async function seedDocuments(data: Record<string, unknown>[]) {
 /**
  * Seed Interested Parties
  */
-async function seedInterestedParties(data: Record<string, unknown>[]) {
+async function seedInterestedParties(data: Record<string, unknown>[], createOnly: boolean = false) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} interested parties...`);
+  let created = 0;
+  let skipped = 0;
+  
   for (const item of data) {
-    await prisma.interestedParty.upsert({
-      where: { id: item.id },
-      update: {
-        name: item.name,
-        group: item.group,
-        description: item.description,
-        dateAdded: item.dateAdded ? new Date(item.dateAdded) : null,
-        requirements: item.requirements,
-        addressedThroughISMS: item.addressedThroughISMS,
-        howAddressedThroughISMS: item.howAddressedThroughISMS,
-        sourceLink: item.sourceLink,
-        keyProductsServices: item.keyProductsServices,
-        ourObligations: item.ourObligations,
-        theirObligations: item.theirObligations,
-        updatedAt: new Date(),
-      },
-      create: {
-        id: item.id,
-        name: item.name,
-        group: item.group,
-        description: item.description,
-        dateAdded: item.dateAdded ? new Date(item.dateAdded) : null,
-        requirements: item.requirements,
-        addressedThroughISMS: item.addressedThroughISMS,
-        howAddressedThroughISMS: item.howAddressedThroughISMS,
-        sourceLink: item.sourceLink,
-        keyProductsServices: item.keyProductsServices,
-        ourObligations: item.ourObligations,
-        theirObligations: item.theirObligations,
-        createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
-        updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
-      },
-    });
+    if (createOnly) {
+      // Only create if missing (system scope - preserve manual changes)
+      const existing = await prisma.interestedParty.findUnique({
+        where: { id: item.id },
+      });
+      if (existing) {
+        skipped++;
+        continue;
+      }
+      await prisma.interestedParty.create({
+        data: {
+          id: item.id,
+          name: item.name,
+          group: item.group,
+          description: item.description,
+          dateAdded: item.dateAdded ? new Date(item.dateAdded) : null,
+          requirements: item.requirements,
+          addressedThroughISMS: item.addressedThroughISMS,
+          howAddressedThroughISMS: item.howAddressedThroughISMS,
+          sourceLink: item.sourceLink,
+          keyProductsServices: item.keyProductsServices,
+          ourObligations: item.ourObligations,
+          theirObligations: item.theirObligations,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    } else {
+      // Upsert (reference/full scope - can update existing)
+      await prisma.interestedParty.upsert({
+        where: { id: item.id },
+        update: {
+          name: item.name,
+          group: item.group,
+          description: item.description,
+          dateAdded: item.dateAdded ? new Date(item.dateAdded) : null,
+          requirements: item.requirements,
+          addressedThroughISMS: item.addressedThroughISMS,
+          howAddressedThroughISMS: item.howAddressedThroughISMS,
+          sourceLink: item.sourceLink,
+          keyProductsServices: item.keyProductsServices,
+          ourObligations: item.ourObligations,
+          theirObligations: item.theirObligations,
+          updatedAt: new Date(),
+        },
+        create: {
+          id: item.id,
+          name: item.name,
+          group: item.group,
+          description: item.description,
+          dateAdded: item.dateAdded ? new Date(item.dateAdded) : null,
+          requirements: item.requirements,
+          addressedThroughISMS: item.addressedThroughISMS,
+          howAddressedThroughISMS: item.howAddressedThroughISMS,
+          sourceLink: item.sourceLink,
+          keyProductsServices: item.keyProductsServices,
+          ourObligations: item.ourObligations,
+          theirObligations: item.theirObligations,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    }
   }
-  console.log(`✓ Seeded ${data.length} interested parties`);
+  if (createOnly && skipped > 0) {
+    console.log(`✓ Seeded ${created} interested parties (${skipped} already existed, skipped)`);
+  } else {
+    console.log(`✓ Seeded ${created} interested parties`);
+  }
 }
 
 /**
  * Seed Legislation
  */
-async function seedLegislation(data: Record<string, unknown>[]) {
+async function seedLegislation(data: Record<string, unknown>[], createOnly: boolean = false) {
   if (!data || data.length === 0) return;
 
   console.log(`Seeding ${data.length} legislation records...`);
+  let created = 0;
+  let skipped = 0;
+  
   for (const item of data) {
-    await prisma.legislation.upsert({
-      where: { id: item.id },
-      update: {
-        dateAdded: item.dateAdded ? new Date(item.dateAdded) : null,
-        interestedParty: item.interestedParty,
-        actRegulationRequirement: item.actRegulationRequirement,
-        description: item.description,
-        riskOfNonCompliance: item.riskOfNonCompliance,
-        howComplianceAchieved: item.howComplianceAchieved,
-        updatedAt: new Date(),
-      },
-      create: {
-        id: item.id,
-        dateAdded: item.dateAdded ? new Date(item.dateAdded) : null,
-        interestedParty: item.interestedParty,
-        actRegulationRequirement: item.actRegulationRequirement,
-        description: item.description,
-        riskOfNonCompliance: item.riskOfNonCompliance,
-        howComplianceAchieved: item.howComplianceAchieved,
-        createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
-        updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
-      },
-    });
+    if (createOnly) {
+      // Only create if missing (system scope - preserve manual changes)
+      const existing = await prisma.legislation.findUnique({
+        where: { id: item.id },
+      });
+      if (existing) {
+        skipped++;
+        continue;
+      }
+      await prisma.legislation.create({
+        data: {
+          id: item.id,
+          dateAdded: item.dateAdded ? new Date(item.dateAdded) : null,
+          interestedParty: item.interestedParty,
+          actRegulationRequirement: item.actRegulationRequirement,
+          description: item.description,
+          riskOfNonCompliance: item.riskOfNonCompliance,
+          howComplianceAchieved: item.howComplianceAchieved,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    } else {
+      // Upsert (reference/full scope - can update existing)
+      await prisma.legislation.upsert({
+        where: { id: item.id },
+        update: {
+          dateAdded: item.dateAdded ? new Date(item.dateAdded) : null,
+          interestedParty: item.interestedParty,
+          actRegulationRequirement: item.actRegulationRequirement,
+          description: item.description,
+          riskOfNonCompliance: item.riskOfNonCompliance,
+          howComplianceAchieved: item.howComplianceAchieved,
+          updatedAt: new Date(),
+        },
+        create: {
+          id: item.id,
+          dateAdded: item.dateAdded ? new Date(item.dateAdded) : null,
+          interestedParty: item.interestedParty,
+          actRegulationRequirement: item.actRegulationRequirement,
+          description: item.description,
+          riskOfNonCompliance: item.riskOfNonCompliance,
+          howComplianceAchieved: item.howComplianceAchieved,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    }
   }
-  console.log(`✓ Seeded ${data.length} legislation records`);
+  if (createOnly && skipped > 0) {
+    console.log(`✓ Seeded ${created} legislation records (${skipped} already existed, skipped)`);
+  } else {
+    console.log(`✓ Seeded ${created} legislation records`);
+  }
 }
 
 /**
@@ -652,17 +844,18 @@ async function main() {
 
   try {
     const seedData = loadSeedData(seedScope);
+    const createOnly = seedScope === 'system'; // Only create missing records, don't update existing
 
-    // Seed reference data (always for 'reference' and 'full')
+    // Seed reference data (for 'system', 'reference', and 'full')
     // Seed classifications first (needed by assets)
     if (seedData.classifications) {
-      await seedClassifications(seedData.classifications);
+      await seedClassifications(seedData.classifications, createOnly);
     }
     if (seedData.assetCategories) {
-      await seedAssetCategories(seedData.assetCategories);
+      await seedAssetCategories(seedData.assetCategories, createOnly);
     }
     if (seedData.controls) {
-      await seedControls(seedData.controls);
+      await seedControls(seedData.controls, createOnly);
       
       // Compute embeddings for controls after seeding
       // This is idempotent - only processes controls with NULL embeddings
@@ -681,12 +874,28 @@ async function main() {
         );
         console.warn('⚠ You can manually run: npm run backfill-control-embeddings');
       }
+      
+      // For system scope, update control applicability to ensure selectedForRiskAssessment
+      // is correctly set based on existing risk-control associations
+      if (createOnly) {
+        console.log('Updating control applicability based on risk associations...');
+        try {
+          const { updateControlApplicability } = await import('../src/services/riskService');
+          await updateControlApplicability();
+          console.log('✓ Control applicability updated');
+        } catch (error) {
+          console.warn(
+            '⚠ Failed to update control applicability (non-fatal):',
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      }
     }
     if (seedData.legislation) {
-      await seedLegislation(seedData.legislation);
+      await seedLegislation(seedData.legislation, createOnly);
     }
     if (seedData.interestedParties) {
-      await seedInterestedParties(seedData.interestedParties);
+      await seedInterestedParties(seedData.interestedParties, createOnly);
     }
 
     // Seed full data (only for 'full' scope)

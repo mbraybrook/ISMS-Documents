@@ -234,7 +234,10 @@ export function RiskDashboardSection() {
   };
 
   // Format number with commas
-  const formatNumber = (num: number): string => {
+  const formatNumber = (num: number | undefined | null): string => {
+    if (num === undefined || num === null) {
+      return '0';
+    }
     return num.toLocaleString();
   };
 
@@ -355,7 +358,7 @@ export function RiskDashboardSection() {
         {/* KPI Tiles Section */}
         <Box>
           <Heading size="sm" mb={4}>Latest Snapshot</Heading>
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
+          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
             <Stat
               as="button"
               type="button"
@@ -386,11 +389,11 @@ export function RiskDashboardSection() {
               _focusVisible={{ boxShadow: 'outline' }}
               transition="all 0.2s"
             >
-              <StatLabel>Implemented Mitigation Score</StatLabel>
+              <StatLabel>Risks with Implemented Mitigations</StatLabel>
               <StatNumber color="green.600">
-                {formatNumber(latest_snapshot.implemented_mitigation_score)}
+                {formatNumber(latest_snapshot.implemented_mitigation_count)}
               </StatNumber>
-              <StatHelpText>Click to view mitigated risks with implemented controls</StatHelpText>
+              <StatHelpText>Total Mitigation Score: {formatNumber(latest_snapshot.implemented_mitigation_score)}</StatHelpText>
             </Stat>
             <Stat
               as="button"
@@ -405,34 +408,15 @@ export function RiskDashboardSection() {
               _focusVisible={{ boxShadow: 'outline' }}
               transition="all 0.2s"
             >
-              <StatLabel>Non-Implemented Mitigation Score</StatLabel>
+              <StatLabel>Risks with Non-implemented Mitigations</StatLabel>
               <StatNumber color="orange.600">
-                {formatNumber(latest_snapshot.non_implemented_mitigation_score)}
+                {formatNumber(latest_snapshot.non_implemented_mitigation_count)}
               </StatNumber>
-              <StatHelpText>Click to view identified mitigations not implemented</StatHelpText>
-            </Stat>
-            <Stat
-              as="button"
-              type="button"
-              p={4}
-              bg="red.50"
-              borderRadius="md"
-              boxShadow="sm"
-              textAlign="left"
-              onClick={() => navigateToRisks({ mitigatedScorePresent: 'false', mitigationImplemented: 'false' })}
-              _hover={{ transform: 'translateY(-2px)', boxShadow: 'md' }}
-              _focusVisible={{ boxShadow: 'outline' }}
-              transition="all 0.2s"
-            >
-              <StatLabel>No Mitigation Score</StatLabel>
-              <StatNumber color="red.600">
-                {formatNumber(latest_snapshot.no_mitigation_score)}
-              </StatNumber>
-              <StatHelpText>Click to view risks with no mitigation data</StatHelpText>
+              <StatHelpText>Total Mitigation Score: {formatNumber(latest_snapshot.non_implemented_mitigation_score)}</StatHelpText>
             </Stat>
           </SimpleGrid>
 
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4} mt={4}>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mt={4}>
             <Stat
               as="button"
               type="button"
@@ -465,30 +449,11 @@ export function RiskDashboardSection() {
               _focusVisible={{ boxShadow: 'outline' }}
               transition="all 0.2s"
             >
-              <StatLabel>Policy Non-Conformance</StatLabel>
+              <StatLabel>Risks missing mitigations</StatLabel>
               <StatNumber color={data.nonconformance.policy_nonconformance_count > 0 ? 'red.600' : 'gray.700'}>
                 {formatNumber(data.nonconformance.policy_nonconformance_count)}
               </StatNumber>
-              <StatHelpText>Click to view policy non-conformances</StatHelpText>
-            </Stat>
-            <Stat
-              as="button"
-              type="button"
-              p={4}
-              bg={data.nonconformance.missing_mitigation_count > 0 ? 'red.50' : 'orange.50'}
-              borderRadius="md"
-              boxShadow="sm"
-              textAlign="left"
-              onClick={() => navigateToRisks({ mitigatedScorePresent: 'false', mitigationImplemented: 'false' })}
-              _hover={{ transform: 'translateY(-2px)', boxShadow: 'md' }}
-              _focusVisible={{ boxShadow: 'outline' }}
-              transition="all 0.2s"
-            >
-              <StatLabel>Missing Mitigation</StatLabel>
-              <StatNumber color={data.nonconformance.missing_mitigation_count > 0 ? 'red.600' : 'orange.600'}>
-                {formatNumber(data.nonconformance.missing_mitigation_count)}
-              </StatNumber>
-              <StatHelpText>Risks with no mitigation data</StatHelpText>
+              <StatHelpText>Total Risk Score: {formatNumber(data.nonconformance.policy_nonconformance_score)}</StatHelpText>
             </Stat>
           </SimpleGrid>
         </Box>
@@ -594,8 +559,10 @@ export function RiskDashboardSection() {
                           onClick={() => {
                             if (count > 0) {
                               // Navigate to risks page - filtering by specific likelihood/impact
-                              // would require backend API support
-                              navigate('/admin/risks/risks');
+                              navigateToRisks({
+                                likelihood: String(likelihood),
+                                impact: String(impact),
+                              });
                             }
                           }}
                         >

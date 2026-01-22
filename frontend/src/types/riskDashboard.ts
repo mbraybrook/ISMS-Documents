@@ -11,7 +11,9 @@ export interface QuarterlyDataPoint {
 export interface LatestSnapshot {
   total_risk_score: number;
   implemented_mitigation_score: number;
+  implemented_mitigation_count: number;
   non_implemented_mitigation_score: number;
+  non_implemented_mitigation_count: number;
   no_mitigation_score: number;
   risk_score_delta: number;
 }
@@ -76,6 +78,7 @@ export interface RiskDashboardSummary {
   };
   nonconformance: {
     policy_nonconformance_count: number;
+    policy_nonconformance_score: number;
     missing_mitigation_count: number;
     missing_mitigation: Array<{
       id: string;

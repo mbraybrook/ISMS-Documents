@@ -31,7 +31,9 @@ describe('RiskDashboardSection', () => {
     latest_snapshot: {
       total_risk_score: 15000,
       implemented_mitigation_score: 8000,
+      implemented_mitigation_count: 8,
       non_implemented_mitigation_score: 5000,
+      non_implemented_mitigation_count: 4,
       no_mitigation_score: 2000,
       risk_score_delta: 500,
     },
@@ -284,21 +286,15 @@ describe('RiskDashboardSection', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText('Implemented Mitigation Score')).toBeInTheDocument();
-        expect(screen.getByText('8,000')).toBeInTheDocument();
-        expect(screen.getByText('Click to view mitigated risks with implemented controls')).toBeInTheDocument();
+        expect(screen.getByText('Risks with Implemented Mitigations')).toBeInTheDocument();
+        expect(screen.getByText('8')).toBeInTheDocument(); // implemented_mitigation_count
+        expect(screen.getByText('Total Mitigation Score: 8,000')).toBeInTheDocument();
       });
 
       await waitFor(() => {
-        expect(screen.getByText('Non-Implemented Mitigation Score')).toBeInTheDocument();
-        expect(screen.getByText('5,000')).toBeInTheDocument();
-        expect(screen.getByText('Click to view identified mitigations not implemented')).toBeInTheDocument();
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('No Mitigation Score')).toBeInTheDocument();
-        expect(screen.getByText('2,000')).toBeInTheDocument();
-        expect(screen.getByText('Click to view risks with no mitigation data')).toBeInTheDocument();
+        expect(screen.getByText('Risks with Non-implemented Mitigations')).toBeInTheDocument();
+        expect(screen.getByText('4')).toBeInTheDocument(); // non_implemented_mitigation_count
+        expect(screen.getByText('Total Mitigation Score: 5,000')).toBeInTheDocument();
       });
     });
 
@@ -310,7 +306,9 @@ describe('RiskDashboardSection', () => {
           ...mockSummary.latest_snapshot,
           total_risk_score: 1234567,
           implemented_mitigation_score: 987654,
+          implemented_mitigation_count: 987,
           non_implemented_mitigation_score: 123456,
+          non_implemented_mitigation_count: 123,
           no_mitigation_score: 123457,
           risk_score_delta: 0,
         },
@@ -326,9 +324,10 @@ describe('RiskDashboardSection', () => {
       await waitFor(() => {
         expect(screen.getByText('1,234')).toBeInTheDocument(); // Risk count
         expect(screen.getByText('Total Risk Score: 1,234,567')).toBeInTheDocument(); // Score in help text
-        expect(screen.getByText('987,654')).toBeInTheDocument();
-        expect(screen.getByText('123,456')).toBeInTheDocument();
-        expect(screen.getByText('123,457')).toBeInTheDocument();
+        expect(screen.getByText('987')).toBeInTheDocument(); // implemented_mitigation_count
+        expect(screen.getByText('Total Mitigation Score: 987,654')).toBeInTheDocument();
+        expect(screen.getByText('123')).toBeInTheDocument(); // non_implemented_mitigation_count
+        expect(screen.getByText('Total Mitigation Score: 123,456')).toBeInTheDocument();
       });
     });
 
@@ -393,7 +392,9 @@ describe('RiskDashboardSection', () => {
           ...mockSummary.latest_snapshot,
           total_risk_score: 0,
           implemented_mitigation_score: 0,
+          implemented_mitigation_count: 0,
           non_implemented_mitigation_score: 0,
+          non_implemented_mitigation_count: 0,
           no_mitigation_score: 0,
           risk_score_delta: 0,
         },

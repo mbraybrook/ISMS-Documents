@@ -548,7 +548,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                         Risk Assessment
                       </Checkbox>
                       <Box fontSize="sm" color="gray.600" mt={1} ml={6}>
-                        Automatically set when control is linked to identified risks
+                        Automatically set when control is linked to active identified risks
                       </Box>
                     </FormControl>
 
@@ -674,7 +674,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
                         Risk Assessment
                       </Checkbox>
                       <Box fontSize="sm" color="gray.600" mt={1} ml={6}>
-                        Automatically set when control is linked to identified risks
+                        Automatically set when control is linked to active identified risks
                       </Box>
                     </FormControl>
 

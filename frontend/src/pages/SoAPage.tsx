@@ -36,6 +36,7 @@ export function SoAPage() {
   usePageTitle('Statement of Applicability', true);
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [updatingApplicability, setUpdatingApplicability] = useState(false);
   const [exports, setExports] = useState<SoAExport[]>([]);
   const [_loadingExports, setLoadingExports] = useState(false);
   const toast = useToast();
@@ -112,6 +113,52 @@ export function SoAPage() {
     }
   };
 
+  const handleUpdateControlApplicability = async () => {
+    if (!isAdminOrEditor) {
+      toast({
+        title: 'Unauthorized',
+        description: 'Only Admins and Editors can update control applicability.',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    setUpdatingApplicability(true);
+    try {
+      const response = await api.post('/api/soa/update-control-applicability');
+      const { message, before, after, changed } = response.data;
+
+      toast({
+        title: 'Success',
+        description: message,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+
+      // Log detailed stats in console for debugging
+      console.log('Control Applicability Update:', {
+        before: `${before.selected}/${before.total} selected`,
+        after: `${after.selected}/${after.total} selected`,
+        changed,
+      });
+    } catch (error: unknown) {
+      console.error('Error updating control applicability:', error);
+      const errorMessage =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to update control applicability';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setUpdatingApplicability(false);
+    }
+  };
+
   // Load exports on mount
   useEffect(() => {
     loadExports();
@@ -153,16 +200,25 @@ export function SoAPage() {
           >
             Generate SoA (Excel)
           </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => handleExport('PDF')}
-            isDisabled
-            title="PDF export not yet implemented"
-          >
-            Generate SoA (PDF) - Coming Soon
-          </Button>
         </HStack>
+        <Box mb={6} p={4} bg="gray.50" borderRadius="md" borderWidth="1px" borderColor="gray.200">
+          <Text fontSize="sm" fontWeight="semibold" mb={2}>
+            Administrative Actions
+          </Text>
+          <Text fontSize="xs" color="gray.600" mb={3}>
+            Update control applicability flags based on current Risk-Control linkages. This ensures controls
+            linked to active risks are correctly marked as "Selected" for implementation.
+          </Text>
+          <Button
+            colorScheme="orange"
+            size="sm"
+            onClick={handleUpdateControlApplicability}
+            isLoading={updatingApplicability}
+            loadingText="Updating..."
+          >
+            Update Control Applicability
+          </Button>
+        </Box>
       </Box>
 
       {exports.length > 0 && (

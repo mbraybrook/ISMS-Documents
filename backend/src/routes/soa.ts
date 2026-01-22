@@ -6,6 +6,7 @@ import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { prisma } from '../lib/prisma';
 import { generateSoAData, generateSoAExcel } from '../services/soaService';
+import { updateControlApplicability } from '../services/riskService';
 
 const router = Router();
 
@@ -143,6 +144,59 @@ router.get(
     } catch (error) {
       console.error('Error fetching SoA exports:', error);
       res.status(500).json({ error: 'Failed to fetch SoA exports' });
+    }
+  }
+);
+
+// POST /api/soa/update-control-applicability - update control applicability flags based on Risk-Control linkages
+router.post(
+  '/update-control-applicability',
+  authenticateToken,
+  requireRole('ADMIN', 'EDITOR'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      // Get statistics before update
+      const beforeStats = {
+        total: await prisma.control.count(),
+        selected: await prisma.control.count({
+          where: { selectedForRiskAssessment: true },
+        }),
+        notSelected: await prisma.control.count({
+          where: { selectedForRiskAssessment: false },
+        }),
+      };
+
+      // Update control applicability
+      await updateControlApplicability();
+
+      // Get statistics after update
+      const afterStats = {
+        total: await prisma.control.count(),
+        selected: await prisma.control.count({
+          where: { selectedForRiskAssessment: true },
+        }),
+        notSelected: await prisma.control.count({
+          where: { selectedForRiskAssessment: false },
+        }),
+      };
+
+      const changed = Math.abs(afterStats.selected - beforeStats.selected);
+
+      res.json({
+        success: true,
+        message: changed > 0
+          ? `Updated ${changed} control${changed === 1 ? '' : 's'}`
+          : 'All controls already have correct status',
+        before: beforeStats,
+        after: afterStats,
+        changed,
+      });
+    } catch (error: any) {
+      console.error('[SOA] Error updating control applicability:', error);
+      res.status(500).json({
+        error: 'Failed to update control applicability',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
     }
   }
 );

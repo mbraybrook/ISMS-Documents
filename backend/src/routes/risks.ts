@@ -66,6 +66,8 @@ router.get(
     query('status').optional().isIn(['DRAFT', 'PROPOSED', 'ACTIVE', 'REJECTED', 'ARCHIVED']),
     query('department').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING']),
     query('testDepartment').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING']),
+    query('likelihood').optional().isInt({ min: 1, max: 5 }),
+    query('impact').optional().isInt({ min: 1, max: 5 }),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
@@ -109,6 +111,8 @@ router.get(
         reviewStatus,
         acceptedAboveAppetite,
         riskIds,
+        likelihood,
+        impact,
       } = req.query;
 
       const pageNum = parseInt(page as string, 10);
@@ -233,6 +237,37 @@ router.get(
       if (assetId) where.assetId = assetId as string;
       if (assetCategoryId) where.assetCategoryId = assetCategoryId as string;
 
+      // Handle likelihood filter (1-5)
+      if (likelihood) {
+        where.likelihood = parseInt(likelihood as string, 10);
+      }
+
+      // Handle impact filter (1-5)
+      // Impact is calculated as sum of CIA scores (3-15), mapped to 1-5 scale:
+      // Impact 1: sum 3-5, Impact 2: sum 6-8, Impact 3: sum 9-11, Impact 4: sum 12-14, Impact 5: sum 15
+      // Store impact filter to apply after fetching (since Prisma doesn't support computed fields)
+      let impactFilterRange: { minSum: number; maxSum: number } | null = null;
+      if (impact) {
+        const impactValue = parseInt(impact as string, 10);
+        switch (impactValue) {
+          case 1:
+            impactFilterRange = { minSum: 3, maxSum: 5 };
+            break;
+          case 2:
+            impactFilterRange = { minSum: 6, maxSum: 8 };
+            break;
+          case 3:
+            impactFilterRange = { minSum: 9, maxSum: 11 };
+            break;
+          case 4:
+            impactFilterRange = { minSum: 12, maxSum: 14 };
+            break;
+          case 5:
+            impactFilterRange = { minSum: 15, maxSum: 15 };
+            break;
+        }
+      }
+
       if (riskIds) {
         const ids = String(riskIds)
           .split(',')
@@ -285,6 +320,46 @@ router.get(
           .map((r: { id: string }) => r.id);
         where.id = { in: filteredIds };
         countWhere.id = { in: filteredIds };
+      }
+
+      // Apply impact filter if specified
+      if (impactFilterRange) {
+        const risksForImpact = await prisma.risk.findMany({
+          where: countWhere,
+          select: {
+            id: true,
+            confidentialityScore: true,
+            integrityScore: true,
+            availabilityScore: true,
+          },
+        });
+        const filteredIds = risksForImpact
+          .filter((r: {
+            id: string;
+            confidentialityScore: number;
+            integrityScore: number;
+            availabilityScore: number;
+          }) => {
+            const impactSum = (r.confidentialityScore ?? 1) + (r.integrityScore ?? 1) + (r.availabilityScore ?? 1);
+            return impactSum >= impactFilterRange!.minSum && impactSum <= impactFilterRange!.maxSum;
+          })
+          .map((r: { id: string }) => r.id);
+        if (filteredIds.length > 0) {
+          // If there are already filtered IDs (e.g., from riskLevel filter), intersect them
+          if (where.id && (where.id as { in: string[] }).in) {
+            const existingIds = (where.id as { in: string[] }).in;
+            const intersectedIds = filteredIds.filter((id) => existingIds.includes(id));
+            where.id = { in: intersectedIds };
+            countWhere.id = { in: intersectedIds };
+          } else {
+            where.id = { in: filteredIds };
+            countWhere.id = { in: filteredIds };
+          }
+        } else {
+          // No risks match the impact filter, return empty result
+          where.id = { in: [] };
+          countWhere.id = { in: [] };
+        }
       }
 
       // Apply derived filters (policy non-conformance / accepted above appetite) if specified

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Heading,
@@ -14,7 +14,7 @@ import {
   Link,
   useToast,
 } from '@chakra-ui/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTrustAuth } from '../contexts/TrustAuthContext';
 import { trustApi } from '../services/trustApi';
 import { DataSensitivityFooter } from '../components/DataSensitivityFooter';
@@ -23,9 +23,18 @@ import { usePageTitle } from '../hooks/usePageTitle';
 export function TrustCenterLoginPage() {
   usePageTitle('Login', false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login } = useTrustAuth();
   const toast = useToast();
   const [isLogin, setIsLogin] = useState(true);
+
+  useEffect(() => {
+    // Check if mode=register is in the URL query params
+    const mode = searchParams.get('mode');
+    if (mode === 'register') {
+      setIsLogin(false);
+    }
+  }, [searchParams]);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',

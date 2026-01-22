@@ -129,6 +129,8 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   const [interestedParties, setInterestedParties] = useState<Array<{ id: string; name: string; group: string | null }>>([]);
   const [selectedControlIds, setSelectedControlIds] = useState<string[]>([]);
   const [controlSearchTerm, setControlSearchTerm] = useState('');
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(-1);
+  const controlSearchInputRef = useRef<HTMLInputElement>(null);
   const [assetSearchTerm, setAssetSearchTerm] = useState('');
   const [showAssetDropdown, setShowAssetDropdown] = useState(false);
   const [loadingAssets, setLoadingAssets] = useState(false);
@@ -2530,21 +2532,67 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                             <SearchIcon color="gray.300" />
                           </InputLeftElement>
                           <Input
+                            ref={controlSearchInputRef}
                             placeholder="Search by control code or title..."
                             value={controlSearchTerm}
-                            onChange={(e) => setControlSearchTerm(e.target.value)}
+                            onChange={(e) => {
+                              setControlSearchTerm(e.target.value);
+                              setSelectedSuggestionIndex(-1); // Reset selection when typing
+                            }}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' && controlSearchTerm.trim() && !viewMode) {
-                                // Try to find and add control by code
-                                const found = controls.find(
+                              if (viewMode) return;
+
+                              const filteredControls = controls
+                                .filter(
                                   (c) =>
-                                    c.code.toLowerCase() === controlSearchTerm.trim().toLowerCase() ||
-                                    c.code.toLowerCase().includes(controlSearchTerm.trim().toLowerCase())
+                                    !selectedControlIds.includes(c.id) &&
+                                    (c.code.toLowerCase().includes(controlSearchTerm.toLowerCase()) ||
+                                      c.title.toLowerCase().includes(controlSearchTerm.toLowerCase()))
+                                )
+                                .slice(0, 10);
+
+                              if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                setSelectedSuggestionIndex((prev) =>
+                                  prev < filteredControls.length - 1 ? prev + 1 : prev
                                 );
-                                if (found && !selectedControlIds.includes(found.id)) {
-                                  setSelectedControlIds([...selectedControlIds, found.id]);
-                                  setControlSearchTerm('');
+                              } else if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                setSelectedSuggestionIndex((prev) => (prev > 0 ? prev - 1 : -1));
+                              } else if (e.key === 'Enter') {
+                                e.preventDefault(); // Prevent form submission
+                                if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < filteredControls.length) {
+                                  // Select highlighted suggestion
+                                  const selectedControl = filteredControls[selectedSuggestionIndex];
+                                  if (!selectedControlIds.includes(selectedControl.id)) {
+                                    setSelectedControlIds([...selectedControlIds, selectedControl.id]);
+                                    setControlSearchTerm('');
+                                    setSelectedSuggestionIndex(-1);
+                                    // Return focus to input
+                                    setTimeout(() => {
+                                      controlSearchInputRef.current?.focus();
+                                    }, 0);
+                                  }
+                                } else if (controlSearchTerm.trim()) {
+                                  // Try to find and add control by code (fallback behavior)
+                                  const found = controls.find(
+                                    (c) =>
+                                      c.code.toLowerCase() === controlSearchTerm.trim().toLowerCase() ||
+                                      c.code.toLowerCase().includes(controlSearchTerm.trim().toLowerCase())
+                                  );
+                                  if (found && !selectedControlIds.includes(found.id)) {
+                                    setSelectedControlIds([...selectedControlIds, found.id]);
+                                    setControlSearchTerm('');
+                                    setSelectedSuggestionIndex(-1);
+                                    // Return focus to input
+                                    setTimeout(() => {
+                                      controlSearchInputRef.current?.focus();
+                                    }, 0);
+                                  }
                                 }
+                              } else if (e.key === 'Escape') {
+                                setControlSearchTerm('');
+                                setSelectedSuggestionIndex(-1);
                               }
                             }}
                             isReadOnly={viewMode}
@@ -2570,26 +2618,35 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                                   c.title.toLowerCase().includes(controlSearchTerm.toLowerCase()))
                             )
                             .slice(0, 10)
-                            .map((control) => (
-                              <Box
-                                key={control.id}
-                                p={2}
-                                _hover={viewMode ? {} : { bg: 'gray.100', cursor: 'pointer' }}
-                                onClick={() => {
-                                  if (!viewMode) {
-                                    setSelectedControlIds([...selectedControlIds, control.id]);
-                                    setControlSearchTerm('');
-                                  }
-                                }}
-                                cursor={viewMode ? 'not-allowed' : 'pointer'}
-                                opacity={viewMode ? 0.6 : 1}
-                              >
-                                <Text fontWeight="medium">{control.code}</Text>
-                                <Text fontSize="sm" color="gray.600">
-                                  {control.title}
-                                </Text>
-                              </Box>
-                            ))}
+                            .map((control, index) => {
+                              const isHighlighted = index === selectedSuggestionIndex;
+                              return (
+                                <Box
+                                  key={control.id}
+                                  p={2}
+                                  bg={isHighlighted ? 'blue.100' : 'transparent'}
+                                  _hover={viewMode ? {} : { bg: isHighlighted ? 'blue.100' : 'gray.100', cursor: 'pointer' }}
+                                  onClick={() => {
+                                    if (!viewMode) {
+                                      setSelectedControlIds([...selectedControlIds, control.id]);
+                                      setControlSearchTerm('');
+                                      setSelectedSuggestionIndex(-1);
+                                      // Return focus to input
+                                      setTimeout(() => {
+                                        controlSearchInputRef.current?.focus();
+                                      }, 0);
+                                    }
+                                  }}
+                                  cursor={viewMode ? 'not-allowed' : 'pointer'}
+                                  opacity={viewMode ? 0.6 : 1}
+                                >
+                                  <Text fontWeight="medium">{control.code}</Text>
+                                  <Text fontSize="sm" color="gray.600">
+                                    {control.title}
+                                  </Text>
+                                </Box>
+                              );
+                            })}
                         </Box>
                       )}
 

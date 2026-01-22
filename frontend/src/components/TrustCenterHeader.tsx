@@ -99,7 +99,7 @@ export function TrustCenterHeader() {
               Login
             </Button>
             <Button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/login?mode=register')}
               colorScheme="blue"
               size="sm"
             >

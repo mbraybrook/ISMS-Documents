@@ -85,6 +85,7 @@ describe('SoA API', () => {
         controlCode: 'A.1.1',
         controlTitle: 'Test Control',
         applicable: 'Yes' as const,
+        implemented: 'Yes' as const,
         selectionReasons: 'Risk Assessment',
         justification: 'Test justification',
         linkedRiskIds: ['risk-1'],
