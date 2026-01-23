@@ -425,7 +425,7 @@ export function AcknowledgmentReportingPage() {
       </Box>
 
       {/* Document Details Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} size="xl">
+      <Modal isOpen={isOpen} onClose={onClose} size={{ base: 'full', md: 'xl' }}>
         <ModalOverlay />
         <ModalContent maxH="80vh" overflowY="auto">
           <ModalHeader>

@@ -273,7 +273,7 @@ export function DataTable<T>({
                   <Badge colorScheme="blue" fontSize="sm">
                     {activeFilterCount} active
                   </Badge>
-                  <Button size="xs" variant="ghost" onClick={onClearFilters}>
+                  <Button size={{ base: 'sm', md: 'xs' }} variant="ghost" onClick={onClearFilters}>
                     Clear All
                   </Button>
                 </HStack>
@@ -285,7 +285,7 @@ export function DataTable<T>({
               if (filter.type === 'search') {
                 const searchValue = filterValues[filter.key] || '';
                 return (
-                  <InputGroup key={filter.key} maxW="300px">
+                  <InputGroup key={filter.key} maxW={{ base: '100%', md: '300px' }} w={{ base: '100%', md: 'auto' }}>
                     <InputLeftElement pointerEvents="none">
                       <SearchIcon color="gray.300" />
                     </InputLeftElement>
@@ -299,7 +299,7 @@ export function DataTable<T>({
                         <IconButton
                           aria-label="Clear search"
                           icon={<CloseIcon />}
-                          size="xs"
+                          size={{ base: 'sm', md: 'xs' }}
                           variant="ghost"
                           onClick={() => onFilterChange(filter.key, '')}
                         />
@@ -321,7 +321,8 @@ export function DataTable<T>({
                     }
                     value={selectValue !== undefined && selectValue !== null && selectValue !== '' ? selectValue : ''}
                     onChange={(e) => onFilterChange(filter.key, e.target.value)}
-                    maxW="200px"
+                    maxW={{ base: '100%', md: '200px' }}
+                    w={{ base: '100%', md: 'auto' }}
                   >
                     {filter.options?.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -401,14 +402,14 @@ export function DataTable<T>({
     const showTotalComparison = hasFilters && totalWithoutFilters !== undefined && totalWithoutFilters !== totalItems;
 
     return (
-      <HStack justify="space-between" mt={4}>
+      <HStack justify="space-between" mt={4} flexWrap="wrap" gap={2}>
         <Text fontSize="sm" color="gray.600">
           Showing {startIndex} to {endIndex} of {totalItems} item{totalItems !== 1 ? 's' : ''}
           {showTotalComparison && ` (${totalWithoutFilters} total without filters)`}
         </Text>
-        <HStack spacing={2}>
+        <HStack spacing={2} flexWrap="wrap">
           <Button
-            size="sm"
+            size={{ base: 'md', md: 'sm' }}
             onClick={() => pagination.onPageChange(currentPage - 1)}
             isDisabled={currentPage === 1}
           >
@@ -418,7 +419,7 @@ export function DataTable<T>({
             Page {currentPage} of {totalPages}
           </Text>
           <Button
-            size="sm"
+            size={{ base: 'md', md: 'sm' }}
             onClick={() => pagination.onPageChange(currentPage + 1)}
             isDisabled={currentPage >= totalPages}
           >
@@ -544,7 +545,7 @@ export function DataTable<T>({
                     <IconButton
                       aria-label={action.label}
                       icon={action.icon || undefined}
-                      size="sm"
+                      size={{ base: 'md', md: 'sm' }}
                       colorScheme={action.colorScheme || 'blue'}
                       variant="ghost"
                       onClick={(e) => {
@@ -564,9 +565,9 @@ export function DataTable<T>({
   };
 
   return (
-    <VStack spacing={6} align="stretch" height={maxHeight ? undefined : "100%"}>
+    <VStack spacing={{ base: 4, md: 6 }} align="stretch" height={maxHeight ? undefined : "100%"}>
       {title && (
-        <HStack justify="space-between">
+        <HStack justify="space-between" flexWrap="wrap" gap={2}>
           <Heading size="lg">{title}</Heading>
           {csvExport?.enabled && (
             <Button
@@ -645,14 +646,14 @@ export function DataTable<T>({
                             Try adjusting your filters or clear them to see all data
                           </Text>
                           {onClearFilters && (
-                            <Button
-                              size="sm"
-                              colorScheme="blue"
-                              variant="outline"
-                              onClick={onClearFilters}
-                            >
-                              Clear All Filters
-                            </Button>
+            <Button
+              size={{ base: 'md', md: 'sm' }}
+              colorScheme="blue"
+              variant="outline"
+              onClick={onClearFilters}
+            >
+              Clear All Filters
+            </Button>
                           )}
                         </VStack>
                       </Td>

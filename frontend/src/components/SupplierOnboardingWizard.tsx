@@ -286,7 +286,7 @@ export function SupplierOnboardingWizard({ isOpen, onClose }: SupplierOnboarding
   const requirements = getApprovalRequirements();
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="4xl" scrollBehavior="inside">
+    <Modal isOpen={isOpen} onClose={onClose} size={{ base: 'full', md: 'xl', lg: '4xl' }} scrollBehavior="inside">
       <ModalOverlay />
       <ModalContent maxH="90vh">
         <ModalHeader>Supplier Onboarding Wizard</ModalHeader>

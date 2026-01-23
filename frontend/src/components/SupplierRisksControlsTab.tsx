@@ -484,7 +484,7 @@ export function SupplierRisksControlsTab({
       </Box>
 
       {/* Link Risk Modal */}
-      <Modal isOpen={isRiskModalOpen} onClose={onRiskModalClose} size="xl">
+      <Modal isOpen={isRiskModalOpen} onClose={onRiskModalClose} size={{ base: 'full', md: 'xl' }}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Link Risk to Supplier</ModalHeader>
@@ -663,7 +663,7 @@ export function SupplierRisksControlsTab({
       </Modal>
 
       {/* Link Control Modal */}
-      <Modal isOpen={isControlModalOpen} onClose={onControlModalClose} size="xl">
+      <Modal isOpen={isControlModalOpen} onClose={onControlModalClose} size={{ base: 'full', md: 'xl' }}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Link Control to Supplier</ModalHeader>

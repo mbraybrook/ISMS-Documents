@@ -1102,7 +1102,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
 
   return (
     <>
-      <Modal isOpen={isOpen} onClose={handleCloseAttempt} size="6xl" scrollBehavior="inside">
+      <Modal isOpen={isOpen} onClose={handleCloseAttempt} size={{ base: 'full', md: 'xl', lg: '6xl' }} scrollBehavior="inside">
         <ModalOverlay />
         <ModalContent maxH="90vh" display="flex" flexDirection="column" overflow="hidden">
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -1733,10 +1733,10 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                         </Alert>
                       )}
 
-                      <HStack spacing={6} align="flex-start">
+                      <HStack spacing={6} align="flex-start" flexDirection={{ base: 'column', lg: 'row' }}>
                         {/* Left side: Sliders */}
-                        <VStack spacing={6} flex="1">
-                          <HStack spacing={4} width="100%" justify="space-around">
+                        <VStack spacing={6} flex="1" w={{ base: '100%', lg: 'auto' }}>
+                          <HStack spacing={4} width="100%" justify="space-around" flexDirection={{ base: 'column', md: 'row' }}>
                           <FormControl isRequired>
                             <FormLabel textAlign="center" mb={2}>
                               Confidentiality (C)
@@ -2116,10 +2116,10 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                         </Alert>
                       )}
 
-                      <HStack spacing={6} align="flex-start">
+                      <HStack spacing={6} align="flex-start" flexDirection={{ base: 'column', lg: 'row' }}>
                         {/* Left side: Sliders */}
-                        <VStack spacing={6} flex="1">
-                          <HStack spacing={4} width="100%" justify="space-around">
+                        <VStack spacing={6} flex="1" w={{ base: '100%', lg: 'auto' }}>
+                          <HStack spacing={4} width="100%" justify="space-around" flexDirection={{ base: 'column', md: 'row' }}>
                             <FormControl>
                               <FormLabel textAlign="center" mb={2}>
                                 Mitigated Confidentiality (MC)
@@ -2803,7 +2803,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
 
       {/* Link Supplier Modal */}
       {risk && (
-        <Modal isOpen={isSupplierModalOpen} onClose={onSupplierModalClose} size="xl">
+        <Modal isOpen={isSupplierModalOpen} onClose={onSupplierModalClose} size={{ base: 'full', md: 'xl' }}>
           <ModalOverlay />
           <ModalContent>
             <ModalHeader>Link Supplier to Risk</ModalHeader>

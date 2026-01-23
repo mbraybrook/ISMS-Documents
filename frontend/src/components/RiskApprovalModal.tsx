@@ -188,7 +188,7 @@ export function RiskApprovalModal({ isOpen, onClose, risk, onSuccess }: RiskAppr
   const levelColor = riskLevel === 'HIGH' ? 'red' : riskLevel === 'MEDIUM' ? 'orange' : 'green';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} size={{ base: 'full', md: 'xl' }}>
       <ModalOverlay />
       <ModalContent>
         <ModalHeader>Review Risk: {risk.title}</ModalHeader>

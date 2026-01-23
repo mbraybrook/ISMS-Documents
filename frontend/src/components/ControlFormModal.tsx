@@ -457,7 +457,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
 
   return (
     <>
-    <Modal isOpen={isOpen} onClose={onClose} size="6xl" scrollBehavior="inside">
+    <Modal isOpen={isOpen} onClose={onClose} size={{ base: 'full', md: 'xl', lg: '6xl' }} scrollBehavior="inside">
       <ModalOverlay />
       <ModalContent maxH="90vh" display="flex" flexDirection="column" overflow="hidden">
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -1047,7 +1047,7 @@ export function ControlFormModal({ isOpen, onClose, control }: ControlFormModalP
       </AlertDialog>
 
       {/* Link Supplier Modal */}
-      <Modal isOpen={isSupplierModalOpen} onClose={onSupplierModalClose} size="xl">
+      <Modal isOpen={isSupplierModalOpen} onClose={onSupplierModalClose} size={{ base: 'full', md: 'xl' }}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Link Supplier to Control</ModalHeader>

@@ -354,7 +354,7 @@ export function RiskWizardModal({ isOpen, onClose, onSuccess }: RiskWizardModalP
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl" closeOnOverlayClick={!loading}>
+    <Modal isOpen={isOpen} onClose={onClose} size={{ base: 'full', md: 'xl' }} closeOnOverlayClick={!loading}>
       <ModalOverlay />
       <ModalContent>
         <ModalHeader>Risk Wizard - Step {currentStep} of 4</ModalHeader>

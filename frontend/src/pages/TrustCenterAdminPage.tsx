@@ -1043,7 +1043,7 @@ export function TrustCenterAdminPage() {
       </Tabs>
 
       {/* Edit Modal */}
-      <Modal isOpen={isOpen} onClose={handleCancelEdit} size="xl">
+      <Modal isOpen={isOpen} onClose={handleCancelEdit} size={{ base: 'full', md: 'xl' }}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>

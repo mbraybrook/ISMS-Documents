@@ -146,7 +146,7 @@ export function DocumentFormModal({ isOpen, onClose, document, readOnly = false,
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} size={{ base: 'full', md: 'xl' }}>
       <ModalOverlay />
       <ModalContent>
         <ModalHeader>{readOnly ? 'View Document' : document ? 'Edit Document' : 'Create Document'}</ModalHeader>

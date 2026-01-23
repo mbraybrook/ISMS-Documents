@@ -1580,15 +1580,16 @@ export function RisksPage() {
   return (
     <>
       <Box
-        w="100vw"
-        ml="calc(-50vw + 50%)"
-        mr="calc(-50vw + 50%)"
+        w={{ base: '100%', md: '100vw' }}
+        ml={{ base: 0, md: 'calc(-50vw + 50%)' }}
+        mr={{ base: 0, md: 'calc(-50vw + 50%)' }}
         bg="white"
-        height="100vh"
+        height={{ base: 'auto', md: '100vh' }}
+        minH={{ base: '100vh', md: '100vh' }}
         overflow="hidden"
         position="relative"
       >
-        <VStack spacing={4} align="stretch" height="100%" px={8} py={6}>
+        <VStack spacing={4} align="stretch" height={{ base: 'auto', md: '100%' }} px={{ base: 4, md: 8 }} py={{ base: 4, md: 6 }}>
           {/* Header Section - Fixed */}
           <HStack justify="space-between">
             <Heading size="lg">Risks</Heading>
@@ -1612,13 +1613,13 @@ export function RisksPage() {
                       <>
                         <Button
                           colorScheme="red"
-                          size="sm"
+                          size={{ base: 'md', md: 'sm' }}
                           onClick={onBulkDeleteOpen}
                         >
                           Delete Selected
                         </Button>
                         <Menu>
-                          <MenuButton as={Button} size="sm" variant="outline" rightIcon={<HamburgerIcon />}>
+                          <MenuButton as={Button} size={{ base: 'md', md: 'sm' }} variant="outline" rightIcon={<HamburgerIcon />}>
                             More Actions
                           </MenuButton>
                           <MenuList>
@@ -1764,7 +1765,7 @@ export function RisksPage() {
               )}
               <Popover>
                 <PopoverTrigger>
-                  <Button size="sm" variant="outline">
+                  <Button size={{ base: 'md', md: 'sm' }} variant="outline">
                     Columns
                   </Button>
                 </PopoverTrigger>
@@ -1878,7 +1879,7 @@ export function RisksPage() {
               {/* Saved Views Menu */}
               {savedViews.length > 0 && (
                 <Menu>
-                  <MenuButton as={Button} size="sm" variant="outline">
+                  <MenuButton as={Button} size={{ base: 'md', md: 'sm' }} variant="outline">
                     Saved Views
                   </MenuButton>
                   <MenuList>
@@ -1902,7 +1903,7 @@ export function RisksPage() {
                   </MenuList>
                 </Menu>
               )}
-              <Button size="sm" variant="outline" onClick={onSaveViewOpen}>
+              <Button size={{ base: 'md', md: 'sm' }} variant="outline" onClick={onSaveViewOpen}>
                 Save View
               </Button>
               <Button colorScheme="blue" onClick={handleCreate}>
@@ -1912,7 +1913,7 @@ export function RisksPage() {
           </HStack>
 
           {/* Scrollable Table Section */}
-          <Box flex="1" overflow="hidden" minHeight="0">
+          <Box flex={{ base: '0 1 auto', md: '1' }} overflow="hidden" minHeight="0">
             <DataTable
               key={`risks-table-${Object.values(visibleColumns).join('-')}`}
               title=""

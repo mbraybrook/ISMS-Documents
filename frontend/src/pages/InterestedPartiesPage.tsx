@@ -1357,7 +1357,7 @@ export function InterestedPartiesPage() {
       <Modal 
         isOpen={isOpen} 
         onClose={onClose} 
-        size="4xl"
+        size={{ base: 'full', md: 'xl', lg: '4xl' }}
         initialFocusRef={initialFocusRef}
         finalFocusRef={finalFocusRef}
         trapFocus={true}
@@ -1637,7 +1637,7 @@ export function InterestedPartiesPage() {
       </AlertDialog>
 
       {/* Risk Management Modal */}
-      <Modal isOpen={isRiskModalOpen} onClose={() => setIsRiskModalOpen(false)} size="2xl">
+      <Modal isOpen={isRiskModalOpen} onClose={() => setIsRiskModalOpen(false)} size={{ base: 'full', md: 'xl', lg: '2xl' }}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>

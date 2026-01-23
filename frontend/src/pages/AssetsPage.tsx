@@ -908,7 +908,7 @@ export function AssetsPage() {
       />
 
       {/* Create/Edit Modal */}
-      <Modal isOpen={isOpen} onClose={handleCloseAttempt} size="xl">
+      <Modal isOpen={isOpen} onClose={handleCloseAttempt} size={{ base: 'full', md: 'xl' }}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>{selectedAsset ? 'Edit Asset' : 'Create Asset'}</ModalHeader>

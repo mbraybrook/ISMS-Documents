@@ -504,7 +504,7 @@ export function SharePointFileBrowser({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} size={{ base: 'full', md: 'xl' }}>
       <ModalOverlay />
       <ModalContent maxH="80vh">
         <ModalHeader>Browse SharePoint Files</ModalHeader>

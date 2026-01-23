@@ -738,7 +738,7 @@ export function LegislationPage() {
       )}
 
       {/* Create/Edit Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} size="6xl">
+      <Modal isOpen={isOpen} onClose={onClose} size={{ base: 'full', md: 'xl', lg: '6xl' }}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>
