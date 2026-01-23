@@ -347,7 +347,6 @@ export async function importRisksFromCSV(csvFilePathOrContent: string | Buffer):
             ownerUserId,
             assetCategory: assetCategoryName || null,
             assetCategoryId,
-            assetId: null,
             interestedPartyId: finalInterestedPartyId,
             threatDescription: (row['Threat Description'] || '').trim() || null,
             archived: false,

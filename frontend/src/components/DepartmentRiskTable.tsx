@@ -206,12 +206,33 @@ export function DepartmentRiskTable() {
   };
 
   const handleSort = (field: string) => {
-    setFilters({
-      ...filters,
-      sortBy: field,
-      sortOrder: filters.sortBy === field && filters.sortOrder === 'asc' ? 'desc' : 'asc',
-      page: 1,
-    });
+    // If clicking a different field, sort ascending
+    if (filters.sortBy !== field) {
+      setFilters({
+        ...filters,
+        sortBy: field,
+        sortOrder: 'asc',
+        page: 1,
+      });
+    } 
+    // If clicking the same field and it's ascending, sort descending
+    else if (filters.sortOrder === 'asc') {
+      setFilters({
+        ...filters,
+        sortBy: field,
+        sortOrder: 'desc',
+        page: 1,
+      });
+    }
+    // If clicking the same field and it's descending, clear sort (reset to default)
+    else {
+      setFilters({
+        ...filters,
+        sortBy: 'calculatedScore',
+        sortOrder: 'desc',
+        page: 1,
+      });
+    }
   };
 
   const getRiskLevelColor = (level: 'LOW' | 'MEDIUM' | 'HIGH'): string => {
@@ -302,11 +323,16 @@ export function DepartmentRiskTable() {
         header: 'Date Added',
         sortable: true,
         minW: '130px',
-        render: (risk) => (
-          <Text fontSize="sm">
-            {risk.dateAdded ? new Date(risk.dateAdded).toLocaleDateString() : 'N/A'}
-          </Text>
-        ),
+        render: (risk) => {
+          if (!risk.dateAdded) {
+            return <Text fontSize="xs" color="gray.400">—</Text>;
+          }
+          const date = new Date(risk.dateAdded);
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const month = monthNames[date.getMonth()];
+          const year = date.getFullYear().toString().slice(-2);
+          return <Text fontSize="sm">{`${month}-${year}`}</Text>;
+        },
       },
       {
         key: 'title',
@@ -402,16 +428,22 @@ export function DepartmentRiskTable() {
         minW: '150px',
         render: (risk) =>
           risk.riskCategory ? (
-            <Badge colorScheme="gray">{risk.riskCategory.replace(/_/g, ' ')}</Badge>
+            <Text fontSize="sm">{risk.riskCategory.replace(/_/g, ' ')}</Text>
           ) : (
-            <Text color="gray.400">N/A</Text>
+            <Text fontSize="xs" color="gray.400">—</Text>
           ),
       },
       {
         key: 'owner',
         header: 'Owner',
         minW: '150px',
-        render: (risk) => <Text>{risk.owner ? risk.owner.displayName : 'N/A'}</Text>,
+        render: (risk) => (
+          risk.owner ? (
+            <Text fontSize="sm">{risk.owner.displayName}</Text>
+          ) : (
+            <Text fontSize="xs" color="gray.400">—</Text>
+          )
+        ),
       },
     ];
   }, [effectiveDepartment]);

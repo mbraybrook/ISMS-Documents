@@ -1,0 +1,1 @@
+Fix the following test failures. Verify that the affected files pass tests prior to finishing. Verify after resolution that the affected files pass lint checks with no errors or warnings. Use subagents if there are multiple errors/warnings. Use the Context7 MCP for guidance if appropriate and available.

@@ -27,7 +27,6 @@ import {
   TagCloseButton,
   InputGroup,
   InputLeftElement,
-  InputRightElement,
   Spinner,
   Alert,
   AlertIcon,
@@ -123,7 +122,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [controls, setControls] = useState<Control[]>([]);
-  const [assets, setAssets] = useState<any[]>([]);
+  const [_assets, setAssets] = useState<any[]>([]);
   const [filteredAssets, setFilteredAssets] = useState<any[]>([]);
   const [assetCategories, setAssetCategories] = useState<any[]>([]);
   const [interestedParties, setInterestedParties] = useState<Array<{ id: string; name: string; group: string | null }>>([]);
@@ -134,6 +133,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   const [assetSearchTerm, setAssetSearchTerm] = useState('');
   const [showAssetDropdown, setShowAssetDropdown] = useState(false);
   const [loadingAssets, setLoadingAssets] = useState(false);
+  const [selectedAssets, setSelectedAssets] = useState<any[]>([]);
   const [suggestedControls, setSuggestedControls] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const assetSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -150,7 +150,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
     nextReviewDate: '',
     ownerUserId: '',
     assetCategory: '',
-    assetId: '',
+    assetIds: [] as string[],
     assetCategoryId: '',
     interestedPartyId: '',
     threatDescription: '',
@@ -369,7 +369,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         nextReviewDate: templateRisk.nextReviewDate ? new Date(templateRisk.nextReviewDate).toISOString().split('T')[0] : '',
         ownerUserId: templateRisk.ownerUserId || '',
         assetCategory: templateRisk.assetCategory || '',
-        assetId: templateRisk.assetId || '',
+        assetIds: templateRisk.assets?.map((a: any) => a.id) || [],
         assetCategoryId: templateRisk.assetCategoryId || '',
         interestedPartyId: templateRisk.interestedPartyId || '',
         threatDescription: templateRisk.threatDescription || '',
@@ -399,17 +399,15 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         setSelectedControlIds([]);
       }
 
-      // Load asset if available
-      if (templateRisk.assetId && templateRisk.asset) {
-        setAssets([templateRisk.asset]);
-        setFilteredAssets([templateRisk.asset]);
-        setAssetSearchTerm(templateRisk.asset.nameSerialNo || templateRisk.asset.model || 'Selected asset');
-        if (templateRisk.asset.assetCategoryId || templateRisk.asset.category?.id) {
-          setFormData((prev) => ({
-            ...prev,
-            assetCategoryId: templateRisk.assetCategoryId || templateRisk.asset.category?.id || '',
-          }));
-        }
+      // Load assets if available
+      if (templateRisk.assets && templateRisk.assets.length > 0) {
+        setSelectedAssets(templateRisk.assets);
+        setAssets(templateRisk.assets);
+        setFilteredAssets(templateRisk.assets);
+        setFormData((prev) => ({
+          ...prev,
+          assetIds: templateRisk.assets.map((a: any) => a.id),
+        }));
       }
 
       setShowSimilarityAlert(false);
@@ -519,6 +517,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       // Don't fetch assets upfront - only when user searches
       setAssets([]);
       setFilteredAssets([]);
+      setSelectedAssets([]);
       setAssetSearchTerm('');
       setShowAssetDropdown(false);
       // Reset similarity state
@@ -552,7 +551,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
             : '',
           ownerUserId: risk.ownerUserId || '',
           assetCategory: risk.assetCategory || '',
-          assetId: risk.assetId || '',
+          assetIds: risk.assets?.map((a: any) => a.id) || [],
           assetCategoryId: risk.assetCategoryId || '',
           interestedPartyId: risk.interestedParty?.id || '',
           threatDescription: risk.threatDescription || '',
@@ -585,15 +584,11 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
         if (risk.id) {
           fetchLinkedSuppliers(risk.id);
         }
-        // If risk has an asset, fetch it to show in the search and set its category
-        if (risk.assetId && risk.asset) {
-          setAssets([risk.asset]);
-          setFilteredAssets([risk.asset]);
-          setAssetSearchTerm(risk.asset.nameSerialNo || risk.asset.model || 'Selected asset');
-          // Automatically set the category from the asset
-          if (risk.asset.assetCategoryId || risk.asset.category?.id) {
-            initialData.assetCategoryId = risk.asset.assetCategoryId || risk.asset.category?.id || '';
-          }
+        // If risk has assets, load them
+        if (risk.assets && risk.assets.length > 0) {
+          setSelectedAssets(risk.assets);
+          setAssets(risk.assets);
+          setFilteredAssets(risk.assets);
         }
       } else {
         initialData = {
@@ -609,7 +604,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           nextReviewDate: '',
           ownerUserId: '',
           assetCategory: '',
-          assetId: '',
+          assetIds: [],
           assetCategoryId: '',
           interestedPartyId: '',
           threatDescription: '',
@@ -970,8 +965,9 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       if (payload.nextReviewDate === '') payload.nextReviewDate = undefined;
       if (payload.ownerUserId === '') payload.ownerUserId = undefined;
       if (payload.assetCategory === '') payload.assetCategory = undefined;
-      // Send null (not undefined) for assetId and assetCategoryId so backend can clear them
-      if (payload.assetId === '') payload.assetId = null;
+      // Send undefined to preserve existing associations, or empty array [] to clear them
+      // Backend validation expects undefined (skip update) or array (update associations)
+      if (payload.assetIds && payload.assetIds.length === 0) payload.assetIds = undefined;
       if (payload.assetCategoryId === '') payload.assetCategoryId = null;
       // interestedPartyId is required, so don't remove it if it's set
       if (payload.threatDescription === '') payload.threatDescription = undefined;
@@ -1399,26 +1395,43 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                       )}
 
                       <FormControl>
-                        <FormLabel>Link to Asset (Optional)</FormLabel>
+                        <FormLabel>Link to Assets (Optional)</FormLabel>
                         <Box position="relative">
+                          {/* Selected Assets Display */}
+                          {selectedAssets.length > 0 && (
+                            <HStack wrap="wrap" spacing={2} mb={2}>
+                              {selectedAssets.map((asset) => (
+                                <Tag key={asset.id} size="md" borderRadius="full" variant="solid" colorScheme="blue">
+                                  <TagLabel>
+                                    {asset.nameSerialNo || asset.model || 'Unnamed Asset'}
+                                    {asset.category?.name && ` (${asset.category.name})`}
+                                  </TagLabel>
+                                  {!viewMode && (
+                                    <TagCloseButton
+                                      onClick={() => {
+                                        const updated = selectedAssets.filter((a) => a.id !== asset.id);
+                                        setSelectedAssets(updated);
+                                        setFormData({
+                                          ...formData,
+                                          assetIds: updated.map((a) => a.id),
+                                        });
+                                      }}
+                                    />
+                                  )}
+                                </Tag>
+                              ))}
+                            </HStack>
+                          )}
                           <InputGroup>
                             <InputLeftElement pointerEvents="none">
                               <SearchIcon color="gray.300" />
                             </InputLeftElement>
                             <Input
                               placeholder="Type to search assets (min 2 characters)..."
-                              value={formData.assetId ? (assets.find(a => a.id === formData.assetId)?.nameSerialNo || assets.find(a => a.id === formData.assetId)?.model || 'Selected asset') : assetSearchTerm}
+                              value={assetSearchTerm}
                               onChange={(e) => {
                                 const value = e.target.value;
                                 setAssetSearchTerm(value);
-                                // Clear asset selection if user is typing
-                                if (value !== (assets.find(a => a.id === formData.assetId)?.nameSerialNo || assets.find(a => a.id === formData.assetId)?.model || '')) {
-                                  setFormData({
-                                    ...formData,
-                                    assetId: '',
-                                    // Don't clear category - user can still select a category when no asset is selected
-                                  });
-                                }
                               }}
                               onFocus={() => {
                                 if (assetSearchTerm.length >= 2) {
@@ -1431,25 +1444,6 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                               }}
                               isDisabled={viewMode}
                             />
-                            {formData.assetId && (
-                              <InputRightElement>
-                                <IconButton
-                                  aria-label="Clear selection"
-                                  icon={<DeleteIcon />}
-                                  size="xs"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    setFormData({
-                                      ...formData,
-                                      assetId: '',
-                                      assetCategoryId: '', // Clear category when clearing asset
-                                    });
-                                    setAssetSearchTerm('');
-                                    setShowAssetDropdown(false);
-                                  }}
-                                />
-                              </InputRightElement>
-                            )}
                           </InputGroup>
                           {showAssetDropdown && (loadingAssets || filteredAssets.length > 0 || assetSearchTerm.length >= 2) && (
                             <Box
@@ -1480,46 +1474,63 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                                   </Text>
                                 </Box>
                               ) : (
-                                Array.isArray(filteredAssets) && filteredAssets.slice(0, 20).map((asset) => (
-                                  <Box
-                                    key={asset.id}
-                                    p={3}
-                                    borderBottomWidth="1px"
-                                    _hover={{ bg: 'blue.50', cursor: 'pointer' }}
-                                    onClick={() => {
-                                      setFormData({
-                                        ...formData,
-                                        assetId: asset.id,
-                                        assetCategoryId: asset.assetCategoryId || asset.category?.id || '', // Set category from asset
-                                      });
-                                      setAssetSearchTerm(asset.nameSerialNo || asset.model || 'Unnamed');
-                                      setShowAssetDropdown(false);
-                                    }}
-                                  >
-                                    <HStack justify="space-between">
-                                      <VStack align="start" spacing={0}>
-                                        <Text fontWeight="medium" fontSize="sm">
-                                          {asset.nameSerialNo || asset.model || 'Unnamed Asset'}
-                                        </Text>
-                                        <HStack spacing={2} fontSize="xs" color="gray.600">
-                                          <Text>{asset.category?.name || ''}</Text>
-                                          {asset.manufacturer && <Text>• {asset.manufacturer}</Text>}
-                                          {asset.primaryUser && <Text>• User: {asset.primaryUser}</Text>}
-                                        </HStack>
-                                      </VStack>
-                                      <Badge colorScheme="blue" fontSize="xs">
-                                        {asset.classification?.name || ''}
-                                      </Badge>
-                                    </HStack>
-                                  </Box>
-                                ))
+                                Array.isArray(filteredAssets) && filteredAssets.slice(0, 20).map((asset) => {
+                                  const isSelected = selectedAssets.some((a) => a.id === asset.id);
+                                  return (
+                                    <Box
+                                      key={asset.id}
+                                      p={3}
+                                      borderBottomWidth="1px"
+                                      bg={isSelected ? 'blue.50' : 'white'}
+                                      _hover={{ bg: isSelected ? 'blue.100' : 'blue.50', cursor: 'pointer' }}
+                                      onClick={() => {
+                                        if (isSelected) {
+                                          // Remove asset
+                                          const updated = selectedAssets.filter((a) => a.id !== asset.id);
+                                          setSelectedAssets(updated);
+                                          setFormData({
+                                            ...formData,
+                                            assetIds: updated.map((a) => a.id),
+                                          });
+                                        } else {
+                                          // Add asset
+                                          const updated = [...selectedAssets, asset];
+                                          setSelectedAssets(updated);
+                                          setFormData({
+                                            ...formData,
+                                            assetIds: updated.map((a) => a.id),
+                                          });
+                                        }
+                                        setAssetSearchTerm('');
+                                        setShowAssetDropdown(false);
+                                      }}
+                                    >
+                                      <HStack justify="space-between">
+                                        <VStack align="start" spacing={0}>
+                                          <Text fontWeight="medium" fontSize="sm">
+                                            {asset.nameSerialNo || asset.model || 'Unnamed Asset'}
+                                            {isSelected && ' ✓'}
+                                          </Text>
+                                          <HStack spacing={2} fontSize="xs" color="gray.600">
+                                            <Text>{asset.category?.name || ''}</Text>
+                                            {asset.manufacturer && <Text>• {asset.manufacturer}</Text>}
+                                            {asset.primaryUser && <Text>• User: {asset.primaryUser}</Text>}
+                                          </HStack>
+                                        </VStack>
+                                        <Badge colorScheme="blue" fontSize="xs">
+                                          {asset.classification?.name || ''}
+                                        </Badge>
+                                      </HStack>
+                                    </Box>
+                                  );
+                                })
                               )}
                             </Box>
                           )}
                         </Box>
-                        {formData.assetId && (
+                        {selectedAssets.length > 0 && (
                           <Text fontSize="xs" color="green.600" mt={1}>
-                            ✓ Asset selected {assets.find(a => a.id === formData.assetId)?.category?.name ? `(Category: ${assets.find(a => a.id === formData.assetId)?.category?.name})` : ''}
+                            ✓ {selectedAssets.length} asset{selectedAssets.length !== 1 ? 's' : ''} selected
                           </Text>
                         )}
                       </FormControl>
@@ -1533,11 +1544,10 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                             setFormData({
                               ...formData,
                               assetCategoryId: assetCategoryId || '',
-                              assetId: assetCategoryId ? '' : formData.assetId, // Clear asset if category selected
                             });
                           }}
                           placeholder="Select an asset category (or leave blank)"
-                          isDisabled={viewMode || !!formData.assetId}
+                          isDisabled={viewMode}
                         >
                           <option value="">None</option>
                           {Array.isArray(assetCategories) && assetCategories.map((cat) => (
@@ -1546,15 +1556,9 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                             </option>
                           ))}
                         </Select>
-                        {formData.assetId ? (
-                          <Text fontSize="sm" color="blue.600" mt={1}>
-                            ℹ️ Category is automatically set from the selected asset and cannot be changed.
-                          </Text>
-                        ) : (
-                          <Text fontSize="sm" color="gray.500" mt={1}>
-                            Note: You can link to either a specific asset OR an asset category, not both. When an asset is selected, its category is automatically used.
-                          </Text>
-                        )}
+                        <Text fontSize="sm" color="gray.500" mt={1}>
+                          You can link to both specific assets and an asset category if needed.
+                        </Text>
                       </FormControl>
 
                       <FormControl>
@@ -1710,16 +1714,15 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                           rows={4}
                           isDisabled={viewMode}
                         />
+                        {riskLevel === 'MEDIUM' && formData.initialRiskTreatmentCategory === 'RETAIN' && (
+                          <Alert status="warning" borderRadius="md" mt={2}>
+                            <AlertIcon />
+                            <Text fontSize="sm">
+                              The Existing Controls Description must justify why Retain is acceptable for a Medium risk. Per policy, Medium and higher risks typically require treatment other than Retain.
+                            </Text>
+                          </Alert>
+                        )}
                       </FormControl>
-
-                      {formData.initialRiskTreatmentCategory && (
-                        <Alert status="info" borderRadius="md">
-                          <AlertIcon />
-                          <Text fontSize="sm">
-                            All risks should have an Initial Risk Treatment Category. Please ensure this is set before completing the assessment.
-                          </Text>
-                        </Alert>
-                      )}
 
                       {formData.initialRiskTreatmentCategory && !formData.existingControlsDescription?.trim() && (
                         <Alert status="warning" borderRadius="md">
@@ -1990,6 +1993,14 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                             </option>
                           ))}
                         </Select>
+                        {!formData.initialRiskTreatmentCategory && (
+                          <Alert status="info" borderRadius="md" mt={2}>
+                            <AlertIcon />
+                            <Text fontSize="sm">
+                              All risks should have an Initial Risk Treatment Category. Please ensure this is set before completing the assessment.
+                            </Text>
+                          </Alert>
+                        )}
                       </FormControl>
                     </VStack>
                   </TabPanel>

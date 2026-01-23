@@ -937,7 +937,6 @@ ${dataRows.join('\n')}`;
           ownerUserId: null,
           assetCategory: 'Server',
           assetCategoryId: 'category-Server',
-          assetId: null,
           interestedPartyId: 'party-Client',
           threatDescription: 'Threat Desc',
           archived: false,

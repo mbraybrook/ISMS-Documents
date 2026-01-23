@@ -42,7 +42,7 @@ model Asset {
   updatedAt        DateTime
   Classification   Classification @relation(fields: [classificationId], references: [id])
   AssetCategory    AssetCategory  @relation(fields: [assetCategoryId], references: [id])
-  Risk             Risk[]
+  riskAssets       RiskAsset[]
 
   @@index([date])
   @@index([owner])
@@ -263,7 +263,6 @@ model Risk {
   rejectionReason               String?
   mergedIntoRiskId              String?
   assetCategory                 String?
-  assetId                       String?
   assetCategoryId               String?
   interestedPartyId             String
   threatDescription             String?
@@ -297,9 +296,9 @@ model Risk {
   acceptedBy                    User?             @relation("RiskAcceptedBy", fields: [acceptedByUserId], references: [id])
   interestedParty               InterestedParty   @relation(fields: [interestedPartyId], references: [id])
   linkedAssetCategory           AssetCategory?    @relation(fields: [assetCategoryId], references: [id])
-  asset                         Asset?            @relation(fields: [assetId], references: [id])
   owner                         User?             @relation("RiskOwner", fields: [ownerUserId], references: [id])
   riskControls                  RiskControl[]
+  riskAssets                    RiskAsset[]
   legislationRisks              LegislationRisk[]
   treatmentActions              RiskTreatmentAction[]
   isSupplierRisk                Boolean  @default(false)
@@ -307,7 +306,6 @@ model Risk {
 
   @@index([interestedPartyId])
   @@index([assetCategoryId])
-  @@index([assetId])
   @@index([mitigationImplemented])
   @@index([residualRiskTreatmentCategory])
   @@index([initialRiskTreatmentCategory])
@@ -333,6 +331,17 @@ model RiskControl {
 
   @@id([riskId, controlId])
   @@index([controlId])
+  @@index([riskId])
+}
+
+model RiskAsset {
+  riskId  String
+  assetId String
+  risk    Risk  @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  asset   Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@id([riskId, assetId])
+  @@index([assetId])
   @@index([riskId])
 }
 

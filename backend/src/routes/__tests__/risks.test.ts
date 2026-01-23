@@ -57,6 +57,10 @@ jest.mock('../../lib/prisma', () => ({
     legislationRisk: {
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
+    riskAsset: {
+      createMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
     supplier: {
       findUnique: jest.fn(),
     },
@@ -510,7 +514,11 @@ describe('Risks API', () => {
       expect(prisma.risk.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            assetId,
+            riskAssets: expect.objectContaining({
+              some: expect.objectContaining({
+                assetId,
+              }),
+            }),
           }),
         })
       );
@@ -1228,22 +1236,30 @@ describe('Risks API', () => {
         .expect(400);
     });
 
-    it('should validate mutually exclusive asset/category linkage', async () => {
+    it('should allow both assets and category to be linked', async () => {
       const partyId = '550e8400-e29b-41d4-a716-446655440010';
-      const assetId = '550e8400-e29b-41d4-a716-446655440040';
+      const assetId1 = '550e8400-e29b-41d4-a716-446655440040';
+      const assetId2 = '550e8400-e29b-41d4-a716-446655440041';
       const categoryId = '550e8400-e29b-41d4-a716-446655440050';
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
       prisma.interestedParty.findUnique.mockResolvedValue({ id: partyId });
+      prisma.risk.create.mockResolvedValue({
+        id: 'risk-1',
+        title: 'New Risk',
+        assetCategoryId: categoryId,
+        interestedPartyId: partyId,
+      } as any);
+      prisma.riskAsset.createMany.mockResolvedValue({ count: 2 } as any);
 
       await request(app)
         .post('/api/risks')
         .send({
           title: 'New Risk',
-          assetId,
+          assetIds: [assetId1, assetId2],
           assetCategoryId: categoryId,
           interestedPartyId: partyId,
         })
-        .expect(400);
+        .expect(201);
     });
 
     it('should return 500 on database error', async () => {
@@ -1680,7 +1696,7 @@ describe('Risks API', () => {
         .expect(400);
     });
 
-    it('should validate mutually exclusive asset/category linkage on update', async () => {
+    it('should allow both assets and category to be linked on update', async () => {
       const riskId = '550e8400-e29b-41d4-a716-446655440001';
       const existingRisk = {
         id: riskId,
@@ -1697,19 +1713,22 @@ describe('Risks API', () => {
         },
         riskControls: [],
       };
-      const assetId = '550e8400-e29b-41d4-a716-446655440040';
+      const assetIds = ['550e8400-e29b-41d4-a716-446655440040'];
       const categoryId = '550e8400-e29b-41d4-a716-446655440050';
 
       prisma.risk.findUnique.mockResolvedValue(existingRisk);
+      prisma.risk.update.mockResolvedValue({ ...existingRisk, assetCategoryId: categoryId } as any);
+      prisma.riskAsset.deleteMany.mockResolvedValue({ count: 0 } as any);
+      prisma.riskAsset.createMany.mockResolvedValue({ count: 1 } as any);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
 
       await request(app)
         .put(`/api/risks/${riskId}`)
         .send({
-          assetId,
+          assetIds,
           assetCategoryId: categoryId,
         })
-        .expect(400);
+        .expect(200);
     });
 
     it('should return 500 on database error', async () => {

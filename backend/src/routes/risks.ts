@@ -234,7 +234,9 @@ router.get(
       }
 
       // Handle asset filters
-      if (assetId) where.assetId = assetId as string;
+      if (assetId) {
+        where.riskAssets = { some: { assetId: assetId as string } };
+      }
       if (assetCategoryId) where.assetCategoryId = assetCategoryId as string;
 
       // Handle likelihood filter (1-5)
@@ -463,6 +465,21 @@ router.get(
                 },
               },
             },
+            riskAssets: {
+              include: {
+                asset: {
+                  include: {
+                    AssetCategory: true,
+                  },
+                },
+              },
+            },
+            linkedAssetCategory: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
           skip,
           take: limitNum,
@@ -473,12 +490,27 @@ router.get(
         prisma.risk.count({ where: countWhere }),
       ]);
 
-      // Add risk level to each risk
-      const risksWithLevel = risks.map((risk: { calculatedScore: number; mitigatedScore: number | null }) => ({
-        ...risk,
-        riskLevel: getRiskLevel(risk.calculatedScore),
-        mitigatedRiskLevel: risk.mitigatedScore ? getRiskLevel(risk.mitigatedScore) : null,
-      }));
+      // Map response to include assets array and linkedAssetCategory
+      const risksWithLevel = risks.map((risk: any) => {
+        const { riskAssets, ...rest } = risk;
+        const assets = riskAssets?.map((ra: any) => ({
+          id: ra.asset.id,
+          nameSerialNo: ra.asset.nameSerialNo,
+          model: ra.asset.model,
+          category: ra.asset.AssetCategory ? {
+            id: ra.asset.AssetCategory.id,
+            name: ra.asset.AssetCategory.name,
+          } : null,
+        })) || null;
+        
+        return {
+          ...rest,
+          assets,
+          linkedAssetCategory: risk.linkedAssetCategory,
+          riskLevel: getRiskLevel(risk.calculatedScore),
+          mitigatedRiskLevel: risk.mitigatedScore ? getRiskLevel(risk.mitigatedScore) : null,
+        };
+      });
 
       res.json({
         data: risksWithLevel,
@@ -528,6 +560,21 @@ router.get(
               control: true,
             },
           },
+          riskAssets: {
+            include: {
+              asset: {
+                include: {
+                  AssetCategory: true,
+                },
+              },
+            },
+          },
+          linkedAssetCategory: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           DocumentRisk: {
             include: {
               document: {
@@ -559,9 +606,23 @@ router.get(
         return res.status(404).json({ error: 'Risk not found' });
       }
 
+      // Map response to include assets array and linkedAssetCategory
+      const { riskAssets, ...rest } = risk;
+      const assets = riskAssets?.map((ra: any) => ({
+        id: ra.asset.id,
+        nameSerialNo: ra.asset.nameSerialNo,
+        model: ra.asset.model,
+        category: ra.asset.AssetCategory ? {
+          id: ra.asset.AssetCategory.id,
+          name: ra.asset.AssetCategory.name,
+        } : null,
+      })) || null;
+
       // Add risk level to response
       const riskWithLevel = {
-        ...risk,
+        ...rest,
+        assets,
+        linkedAssetCategory: risk.linkedAssetCategory,
         riskLevel: getRiskLevel(risk.calculatedScore),
         mitigatedRiskLevel: risk.mitigatedScore ? getRiskLevel(risk.mitigatedScore) : null,
       };
@@ -597,10 +658,8 @@ router.post(
     body('acceptanceRationale').optional().isString(),
     body('appetiteThreshold').optional().isInt({ min: 1 }),
     body('assetCategory').optional().isString(),
-    body('assetId').optional().custom((value) => {
-      if (value === null || value === undefined || value === '') return true;
-      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-    }).withMessage('assetId must be a valid UUID or null'),
+    body('assetIds').optional().isArray(),
+    body('assetIds.*').optional().isUUID().withMessage('Each assetId must be a valid UUID'),
     body('assetCategoryId').optional().custom((value) => {
       if (value === null || value === undefined || value === '') return true;
       return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -665,7 +724,7 @@ router.post(
         acceptanceRationale,
         appetiteThreshold,
         assetCategory,
-        assetId,
+        assetIds,
         assetCategoryId,
         interestedPartyId,
         threatDescription,
@@ -777,13 +836,6 @@ router.post(
         mitigatedLikelihood
       );
 
-      // Validate mutually exclusive asset/category linkage
-      if (assetId && assetCategoryId) {
-        return res.status(400).json({
-          error: 'Risk can be linked to either an asset or an asset category, not both',
-        });
-      }
-
       // Handle missing interestedPartyId - get or create "Unspecified" party
       let finalInterestedPartyId = interestedPartyId;
       if (!finalInterestedPartyId) {
@@ -825,7 +877,6 @@ router.post(
           status: finalStatus,
           wizardData: finalWizardData,
           assetCategory, // Keep for backward compatibility
-          assetId: assetId || null,
           assetCategoryId: assetCategoryId || null,
           interestedPartyId: finalInterestedPartyId,
           threatDescription,
@@ -851,6 +902,16 @@ router.post(
           updatedAt: new Date(),
         } as any, // Temporary: TypeScript types need server restart to pick up new Prisma schema
       });
+
+      // Create asset associations if assetIds provided
+      if (assetIds && Array.isArray(assetIds) && assetIds.length > 0) {
+        await prisma.riskAsset.createMany({
+          data: assetIds.map((assetId: string) => ({
+            riskId: risk.id,
+            assetId: assetId,
+          })),
+        });
+      }
 
       // Parse and update control associations
       if (annexAControlsRaw) {
@@ -927,10 +988,8 @@ router.put(
     body('acceptanceRationale').optional().isString(),
     body('appetiteThreshold').optional().isInt({ min: 1 }),
     body('assetCategory').optional().isString(),
-    body('assetId').optional().custom((value) => {
-      if (value === null || value === undefined || value === '') return true;
-      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-    }).withMessage('assetId must be a valid UUID or null'),
+    body('assetIds').optional().isArray(),
+    body('assetIds.*').optional().isUUID().withMessage('Each assetId must be a valid UUID'),
     body('assetCategoryId').optional().custom((value) => {
       if (value === null || value === undefined || value === '') return true;
       return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -1057,13 +1116,6 @@ router.put(
         });
       }
 
-      // Validate mutually exclusive asset/category linkage
-      if (updateData.assetId && updateData.assetCategoryId) {
-        return res.status(400).json({
-          error: 'Risk can be linked to either an asset or an asset category, not both',
-        });
-      }
-
       // Handle archivedDate: set when archiving, clear when unarchiving
       if (updateData.archived !== undefined) {
         if (updateData.archived === true) {
@@ -1104,10 +1156,7 @@ router.put(
         updateData.acceptedByUserId = user.id;
       }
 
-      // Handle assetId and assetCategoryId - set to null if explicitly cleared
-      if (updateData.assetId === '' || updateData.assetId === null) {
-        updateData.assetId = null;
-      }
+      // Handle assetCategoryId - set to null if explicitly cleared
       if (updateData.assetCategoryId === '' || updateData.assetCategoryId === null) {
         updateData.assetCategoryId = null;
       }
@@ -1177,17 +1226,6 @@ router.put(
         delete updateData.acceptedByUserId;
       }
 
-      // Transform assetId to Prisma relation syntax if needed
-      if (updateData.assetId !== undefined) {
-        if (updateData.assetId === null || updateData.assetId === '') {
-          updateData.asset = { disconnect: true };
-        } else {
-          updateData.asset = { connect: { id: updateData.assetId } };
-        }
-        // Remove assetId since we're using relation syntax
-        delete updateData.assetId;
-      }
-
       // Transform assetCategoryId to Prisma relation syntax if needed
       if (updateData.assetCategoryId !== undefined) {
         if (updateData.assetCategoryId === null || updateData.assetCategoryId === '') {
@@ -1205,10 +1243,31 @@ router.put(
         delete updateData.interestedPartyId;
       }
 
+      // Handle assetIds separately - need to update RiskAsset junction table
+      const assetIdsToUpdate = updateData.assetIds;
+      delete updateData.assetIds;
+
       const risk = await prisma.risk.update({
         where: { id },
         data: updateData,
       });
+
+      // Update asset associations if assetIds provided
+      if (assetIdsToUpdate !== undefined) {
+        // Delete existing links
+        await prisma.riskAsset.deleteMany({
+          where: { riskId: id },
+        });
+        // Create new links
+        if (Array.isArray(assetIdsToUpdate) && assetIdsToUpdate.length > 0) {
+          await prisma.riskAsset.createMany({
+            data: assetIdsToUpdate.map((assetId: string) => ({
+              riskId: id,
+              assetId: assetId,
+            })),
+          });
+        }
+      }
 
       // Update control associations if annexAControlsRaw changed
       if (updateData.annexAControlsRaw !== undefined) {

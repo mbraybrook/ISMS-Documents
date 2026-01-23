@@ -71,9 +71,9 @@ interface Risk {
   } | null;
   ownerUserId: string | null;
   assetCategory: string | null;
-  assetId: string | null;
+  assetIds: string[] | null;
   assetCategoryId: string | null;
-  asset: {
+  assets: Array<{
     id: string;
     nameSerialNo: string | null;
     model: string | null;
@@ -81,7 +81,7 @@ interface Risk {
       id: string;
       name: string;
     };
-  } | null;
+  }> | null;
   linkedAssetCategory: {
     id: string;
     name: string;
@@ -669,12 +669,33 @@ export function RisksPage() {
   };
 
   const handleSort = (field: string) => {
-    setFilters({
-      ...filters,
-      sortBy: field,
-      sortOrder: filters.sortBy === field && filters.sortOrder === 'asc' ? 'desc' : 'asc',
-      page: 1, // Reset to first page when sorting
-    });
+    // If clicking a different field, sort ascending
+    if (filters.sortBy !== field) {
+      setFilters({
+        ...filters,
+        sortBy: field,
+        sortOrder: 'asc',
+        page: 1,
+      });
+    } 
+    // If clicking the same field and it's ascending, sort descending
+    else if (filters.sortOrder === 'asc') {
+      setFilters({
+        ...filters,
+        sortBy: field,
+        sortOrder: 'desc',
+        page: 1,
+      });
+    }
+    // If clicking the same field and it's descending, clear sort (reset to default)
+    else {
+      setFilters({
+        ...filters,
+        sortBy: 'calculatedScore',
+        sortOrder: 'desc',
+        page: 1,
+      });
+    }
   };
 
   const handleSelectRisk = (riskId: string, isSelected: boolean) => {
@@ -786,11 +807,16 @@ export function RisksPage() {
       header: 'Date Added',
       sortable: true,
       minW: '130px',
-      render: (risk) => (
-        <Text fontSize="sm">
-          {risk.dateAdded ? new Date(risk.dateAdded).toLocaleDateString() : 'N/A'}
-        </Text>
-      ),
+      render: (risk) => {
+        if (!risk.dateAdded) {
+          return <Text fontSize="xs" color="gray.400">—</Text>;
+        }
+        const date = new Date(risk.dateAdded);
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = monthNames[date.getMonth()];
+        const year = date.getFullYear().toString().slice(-2);
+        return <Text fontSize="sm">{`${month}-${year}`}</Text>;
+      },
     });
 
     if (visibleColumns.title) {
@@ -834,9 +860,9 @@ export function RisksPage() {
         minW: '150px',
         render: (risk) =>
           risk.riskCategory ? (
-            <Badge colorScheme="gray">{risk.riskCategory.replace(/_/g, ' ')}</Badge>
+            <Text fontSize="sm">{risk.riskCategory.replace(/_/g, ' ')}</Text>
           ) : (
-            <Text color="gray.400">N/A</Text>
+            <Text fontSize="xs" color="gray.400">—</Text>
           ),
       });
     }
@@ -864,7 +890,13 @@ export function RisksPage() {
         header: 'Owner',
         sortable: false,
         minW: '150px',
-        render: (risk) => <Text>{risk.owner ? risk.owner.displayName : 'N/A'}</Text>,
+        render: (risk) => (
+          risk.owner ? (
+            <Text fontSize="sm">{risk.owner.displayName}</Text>
+          ) : (
+            <Text fontSize="xs" color="gray.400">—</Text>
+          )
+        ),
       });
     }
 
@@ -874,19 +906,31 @@ export function RisksPage() {
       header: 'Asset/Category',
       sortable: false,
       minW: '200px',
-      render: (risk) => (
-        risk.asset ? (
-          <Badge colorScheme="blue" as="a" href={`/assets/assets`} cursor="pointer">
-            {risk.asset.nameSerialNo || risk.asset.model || 'Asset'} ({risk.asset.category.name})
-          </Badge>
-        ) : risk.linkedAssetCategory ? (
-          <Badge colorScheme="purple" as="a" href={`/assets/asset-categories`} cursor="pointer">
-            {risk.linkedAssetCategory.name}
-          </Badge>
-        ) : (
-          <Text fontSize="xs" color="gray.400">—</Text>
-        )
-      ),
+      render: (risk) => {
+        const parts: string[] = [];
+        if (risk.linkedAssetCategory) {
+          parts.push(`Category: ${risk.linkedAssetCategory.name}`);
+        }
+        if (risk.assets && risk.assets.length > 0) {
+          if (risk.assets.length === 1) {
+            parts.push(`Asset: ${risk.assets[0].nameSerialNo || risk.assets[0].model || 'Asset'}`);
+          } else {
+            parts.push(`${risk.assets.length} assets`);
+          }
+        }
+        if (parts.length === 0) {
+          return <Text fontSize="xs" color="gray.400">—</Text>;
+        }
+        return (
+          <VStack align="start" spacing={1}>
+            {parts.map((part, idx) => (
+              <Badge key={idx} colorScheme={idx === 0 && risk.linkedAssetCategory ? "purple" : "blue"} fontSize="xs">
+                {part}
+              </Badge>
+            ))}
+          </VStack>
+        );
+      },
     });
 
     // Interested Party is always visible
@@ -895,16 +939,18 @@ export function RisksPage() {
       header: 'Interested Party',
       sortable: false,
       minW: '200px',
-      render: (risk) => (
-        risk.interestedParty ? (
-          <Badge colorScheme="teal" as="a" href={`/admin/risks/interested-parties`} cursor="pointer">
+      render: (risk) => {
+        // Treat "Unspecified" as empty - show emdash instead
+        if (!risk.interestedParty || risk.interestedParty.name === 'Unspecified') {
+          return <Text fontSize="xs" color="gray.400">—</Text>;
+        }
+        return (
+          <Text fontSize="sm">
             {risk.interestedParty.name}
             {risk.interestedParty.group && ` (${risk.interestedParty.group})`}
-          </Badge>
-        ) : (
-          <Text fontSize="xs" color="gray.400">—</Text>
-        )
-      ),
+          </Text>
+        );
+      },
     });
 
     if (visibleColumns.cia) {
@@ -991,20 +1037,7 @@ export function RisksPage() {
           
           return risk.initialRiskTreatmentCategory ? (
             <HStack spacing={2}>
-              <Badge
-                colorScheme={
-                  risk.initialRiskTreatmentCategory === 'MODIFY' ? 'blue' :
-                    risk.initialRiskTreatmentCategory === 'RETAIN' ? 'green' :
-                      risk.initialRiskTreatmentCategory === 'SHARE' ? 'purple' :
-                        'red'
-                }
-                fontSize="sm"
-                px={3}
-                py={1}
-                minW="80px"
-              >
-                {risk.initialRiskTreatmentCategory}
-              </Badge>
+              <Text fontSize="sm">{risk.initialRiskTreatmentCategory}</Text>
               {hasNonConformance && (
                 <Tooltip label="Policy Non-Conformance: MODIFY risk without complete Additional Controls Assessment">
                   <Badge colorScheme="red" fontSize="xs" cursor="help">
@@ -1014,7 +1047,7 @@ export function RisksPage() {
               )}
             </HStack>
           ) : (
-            <Text fontSize="xs" color="gray.400" fontStyle="italic">N/A</Text>
+            <Text fontSize="xs" color="gray.400">—</Text>
           );
         },
       });
@@ -1099,9 +1132,9 @@ export function RisksPage() {
         sortable: false,
         render: (risk) =>
           risk.residualRiskTreatmentCategory ? (
-            <Badge colorScheme="green">{risk.residualRiskTreatmentCategory}</Badge>
+            <Text fontSize="sm">{risk.residualRiskTreatmentCategory}</Text>
           ) : (
-            <Text color="gray.400">N/A</Text>
+            <Text fontSize="xs" color="gray.400">—</Text>
           ),
       });
     }
@@ -1892,7 +1925,10 @@ export function RisksPage() {
                   setSearchInput(value);
                   // Actual filter update happens via debouncedSearch effect
                 } else if (key === 'archived') {
-                  setFilters({ ...filters, archived: value, page: 1 });
+                  // When removing the archived filter (empty string), change to 'all' to show all risks
+                  // Otherwise, use the provided value
+                  const archivedValue = value === '' ? 'all' : value;
+                  setFilters({ ...filters, archived: archivedValue, page: 1 });
                 } else {
                   setFilters({ ...filters, [key]: value, page: 1 });
                 }

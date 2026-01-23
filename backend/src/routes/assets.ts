@@ -99,7 +99,7 @@ router.get(
               },
             },
             _count: {
-              select: { Risk: true },
+              select: { riskAssets: true },
             },
           },
         }),
@@ -114,7 +114,7 @@ router.get(
           category: AssetCategory,
           classification: Classification,
           _count: _count ? {
-            risks: _count.Risk || 0,
+            risks: _count.riskAssets || 0,
           } : undefined,
         };
       });
@@ -148,12 +148,16 @@ router.get(
         include: {
           AssetCategory: true,
           Classification: true,
-          Risk: {
-            select: {
-              id: true,
-              title: true,
-              calculatedScore: true,
-              mitigatedScore: true,
+          riskAssets: {
+            include: {
+              risk: {
+                select: {
+                  id: true,
+                  title: true,
+                  calculatedScore: true,
+                  mitigatedScore: true,
+                },
+              },
             },
           },
         },
@@ -164,12 +168,12 @@ router.get(
       }
 
       // Map response to match frontend expectations
-      const { AssetCategory, Classification, Risk, ...rest } = asset;
+      const { AssetCategory, Classification, riskAssets, ...rest } = asset;
       const mappedAsset = {
         ...rest,
         category: AssetCategory,
         classification: Classification,
-        risks: Risk,
+        risks: riskAssets.map((ra: any) => ra.risk),
       };
 
       res.json(mappedAsset);
@@ -347,7 +351,7 @@ router.delete(
   async (req: AuthRequest, res: Response) => {
     try {
       // Check if asset is linked to any risks
-      const riskCount = await prisma.risk.count({
+      const riskCount = await prisma.riskAsset.count({
         where: { assetId: req.params.id },
       });
 

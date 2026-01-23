@@ -39,6 +39,9 @@ jest.mock('../../lib/prisma', () => ({
     risk: {
       count: jest.fn(),
     },
+    riskAsset: {
+      count: jest.fn(),
+    },
   },
 }));
 
@@ -117,7 +120,7 @@ describe('Assets API', () => {
           owner: 'Owner 1',
           AssetCategory: { id: 'cat-1', name: 'Category 1' },
           Classification: { id: 'class-1', name: 'Classification 1' },
-          _count: { Risk: 2 },
+          _count: { riskAssets: 2 },
         },
       ];
       prisma.asset.findMany.mockResolvedValue(mockAssets);
@@ -316,7 +319,7 @@ describe('Assets API', () => {
           nameSerialNo: 'Asset 1',
           AssetCategory: { id: validCategoryId, name: 'Category 1' },
           Classification: { id: validClassificationId, name: 'Classification 1' },
-          _count: { Risk: null }, // Risk count is null/undefined
+          _count: { riskAssets: null }, // Risk count is null/undefined
         },
       ];
       prisma.asset.findMany.mockResolvedValue(mockAssets);
@@ -439,8 +442,8 @@ describe('Assets API', () => {
         nameSerialNo: 'Asset 1',
         AssetCategory: { id: validCategoryId, name: 'Category 1' },
         Classification: { id: validClassificationId, name: 'Classification 1' },
-        Risk: [
-          { id: '550e8400-e29b-41d4-a716-446655440004', title: 'Risk 1', calculatedScore: 10, mitigatedScore: 5 },
+        riskAssets: [
+          { risk: { id: '550e8400-e29b-41d4-a716-446655440004', title: 'Risk 1', calculatedScore: 10, mitigatedScore: 5 } },
         ],
       };
       prisma.asset.findUnique.mockResolvedValue(mockAsset);
@@ -921,7 +924,7 @@ describe('Assets API', () => {
   describe('DELETE /api/assets/:id', () => {
     it('should delete asset successfully when not linked to risks', async () => {
       // Arrange
-      prisma.risk.count.mockResolvedValue(0);
+      prisma.riskAsset.count.mockResolvedValue(0);
       prisma.asset.delete.mockResolvedValue({ id: validAssetId });
 
       // Act
@@ -930,7 +933,7 @@ describe('Assets API', () => {
         .expect(204);
 
       // Assert
-      expect(prisma.risk.count).toHaveBeenCalledWith({
+      expect(prisma.riskAsset.count).toHaveBeenCalledWith({
         where: { assetId: validAssetId },
       });
       expect(prisma.asset.delete).toHaveBeenCalledWith({
@@ -940,7 +943,7 @@ describe('Assets API', () => {
 
     it('should return 409 when asset is linked to risks', async () => {
       // Arrange
-      prisma.risk.count.mockResolvedValue(3);
+      prisma.riskAsset.count.mockResolvedValue(3);
 
       // Act
       const response = await request(app)
@@ -961,7 +964,7 @@ describe('Assets API', () => {
 
     it('should return 404 when asset not found', async () => {
       // Arrange
-      prisma.risk.count.mockResolvedValue(0);
+      prisma.riskAsset.count.mockResolvedValue(0);
       const error: any = new Error('Record not found');
       error.code = 'P2025';
       prisma.asset.delete.mockRejectedValue(error);
@@ -977,7 +980,7 @@ describe('Assets API', () => {
 
     it('should return 500 when database error occurs', async () => {
       // Arrange
-      prisma.risk.count.mockResolvedValue(0);
+      prisma.riskAsset.count.mockResolvedValue(0);
       prisma.asset.delete.mockRejectedValue(new Error('Database error'));
 
       // Act

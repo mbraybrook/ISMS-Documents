@@ -1,1 +1,1 @@
-Create comprehensive test coverage for the below file review our testing rules at .cursor/rules/testing.mdc to ensure compliance test coverage for the file must be at least 80%. The file is: 
+Create comprehensive test coverage for the below file review our testing rules at .cursor/rules/testing.mdc to ensure compliance test coverage for the file must be at least 80%. Use Context7 MCP for guidance on coding standards and syntax. The file is: 

@@ -99,9 +99,9 @@ describe('DepartmentRiskTable', () => {
       rejectionReason: null,
       mergedIntoRiskId: null,
       assetCategory: null,
-      assetId: null,
+      assetIds: null,
       assetCategoryId: null,
-      asset: null,
+      assets: null,
       linkedAssetCategory: null,
       interestedParty: null,
       threatDescription: null,
@@ -148,9 +148,9 @@ describe('DepartmentRiskTable', () => {
       rejectionReason: null,
       mergedIntoRiskId: null,
       assetCategory: null,
-      assetId: null,
+      assetIds: null,
       assetCategoryId: null,
-      asset: null,
+      assets: null,
       linkedAssetCategory: null,
       interestedParty: null,
       threatDescription: null,
@@ -1189,7 +1189,7 @@ describe('DepartmentRiskTable', () => {
 
       // Assert
       await waitFor(() => {
-        expect(screen.getByText('N/A')).toBeInTheDocument();
+        expect(screen.getByText('—')).toBeInTheDocument();
       });
     });
 
@@ -1211,7 +1211,7 @@ describe('DepartmentRiskTable', () => {
 
       // Assert
       await waitFor(() => {
-        expect(screen.getByText('N/A')).toBeInTheDocument();
+        expect(screen.getByText('—')).toBeInTheDocument();
       });
     });
   });

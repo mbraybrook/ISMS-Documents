@@ -98,7 +98,7 @@ describe('similarityService', () => {
         email: 'test@paythru.com',
       },
       assetCategory: null,
-      asset: null,
+      riskAssets: [],
       interestedParty: null,
       ...overrides,
     });
@@ -225,15 +225,19 @@ describe('similarityService', () => {
       // Arrange
       const otherRisk = createMockRisk({
         id: 'risk-2',
-        asset: {
-          id: 'asset-1',
-          nameSerialNo: 'Asset 1',
-          model: 'Model 1',
-          AssetCategory: {
-            id: 'cat-1',
-            name: 'Category 1',
+        riskAssets: [
+          {
+            asset: {
+              id: 'asset-1',
+              nameSerialNo: 'Asset 1',
+              model: 'Model 1',
+              AssetCategory: {
+                id: 'cat-1',
+                name: 'Category 1',
+              },
+            },
           },
-        },
+        ],
       });
       mockPrisma.risk.findUnique.mockResolvedValue(mockRisk);
       mockPrisma.risk.findMany.mockResolvedValue([otherRisk]);
@@ -259,7 +263,7 @@ describe('similarityService', () => {
       // Arrange
       const otherRisk = createMockRisk({
         id: 'risk-2',
-        asset: null,
+        riskAssets: [],
       });
       mockPrisma.risk.findUnique.mockResolvedValue(mockRisk);
       mockPrisma.risk.findMany.mockResolvedValue([otherRisk]);
@@ -347,7 +351,7 @@ describe('similarityService', () => {
         email: 'test@paythru.com',
       },
       assetCategory: null,
-      asset: null,
+      riskAssets: [],
       interestedParty: null,
       ...overrides,
     });
@@ -626,15 +630,19 @@ describe('similarityService', () => {
       const existingRisk = createMockRisk({
         id: 'risk-1',
         title: 'Exact Match Risk',
-        asset: {
-          id: 'asset-1',
-          nameSerialNo: 'Asset 1',
-          model: 'Model 1',
-          AssetCategory: {
-            id: 'cat-1',
-            name: 'Category 1',
+        riskAssets: [
+          {
+            asset: {
+              id: 'asset-1',
+              nameSerialNo: 'Asset 1',
+              model: 'Model 1',
+              AssetCategory: {
+                id: 'cat-1',
+                name: 'Category 1',
+              },
+            },
           },
-        },
+        ],
       });
       mockPrisma.risk.findMany.mockResolvedValue([existingRisk]);
 
@@ -655,15 +663,19 @@ describe('similarityService', () => {
       const riskData = { title: 'New Risk Title' };
       const existingRisk = createMockRisk({
         id: 'risk-1',
-        asset: {
-          id: 'asset-1',
-          nameSerialNo: 'Asset 1',
-          model: 'Model 1',
-          AssetCategory: {
-            id: 'cat-1',
-            name: 'Category 1',
+        riskAssets: [
+          {
+            asset: {
+              id: 'asset-1',
+              nameSerialNo: 'Asset 1',
+              model: 'Model 1',
+              AssetCategory: {
+                id: 'cat-1',
+                name: 'Category 1',
+              },
+            },
           },
-        },
+        ],
       });
       mockPrisma.risk.findMany.mockResolvedValue([existingRisk]);
       mockNormalizeRiskText.mockReturnValue('normalized text');
@@ -688,7 +700,7 @@ describe('similarityService', () => {
       const riskData = { title: 'New Risk Title' };
       const existingRisk = createMockRisk({
         id: 'risk-1',
-        asset: null,
+        riskAssets: [],
       });
       mockPrisma.risk.findMany.mockResolvedValue([existingRisk]);
       mockNormalizeRiskText.mockReturnValue('normalized text');

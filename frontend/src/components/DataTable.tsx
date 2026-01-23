@@ -341,7 +341,8 @@ export function DataTable<T>({
             <Wrap spacing={2} mt={2}>
               {filters.map((filter) => {
                 const value = filterValues[filter.key];
-                if (!value || value === '' || value === false) return null;
+                // Don't show lozenge for empty values, false, or 'all' (which means show all/no filter)
+                if (!value || value === '' || value === false || value === 'all') return null;
 
                 let displayValue = String(value);
                 const filterLabel = filter.label || filter.key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());

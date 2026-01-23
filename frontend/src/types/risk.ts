@@ -46,9 +46,9 @@ export interface Risk {
   rejectionReason: string | null;
   mergedIntoRiskId: string | null;
   assetCategory: string | null;
-  assetId: string | null;
+  assetIds: string[] | null;
   assetCategoryId: string | null;
-  asset: {
+  assets: Array<{
     id: string;
     nameSerialNo: string | null;
     model: string | null;
@@ -56,7 +56,7 @@ export interface Risk {
       id: string;
       name: string;
     };
-  } | null;
+  }> | null;
   linkedAssetCategory: {
     id: string;
     name: string;

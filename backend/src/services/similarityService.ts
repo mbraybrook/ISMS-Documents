@@ -86,18 +86,23 @@ export async function findSimilarRisksForRisk(riskId: string, limit: number = 10
           },
         },
         assetCategory: true,
-        asset: {
+        riskAssets: {
           select: {
-            id: true,
-            nameSerialNo: true,
-            model: true,
-            AssetCategory: {
+            asset: {
               select: {
                 id: true,
-                name: true,
+                nameSerialNo: true,
+                model: true,
+                AssetCategory: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
           },
+          take: 1, // Take first asset for backward compatibility
         },
         interestedParty: {
           select: {
@@ -134,12 +139,14 @@ export async function findSimilarRisksForRisk(riskId: string, limit: number = 10
         if (!fullRisk) return null;
 
         // Transform AssetCategory to category for frontend compatibility
+        // Handle many-to-many relationship: take first asset for backward compatibility
+        const firstAsset = fullRisk.riskAssets && fullRisk.riskAssets.length > 0 ? fullRisk.riskAssets[0].asset : null;
         const transformedRisk = {
           ...fullRisk,
-          asset: fullRisk.asset
+          asset: firstAsset
             ? {
-                ...fullRisk.asset,
-                category: fullRisk.asset.AssetCategory || null,
+                ...firstAsset,
+                category: firstAsset.AssetCategory || null,
               }
             : null,
         };
@@ -208,18 +215,23 @@ export async function checkSimilarityForNewRisk(
           },
         },
         assetCategory: true,
-        asset: {
+        riskAssets: {
           select: {
-            id: true,
-            nameSerialNo: true,
-            model: true,
-            AssetCategory: {
+            asset: {
               select: {
                 id: true,
-                name: true,
+                nameSerialNo: true,
+                model: true,
+                AssetCategory: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
           },
+          take: 1, // Take first asset for backward compatibility
         },
         interestedParty: {
           select: {
@@ -243,14 +255,16 @@ export async function checkSimilarityForNewRisk(
     );
 
     if (exactMatches.length > 0) {
-      return exactMatches.slice(0, limit).map((r: { id: string; title: string; asset: { AssetCategory: unknown } | null }) => {
+      return exactMatches.slice(0, limit).map((r: { id: string; title: string; riskAssets: Array<{ asset: { AssetCategory: unknown } | null }> | null }) => {
         // Transform AssetCategory to category for frontend compatibility
+        // Handle many-to-many relationship: take first asset for backward compatibility
+        const firstAsset = r.riskAssets && r.riskAssets.length > 0 ? r.riskAssets[0].asset : null;
         const transformedRisk = {
           ...r,
-          asset: r.asset
+          asset: firstAsset
             ? {
-                ...r.asset,
-                category: r.asset.AssetCategory || null,
+                ...firstAsset,
+                category: firstAsset.AssetCategory || null,
               }
             : null,
         };
@@ -286,12 +300,14 @@ export async function checkSimilarityForNewRisk(
         if (!fullRisk) return null;
 
         // Transform AssetCategory to category for frontend compatibility
+        // Handle many-to-many relationship: take first asset for backward compatibility
+        const firstAsset = fullRisk.riskAssets && fullRisk.riskAssets.length > 0 ? fullRisk.riskAssets[0].asset : null;
         const transformedRisk = {
           ...fullRisk,
-          asset: fullRisk.asset
+          asset: firstAsset
             ? {
-                ...fullRisk.asset,
-                category: fullRisk.asset.AssetCategory || null,
+                ...firstAsset,
+                category: firstAsset.AssetCategory || null,
               }
             : null,
         };
