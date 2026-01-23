@@ -753,18 +753,20 @@ describe('DepartmentRiskTable', () => {
   });
 
   describe('Department Filtering Logic', () => {
-    it('should not pre-filter by user department on mount - Contributors can view all risks', async () => {
+    it('should pre-filter by user department on mount - Contributors see their department by default', async () => {
       // Arrange
       mockGetUserDepartment.mockReturnValue('HR');
+      // Clear sessionStorage to ensure initial filter is set
+      sessionStorage.removeItem('contributorRiskFilterInitialized');
 
       // Act
       render(<DepartmentRiskTable />);
 
-      // Assert - Contributors can now view all risks by default (no department pre-filter)
+      // Assert - Contributors see their department's risks by default
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/api/risks', expect.objectContaining({
-          params: expect.not.objectContaining({
-            department: expect.anything(),
+          params: expect.objectContaining({
+            department: 'HR',
           }),
         }));
       });
@@ -792,6 +794,64 @@ describe('DepartmentRiskTable', () => {
           }),
         }));
       });
+    });
+
+    it('should allow clearing department filter and not re-set it automatically', async () => {
+      // Arrange
+      mockGetUserDepartment.mockReturnValue('HR');
+      
+      const user = userEvent.setup();
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          data: mockRisks,
+          pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+        },
+      });
+
+      // Act - Render component (department filter will be set to HR initially)
+      render(<DepartmentRiskTable />);
+      
+      // Wait for initial render with department filter
+      await waitFor(() => {
+        expect(api.get).toHaveBeenCalledWith('/api/risks', expect.objectContaining({
+          params: expect.objectContaining({
+            department: 'HR',
+          }),
+        }));
+      });
+      
+      // Clear the department filter by selecting "All Departments" option
+      const selects = screen.getAllByRole('combobox');
+      const departmentSelect = Array.from(selects).find((select) => {
+        const options = Array.from(select.querySelectorAll('option'));
+        return options.some((opt) => opt.textContent === 'All Departments');
+      });
+      
+      if (departmentSelect) {
+        await user.selectOptions(departmentSelect, '');
+        
+        // Assert - Filter should be cleared and API should be called without department param
+        await waitFor(() => {
+          const calls = vi.mocked(api.get).mock.calls;
+          const lastCall = calls[calls.length - 1];
+          expect(lastCall[1]).toEqual(expect.objectContaining({
+            params: expect.not.objectContaining({
+              department: expect.anything(),
+            }),
+          }));
+        });
+        
+        // Verify filter stays cleared (not re-set by useEffect) - make another API call
+        // by triggering a re-render or filter change
+        await waitFor(() => {
+          const calls = vi.mocked(api.get).mock.calls;
+          // Check that the last call doesn't have department param
+          const lastCall = calls[calls.length - 1];
+          expect(lastCall[1].params.department).toBeUndefined();
+        });
+      } else {
+        throw new Error('Department select not found');
+      }
     });
 
     it('should clear department filter completely when clear filters is clicked', async () => {

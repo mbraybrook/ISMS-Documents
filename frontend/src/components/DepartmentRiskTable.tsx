@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Box,
   Heading,
@@ -61,6 +61,9 @@ export function DepartmentRiskTable() {
   // Determine effective department (test override or real department)
   const effectiveDepartment = testDepartment || department;
   
+  // Track if we've initialized the department filter to prevent re-setting after user clears it
+  const hasInitializedDepartmentFilter = useRef(false);
+  
   // Filters and pagination - start with empty department filter to allow viewing all risks
   const [filters, setFilters] = useState({
     riskCategory: '',
@@ -101,25 +104,23 @@ export function DepartmentRiskTable() {
     setSearchInput(filters.search);
   }, [filters.search]);
 
-  // Only set department filter on initial mount if user is Contributor (not in test mode)
-  // This allows Contributors to see all risks by default, but they can filter by department if needed
-  // In test mode (testDepartment set), automatically set the department filter to enable testing
+  // Set department filter to user's department on initial mount only
+  // This allows Contributors to see their department's risks by default
+  // Users can then clear or change the filter to view all risks or other departments
   useEffect(() => {
     // In test mode, automatically set department filter to testDepartment
-    if (testDepartment && filters.department === '') {
+    if (testDepartment && filters.department === '' && !hasInitializedDepartmentFilter.current) {
       setFilters(prev => ({ ...prev, department: testDepartment }));
+      hasInitializedDepartmentFilter.current = true;
       return;
     }
     
-    // Only auto-set on initial load if we have an effective department and no filter is set
-    // Don't force it if user has cleared the filter
-    if (effectiveDepartment && filters.department === '' && !testDepartment) {
-      // Only set on initial mount - check if this is the first render
-      const hasSetInitialFilter = sessionStorage.getItem('contributorRiskFilterInitialized');
-      if (!hasSetInitialFilter) {
-        sessionStorage.setItem('contributorRiskFilterInitialized', 'true');
-        // Don't auto-set - let Contributors see all risks by default
-      }
+    // Only auto-set on initial mount if we have an effective department and no filter is set
+    // Use a ref to ensure we only set it once, even if the component re-renders
+    if (effectiveDepartment && filters.department === '' && !testDepartment && !hasInitializedDepartmentFilter.current) {
+      // Set the department filter to user's department on initial load
+      setFilters(prev => ({ ...prev, department: effectiveDepartment }));
+      hasInitializedDepartmentFilter.current = true;
     }
   }, [effectiveDepartment, filters.department, testDepartment]);
 
@@ -302,7 +303,10 @@ export function DepartmentRiskTable() {
       key: 'department',
       type: 'select',
       placeholder: 'Department',
-      options: DEPARTMENTS,
+      options: [
+        { value: '', label: 'All Departments' },
+        ...DEPARTMENTS,
+      ],
     },
     {
       key: 'riskLevel',
@@ -509,10 +513,17 @@ export function DepartmentRiskTable() {
             if (key === 'search') {
               setSearchInput(value);
             } else {
+              // When user explicitly clears department filter, mark as initialized to prevent re-setting
+              if (key === 'department' && value === '') {
+                hasInitializedDepartmentFilter.current = true;
+              }
               setFilters({ ...filters, [key]: value, page: 1 });
             }
           }}
           onClearFilters={() => {
+            // Mark department filter as initialized when user clears all filters
+            // This prevents useEffect from re-setting it
+            hasInitializedDepartmentFilter.current = true;
             setFilters({
               riskCategory: '',
               riskNature: '',

@@ -637,10 +637,10 @@ export function RisksPage() {
 
   const isAdminOrEditor = user?.role === 'ADMIN' || user?.role === 'EDITOR';
 
-  const getScoreColor = (score: number): string => {
-    if (score >= 36) return 'red';
-    if (score >= 15) return 'orange';
-    return 'yellow';
+  const getRiskLevel = (score: number): 'LOW' | 'MEDIUM' | 'HIGH' => {
+    if (score >= 36) return 'HIGH';
+    if (score >= 15) return 'MEDIUM';
+    return 'LOW';
   };
 
   const getRiskLevelColor = (level: 'LOW' | 'MEDIUM' | 'HIGH'): string => {
@@ -654,6 +654,12 @@ export function RisksPage() {
       default:
         return 'gray';
     }
+  };
+
+  // Get color for score badge - uses risk level color for consistency
+  const getScoreColor = (score: number): string => {
+    const level = getRiskLevel(score);
+    return getRiskLevelColor(level);
   };
 
   const getRowBgColor = (risk: Risk): string => {
@@ -1107,20 +1113,33 @@ export function RisksPage() {
         key: 'mitigatedScore',
         header: 'Mitigated Score',
         sortable: true,
+        minW: '120px',
         render: (risk) =>
-          risk.mitigatedScore !== null ? (
-            <VStack spacing={1} align="start">
-              <Badge colorScheme={getScoreColor(risk.mitigatedScore)}>
-                {risk.mitigatedScore}
-              </Badge>
-              {risk.mitigatedRiskLevel && (
-                <Badge colorScheme={getRiskLevelColor(risk.mitigatedRiskLevel)} size="sm">
+          risk.mitigatedScore !== null && risk.mitigatedRiskLevel ? (
+            <Box bg={`${getRiskLevelColor(risk.mitigatedRiskLevel)}.50`} px={3} py={2}>
+              <VStack spacing={1} align="center">
+                <Badge
+                  colorScheme={getScoreColor(risk.mitigatedScore)}
+                  fontSize="md"
+                  px={3}
+                  py={1}
+                  minW="60px"
+                >
+                  {risk.mitigatedScore}
+                </Badge>
+                <Badge
+                  colorScheme={getRiskLevelColor(risk.mitigatedRiskLevel)}
+                  size="md"
+                  px={3}
+                  py={1}
+                  minW="60px"
+                >
                   {risk.mitigatedRiskLevel}
                 </Badge>
-              )}
-            </VStack>
+              </VStack>
+            </Box>
           ) : (
-            <Text color="gray.400">-</Text>
+            <Text color="gray.400">—</Text>
           ),
       });
     }
