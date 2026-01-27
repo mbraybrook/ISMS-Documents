@@ -223,7 +223,13 @@ export function Layout({ children }: LayoutProps) {
           <Flex py={{ base: 3, md: 4 }} justify="space-between" align="center">
             <Link as={RouterLink} to={effectiveRole === 'STAFF' || effectiveRole === 'CONTRIBUTOR' ? '/admin/staff' : '/admin'}>
               <Heading size="md">
-                <Image src={bannerImage} height={{ base: 60, md: 100 }} alt="Paythru Trust Centre" />
+                <Image 
+                  src={bannerImage} 
+                  maxH={{ base: 50, md: 100 }} 
+                  h="auto"
+                  w="auto"
+                  alt="Paythru Trust Centre" 
+                />
               </Heading>
             </Link>
             <Flex gap={4} align="center">
