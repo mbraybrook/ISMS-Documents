@@ -121,7 +121,7 @@ export async function getRiskDashboardSummaryWithFilters(
   const now = new Date();
   const baseWhere: {
     OR: Array<{ archived: boolean; archivedDate?: { gt: Date } | null }>;
-    department?: string;
+    departmentId?: string;
     riskCategory?: string;
     ownerUserId?: string;
     status?: string;
@@ -134,7 +134,22 @@ export async function getRiskDashboardSummaryWithFilters(
   };
 
   if (filters.department) {
-    baseWhere.department = filters.department;
+    // Support both departmentId (UUID) and department name (legacy)
+    // Check if it's a UUID
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.department)) {
+      baseWhere.departmentId = filters.department;
+    } else {
+      // Legacy: department name - need to look up ID
+      const dept = await prisma.department.findUnique({
+        where: { name: filters.department },
+      });
+      if (dept) {
+        baseWhere.departmentId = dept.id;
+      } else {
+        // Department not found - return empty results
+        baseWhere.departmentId = '00000000-0000-0000-0000-000000000000';
+      }
+    }
   }
   if (filters.riskCategory) {
     baseWhere.riskCategory = filters.riskCategory;
@@ -151,7 +166,13 @@ export async function getRiskDashboardSummaryWithFilters(
     select: {
       id: true,
       title: true,
-      department: true,
+      departmentId: true,
+      department: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
       riskCategory: true,
       status: true,
       dateAdded: true,
@@ -383,7 +404,7 @@ export async function getRiskDashboardSummaryWithFilters(
     const residualLevel = getRiskLevel(residualScore);
     residualLevels[residualLevel]++;
 
-    const departmentKey = risk.department || 'UNASSIGNED';
+    const departmentKey = risk.department?.name || (risk.departmentId || 'UNASSIGNED');
     if (!by_department[departmentKey]) {
       by_department[departmentKey] = { inherent: baseLevel(), residual: baseLevel() };
     }

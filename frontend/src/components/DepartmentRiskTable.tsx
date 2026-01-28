@@ -33,20 +33,14 @@ const RISK_CATEGORIES = [
 
 const RISK_NATURES = ['STATIC', 'INSTANCE'];
 
-const DEPARTMENTS = [
-  { value: 'BUSINESS_STRATEGY', label: 'Business Strategy' },
-  { value: 'FINANCE', label: 'Finance' },
-  { value: 'HR', label: 'HR' },
-  { value: 'OPERATIONS', label: 'Operations' },
-  { value: 'PRODUCT', label: 'Product' },
-  { value: 'MARKETING', label: 'Marketing' },
-];
+// DEPARTMENTS will be fetched from API - see fetchDepartments function
 
 export function DepartmentRiskTable() {
   const toast = useToast();
   const { user, getUserDepartment, roleOverride } = useAuth();
   const [risks, setRisks] = useState<Risk[]>([]);
   const [loading, setLoading] = useState(true);
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
   const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
@@ -181,6 +175,39 @@ export function DepartmentRiskTable() {
     fetchRisks();
   }, [fetchRisks]);
 
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const response = await api.get('/api/departments');
+      setDepartments(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      setDepartments([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDepartments();
+  }, [fetchDepartments]);
+
+  // Refetch departments when window regains focus or page becomes visible
+  // (user might have added a new department in another tab or navigated back)
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchDepartments();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchDepartments();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchDepartments]);
+
   const handleEdit = useCallback((risk: Risk) => {
     // Check if risk belongs to Contributor's department
     const riskDepartment = risk.department;
@@ -270,7 +297,7 @@ export function DepartmentRiskTable() {
     return 'yellow';
   };
 
-  const filterConfigs: FilterConfig[] = [
+  const filterConfigs: FilterConfig[] = useMemo(() => [
     {
       key: 'search',
       type: 'search',
@@ -305,7 +332,7 @@ export function DepartmentRiskTable() {
       placeholder: 'Department',
       options: [
         { value: '', label: 'All Departments' },
-        ...DEPARTMENTS,
+        ...departments.map(dept => ({ value: dept.id, label: dept.name })),
       ],
     },
     {
@@ -318,7 +345,7 @@ export function DepartmentRiskTable() {
         { value: 'HIGH', label: 'High' },
       ],
     },
-  ];
+  ], [departments]);
 
   const buildColumns = useMemo((): Column<Risk>[] => {
     return [

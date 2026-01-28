@@ -52,6 +52,14 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
     let user: User | null = await retryDbOperation(() =>
       prisma.user.findUnique({
         where: { email: email },
+        include: {
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       })
     );
 
@@ -60,6 +68,14 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res: Response) 
       user = await retryDbOperation(() =>
         prisma.user.findFirst({
           where: { entraObjectId: oid },
+          include: {
+            department: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
         })
       );
     }

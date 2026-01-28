@@ -285,7 +285,7 @@ describe('RiskReviewQueue', () => {
       // Assert
       await waitFor(() => {
         expect(screen.getByText('Test Risk 1')).toBeInTheDocument();
-        expect(screen.getByText('Finance')).toBeInTheDocument();
+        expect(screen.getByText('FINANCE')).toBeInTheDocument();
         expect(screen.getByText('John Doe')).toBeInTheDocument();
         expect(screen.getByText('36 (HIGH)')).toBeInTheDocument();
       });
@@ -1186,9 +1186,9 @@ describe('RiskReviewQueue', () => {
 
       // Assert
       await waitFor(() => {
-        expect(screen.getAllByText('Finance').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('FINANCE').length).toBeGreaterThan(0);
         expect(screen.getByText('HR')).toBeInTheDocument();
-        expect(screen.getByText('Operations')).toBeInTheDocument();
+        expect(screen.getByText('OPERATIONS')).toBeInTheDocument();
       });
     });
   });

@@ -59,6 +59,14 @@ describe('requireRole middleware', () => {
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { email: adminUser.email },
+      include: {
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
     expect(nextFunction).toHaveBeenCalled();
     expect(mockResponse.status).not.toHaveBeenCalled();

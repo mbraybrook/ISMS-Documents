@@ -142,10 +142,14 @@ jest.mock('../middleware/errorHandler', () => ({
   },
 }));
 
-// Mock config
+// Mock config (auth.tenantId and databaseUrl required when app loads routes that import auth/prisma)
 jest.mock('../config', () => ({
   config: {
     nodeEnv: 'development',
+    auth: {
+      tenantId: 'test-tenant-id',
+    },
+    databaseUrl: 'postgresql://test:test@localhost:5432/test?schema=public',
     cors: {
       trustCenterOrigins: ['https://trust.paythru.com', 'https://trust.*.paythru.com'],
     },

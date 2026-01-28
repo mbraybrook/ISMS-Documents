@@ -122,8 +122,8 @@ describe('StaffRiskTable', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Test Risk')).toBeInTheDocument();
-      // Find Operations in a badge (table cell), not in the filter dropdown
-      const operationsBadge = screen.getAllByText('Operations').find(
+      // getDepartmentDisplayName returns string as-is, so department 'OPERATIONS' displays as 'OPERATIONS'
+      const operationsBadge = screen.getAllByText('OPERATIONS').find(
         (el) => el.closest('td') !== null
       );
       expect(operationsBadge).toBeInTheDocument();

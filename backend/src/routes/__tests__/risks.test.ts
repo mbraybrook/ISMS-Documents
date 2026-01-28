@@ -37,6 +37,9 @@ jest.mock('../../lib/prisma', () => ({
     user: {
       findUnique: jest.fn(),
     },
+    department: {
+      findUnique: jest.fn(),
+    },
     interestedParty: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
@@ -571,18 +574,26 @@ describe('Risks API', () => {
     });
 
     it('should filter by department when provided for ADMIN/EDITOR', async () => {
+      const operationsDeptId = '11111111-1111-1111-1111-111111111111';
       prisma.risk.findMany.mockResolvedValue([]);
       prisma.risk.count.mockResolvedValue(0);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+      prisma.department.findUnique.mockResolvedValue({
+        id: operationsDeptId,
+        name: 'OPERATIONS',
+      });
 
       await request(app)
         .get('/api/risks?department=OPERATIONS')
         .expect(200);
 
+      expect(prisma.department.findUnique).toHaveBeenCalledWith({
+        where: { name: 'OPERATIONS' },
+      });
       expect(prisma.risk.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            department: 'OPERATIONS',
+            departmentId: operationsDeptId,
           }),
         })
       );
@@ -754,18 +765,26 @@ describe('Risks API', () => {
     });
 
     it('should handle testDepartment parameter for ADMIN', async () => {
+      const operationsDeptId = '11111111-1111-1111-1111-111111111111';
       prisma.risk.findMany.mockResolvedValue([]);
       prisma.risk.count.mockResolvedValue(0);
       prisma.user.findUnique.mockResolvedValue(mockUsers.admin());
+      prisma.department.findUnique.mockResolvedValue({
+        id: operationsDeptId,
+        name: 'OPERATIONS',
+      });
 
       await request(app)
         .get('/api/risks?view=department&testDepartment=OPERATIONS')
         .expect(200);
 
+      expect(prisma.department.findUnique).toHaveBeenCalledWith({
+        where: { name: 'OPERATIONS' },
+      });
       expect(prisma.risk.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            department: 'OPERATIONS',
+            departmentId: operationsDeptId,
           }),
         })
       );
@@ -970,6 +989,10 @@ describe('Risks API', () => {
       prisma.risk.create.mockResolvedValue(newRisk);
       prisma.risk.findUnique.mockResolvedValue(newRisk);
       prisma.user.findUnique.mockResolvedValue(contributorUser);
+      prisma.department.findUnique.mockResolvedValue({
+        id: '11111111-1111-1111-1111-111111111111',
+        name: 'OPERATIONS',
+      });
 
       await request(app)
         .post('/api/risks')
@@ -1101,13 +1124,14 @@ describe('Risks API', () => {
     });
 
     it('should enforce department for CONTRIBUTOR users', async () => {
+      const operationsDeptId = '11111111-1111-1111-1111-111111111111';
       const contributorUser = mockUsers.contributor('OPERATIONS');
       const partyId = '550e8400-e29b-41d4-a716-446655440010';
       const newRisk = {
         id: '550e8400-e29b-41d4-a716-446655440020',
         title: 'New Risk',
         calculatedScore: 18,
-        department: 'OPERATIONS',
+        departmentId: operationsDeptId,
         owner: {
           id: '550e8400-e29b-41d4-a716-446655440030',
           displayName: 'Test Owner',
@@ -1120,6 +1144,10 @@ describe('Risks API', () => {
       prisma.interestedParty.findUnique.mockResolvedValue({ id: partyId });
       prisma.risk.create.mockResolvedValue(newRisk);
       prisma.risk.findUnique.mockResolvedValue(newRisk);
+      prisma.department.findUnique.mockResolvedValue({
+        id: operationsDeptId,
+        name: 'OPERATIONS',
+      });
 
       const _response = await request(app)
         .post('/api/risks')
@@ -1131,7 +1159,7 @@ describe('Risks API', () => {
       expect(prisma.risk.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            department: 'OPERATIONS',
+            departmentId: operationsDeptId,
           }),
         })
       );
@@ -1184,6 +1212,10 @@ describe('Risks API', () => {
       prisma.risk.create.mockResolvedValue(newRisk);
       prisma.risk.findUnique.mockResolvedValue(newRisk);
       prisma.user.findUnique.mockResolvedValue(contributorUser);
+      prisma.department.findUnique.mockResolvedValue({
+        id: '11111111-1111-1111-1111-111111111111',
+        name: 'OPERATIONS',
+      });
 
       await request(app)
         .post('/api/risks')
@@ -1603,6 +1635,7 @@ describe('Risks API', () => {
 
     it('should allow ADMIN to test as CONTRIBUTOR with testDepartment', async () => {
       const riskId = '550e8400-e29b-41d4-a716-446655440001';
+      const operationsDeptId = '11111111-1111-1111-1111-111111111111';
       const existingRisk = {
         id: riskId,
         title: 'Existing Risk',
@@ -1627,6 +1660,10 @@ describe('Risks API', () => {
         .mockResolvedValueOnce(updatedRisk);
       prisma.risk.update.mockResolvedValue(updatedRisk);
       prisma.user.findUnique.mockResolvedValue(adminUser);
+      prisma.department.findUnique.mockResolvedValue({
+        id: operationsDeptId,
+        name: 'OPERATIONS',
+      });
 
       await request(app)
         .put(`/api/risks/${riskId}?testDepartment=OPERATIONS`)

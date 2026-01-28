@@ -27,6 +27,7 @@ import { StaffAcknowledgmentPage } from './pages/StaffAcknowledgmentPage'
 import { StaffDocumentsPage } from './pages/StaffDocumentsPage'
 import { UnauthorizedPage } from './pages/UnauthorizedPage'
 import { UsersPage } from './pages/UsersPage'
+import { DepartmentsPage } from './pages/DepartmentsPage'
 import { TrustAuthProvider } from './contexts/TrustAuthContext'
 import { TrustCenterPage } from './pages/TrustCenterPage'
 import { TrustCenterLoginPage } from './pages/TrustCenterLoginPage'
@@ -245,6 +246,16 @@ function App() {
               <ProtectedRoute requiredRole="ADMIN">
                 <Layout>
                   <UsersPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/departments"
+            element={
+              <ProtectedRoute requiredRole="ADMIN">
+                <Layout>
+                  <DepartmentsPage />
                 </Layout>
               </ProtectedRoute>
             }

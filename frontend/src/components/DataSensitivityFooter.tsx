@@ -20,7 +20,7 @@ export function DataSensitivityFooter() {
         color="gray.400"
         opacity={0.7}
       >
-        Paythru Confidential • v-{APP_VERSION}
+        Paythru Confidential • v{APP_VERSION}
       </Text>
     </Box>
   )

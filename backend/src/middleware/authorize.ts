@@ -14,6 +14,14 @@ export const requireRole = (...allowedRoles: UserRole[]) => {
     try {
       const user = await prisma.user.findUnique({
         where: { email: req.user.email },
+        include: {
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       });
 
       if (!user) {
@@ -27,7 +35,10 @@ export const requireRole = (...allowedRoles: UserRole[]) => {
       }
 
       // Attach user object with role and department to request
-      req.user = { ...req.user, role: user.role, department: user.department } as any;
+      // Support both departmentId (new) and department name (legacy)
+      const userDepartment = (user as any).department?.name || (user as any).department || null;
+      const userDepartmentId = (user as any).departmentId || null;
+      req.user = { ...req.user, role: user.role, department: userDepartment, departmentId: userDepartmentId } as any;
       next();
     } catch (error) {
       log.error('Authorization error', { error: error instanceof Error ? error.message : String(error) });
@@ -49,6 +60,14 @@ export const requireDepartmentAccess = () => {
     try {
       const user = await prisma.user.findUnique({
         where: { email: req.user.email },
+        include: {
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       });
 
       if (!user) {

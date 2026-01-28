@@ -10,6 +10,7 @@ type SeedScope = 'system' | 'reference' | 'full' | 'none';
 interface SeedData {
   classifications?: Record<string, unknown>[];
   assetCategories?: Record<string, unknown>[];
+  departments?: Record<string, unknown>[];
   assets?: Record<string, unknown>[];
   risks?: Record<string, unknown>[];
   controls?: Record<string, unknown>[];
@@ -39,6 +40,7 @@ function loadSeedData(scope: SeedScope): SeedData {
   const referenceFiles = [
     'classifications.json',
     'asset-categories.json',
+    'departments.json',
     'controls.json',
     'legislation.json',
     'interested-parties.json',
@@ -56,6 +58,8 @@ function loadSeedData(scope: SeedScope): SeedData {
         data.interestedParties = JSON.parse(content);
       } else if (key === 'classifications') {
         data.classifications = JSON.parse(content);
+      } else if (key === 'departments') {
+        data.departments = JSON.parse(content);
       } else {
         data[key as keyof SeedData] = JSON.parse(content);
       }
@@ -152,6 +156,60 @@ async function seedClassifications(data: Record<string, unknown>[], createOnly: 
     console.log(`✓ Seeded ${created} classifications (${skipped} already existed, skipped)`);
   } else {
     console.log(`✓ Seeded ${created} classifications`);
+  }
+}
+
+/**
+ * Seed Departments
+ */
+async function seedDepartments(data: Record<string, unknown>[], createOnly: boolean = false) {
+  if (!data || data.length === 0) return;
+
+  console.log(`Seeding ${data.length} departments...`);
+  let created = 0;
+  let skipped = 0;
+  
+  for (const item of data) {
+    if (createOnly) {
+      // Only create if missing (system scope - preserve manual changes)
+      const existing = await prisma.department.findUnique({
+        where: { id: item.id },
+      });
+      if (existing) {
+        skipped++;
+        continue;
+      }
+      await prisma.department.create({
+        data: {
+          id: item.id,
+          name: item.name,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    } else {
+      // Upsert (reference/full scope - can update existing)
+      await prisma.department.upsert({
+        where: { id: item.id },
+        update: {
+          name: item.name,
+          updatedAt: new Date(),
+        },
+        create: {
+          id: item.id,
+          name: item.name,
+          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date(),
+        },
+      });
+      created++;
+    }
+  }
+  if (createOnly && skipped > 0) {
+    console.log(`✓ Seeded ${created} departments (${skipped} already existed, skipped)`);
+  } else {
+    console.log(`✓ Seeded ${created} departments`);
   }
 }
 
@@ -850,6 +908,9 @@ async function main() {
     // Seed classifications first (needed by assets)
     if (seedData.classifications) {
       await seedClassifications(seedData.classifications, createOnly);
+    }
+    if (seedData.departments) {
+      await seedDepartments(seedData.departments, createOnly);
     }
     if (seedData.assetCategories) {
       await seedAssetCategories(seedData.assetCategories, createOnly);

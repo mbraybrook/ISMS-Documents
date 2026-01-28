@@ -198,6 +198,14 @@ describe('Auth API', () => {
       // Assert
       expect(prisma.user.findFirst).toHaveBeenCalledWith({
         where: { entraObjectId: 'test-oid' },
+        include: {
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       });
       expect(response.body.id).toBe('550e8400-e29b-41d4-a716-446655440003');
     });

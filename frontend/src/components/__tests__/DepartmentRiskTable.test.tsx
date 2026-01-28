@@ -176,6 +176,11 @@ describe('DepartmentRiskTable', () => {
     },
   ];
 
+  const mockDepartments = [
+    { id: 'hr-id', name: 'HR' },
+    { id: 'finance-id', name: 'FINANCE' },
+  ];
+
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
@@ -185,16 +190,21 @@ describe('DepartmentRiskTable', () => {
       getUserDepartment: mockGetUserDepartment,
       roleOverride: null,
     });
-    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: {
-        data: mockRisks,
-        pagination: {
-          page: 1,
-          limit: 20,
-          total: 2,
-          totalPages: 1,
+    (api.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url === '/api/departments') {
+        return Promise.resolve({ data: mockDepartments });
+      }
+      return Promise.resolve({
+        data: {
+          data: mockRisks,
+          pagination: {
+            page: 1,
+            limit: 20,
+            total: 2,
+            totalPages: 1,
+          },
         },
-      },
+      });
     });
   });
 
@@ -382,23 +392,23 @@ describe('DepartmentRiskTable', () => {
         expect(screen.getByText('Test Risk 1')).toBeInTheDocument();
       });
 
-      // Act - Find department filter (select element)
+      // Act - Find department filter (options use dept.id as value, dept.name as label)
       const selects = screen.getAllByRole('combobox');
       const departmentSelect = Array.from(selects).find((select) => {
         const options = Array.from(select.querySelectorAll('option'));
-        return options.some((opt) => opt.textContent?.includes('Department') || opt.value === 'HR');
+        return options.some((opt) => opt.value === 'hr-id' || opt.textContent?.includes('Department'));
       }) as HTMLSelectElement;
 
       if (departmentSelect) {
         const user = userEvent.setup();
-        await user.selectOptions(departmentSelect, 'HR');
+        await user.selectOptions(departmentSelect, 'hr-id');
       }
 
-      // Assert
+      // Assert - component sends department filter value (dept.id)
       await waitFor(() => {
         const calls = (api.get as ReturnType<typeof vi.fn>).mock.calls;
         const lastCall = calls[calls.length - 1];
-        expect(lastCall[1].params.department).toBe('HR');
+        expect(lastCall[1].params.department).toBe('hr-id');
         expect(lastCall[1].params.page).toBe(1);
       }, { timeout: 3000 });
     });
@@ -820,16 +830,16 @@ describe('DepartmentRiskTable', () => {
         }));
       });
       
-      // Clear the department filter by selecting "All Departments" option
+      // Clear the department filter by selecting "All Departments" option (value '')
       const selects = screen.getAllByRole('combobox');
       const departmentSelect = Array.from(selects).find((select) => {
         const options = Array.from(select.querySelectorAll('option'));
         return options.some((opt) => opt.textContent === 'All Departments');
       });
-      
+
       if (departmentSelect) {
         await user.selectOptions(departmentSelect, '');
-        
+
         // Assert - Filter should be cleared and API should be called without department param
         await waitFor(() => {
           const calls = vi.mocked(api.get).mock.calls;
@@ -840,12 +850,10 @@ describe('DepartmentRiskTable', () => {
             }),
           }));
         });
-        
-        // Verify filter stays cleared (not re-set by useEffect) - make another API call
-        // by triggering a re-render or filter change
+
+        // Verify filter stays cleared (not re-set by useEffect)
         await waitFor(() => {
           const calls = vi.mocked(api.get).mock.calls;
-          // Check that the last call doesn't have department param
           const lastCall = calls[calls.length - 1];
           expect(lastCall[1].params.department).toBeUndefined();
         });
@@ -857,7 +865,7 @@ describe('DepartmentRiskTable', () => {
     it('should clear department filter completely when clear filters is clicked', async () => {
       // Arrange
       localStorageMock.getItem.mockReturnValue('OPERATIONS');
-      mockGetUserDepartment.mockReturnValue('FINANCE'); // User's actual department
+      mockGetUserDepartment.mockReturnValue('FINANCE');
       mockUseAuth.mockReturnValue({
         user: mockUser,
         getUserDepartment: mockGetUserDepartment,
@@ -870,20 +878,20 @@ describe('DepartmentRiskTable', () => {
         expect(api.get).toHaveBeenCalled();
       });
 
-      // Act - Set a department filter first, then clear it
+      // Act - Set a department filter first (use dept id), then clear via Clear All
       const user = userEvent.setup();
       const selects = screen.getAllByRole('combobox');
       const departmentSelect = Array.from(selects).find((select) => {
         const options = Array.from(select.querySelectorAll('option'));
-        return options.some((opt) => opt.textContent?.includes('Department'));
+        return options.some((opt) => opt.value === 'hr-id');
       });
 
       if (departmentSelect) {
-        await user.selectOptions(departmentSelect, 'HR');
+        await user.selectOptions(departmentSelect, 'hr-id');
         await waitFor(() => {
           const calls = (api.get as ReturnType<typeof vi.fn>).mock.calls;
           const lastCall = calls[calls.length - 1];
-          expect(lastCall[1].params.department).toBe('HR');
+          expect(lastCall[1].params.department).toBe('hr-id');
         });
       }
 
@@ -918,28 +926,22 @@ describe('DepartmentRiskTable', () => {
         }));
       });
 
-      // Clear department filter first (so useEffect can set it when department changes)
+      // Select a department (use dept id; filter options use value: dept.id)
       const user = userEvent.setup();
       const selects = screen.getAllByRole('combobox');
       const departmentSelect = Array.from(selects).find((select) => {
         const options = Array.from(select.querySelectorAll('option'));
-        return options.some((opt) => opt.textContent?.includes('Department'));
+        return options.some((opt) => opt.value === 'hr-id');
       }) as HTMLSelectElement;
 
       if (departmentSelect) {
-        // Select a different department first, then we'll change the mock
-        await user.selectOptions(departmentSelect, 'HR');
+        await user.selectOptions(departmentSelect, 'hr-id');
         await waitFor(() => {
           const calls = (api.get as ReturnType<typeof vi.fn>).mock.calls;
           const lastCall = calls[calls.length - 1];
-          expect(lastCall[1].params.department).toBe('HR');
+          expect(lastCall[1].params.department).toBe('hr-id');
         }, { timeout: 2000 });
       }
-
-      // Note: The useEffect only sets department if it's empty, so this test
-      // verifies that when department is manually set, it works correctly.
-      // The actual useEffect behavior (auto-updating when effectiveDepartment changes)
-      // is tested implicitly through the initial render.
     });
   });
 
@@ -1016,10 +1018,12 @@ describe('DepartmentRiskTable', () => {
       // Arrange & Act
       render(<DepartmentRiskTable />);
 
-      // Assert
+      // Assert - getDepartmentDisplayName returns string as-is. Find badges in table cells (not filter dropdown)
       await waitFor(() => {
-        expect(screen.getByText('Finance')).toBeInTheDocument();
-        expect(screen.getByText('HR')).toBeInTheDocument();
+        const financeBadge = screen.getAllByText('FINANCE').find((el) => el.closest('td') !== null);
+        const hrBadge = screen.getAllByText('HR').find((el) => el.closest('td') !== null);
+        expect(financeBadge).toBeInTheDocument();
+        expect(hrBadge).toBeInTheDocument();
       });
     });
 

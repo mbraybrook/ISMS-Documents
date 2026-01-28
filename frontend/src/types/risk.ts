@@ -1,20 +1,12 @@
 // Type definitions
 export type RiskStatus = 'DRAFT' | 'PROPOSED' | 'ACTIVE' | 'REJECTED' | 'ARCHIVED';
-export type Department = 'BUSINESS_STRATEGY' | 'FINANCE' | 'HR' | 'OPERATIONS' | 'PRODUCT' | 'MARKETING';
 
-// Helper to get display name for department
-export function getDepartmentDisplayName(dept: Department | null | undefined): string {
-  if (!dept) return 'Not assigned';
-  const displayNames: Record<Department, string> = {
-    BUSINESS_STRATEGY: 'Business Strategy',
-    FINANCE: 'Finance',
-    HR: 'HR',
-    OPERATIONS: 'Operations',
-    PRODUCT: 'Product',
-    MARKETING: 'Marketing',
-  };
-  return displayNames[dept] || dept;
-}
+// Legacy Department type - kept for backward compatibility
+// New code should use the Department interface from types/department.ts
+export type Department = string;
+
+// Re-export helper function from department types
+export { getDepartmentDisplayName } from './department';
 
 // Risk interface matching the backend model
 export interface Risk {
@@ -40,7 +32,9 @@ export interface Risk {
   acceptanceRationale?: string | null;
   appetiteThreshold?: number | null;
   reviewCadenceDays?: number | null;
-  department: string | null;
+  department: string | null; // Legacy: department name as string
+  departmentId?: string | null; // New: department ID reference
+  departmentObj?: { id: string; name: string } | null; // New: full department object
   status: RiskStatus;
   wizardData: string | null;
   rejectionReason: string | null;

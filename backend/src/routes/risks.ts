@@ -64,8 +64,9 @@ router.get(
     query('assetCategoryId').optional().isUUID(),
     query('view').optional().isIn(['department', 'inbox']),
     query('status').optional().isIn(['DRAFT', 'PROPOSED', 'ACTIVE', 'REJECTED', 'ARCHIVED']),
-    query('department').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING']),
-    query('testDepartment').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING']),
+    query('department').optional().isString(), // Can be department name (legacy) or departmentId (new)
+    query('departmentId').optional().isUUID(), // New format: department ID
+    query('testDepartment').optional().isString(), // Can be department name (legacy) or departmentId (new)
     query('likelihood').optional().isInt({ min: 1, max: 5 }),
     query('impact').optional().isInt({ min: 1, max: 5 }),
   ],
@@ -82,7 +83,9 @@ router.get(
       }
 
       const userRole = user.role as string;
-      const _userDepartment = user.department;
+      // Support both departmentId (new) and department (legacy string)
+      const _userDepartmentId = (user as any).departmentId || null;
+      const _userDepartment = (user as any).department?.name || (user as any).department || null;
 
       const {
         page = '1',
@@ -105,6 +108,7 @@ router.get(
         view,
         status,
         department,
+        departmentId,
         testDepartment,
         policyNonConformance,
         controlsApplied,
@@ -130,8 +134,20 @@ router.get(
       if (userRole === 'STAFF') {
         // Staff: Can see all risks (no department filter), cannot see archived risks by default
         // Only apply department filter if explicitly requested
-        if (department) {
-          where.department = department;
+        // Support both departmentId (new) and department name (legacy - convert to ID)
+        if (departmentId) {
+          where.departmentId = departmentId;
+        } else if (department) {
+          // Legacy: filter by department name - need to look up the department ID
+          const dept = await prisma.department.findUnique({
+            where: { name: String(department) },
+          });
+          if (dept) {
+            where.departmentId = dept.id;
+          } else {
+            // Department not found - return empty results
+            where.departmentId = '00000000-0000-0000-0000-000000000000'; // Non-existent ID
+          }
         }
         // Staff cannot see archived risks by default
         if (archived === 'all') {
@@ -146,18 +162,53 @@ router.get(
         // Contributors: Can see all risks (no department restriction), cannot see archived risks
         // Only apply department filter if explicitly requested
         // For testing: use testDepartment when isTestingAsContributor is true
+        // Support both departmentId (new) and department name (legacy - convert to ID)
         if (isTestingAsContributor && testDepartment) {
-          where.department = testDepartment;
+          // Try as UUID first (new format), fall back to name lookup (legacy)
+          const testDeptStr = String(testDepartment);
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(testDeptStr)) {
+            where.departmentId = testDeptStr;
+          } else {
+            const dept = await prisma.department.findUnique({
+              where: { name: testDeptStr },
+            });
+            if (dept) {
+              where.departmentId = dept.id;
+            } else {
+              where.departmentId = '00000000-0000-0000-0000-000000000000'; // Non-existent ID
+            }
+          }
+        } else if (departmentId) {
+          where.departmentId = departmentId;
         } else if (department) {
-          where.department = department;
+          // Legacy: filter by department name - convert to ID
+          const dept = await prisma.department.findUnique({
+            where: { name: String(department) },
+          });
+          if (dept) {
+            where.departmentId = dept.id;
+          } else {
+            where.departmentId = '00000000-0000-0000-0000-000000000000'; // Non-existent ID
+          }
         }
         // Contributors cannot see archived risks
         where.archived = false;
       } else {
         // Editors/Admins: Global visibility - no department filter by default
         // Only apply department filter if explicitly requested
-        if (department) {
-          where.department = department;
+        // Support both departmentId (new) and department name (legacy - convert to ID)
+        if (departmentId) {
+          where.departmentId = departmentId;
+        } else if (department) {
+          // Legacy: filter by department name - convert to ID
+          const dept = await prisma.department.findUnique({
+            where: { name: String(department) },
+          });
+          if (dept) {
+            where.departmentId = dept.id;
+          } else {
+            where.departmentId = '00000000-0000-0000-0000-000000000000'; // Non-existent ID
+          }
         }
         // Handle archived filter: 'true' = archived only, 'false' = active only, 'all' = both
         if (archived === 'all') {
@@ -689,9 +740,17 @@ router.post(
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
-      // Get user from database
+      // Get user from database with department relation
       const user = await prisma.user.findUnique({
         where: { email: req.user!.email },
+        include: {
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       });
 
       if (!user) {
@@ -699,7 +758,9 @@ router.post(
       }
 
       const userRole = user.role as string;
-      const userDepartment = user.department;
+      // Support both departmentId (new) and department (legacy string)
+      const userDepartmentId = (user as any).departmentId || null;
+      const userDepartment = (user as any).department?.name || (user as any).department || null;
 
       // Staff cannot create risks
       if (userRole === 'STAFF') {
@@ -747,6 +808,7 @@ router.post(
         wizardData,
         status,
         department,
+        departmentId,
         isSupplierRisk,
       } = req.body;
 
@@ -756,7 +818,19 @@ router.post(
       let finalAvailabilityScore = availabilityScore ?? 1;
       let finalLikelihood = likelihood ?? 1;
       let finalStatus = status || 'DRAFT';
-      let finalDepartment = department;
+      // Support both departmentId (new) and department name (legacy - convert to ID)
+      // Prefer departmentId if provided, fall back to department name lookup for backward compatibility
+      let finalDepartmentId = departmentId || null;
+      // If department name is provided instead of ID, look it up
+      if (!finalDepartmentId && department) {
+        const dept = await prisma.department.findUnique({
+          where: { name: department },
+        });
+        if (dept) {
+          finalDepartmentId = dept.id;
+        }
+        // If department not found, finalDepartmentId remains null
+      }
       const finalWizardData = wizardData;
 
       if (wizardData) {
@@ -790,15 +864,40 @@ router.post(
           select: { role: true },
         });
         
-        if (actualUser?.role === 'ADMIN' && department) {
+        if (actualUser?.role === 'ADMIN' && (department || departmentId)) {
           // ADMIN testing as CONTRIBUTOR - use department from request (test override)
-          finalDepartment = department;
+          if (departmentId) {
+            finalDepartmentId = departmentId;
+          } else if (department) {
+            // Convert department name to ID
+            const dept = await prisma.department.findUnique({
+              where: { name: department },
+            });
+            if (dept) {
+              finalDepartmentId = dept.id;
+            } else {
+              return res.status(400).json({ error: `Department "${department}" not found` });
+            }
+          }
         } else {
           // Real CONTRIBUTOR - use department from database
-          if (!userDepartment) {
+          // Support both departmentId (new) and department name (legacy)
+          if (!userDepartmentId && !userDepartment) {
             return res.status(403).json({ error: 'Contributors must have a department assigned' });
           }
-          finalDepartment = userDepartment;
+          // Prefer departmentId if available, otherwise use department name (will be converted to ID)
+          finalDepartmentId = userDepartmentId || null;
+          // If we only have department name, look it up
+          if (!finalDepartmentId && userDepartment) {
+            const dept = await prisma.department.findUnique({
+              where: { name: userDepartment },
+            });
+            if (dept) {
+              finalDepartmentId = dept.id;
+            } else {
+              return res.status(403).json({ error: `Contributor's department "${userDepartment}" not found` });
+            }
+          }
         }
         
         // Contributors can only create DRAFT or PROPOSED risks
@@ -873,7 +972,7 @@ router.post(
         acceptedAt: acceptedAt ? new Date(acceptedAt) : null,
         acceptanceRationale,
         appetiteThreshold: appetiteThreshold ?? null,
-          department: finalDepartment,
+          departmentId: finalDepartmentId,
           status: finalStatus,
           wizardData: finalWizardData,
           assetCategory, // Keep for backward compatibility
@@ -1023,9 +1122,17 @@ router.put(
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
-      // Get user from database
+      // Get user from database with department relation
       const user = await prisma.user.findUnique({
         where: { email: req.user!.email },
+        include: {
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       });
 
       if (!user) {
@@ -1033,7 +1140,9 @@ router.put(
       }
 
       const userRole = user.role as string;
-      const userDepartment = user.department;
+      // Support both departmentId (new) and department (legacy string)
+      const userDepartmentId = (user as any).departmentId || null;
+      const userDepartment = (user as any).department?.name || (user as any).department || null;
 
       // Staff cannot edit risks
       if (userRole === 'STAFF') {
@@ -1052,6 +1161,8 @@ router.put(
       // Check if this is a test scenario: ADMIN user testing as CONTRIBUTOR
       // Check if testDepartment query parameter is provided (sent from frontend when testing)
       const testDepartment = req.query.testDepartment as string | undefined;
+      // Support both departmentId (new) and department (legacy string)
+      const riskDepartmentId = (existing as any).departmentId || null;
       const riskDepartment = (existing as any).department || null;
       
       // Determine if we're in test mode: ADMIN with testDepartment provided
@@ -1067,10 +1178,12 @@ router.put(
         } else if (userRole === 'CONTRIBUTOR') {
           // Real CONTRIBUTOR - use database department
           // Check if Contributor has a department assigned
-          if (!userDepartment) {
+          // Support both departmentId (new) and department name (legacy)
+          if (!userDepartmentId && !userDepartment) {
             return res.status(403).json({ error: 'Contributors must have a department assigned' });
           }
-          effectiveDepartment = userDepartment;
+          // Prefer departmentId if available, otherwise use department name
+          effectiveDepartment = userDepartmentId || userDepartment;
         }
         
         // Contributors can only edit risks from their department
@@ -1090,15 +1203,42 @@ router.put(
         }
 
         // Contributors cannot change the department of a risk
-        if (updateData.department !== undefined && updateData.department !== riskDepartment) {
+        // Check both departmentId (new) and department (legacy)
+        const attemptedDepartmentId = updateData.departmentId;
+        const attemptedDepartment = updateData.department;
+        const currentDepartmentId = riskDepartmentId;
+        const currentDepartment = riskDepartment;
+        
+        if ((attemptedDepartmentId !== undefined && attemptedDepartmentId !== currentDepartmentId) ||
+            (attemptedDepartment !== undefined && attemptedDepartment !== currentDepartment)) {
           return res.status(403).json({ 
             error: 'Contributors cannot change the department of a risk',
-            details: { currentDepartment: riskDepartment, attemptedDepartment: updateData.department }
+            details: { 
+              currentDepartmentId, 
+              attemptedDepartmentId,
+              currentDepartment,
+              attemptedDepartment
+            }
           });
         }
 
         // Ensure department remains unchanged for Contributors (use effective department for testing)
-        updateData.department = effectiveDepartment;
+        // Support both formats - prefer departmentId if available
+        if (effectiveDepartment) {
+          // Check if effectiveDepartment is a UUID (new format) or string (legacy - convert to ID)
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(effectiveDepartment)) {
+            updateData.departmentId = effectiveDepartment;
+          } else {
+            // Legacy: department name - convert to departmentId
+            const dept = await prisma.department.findUnique({
+              where: { name: effectiveDepartment },
+            });
+            if (dept) {
+              updateData.departmentId = dept.id;
+            }
+            // If department not found, don't set anything (will keep existing)
+          }
+        }
       }
 
       // Determine riskNature (use updated value if provided, otherwise existing)
@@ -1243,6 +1383,16 @@ router.put(
         delete updateData.interestedPartyId;
       }
 
+      // Transform departmentId to Prisma relation syntax if needed
+      if (updateData.departmentId !== undefined) {
+        if (updateData.departmentId === null || updateData.departmentId === '') {
+          updateData.department = { disconnect: true };
+        } else {
+          updateData.department = { connect: { id: updateData.departmentId } };
+        }
+        delete updateData.departmentId;
+      }
+
       // Handle assetIds separately - need to update RiskAsset junction table
       const assetIdsToUpdate = updateData.assetIds;
       delete updateData.assetIds;
@@ -1360,9 +1510,17 @@ router.patch(
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
-      // Get user from database
+      // Get user from database with department relation
       const user = await prisma.user.findUnique({
         where: { email: req.user!.email },
+        include: {
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       });
 
       if (!user) {

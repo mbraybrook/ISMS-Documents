@@ -209,6 +209,11 @@ export function Layout({ children }: LayoutProps) {
                   User Management
                 </MenuItem>
               )}
+              {effectiveRole === 'ADMIN' && (
+                <MenuItem as={RouterLink} to="/admin/departments" onClick={isMobile ? onClose : undefined}>
+                  Departments
+                </MenuItem>
+              )}
             </MenuList>
           </Menu>
         </>

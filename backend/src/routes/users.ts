@@ -44,7 +44,13 @@ router.get(
           displayName: true,
           email: true,
           role: true,
-          department: true,
+          departmentId: true,
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
         orderBy: {
           displayName: 'asc',
@@ -67,13 +73,20 @@ router.put(
   [
     param('id').isUUID(),
     body('role').optional().isIn(['ADMIN', 'EDITOR', 'STAFF', 'CONTRIBUTOR']),
-    body('department').optional().isIn(['BUSINESS_STRATEGY', 'FINANCE', 'HR', 'OPERATIONS', 'PRODUCT', 'MARKETING', null]),
+    body('departmentId')
+      .optional()
+      .custom((v) => v === null || v === undefined || (typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)))
+      .withMessage('departmentId must be a valid UUID or null'),
+    body('department')
+      .optional()
+      .custom((v) => v === null || v === undefined || typeof v === 'string')
+      .withMessage('department must be a string or null'),
   ],
   validate,
   async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
-      const { role, department } = req.body;
+      const { role, department, departmentId } = req.body;
 
       // Check if user exists
       const existingUser = await prisma.user.findUnique({
@@ -93,9 +106,25 @@ router.put(
         updateData.role = role;
       }
 
-      if (department !== undefined) {
-        // Allow null to clear department
-        updateData.department = department === null ? null : department;
+      // Support both departmentId (new) and department (legacy)
+      if (departmentId !== undefined) {
+        // New format: departmentId (UUID)
+        updateData.departmentId = departmentId === null ? null : departmentId;
+      } else if (department !== undefined) {
+        // Legacy format: department name string - need to find the department ID
+        if (department === null) {
+          updateData.departmentId = null;
+        } else {
+          // Find department by name
+          const dept = await prisma.department.findUnique({
+            where: { name: department },
+          });
+          if (dept) {
+            updateData.departmentId = dept.id;
+          } else {
+            return res.status(400).json({ error: `Department "${department}" not found` });
+          }
+        }
       }
 
       // Update user
@@ -107,7 +136,13 @@ router.put(
           displayName: true,
           email: true,
           role: true,
-          department: true,
+          departmentId: true,
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           createdAt: true,
           updatedAt: true,
         },

@@ -29,6 +29,9 @@ jest.mock('../../lib/prisma', () => ({
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    department: {
+      findUnique: jest.fn(),
+    },
   },
 }));
 
@@ -57,23 +60,25 @@ describe('Users API', () => {
   describe('GET /api/users', () => {
     it('should return list of users', async () => {
       // Arrange
-      const mockUsers = [
+      const mockUsersData = [
         {
           id: 'user-1',
           displayName: 'User One',
           email: 'user1@paythru.com',
           role: 'ADMIN',
-          department: 'OPERATIONS',
+          departmentId: 'dept-1',
+          department: { id: 'dept-1', name: 'OPERATIONS' },
         },
         {
           id: 'user-2',
           displayName: 'User Two',
           email: 'user2@paythru.com',
           role: 'STAFF',
-          department: 'FINANCE',
+          departmentId: 'dept-2',
+          department: { id: 'dept-2', name: 'FINANCE' },
         },
       ];
-      (prisma.user.findMany as jest.Mock).mockResolvedValue(mockUsers);
+      (prisma.user.findMany as jest.Mock).mockResolvedValue(mockUsersData);
 
       // Act
       const response = await request(app)
@@ -81,7 +86,7 @@ describe('Users API', () => {
         .expect(200);
 
       // Assert
-      expect(response.body).toEqual({ data: mockUsers });
+      expect(response.body).toEqual({ data: mockUsersData });
       expect(prisma.user.findMany).toHaveBeenCalledWith({
         where: {},
         select: {
@@ -89,7 +94,13 @@ describe('Users API', () => {
           displayName: true,
           email: true,
           role: true,
-          department: true,
+          departmentId: true,
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
         orderBy: {
           displayName: 'asc',
@@ -273,18 +284,25 @@ describe('Users API', () => {
 
     it('should update user department', async () => {
       // Arrange
+      const financeDeptId = '22222222-2222-2222-2222-222222222222';
       const existingUser = {
         id: '550e8400-e29b-41d4-a716-446655440000',
         displayName: 'Test User',
         email: 'test@paythru.com',
         role: 'STAFF',
+        departmentId: null,
         department: null,
       };
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(existingUser);
+      (prisma.department.findUnique as jest.Mock).mockResolvedValue({
+        id: financeDeptId,
+        name: 'FINANCE',
+      });
 
       const updatedUser = {
         ...existingUser,
-        department: 'FINANCE',
+        departmentId: financeDeptId,
+        department: { id: financeDeptId, name: 'FINANCE' },
         createdAt: new Date('2024-01-01'),
         updatedAt: new Date('2024-01-02'),
       };
@@ -297,11 +315,14 @@ describe('Users API', () => {
         .expect(200);
 
       // Assert
-      expect(response.body.department).toBe('FINANCE');
+      expect(response.body.department?.name).toBe('FINANCE');
+      expect(prisma.department.findUnique).toHaveBeenCalledWith({
+        where: { name: 'FINANCE' },
+      });
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: '550e8400-e29b-41d4-a716-446655440000' },
         data: expect.objectContaining({
-          department: 'FINANCE',
+          departmentId: financeDeptId,
         }),
         select: expect.any(Object),
       });
@@ -314,12 +335,14 @@ describe('Users API', () => {
         displayName: 'Test User',
         email: 'test@paythru.com',
         role: 'STAFF',
-        department: 'OPERATIONS',
+        departmentId: 'dept-ops-id',
+        department: { id: 'dept-ops-id', name: 'OPERATIONS' },
       };
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(existingUser);
 
       const updatedUser = {
         ...existingUser,
+        departmentId: null,
         department: null,
         createdAt: new Date('2024-01-01'),
         updatedAt: new Date('2024-01-02'),
@@ -337,7 +360,7 @@ describe('Users API', () => {
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: '550e8400-e29b-41d4-a716-446655440000' },
         data: expect.objectContaining({
-          department: null,
+          departmentId: null,
         }),
         select: expect.any(Object),
       });
@@ -345,19 +368,26 @@ describe('Users API', () => {
 
     it('should update both role and department', async () => {
       // Arrange
+      const hrDeptId = '33333333-3333-3333-3333-333333333333';
       const existingUser = {
         id: '550e8400-e29b-41d4-a716-446655440000',
         displayName: 'Test User',
         email: 'test@paythru.com',
         role: 'STAFF',
+        departmentId: null,
         department: null,
       };
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(existingUser);
+      (prisma.department.findUnique as jest.Mock).mockResolvedValue({
+        id: hrDeptId,
+        name: 'HR',
+      });
 
       const updatedUser = {
         ...existingUser,
         role: 'EDITOR',
-        department: 'HR',
+        departmentId: hrDeptId,
+        department: { id: hrDeptId, name: 'HR' },
         createdAt: new Date('2024-01-01'),
         updatedAt: new Date('2024-01-02'),
       };
@@ -371,7 +401,7 @@ describe('Users API', () => {
 
       // Assert
       expect(response.body.role).toBe('EDITOR');
-      expect(response.body.department).toBe('HR');
+      expect(response.body.department?.name).toBe('HR');
     });
 
     it('should require ADMIN role', async () => {
@@ -455,6 +485,17 @@ describe('Users API', () => {
     });
 
     it('should return 400 for invalid department', async () => {
+      // Arrange - user exists, department name not found
+      const existingUser = {
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        displayName: 'Test User',
+        email: 'test@paythru.com',
+        role: 'STAFF',
+        departmentId: null,
+      };
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(existingUser);
+      (prisma.department.findUnique as jest.Mock).mockResolvedValue(null);
+
       // Act
       const response = await request(app)
         .put('/api/users/550e8400-e29b-41d4-a716-446655440000')
@@ -462,12 +503,7 @@ describe('Users API', () => {
 
       // Assert - should return 400 for invalid department
       expect(response.status).toBe(400);
-      if (response.body.errors && Array.isArray(response.body.errors)) {
-        const deptError = response.body.errors.find((err: any) => err.param === 'department');
-        if (deptError) {
-          expect(deptError).toBeDefined();
-        }
-      }
+      expect(response.body).toEqual({ error: 'Department "INVALID" not found' });
     });
 
     it('should handle database errors gracefully', async () => {

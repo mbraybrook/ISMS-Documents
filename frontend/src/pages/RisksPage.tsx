@@ -156,6 +156,7 @@ export function RisksPage() {
   const [viewName, setViewName] = useState('');
   const cancelRef = useRef(null);
   const viewRiskProcessedRef = useRef<string | null>(null);
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
 
   // Initialize filters from URL params on mount
   const getInitialFilters = () => {
@@ -310,7 +311,15 @@ export function RisksPage() {
       if (filters.dateAddedFrom) params.append('dateAddedFrom', filters.dateAddedFrom);
       if (filters.dateAddedTo) params.append('dateAddedTo', filters.dateAddedTo);
       if (filters.status) params.append('status', filters.status);
-      if (filters.department) params.append('department', filters.department);
+      // Support both departmentId (new UUID format) and department (legacy string format)
+      if (filters.department) {
+        // Check if it's a UUID (new format) or string (legacy)
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.department)) {
+          params.append('departmentId', filters.department);
+        } else {
+          params.append('department', filters.department);
+        }
+      }
       if (filters.assetCategoryId) params.append('assetCategoryId', filters.assetCategoryId);
       if (filters.sortBy) params.append('sortBy', filters.sortBy);
       if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
@@ -434,6 +443,21 @@ export function RisksPage() {
     // Clear selections when filters change
     setSelectedRiskIds(new Set());
   }, [fetchRisks]);
+
+  // Fetch departments from API
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const response = await api.get('/api/departments');
+      setDepartments(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      setDepartments([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDepartments();
+  }, [fetchDepartments]);
 
   // Handle view/edit query parameters - open risk in view or edit mode
   useEffect(() => {
@@ -1198,7 +1222,7 @@ export function RisksPage() {
     return cols;
   }, [visibleColumns, user]);
 
-  const filterConfigs: FilterConfig[] = [
+  const filterConfigs: FilterConfig[] = useMemo(() => [
     {
       key: 'search',
       type: 'search',
@@ -1285,16 +1309,9 @@ export function RisksPage() {
       key: 'department',
       type: 'select',
       placeholder: 'Department',
-      options: [
-        { value: 'BUSINESS_STRATEGY', label: 'Business Strategy' },
-        { value: 'FINANCE', label: 'Finance' },
-        { value: 'HR', label: 'HR' },
-        { value: 'OPERATIONS', label: 'Operations' },
-        { value: 'PRODUCT', label: 'Product' },
-        { value: 'MARKETING', label: 'Marketing' },
-      ],
+      options: departments.map(dept => ({ value: dept.id, label: dept.name })),
     },
-  ];
+  ], [departments]);
 
   // Actions moved to RiskFormModal
   // const actions: ActionButton<Risk>[] = ...

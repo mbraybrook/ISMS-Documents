@@ -257,7 +257,8 @@ model Risk {
   acceptanceRationale           String?
   appetiteThreshold             Int?
   reviewCadenceDays             Int?
-  department                    String?
+  departmentId                  String?
+  department                    Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   status                        String            @default("DRAFT")
   wizardData                    String?
   rejectionReason               String?
@@ -319,7 +320,7 @@ model Risk {
   @@index([riskNature])
   @@index([riskCategory])
   @@index([calculatedScore])
-  @@index([department])
+  @@index([departmentId])
   @@index([status])
 }
 
@@ -401,13 +402,25 @@ model SoAExport {
   @@index([generatedByUserId])
 }
 
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+  risks     Risk[]
+
+  @@index([name])
+}
+
 model User {
   id             String           @id
   displayName    String
   email          String           @unique
   entraObjectId  String           @unique
   role           String           @default("STAFF")
-  department     String?
+  departmentId   String?
+  department     Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime
   Acknowledgment Acknowledgment[]
@@ -424,7 +437,7 @@ model User {
 
   @@index([entraObjectId])
   @@index([email])
-  @@index([department])
+  @@index([departmentId])
 }
 
 model EntraIdConfig {

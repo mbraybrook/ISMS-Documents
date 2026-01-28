@@ -134,7 +134,7 @@ describe('RiskApprovalModal', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Department:/)).toBeInTheDocument();
-        expect(screen.getByText(/Finance/)).toBeInTheDocument();
+        expect(screen.getByText(/FINANCE/)).toBeInTheDocument();
         expect(screen.getByText(/Submitted By:/)).toBeInTheDocument();
         expect(screen.getByText(/John Doe/)).toBeInTheDocument();
       });

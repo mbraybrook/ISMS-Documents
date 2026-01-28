@@ -108,14 +108,7 @@ const RISK_NATURES = ['STATIC', 'INSTANCE'];
 
 const TREATMENT_CATEGORIES = ['RETAIN', 'MODIFY', 'SHARE', 'AVOID'];
 
-const DEPARTMENTS: { value: Department; label: string }[] = [
-  { value: 'BUSINESS_STRATEGY', label: 'Business Strategy' },
-  { value: 'FINANCE', label: 'Finance' },
-  { value: 'HR', label: 'HR' },
-  { value: 'OPERATIONS', label: 'Operations' },
-  { value: 'PRODUCT', label: 'Product' },
-  { value: 'MARKETING', label: 'Marketing' },
-];
+// DEPARTMENTS will be fetched from API - see fetchDepartments function
 
 export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, viewMode = false, onDuplicate, onDelete, onEdit }: RiskFormModalProps) {
   const { getEffectiveRole } = useAuth();
@@ -126,6 +119,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
   const [filteredAssets, setFilteredAssets] = useState<any[]>([]);
   const [assetCategories, setAssetCategories] = useState<any[]>([]);
   const [interestedParties, setInterestedParties] = useState<Array<{ id: string; name: string; group: string | null }>>([]);
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedControlIds, setSelectedControlIds] = useState<string[]>([]);
   const [controlSearchTerm, setControlSearchTerm] = useState('');
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(-1);
@@ -514,6 +508,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       fetchControls();
       fetchAssetCategories();
       fetchInterestedParties();
+      fetchDepartments();
       // Don't fetch assets upfront - only when user searches
       setAssets([]);
       setFilteredAssets([]);
@@ -571,7 +566,7 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
           existingControlsDescription: risk.existingControlsDescription || '',
           residualRiskTreatmentCategory: risk.residualRiskTreatmentCategory || '',
           isSupplierRisk: risk.isSupplierRisk || false,
-          department: risk.department || null,
+          department: risk.departmentId || risk.department || null, // Support both old (string) and new (ID) format
         };
         setFormData(initialData);
         // Load existing control associations
@@ -857,6 +852,18 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const response = await api.get('/api/departments');
+      // Ensure response.data is always an array
+      setDepartments(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      // Set empty array on error to prevent map errors
+      setDepartments([]);
+    }
+  };
+
   const getSuggestedControls = async () => {
     if (!formData.title && !formData.description && !formData.threatDescription) {
       toast({
@@ -975,7 +982,16 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
       if (payload.mitigationDescription === '') payload.mitigationDescription = undefined;
       if (payload.existingControlsDescription === '') payload.existingControlsDescription = undefined;
       if (payload.residualRiskTreatmentCategory === '') payload.residualRiskTreatmentCategory = undefined;
-      if (payload.department === '' || payload.department === null) payload.department = null;
+      // Convert department to departmentId for API (support both old string and new ID format)
+      if (payload.department === '' || payload.department === null) {
+        payload.departmentId = null;
+        delete payload.department;
+      } else {
+        // If it's already an ID (UUID format), use it as departmentId
+        // Otherwise, it's the old string format - backend will handle migration
+        payload.departmentId = payload.department;
+        delete payload.department;
+      }
 
       // Remove null values for optional fields
       if (payload.mitigatedConfidentialityScore === null) payload.mitigatedConfidentialityScore = undefined;
@@ -1304,14 +1320,14 @@ export function RiskFormModal({ isOpen, onClose, risk, isDuplicateMode = false, 
                         <FormLabel>Department</FormLabel>
                         <Select
                           value={formData.department || ''}
-                          onChange={(e) => setFormData({ ...formData, department: e.target.value as Department || null })}
+                          onChange={(e) => setFormData({ ...formData, department: e.target.value || null })}
                           placeholder="Select department"
                           isDisabled={viewMode || getEffectiveRole() === 'CONTRIBUTOR'}
                         >
                           <option value="">Not assigned</option>
-                          {DEPARTMENTS.map((dept) => (
-                            <option key={dept.value} value={dept.value}>
-                              {dept.label}
+                          {departments.map((dept) => (
+                            <option key={dept.id} value={dept.id}>
+                              {dept.name}
                             </option>
                           ))}
                         </Select>

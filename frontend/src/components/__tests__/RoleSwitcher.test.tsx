@@ -279,9 +279,9 @@ describe('RoleSwitcher', () => {
       });
 
       // The select should have FINANCE as the selected value
-      // Chakra Select uses the option text for displayValue, so we check for "Finance"
+      // getDepartmentDisplayName returns string as-is, so option text is "FINANCE"
       await waitFor(() => {
-        const select = screen.getByDisplayValue('Finance') as HTMLSelectElement;
+        const select = screen.getByDisplayValue('FINANCE') as HTMLSelectElement;
         expect(select.value).toBe('FINANCE');
       });
     });
